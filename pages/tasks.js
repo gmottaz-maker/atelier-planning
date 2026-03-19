@@ -114,21 +114,26 @@ function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
         opacity: completed ? 0.65 : 1,
       }}
     >
-      <div className="flex items-start gap-3 p-4">
-        {/* Checkbox */}
+      <div className="flex items-center gap-3 p-4">
+        {/* Checkbox — touch target 44px */}
         <button
           onClick={() => onToggle(task)}
-          className="flex-shrink-0 w-6 h-6 mt-0.5 rounded-full border-2 flex items-center justify-center transition-all"
-          style={{
-            borderColor: completed ? '#22c55e' : '#d1d5db',
-            background: completed ? '#22c55e' : 'white',
-          }}
+          className="flex-shrink-0 flex items-center justify-center transition-all"
+          style={{ width: 44, height: 44, margin: -10 }}
         >
-          {completed && (
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          )}
+          <div
+            className="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
+            style={{
+              borderColor: completed ? '#22c55e' : '#d1d5db',
+              background: completed ? '#22c55e' : 'white',
+            }}
+          >
+            {completed && (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </div>
         </button>
 
         {/* Contenu */}
@@ -221,7 +226,7 @@ function TaskForm({ task, projects, currentUser, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-t-3xl px-5 pt-5 pb-8" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="bg-white rounded-t-3xl px-5 pt-5" style={{ maxHeight: '92vh', overflowY: 'auto', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
         {/* Handle */}
         <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
         <div className="flex items-center justify-between mb-4">
@@ -245,7 +250,7 @@ function TaskForm({ task, projects, currentUser, onSave, onClose }) {
           {/* Projet */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Projet lié</label>
-            <select value={form.project_id} onChange={e => set('project_id', e.target.value)} className={inputCls}>
+            <select value={form.project_id} onChange={e => set('project_id', e.target.value)} className={inputCls} style={{ fontSize: 16 }}>
               <option value="">— Aucun projet —</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name} · {p.client}</option>)}
             </select>
@@ -274,12 +279,12 @@ function TaskForm({ task, projects, currentUser, onSave, onClose }) {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Date d'exécution *</label>
               <input type="date" required value={form.execution_date}
-                onChange={e => set('execution_date', e.target.value)} className={inputCls} />
+                onChange={e => set('execution_date', e.target.value)} className={inputCls} style={{ fontSize: 16 }} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Échéance (optionnel)</label>
               <input type="date" value={form.due_date}
-                onChange={e => set('due_date', e.target.value)} className={inputCls} />
+                onChange={e => set('due_date', e.target.value)} className={inputCls} style={{ fontSize: 16 }} />
             </div>
           </div>
 
@@ -287,7 +292,7 @@ function TaskForm({ task, projects, currentUser, onSave, onClose }) {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Note</label>
             <input type="text" value={form.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Détail ou info utile..." className={inputCls} />
+              placeholder="Détail ou info utile..." className={inputCls} style={{ fontSize: 16 }} />
           </div>
 
           {/* Privée */}
@@ -490,11 +495,14 @@ export default function Tasks() {
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
         <title>Tâches — Amazing Lab</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           * { -webkit-tap-highlight-color: transparent; }
+          button, a { touch-action: manipulation; }
           input:focus, select:focus { border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; outline: none; }
+          input, select, textarea { font-size: 16px !important; }
+          body { padding-bottom: env(safe-area-inset-bottom); }
         `}</style>
       </Head>
 
@@ -580,7 +588,7 @@ export default function Tasks() {
       </header>
 
       {/* Liste */}
-      <main className="px-4 py-4 pb-28 space-y-2">
+      <main className="px-4 py-4 space-y-2" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
         {loading ? (
           <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
         ) : sorted.length === 0 ? (
@@ -605,8 +613,8 @@ export default function Tasks() {
       {/* FAB */}
       <button
         onClick={() => { setEditingTask(null); setShowForm(true) }}
-        className="fixed bottom-6 right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-2xl font-light transition-transform hover:scale-105 active:scale-95"
-        style={{ background: PINK }}
+        className="fixed right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-2xl font-light active:scale-95"
+        style={{ background: PINK, bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
       >
         +
       </button>

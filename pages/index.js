@@ -15,6 +15,12 @@ const COLOR_OPTIONS = [
 ]
 
 const PINK = '#FF4D6D'
+const PERSON_COLORS = {
+  Arnaud: '#3b82f6',
+  Gabin: '#8b5cf6',
+  Guillaume: '#FF4D6D',
+  'Sous-traitant': '#64748b',
+}
 
 function getDaysRemaining(deadline) {
   const today = new Date()
@@ -72,6 +78,98 @@ function AtomLogo({ size = 24 }) {
   )
 }
 
+// ─── Modal tâches d'un projet ──────────────────────────────────────────────
+
+function ProjectTasksModal({ project, tasks, onClose }) {
+  const projectTasks = tasks.filter(t => t.project_id === project.id)
+  const active = projectTasks.filter(t => t.status === 'active')
+    .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))
+  const done = projectTasks.filter(t => t.status === 'completed')
+  const color = getProjectColor(project)
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-t-3xl overflow-hidden flex flex-col" style={{ maxHeight: '80vh' }}>
+        {/* Handle */}
+        <div className="pt-4 pb-2 flex-shrink-0">
+          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto" />
+        </div>
+
+        {/* Header */}
+        <div className="px-5 pb-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                <h2 className="font-bold text-gray-900 text-base leading-snug">{project.name}</h2>
+              </div>
+              <p className="text-sm text-gray-400">{project.client}</p>
+            </div>
+            <button onClick={onClose}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xl flex-shrink-0">
+              ×
+            </button>
+          </div>
+        </div>
+
+        {/* Tâches */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2">
+          {projectTasks.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="text-3xl mb-2">📋</div>
+              <p className="text-gray-400 text-sm">Aucune tâche liée à ce projet</p>
+            </div>
+          ) : (
+            <>
+              {active.map(task => (
+                <div key={task.id} className="flex items-center gap-3 py-3 px-3 rounded-2xl bg-gray-50">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: PERSON_COLORS[task.responsible] || '#64748b' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {task.is_private && <span className="mr-1">🔒</span>}{task.title}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {task.responsible}
+                      {task.execution_date && ` · ${task.execution_date.split('-').reverse().slice(0,2).join('.')}`}
+                    </p>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                    style={{ background: PERSON_COLORS[task.responsible] + '22', color: PERSON_COLORS[task.responsible] }}>
+                    {task.responsible.split(' ')[0]}
+                  </span>
+                </div>
+              ))}
+              {done.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Terminées</p>
+                  {done.map(task => (
+                    <div key={task.id} className="flex items-center gap-3 py-2 px-3 rounded-2xl opacity-40">
+                      <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                      <p className="text-sm text-gray-500 line-through truncate">{task.title}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 pb-8 pt-3 border-t border-gray-100 flex-shrink-0">
+          <Link href="/tasks"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold border-2 transition-opacity hover:opacity-80"
+            style={{ borderColor: PINK, color: PINK }}>
+            Gérer les tâches →
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const emptyForm = {
   name: '',
   client: '',
@@ -85,6 +183,7 @@ const emptyForm = {
 
 export default function Admin() {
   const [projects, setProjects] = useState([])
+  const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingProject, setEditingProject] = useState(null)
@@ -92,8 +191,9 @@ export default function Admin() {
   const [saving, setSaving] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [feedback, setFeedback] = useState(null)
+  const [selectedProjectId, setSelectedProjectId] = useState(null)
 
-  useEffect(() => { fetchProjects() }, [])
+  useEffect(() => { fetchProjects(); fetchTasks() }, [])
 
   async function fetchProjects() {
     setLoading(true)
@@ -101,6 +201,12 @@ export default function Admin() {
     const data = await res.json()
     setProjects(Array.isArray(data) ? data : [])
     setLoading(false)
+  }
+
+  async function fetchTasks() {
+    const res = await fetch('/api/tasks')
+    const data = await res.json()
+    setTasks(Array.isArray(data) ? data : [])
   }
 
   function showFeedback(msg, type = 'success') {
@@ -202,50 +308,56 @@ export default function Admin() {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <style>{`
           body { font-family: 'Inter', sans-serif; }
           input:focus, select:focus, textarea:focus {
             border-color: ${PINK} !important;
             box-shadow: 0 0 0 3px ${PINK}22 !important;
           }
+          * { -webkit-tap-highlight-color: transparent; }
+          button, a { touch-action: manipulation; }
+          @media (max-width: 768px) {
+            input, select, textarea { font-size: 16px !important; }
+          }
         `}</style>
       </Head>
 
       {/* Header */}
       <header style={{ background: '#fff', borderBottom: '1px solid #f0f0f0' }} className="sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <AtomLogo size={28} />
-            <div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <AtomLogo size={26} />
+            <div className="hidden sm:block">
               <span className="font-bold text-gray-900 text-base tracking-tight">amazing lab</span>
               <span className="ml-2 text-xs text-gray-400 font-normal">planning</span>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Link
               href="/tasks"
               style={{ border: '1.5px solid #e5e7eb', color: '#374151' }}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white"
             >
-              <span>✅</span> Tâches
+              <span>✅</span><span className="hidden sm:inline"> Tâches</span>
             </Link>
             <Link
               href="/display"
               target="_blank"
               style={{ border: '1.5px solid #e5e7eb', color: '#374151' }}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white"
             >
-              <span>📺</span> Vue Atelier
+              <span>📺</span><span className="hidden sm:inline"> Vue Atelier</span>
             </Link>
             <button
               onClick={() => { resetForm(); setShowForm(true) }}
               style={{ background: PINK, color: '#fff' }}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full hover:opacity-90 transition-opacity"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:opacity-90 transition-opacity"
             >
-              <span className="text-lg leading-none">+</span> Nouveau projet
+              <span className="text-lg leading-none">+</span><span className="hidden sm:inline"> Nouveau projet</span>
             </button>
           </div>
         </div>
@@ -435,7 +547,8 @@ export default function Admin() {
                       {/* Contenu */}
                       <div className="flex-1 px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
+                          <div className="min-w-0 cursor-pointer flex-1"
+                            onClick={() => setSelectedProjectId(project.id)}>
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-gray-900 text-sm">{project.name}</span>
                               {fromTodoist && (
@@ -456,6 +569,15 @@ export default function Admin() {
                                   À compléter
                                 </span>
                               )}
+                              {(() => {
+                                const count = tasks.filter(t => t.project_id === project.id && t.status === 'active').length
+                                return count > 0 ? (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                                    style={{ background: PINK + '18', color: PINK }}>
+                                    {count} tâche{count > 1 ? 's' : ''}
+                                  </span>
+                                ) : null
+                              })()}
                             </div>
                             {project.description && (
                               <p className="text-xs text-gray-400 mt-0.5">{project.description}</p>
@@ -565,6 +687,18 @@ export default function Admin() {
           <span>amazing lab — atelier planning</span>
         </div>
       </main>
+
+      {/* Modal tâches projet */}
+      {selectedProjectId && (() => {
+        const proj = projects.find(p => p.id === selectedProjectId)
+        return proj ? (
+          <ProjectTasksModal
+            project={proj}
+            tasks={tasks}
+            onClose={() => setSelectedProjectId(null)}
+          />
+        ) : null
+      })()}
     </div>
   )
 }
