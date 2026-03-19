@@ -14,6 +14,8 @@ const COLOR_OPTIONS = [
   { value: '#64748b', label: 'Gris',   icon: '⚫' },
 ]
 
+const PINK = '#FF4D6D'
+
 function getDaysRemaining(deadline) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -42,12 +44,24 @@ function formatDate(dateStr) {
 
 function DaysChip({ deadline }) {
   const days = getDaysRemaining(deadline)
-  if (days < 0)  return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">En retard ({Math.abs(days)}j)</span>
-  if (days === 0) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">Aujourd'hui !</span>
-  if (days === 1) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">Demain</span>
-  if (days < 7)  return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">{days}j restants</span>
-  if (days < 14) return <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">{days}j restants</span>
-  return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">{days}j restants</span>
+  if (days < 0)  return <span style={{ background: '#fee2e2', color: '#dc2626' }} className="px-2 py-0.5 rounded-full text-xs font-bold">En retard ({Math.abs(days)}j)</span>
+  if (days === 0) return <span style={{ background: '#fee2e2', color: '#dc2626' }} className="px-2 py-0.5 rounded-full text-xs font-bold">Aujourd'hui !</span>
+  if (days === 1) return <span style={{ background: '#fff7ed', color: '#ea580c' }} className="px-2 py-0.5 rounded-full text-xs font-bold">Demain</span>
+  if (days < 7)  return <span style={{ background: '#fff7ed', color: '#ea580c' }} className="px-2 py-0.5 rounded-full text-xs font-bold">{days}j restants</span>
+  if (days < 14) return <span style={{ background: '#fefce8', color: '#ca8a04' }} className="px-2 py-0.5 rounded-full text-xs font-bold">{days}j restants</span>
+  return <span style={{ background: '#f0fdf4', color: '#16a34a' }} className="px-2 py-0.5 rounded-full text-xs font-semibold">{days}j restants</span>
+}
+
+// SVG logo atom Amazing Lab style
+function AtomLogo({ size = 24 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
+      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
+      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
+      <circle cx="20" cy="20" r="3" fill={PINK} />
+    </svg>
+  )
 }
 
 const emptyForm = {
@@ -170,37 +184,52 @@ export default function Admin() {
     .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
   const archivedProjects = projects.filter(p => p.status !== 'active')
 
+  const inputClass = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none transition-colors bg-white"
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: '#fafafa' }}>
       <Head>
         <title>Atelier Planning — Admin</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <style>{`
+          body { font-family: 'Inter', sans-serif; }
+          input:focus, select:focus, textarea:focus {
+            border-color: ${PINK} !important;
+            box-shadow: 0 0 0 3px ${PINK}22 !important;
+          }
+        `}</style>
       </Head>
 
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-              <span className="text-white text-sm font-bold">AP</span>
-            </div>
+      <header style={{ background: '#fff', borderBottom: '1px solid #f0f0f0' }} className="sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <AtomLogo size={28} />
             <div>
-              <h1 className="text-base font-semibold text-gray-900">Atelier Planning</h1>
-              <p className="text-xs text-gray-500">Interface Admin</p>
+              <span className="font-bold text-gray-900 text-base tracking-tight">amazing lab</span>
+              <span className="ml-2 text-xs text-gray-400 font-normal">planning</span>
             </div>
           </div>
+
+          {/* Actions */}
           <div className="flex items-center gap-2">
             <Link
               href="/display"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               target="_blank"
+              style={{ border: '1.5px solid #e5e7eb', color: '#374151' }}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white"
             >
               <span>📺</span> Vue Atelier
             </Link>
             <button
               onClick={() => { resetForm(); setShowForm(true) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-700 transition-colors"
+              style={{ background: PINK, color: '#fff' }}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full hover:opacity-90 transition-opacity"
             >
-              <span>+</span> Nouveau projet
+              <span className="text-lg leading-none">+</span> Nouveau projet
             </button>
           </div>
         </div>
@@ -208,108 +237,103 @@ export default function Admin() {
 
       {/* Feedback toast */}
       {feedback && (
-        <div className={`fixed top-16 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium transition-all ${
-          feedback.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-        }`}>
+        <div
+          className="fixed top-20 right-5 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-medium"
+          style={{ background: feedback.type === 'error' ? '#ef4444' : PINK, color: '#fff' }}
+        >
           {feedback.msg}
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
 
         {/* Formulaire Add/Edit */}
         {showForm && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">
-                {editingProject ? `Modifier — ${editingProject.name}` : 'Nouveau projet'}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 text-base">
+                {editingProject
+                  ? <><span style={{ color: PINK }}>Modifier</span> — {editingProject.name}</>
+                  : <><span style={{ color: PINK }}>Nouveau</span> projet</>
+                }
               </h2>
-              <button onClick={resetForm} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+              <button
+                onClick={resetForm}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none"
+              >
+                ×
+              </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-5">
+            <form onSubmit={handleSubmit} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                {/* Nom du projet */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Nom du projet *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Nom du projet *</label>
                   <input
-                    type="text"
-                    required
-                    value={form.name}
+                    type="text" required value={form.name}
                     onChange={e => handleFieldChange('name', e.target.value)}
                     placeholder="Ex: Bar comptoir EventX"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   />
                 </div>
 
-                {/* Client */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Client *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Client *</label>
                   <input
-                    type="text"
-                    required
-                    value={form.client}
+                    type="text" required value={form.client}
                     onChange={e => handleFieldChange('client', e.target.value)}
                     placeholder="Ex: Hôtel du Lac"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   />
                 </div>
 
-                {/* Description */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Description / Ce qu'on fabrique</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Description / Ce qu'on fabrique</label>
                   <input
-                    type="text"
-                    value={form.description}
+                    type="text" value={form.description}
                     onChange={e => handleFieldChange('description', e.target.value)}
                     placeholder="Ex: 2 bars en bois + 4 bacs bar LED"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   />
                 </div>
 
-                {/* Deadline */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Date de livraison *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Date de livraison *</label>
                   <input
-                    type="date"
-                    required
-                    value={form.deadline}
+                    type="date" required value={form.deadline}
                     onChange={e => handleFieldChange('deadline', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   />
                 </div>
 
-                {/* Type de livraison */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Mode de livraison</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Mode de livraison</label>
                   <select
                     value={form.delivery_type}
                     onChange={e => handleFieldChange('delivery_type', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   >
                     {DELIVERY_TYPES.map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
 
-                {/* Responsable */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Responsable</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Responsable</label>
                   <select
                     value={form.responsible}
                     onChange={e => handleFieldChange('responsible', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   >
                     {RESPONSIBLES.map(r => <option key={r}>{r}</option>)}
                   </select>
                 </div>
 
-                {/* Couleur */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Couleur de la carte</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Couleur de la carte</label>
                   <select
                     value={form.color_override ?? 'null'}
                     onChange={e => handleFieldChange('color_override', e.target.value === 'null' ? null : e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   >
                     {COLOR_OPTIONS.map(c => (
                       <option key={String(c.value)} value={c.value ?? 'null'}>
@@ -319,31 +343,28 @@ export default function Admin() {
                   </select>
                 </div>
 
-                {/* Notes */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Notes internes</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Notes internes</label>
                   <input
-                    type="text"
-                    value={form.notes}
+                    type="text" value={form.notes}
                     onChange={e => handleFieldChange('notes', e.target.value)}
                     placeholder="Info logistique, remarques..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    className={inputClass}
                   />
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center gap-3">
+              <div className="mt-6 flex items-center gap-3">
                 <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                  type="submit" disabled={saving}
+                  style={{ background: PINK, color: '#fff' }}
+                  className="px-6 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity"
                 >
                   {saving ? 'Enregistrement...' : editingProject ? 'Mettre à jour' : 'Créer le projet'}
                 </button>
                 <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  type="button" onClick={resetForm}
+                  className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
                 >
                   Annuler
                 </button>
@@ -354,61 +375,57 @@ export default function Admin() {
 
         {/* Projets actifs */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-gray-900">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-gray-900 text-lg">
               Projets en cours
-              <span className="ml-2 text-sm font-normal text-gray-500">({activeProjects.length})</span>
+              <span className="ml-2 text-sm font-normal text-gray-400">({activeProjects.length})</span>
             </h2>
           </div>
 
           {loading ? (
-            <div className="text-center py-12 text-gray-400 text-sm">Chargement...</div>
+            <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
           ) : activeProjects.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+            <div className="text-center py-16 bg-white rounded-3xl border border-gray-100">
+              <div className="text-4xl mb-3">🛠️</div>
               <p className="text-gray-400 text-sm">Aucun projet actif. Créez votre premier projet !</p>
             </div>
           ) : (
             <div className="space-y-2">
               {activeProjects.map(project => {
                 const color = getProjectColor(project)
-                const days = getDaysRemaining(project.deadline)
                 return (
                   <div
                     key={project.id}
-                    className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors overflow-hidden"
+                    className="bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all overflow-hidden"
                   >
                     <div className="flex items-stretch">
                       {/* Barre couleur */}
-                      <div className="w-1.5 flex-shrink-0" style={{ backgroundColor: color }} />
+                      <div className="w-1 flex-shrink-0 rounded-l-2xl" style={{ backgroundColor: color }} />
 
                       {/* Contenu */}
-                      <div className="flex-1 px-4 py-3">
+                      <div className="flex-1 px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-gray-900 text-sm">{project.name}</span>
-                              <span className="text-gray-400 text-xs">•</span>
-                              <span className="text-sm text-gray-600">{project.client}</span>
+                              <span className="text-gray-300">·</span>
+                              <span className="text-sm text-gray-500">{project.client}</span>
                               <DaysChip deadline={project.deadline} />
                             </div>
                             {project.description && (
-                              <p className="text-xs text-gray-500 mt-0.5">{project.description}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{project.description}</p>
                             )}
-                            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                            <div className="flex items-center gap-3 mt-2 flex-wrap">
                               <span className="text-xs text-gray-500">
                                 📅 <strong>{formatDate(project.deadline)}</strong>
                               </span>
-                              <span className="text-xs text-gray-400">·</span>
-                              <span className="text-xs text-gray-500">
-                                🚚 {project.delivery_type}
-                              </span>
-                              <span className="text-xs text-gray-400">·</span>
-                              <span className="text-xs text-gray-500">
-                                👤 {project.responsible}
-                              </span>
+                              <span className="text-gray-200">·</span>
+                              <span className="text-xs text-gray-400">🚚 {project.delivery_type}</span>
+                              <span className="text-gray-200">·</span>
+                              <span className="text-xs text-gray-400">👤 {project.responsible}</span>
                               {project.notes && (
                                 <>
-                                  <span className="text-xs text-gray-400">·</span>
+                                  <span className="text-gray-200">·</span>
                                   <span className="text-xs text-gray-400 italic">{project.notes}</span>
                                 </>
                               )}
@@ -420,21 +437,21 @@ export default function Admin() {
                             <button
                               onClick={() => handleEdit(project)}
                               title="Modifier"
-                              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors text-sm"
+                              className="p-2 text-gray-300 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-colors text-sm"
                             >
                               ✏️
                             </button>
                             <button
                               onClick={() => handleArchive(project)}
                               title="Archiver (projet terminé)"
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors text-sm"
+                              className="p-2 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors text-sm"
                             >
                               ✅
                             </button>
                             <button
                               onClick={() => handleDelete(project)}
                               title="Supprimer"
-                              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors text-sm"
+                              className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm"
                             >
                               🗑️
                             </button>
@@ -454,7 +471,7 @@ export default function Admin() {
           <div>
             <button
               onClick={() => setShowArchived(v => !v)}
-              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors mb-3"
+              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-4"
             >
               <span>{showArchived ? '▾' : '▸'}</span>
               Projets archivés ({archivedProjects.length})
@@ -462,28 +479,28 @@ export default function Admin() {
             {showArchived && (
               <div className="space-y-2">
                 {archivedProjects.map(project => (
-                  <div key={project.id} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden opacity-60">
+                  <div key={project.id} className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden opacity-50 hover:opacity-70 transition-opacity">
                     <div className="flex items-stretch">
-                      <div className="w-1.5 flex-shrink-0 bg-gray-300" />
-                      <div className="flex-1 px-4 py-3 flex items-center justify-between">
+                      <div className="w-1 flex-shrink-0 rounded-l-2xl bg-gray-200" />
+                      <div className="flex-1 px-5 py-3 flex items-center justify-between">
                         <div>
-                          <span className="font-medium text-gray-600 text-sm">{project.name}</span>
-                          <span className="mx-2 text-gray-400">·</span>
-                          <span className="text-sm text-gray-500">{project.client}</span>
+                          <span className="font-medium text-gray-500 text-sm">{project.name}</span>
+                          <span className="mx-2 text-gray-300">·</span>
+                          <span className="text-sm text-gray-400">{project.client}</span>
                           <span className="ml-3 text-xs text-gray-400">{formatDate(project.deadline)}</span>
                         </div>
                         <div className="flex gap-1">
                           <button
                             onClick={() => handleRestore(project)}
                             title="Remettre en cours"
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm"
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors text-sm"
                           >
                             ↩️
                           </button>
                           <button
                             onClick={() => handleDelete(project)}
                             title="Supprimer définitivement"
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors text-sm"
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm"
                           >
                             🗑️
                           </button>
@@ -496,6 +513,12 @@ export default function Admin() {
             )}
           </div>
         )}
+
+        {/* Footer */}
+        <div className="pt-4 pb-8 flex items-center justify-center gap-2 text-xs text-gray-300">
+          <AtomLogo size={16} />
+          <span>amazing lab — atelier planning</span>
+        </div>
       </main>
     </div>
   )
