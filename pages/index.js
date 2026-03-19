@@ -226,6 +226,13 @@ export default function Admin() {
           {/* Actions */}
           <div className="flex items-center gap-2">
             <Link
+              href="/tasks"
+              style={{ border: '1.5px solid #e5e7eb', color: '#374151' }}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white"
+            >
+              <span>✅</span> Tâches
+            </Link>
+            <Link
               href="/display"
               target="_blank"
               style={{ border: '1.5px solid #e5e7eb', color: '#374151' }}

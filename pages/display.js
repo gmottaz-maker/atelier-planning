@@ -386,6 +386,16 @@ export default function Display() {
               <span className="text-xs tabular-nums">{countdown}s</span>
             </button>
 
+            {/* Tâches */}
+            <Link
+              href="/tasks"
+              className="px-3 py-2 rounded-2xl text-sm transition-colors"
+              style={{ background: '#1a1a1a', color: '#555' }}
+              title="Gestionnaire de tâches"
+            >
+              ✅
+            </Link>
+
             {/* Admin */}
             <Link
               href="/"

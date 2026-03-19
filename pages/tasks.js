@@ -1,0 +1,626 @@
+import { useState, useEffect, useCallback } from 'react'
+import Head from 'next/head'
+import Link from 'next/link'
+
+const PINK = '#FF4D6D'
+const PEOPLE = ['Arnaud', 'Gabin', 'Guillaume', 'Sous-traitant']
+const PERSON_COLORS = {
+  Arnaud: '#3b82f6',
+  Gabin: '#8b5cf6',
+  Guillaume: PINK,
+  'Sous-traitant': '#64748b',
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function today() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function parseDate(str) {
+  if (!str) return null
+  const [y, m, d] = str.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function toDateStr(date) {
+  return date.toISOString().split('T')[0]
+}
+
+function endOfWeek() {
+  const d = today()
+  const day = d.getDay() || 7
+  d.setDate(d.getDate() + (7 - day))
+  return d
+}
+
+function addDays(date, n) {
+  const d = new Date(date)
+  d.setDate(d.getDate() + n)
+  return d
+}
+
+// Retourne la date qui compte pour le décompte
+function countdownDate(task) {
+  if (task.due_date && task.due_date !== task.execution_date) return parseDate(task.due_date)
+  return parseDate(task.execution_date)
+}
+
+function daysRemaining(task) {
+  const ref = countdownDate(task)
+  if (!ref) return null
+  const t = today()
+  return Math.ceil((ref - t) / 86400000)
+}
+
+// La "date effective" pour le tri/affichage (auto-rollover si passée)
+function effectiveDate(task) {
+  const exec = parseDate(task.execution_date)
+  const t = today()
+  if (exec < t && task.status === 'active') return t
+  return exec
+}
+
+function formatDate(str) {
+  if (!str) return ''
+  const [y, m, d] = str.split('-')
+  return `${d}.${m}`
+}
+
+// Une tâche terminée aujourd'hui reste visible jusqu'à demain
+function isCompletedToday(task) {
+  if (task.status !== 'completed' || !task.completed_at) return false
+  const completedDay = task.completed_at.split('T')[0]
+  return completedDay === toDateStr(today())
+}
+
+// ─── Composant CountdownBadge ─────────────────────────────────────────────
+
+function CountdownBadge({ task }) {
+  const days = daysRemaining(task)
+  if (days === null) return null
+  const hasDueDate = task.due_date && task.due_date !== task.execution_date
+
+  let bg, color, label
+  if (days < 0) { bg = '#fee2e2'; color = '#dc2626'; label = `${Math.abs(days)}j de retard` }
+  else if (days === 0) { bg = '#fee2e2'; color = '#dc2626'; label = "Aujourd'hui !" }
+  else if (days === 1) { bg = '#fff7ed'; color = '#ea580c'; label = 'Demain' }
+  else if (days <= 7) { bg = '#fff7ed'; color = '#ea580c'; label = `J-${days}` }
+  else { bg = '#f0fdf4'; color = '#16a34a'; label = `J-${days}` }
+
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
+      style={{ background: bg, color }}>
+      {hasDueDate && <span title="Date d'échéance">⏰</span>}
+      {label}
+    </span>
+  )
+}
+
+// ─── Composant TaskCard ───────────────────────────────────────────────────
+
+function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
+  const completed = task.status === 'completed'
+  const personColor = PERSON_COLORS[task.responsible] || '#64748b'
+  const projectName = task.projects?.name
+
+  return (
+    <div
+      className="bg-white rounded-2xl border transition-all"
+      style={{
+        borderColor: completed ? '#e5e7eb' : '#f3f4f6',
+        opacity: completed ? 0.65 : 1,
+      }}
+    >
+      <div className="flex items-start gap-3 p-4">
+        {/* Checkbox */}
+        <button
+          onClick={() => onToggle(task)}
+          className="flex-shrink-0 w-6 h-6 mt-0.5 rounded-full border-2 flex items-center justify-center transition-all"
+          style={{
+            borderColor: completed ? '#22c55e' : '#d1d5db',
+            background: completed ? '#22c55e' : 'white',
+          }}
+        >
+          {completed && (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+        </button>
+
+        {/* Contenu */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className={`text-sm font-semibold text-gray-900 leading-snug ${completed ? 'line-through text-gray-400' : ''}`}>
+              {task.is_private && <span className="mr-1">🔒</span>}
+              {task.title}
+            </p>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {!completed && (
+                <button onClick={() => onEdit(task)}
+                  className="p-1.5 text-gray-300 hover:text-gray-600 rounded-xl transition-colors">
+                  ✏️
+                </button>
+              )}
+              {(task.responsible === currentUser || currentUser === 'Guillaume') && (
+                <button onClick={() => onDelete(task)}
+                  className="p-1.5 text-gray-300 hover:text-red-400 rounded-xl transition-colors">
+                  🗑️
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {/* Responsable */}
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
+              style={{ background: personColor }}>
+              {task.responsible}
+            </span>
+
+            {/* Projet */}
+            {projectName && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                {projectName}
+              </span>
+            )}
+
+            {/* Countdown */}
+            {!completed && <CountdownBadge task={task} />}
+
+            {/* Date d'exécution si différente de aujourd'hui */}
+            {!completed && task.execution_date !== toDateStr(today()) && (
+              <span className="text-xs text-gray-400">📅 {formatDate(task.execution_date)}</span>
+            )}
+          </div>
+
+          {task.notes && (
+            <p className="text-xs text-gray-400 mt-1 italic">{task.notes}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Formulaire (slide-up mobile) ─────────────────────────────────────────
+
+function TaskForm({ task, projects, currentUser, onSave, onClose }) {
+  const isEdit = !!task?.id
+  const [form, setForm] = useState({
+    title: task?.title || '',
+    project_id: task?.project_id || '',
+    responsible: task?.responsible || currentUser || 'Arnaud',
+    execution_date: task?.execution_date || toDateStr(today()),
+    due_date: task?.due_date || '',
+    is_private: task?.is_private || false,
+    notes: task?.notes || '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.title.trim()) return
+    setSaving(true)
+    const body = {
+      ...form,
+      project_id: form.project_id || null,
+      due_date: form.due_date || null,
+    }
+    await onSave(body, isEdit ? task.id : null)
+    setSaving(false)
+  }
+
+  const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white"
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: 'rgba(0,0,0,0.4)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-t-3xl px-5 pt-5 pb-8" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+        {/* Handle */}
+        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-gray-900 text-base">
+            {isEdit ? 'Modifier la tâche' : <><span style={{ color: PINK }}>Nouvelle</span> tâche</>}
+          </h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">×</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Titre */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Titre *</label>
+            <input type="text" required autoFocus
+              value={form.title} onChange={e => set('title', e.target.value)}
+              placeholder="Ex: Découpe panneaux bar" className={inputCls}
+              style={{ fontSize: 16 }} // évite le zoom iOS
+            />
+          </div>
+
+          {/* Projet */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Projet lié</label>
+            <select value={form.project_id} onChange={e => set('project_id', e.target.value)} className={inputCls}>
+              <option value="">— Aucun projet —</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name} · {p.client}</option>)}
+            </select>
+          </div>
+
+          {/* Responsable */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Responsable</label>
+            <div className="flex gap-2 flex-wrap">
+              {PEOPLE.filter(p => p !== 'Sous-traitant').map(p => (
+                <button key={p} type="button"
+                  onClick={() => set('responsible', p)}
+                  className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                  style={form.responsible === p
+                    ? { background: PERSON_COLORS[p], color: 'white' }
+                    : { background: '#f3f4f6', color: '#374151' }
+                  }>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Date d'exécution *</label>
+              <input type="date" required value={form.execution_date}
+                onChange={e => set('execution_date', e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Échéance (optionnel)</label>
+              <input type="date" value={form.due_date}
+                onChange={e => set('due_date', e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Note</label>
+            <input type="text" value={form.notes} onChange={e => set('notes', e.target.value)}
+              placeholder="Détail ou info utile..." className={inputCls} />
+          </div>
+
+          {/* Privée */}
+          <label className="flex items-center gap-3 py-1 cursor-pointer">
+            <div
+              onClick={() => set('is_private', !form.is_private)}
+              className="w-11 h-6 rounded-full transition-colors flex items-center px-0.5"
+              style={{ background: form.is_private ? PINK : '#d1d5db' }}>
+              <div className="w-5 h-5 bg-white rounded-full shadow transition-transform"
+                style={{ transform: form.is_private ? 'translateX(20px)' : 'translateX(0)' }} />
+            </div>
+            <span className="text-sm text-gray-700">🔒 Tâche privée (visible uniquement par moi)</span>
+          </label>
+
+          <button type="submit" disabled={saving}
+            className="w-full py-3 rounded-2xl text-white font-semibold text-base transition-opacity disabled:opacity-50"
+            style={{ background: PINK }}>
+            {saving ? 'Enregistrement...' : isEdit ? 'Mettre à jour' : 'Créer la tâche'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Sélecteur d'identité ─────────────────────────────────────────────────
+
+function WhoAreYou({ onSelect }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center px-6"
+      style={{ background: '#fafafa' }}>
+      <div className="mb-8 text-center">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" className="mx-auto mb-3">
+          <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
+          <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
+          <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
+          <circle cx="20" cy="20" r="3" fill={PINK} />
+        </svg>
+        <p className="font-bold text-gray-900 text-lg">amazing lab</p>
+        <p className="text-gray-500 text-sm mt-1">Qui es-tu ?</p>
+      </div>
+      <div className="w-full space-y-3 max-w-xs">
+        {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
+          <button key={p} onClick={() => onSelect(p)}
+            className="w-full py-4 rounded-2xl text-white text-lg font-semibold transition-opacity hover:opacity-90"
+            style={{ background: PERSON_COLORS[p] }}>
+            {p}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────
+
+export default function Tasks() {
+  const [tasks, setTasks] = useState([])
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [showWho, setShowWho] = useState(false)
+  const [view, setView] = useState('today')       // 'today' | 'week' | 'twoweeks'
+  const [personFilter, setPersonFilter] = useState('all') // 'all' | 'Arnaud' | 'Gabin' | 'Guillaume'
+  const [showForm, setShowForm] = useState(false)
+  const [editingTask, setEditingTask] = useState(null)
+  const [feedback, setFeedback] = useState(null)
+
+  // Chargement identité depuis localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('al_user')
+    if (stored) {
+      setCurrentUser(stored)
+      setPersonFilter(stored)
+    } else {
+      setShowWho(true)
+    }
+  }, [])
+
+  function selectUser(name) {
+    localStorage.setItem('al_user', name)
+    setCurrentUser(name)
+    setPersonFilter(name)
+    setShowWho(false)
+  }
+
+  const fetchAll = useCallback(async () => {
+    const [tRes, pRes] = await Promise.all([
+      fetch('/api/tasks'),
+      fetch('/api/projects'),
+    ])
+    const [tData, pData] = await Promise.all([tRes.json(), pRes.json()])
+    setTasks(Array.isArray(tData) ? tData : [])
+    setProjects((Array.isArray(pData) ? pData : []).filter(p => p.status === 'active'))
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { if (currentUser) fetchAll() }, [currentUser, fetchAll])
+
+  function showMsg(msg, type = 'ok') {
+    setFeedback({ msg, type })
+    setTimeout(() => setFeedback(null), 2500)
+  }
+
+  async function handleToggle(task) {
+    const newStatus = task.status === 'completed' ? 'active' : 'completed'
+    await fetch(`/api/tasks/${task.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...task, status: newStatus }),
+    })
+    fetchAll()
+  }
+
+  async function handleSave(body, id) {
+    if (id) {
+      await fetch(`/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      showMsg('Tâche mise à jour ✓')
+    } else {
+      await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      showMsg('Tâche créée ✓')
+    }
+    setShowForm(false)
+    setEditingTask(null)
+    fetchAll()
+  }
+
+  async function handleDelete(task) {
+    if (!confirm(`Supprimer "${task.title}" ?`)) return
+    await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' })
+    showMsg('Tâche supprimée')
+    fetchAll()
+  }
+
+  function handleEdit(task) {
+    setEditingTask(task)
+    setShowForm(true)
+  }
+
+  // ─── Filtrage ───────────────────────────────────────────────────────────
+
+  const todayStr = toDateStr(today())
+  const weekEnd = toDateStr(endOfWeek())
+  const twoWeeksEnd = toDateStr(addDays(today(), 14))
+
+  function taskInView(task) {
+    const eff = effectiveDate(task)
+    const effStr = toDateStr(eff)
+    const completed = task.status === 'completed'
+
+    // Tâches terminées : afficher seulement si complétées aujourd'hui
+    if (completed && !isCompletedToday(task)) return false
+
+    if (view === 'today') {
+      // Auto-rollover : tâches actives en retard = aujourd'hui
+      if (!completed && task.execution_date < todayStr) return true
+      return effStr === todayStr
+    }
+    if (view === 'week') return effStr <= weekEnd
+    if (view === 'twoweeks') return effStr <= twoWeeksEnd
+    return true
+  }
+
+  function taskVisible(task) {
+    // Masquer les tâches privées des autres
+    if (task.is_private && task.responsible !== currentUser) return false
+    // Filtre par personne
+    if (personFilter !== 'all' && task.responsible !== personFilter) return false
+    // Filtre par vue temporelle
+    return taskInView(task)
+  }
+
+  const visibleTasks = tasks.filter(taskVisible)
+
+  // Tri : tâches actives d'abord (par date), puis complétées
+  const sorted = [
+    ...visibleTasks.filter(t => t.status === 'active').sort((a, b) => {
+      const da = toDateStr(effectiveDate(a))
+      const db = toDateStr(effectiveDate(b))
+      return da.localeCompare(db)
+    }),
+    ...visibleTasks.filter(t => t.status === 'completed'),
+  ]
+
+  const activeCount = sorted.filter(t => t.status === 'active').length
+
+  // ─── Rendu ─────────────────────────────────────────────────────────────
+
+  if (showWho) return <WhoAreYou onSelect={selectUser} />
+
+  return (
+    <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
+      <Head>
+        <title>Tâches — Amazing Lab</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <style>{`
+          * { -webkit-tap-highlight-color: transparent; }
+          input:focus, select:focus { border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; outline: none; }
+        `}</style>
+      </Head>
+
+      {/* Feedback toast */}
+      {feedback && (
+        <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 px-4 py-2 rounded-2xl shadow-lg text-sm font-medium text-white"
+          style={{ background: feedback.type === 'err' ? '#ef4444' : PINK }}>
+          {feedback.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
+        <div className="px-4 pt-4 pb-0">
+          <div className="flex items-center justify-between mb-3">
+            {/* Logo + titre */}
+            <div className="flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
+                <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
+                <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
+                <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
+                <circle cx="20" cy="20" r="3" fill={PINK} />
+              </svg>
+              <span className="font-bold text-gray-900 text-sm">tâches</span>
+              {activeCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold text-white"
+                  style={{ background: PINK }}>{activeCount}</span>
+              )}
+            </div>
+
+            {/* Identité + nav */}
+            <div className="flex items-center gap-2">
+              <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200">
+                Admin
+              </Link>
+              <button
+                onClick={() => setShowWho(true)}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
+                style={{ background: PERSON_COLORS[currentUser] || PINK }}>
+                {currentUser}
+              </button>
+            </div>
+          </div>
+
+          {/* Tabs vue */}
+          <div className="flex gap-1 pb-3">
+            {[
+              { key: 'today', label: "Aujourd'hui" },
+              { key: 'week', label: 'Cette semaine' },
+              { key: 'twoweeks', label: '2 semaines' },
+            ].map(v => (
+              <button key={v.key} onClick={() => setView(v.key)}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+                style={view === v.key
+                  ? { background: PINK, color: 'white' }
+                  : { background: '#f3f4f6', color: '#6b7280' }
+                }>
+                {v.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Filtre par personne */}
+          <div className="flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            <button onClick={() => setPersonFilter('all')}
+              className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
+              style={personFilter === 'all'
+                ? { background: '#111', color: 'white' }
+                : { background: '#f3f4f6', color: '#6b7280' }}>
+              Tous
+            </button>
+            {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
+              <button key={p} onClick={() => setPersonFilter(p)}
+                className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 transition-all"
+                style={personFilter === p
+                  ? { background: PERSON_COLORS[p], color: 'white' }
+                  : { background: '#f3f4f6', color: '#6b7280' }}>
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* Liste */}
+      <main className="px-4 py-4 pb-28 space-y-2">
+        {loading ? (
+          <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
+        ) : sorted.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-4xl mb-3">✅</div>
+            <p className="text-gray-400 text-sm">Rien pour cette période !</p>
+          </div>
+        ) : (
+          sorted.map(task => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              currentUser={currentUser}
+              onToggle={handleToggle}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          ))
+        )}
+      </main>
+
+      {/* FAB */}
+      <button
+        onClick={() => { setEditingTask(null); setShowForm(true) }}
+        className="fixed bottom-6 right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-2xl font-light transition-transform hover:scale-105 active:scale-95"
+        style={{ background: PINK }}
+      >
+        +
+      </button>
+
+      {/* Formulaire */}
+      {showForm && (
+        <TaskForm
+          task={editingTask}
+          projects={projects}
+          currentUser={currentUser}
+          onSave={handleSave}
+          onClose={() => { setShowForm(false); setEditingTask(null) }}
+        />
+      )}
+    </div>
+  )
+}
