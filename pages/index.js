@@ -36,6 +36,14 @@ function getProjectColor(project) {
   return project.color_override || getAutoColor(project.deadline)
 }
 
+function isFromTodoist(project) {
+  return project.notes && project.notes.startsWith('todoist:')
+}
+
+function needsCompletion(project) {
+  return project.client === 'À définir'
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return ''
   const [year, month, day] = dateStr.split('-')
@@ -163,7 +171,8 @@ export default function Admin() {
       delivery_type: project.delivery_type || 'Livraison',
       responsible: project.responsible || 'Arnaud',
       color_override: project.color_override || null,
-      notes: project.notes || '',
+      // Si importé de Todoist, on garde la note interne vide pour l'utilisateur
+      notes: isFromTodoist(project) ? '' : (project.notes || ''),
     })
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -382,6 +391,17 @@ export default function Admin() {
             </h2>
           </div>
 
+          {/* Bannière projets Todoist à compléter */}
+          {activeProjects.some(needsCompletion) && (
+            <div className="mb-4 px-4 py-3 rounded-2xl border flex items-center gap-3"
+              style={{ background: '#fff8f0', borderColor: '#fed7aa' }}>
+              <span className="text-lg">🔔</span>
+              <p className="text-sm text-orange-800">
+                <strong>{activeProjects.filter(needsCompletion).length} projet{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''}</strong> importé{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''} depuis Todoist — clique sur ✏️ pour ajouter le client, la date et le mode de livraison.
+              </p>
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
           ) : activeProjects.length === 0 ? (
@@ -393,10 +413,13 @@ export default function Admin() {
             <div className="space-y-2">
               {activeProjects.map(project => {
                 const color = getProjectColor(project)
+                const fromTodoist = isFromTodoist(project)
+                const incomplete = needsCompletion(project)
                 return (
                   <div
                     key={project.id}
-                    className="bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all overflow-hidden"
+                    className="bg-white rounded-2xl border hover:shadow-sm transition-all overflow-hidden"
+                    style={{ borderColor: incomplete ? '#fed7aa' : '#f3f4f6' }}
                   >
                     <div className="flex items-stretch">
                       {/* Barre couleur */}
@@ -408,9 +431,24 @@ export default function Admin() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-gray-900 text-sm">{project.name}</span>
+                              {fromTodoist && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ background: '#e8f5e9', color: '#2e7d32' }}>
+                                  Todoist
+                                </span>
+                              )}
                               <span className="text-gray-300">·</span>
-                              <span className="text-sm text-gray-500">{project.client}</span>
-                              <DaysChip deadline={project.deadline} />
+                              <span className={`text-sm ${incomplete ? 'font-semibold' : 'text-gray-500'}`}
+                                style={incomplete ? { color: '#ea580c' } : {}}>
+                                {project.client}
+                              </span>
+                              {!incomplete && <DaysChip deadline={project.deadline} />}
+                              {incomplete && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                                  style={{ background: '#fff7ed', color: '#ea580c' }}>
+                                  À compléter
+                                </span>
+                              )}
                             </div>
                             {project.description && (
                               <p className="text-xs text-gray-400 mt-0.5">{project.description}</p>
