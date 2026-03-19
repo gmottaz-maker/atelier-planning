@@ -14,7 +14,8 @@ export default async function handler(req, res) {
 
   // POST — créer un projet
   if (req.method === 'POST') {
-    const { name, client, description, deadline, delivery_type, responsible, color_override, notes } = req.body
+    const { name, client, description, deadline, delivery_type, responsible, color_override, notes,
+            logistics_address, logistics_time, logistics_contact, logistics_notes } = req.body
 
     if (!name || !client || !deadline) {
       return res.status(400).json({ error: 'Champs obligatoires manquants : name, client, deadline' })
@@ -22,7 +23,8 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
       .from('projects')
-      .insert([{ name, client, description, deadline, delivery_type, responsible, color_override, notes, status: 'active' }])
+      .insert([{ name, client, description, deadline, delivery_type, responsible, color_override, notes,
+                 logistics_address, logistics_time, logistics_contact, logistics_notes, status: 'active' }])
       .select()
 
     if (error) return res.status(500).json({ error: error.message })

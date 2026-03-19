@@ -5,11 +5,14 @@ export default async function handler(req, res) {
 
   // PUT — modifier un projet
   if (req.method === 'PUT') {
-    const { name, client, description, deadline, delivery_type, responsible, color_override, notes, status } = req.body
+    const { name, client, description, deadline, delivery_type, responsible, color_override, notes, status,
+            logistics_address, logistics_time, logistics_contact, logistics_notes } = req.body
 
     const { data, error } = await supabase
       .from('projects')
-      .update({ name, client, description, deadline, delivery_type, responsible, color_override, notes, status, updated_at: new Date().toISOString() })
+      .update({ name, client, description, deadline, delivery_type, responsible, color_override, notes, status,
+                logistics_address, logistics_time, logistics_contact, logistics_notes,
+                updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
 

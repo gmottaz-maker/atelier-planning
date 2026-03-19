@@ -78,6 +78,78 @@ function AtomLogo({ size = 24 }) {
   )
 }
 
+// ─── Modal logistique ──────────────────────────────────────────────────────
+
+function LogisticsModal({ project, onClose, onSave }) {
+  const [form, setForm] = useState({
+    logistics_address: project.logistics_address || '',
+    logistics_time: project.logistics_time || '',
+    logistics_contact: project.logistics_contact || '',
+    logistics_notes: project.logistics_notes || '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    await onSave(project.id, form)
+    setSaving(false)
+    onClose()
+  }
+
+  const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white"
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-t-3xl px-5 pt-5" style={{ maxHeight: '90vh', overflowY: 'auto', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
+        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h2 className="font-bold text-gray-900 text-base">🚚 Infos logistiques</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{project.name} · {project.delivery_type}</p>
+          </div>
+          <button onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xl">×</button>
+        </div>
+
+        <form onSubmit={handleSave} className="mt-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Adresse</label>
+            <input type="text" value={form.logistics_address}
+              onChange={e => setForm(f => ({ ...f, logistics_address: e.target.value }))}
+              placeholder="Rue, ville..." className={inp} style={{ fontSize: 16 }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Heure prévue</label>
+            <input type="text" value={form.logistics_time}
+              onChange={e => setForm(f => ({ ...f, logistics_time: e.target.value }))}
+              placeholder="Ex: 08h00 – 10h00" className={inp} style={{ fontSize: 16 }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Contact sur place</label>
+            <input type="text" value={form.logistics_contact}
+              onChange={e => setForm(f => ({ ...f, logistics_contact: e.target.value }))}
+              placeholder="Nom + téléphone" className={inp} style={{ fontSize: 16 }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Commentaires</label>
+            <textarea rows={3} value={form.logistics_notes}
+              onChange={e => setForm(f => ({ ...f, logistics_notes: e.target.value }))}
+              placeholder="Accès, matériel, remarques..." className={inp} style={{ fontSize: 16, resize: 'none' }} />
+          </div>
+          <button type="submit" disabled={saving}
+            className="w-full py-3 rounded-2xl text-white font-semibold text-sm disabled:opacity-50"
+            style={{ background: PINK }}>
+            {saving ? 'Enregistrement...' : 'Sauvegarder'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Modal tâches d'un projet ──────────────────────────────────────────────
 
 function ProjectTasksModal({ project, tasks, onClose }) {
@@ -192,6 +264,7 @@ export default function Admin() {
   const [showArchived, setShowArchived] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [selectedProjectId, setSelectedProjectId] = useState(null)
+  const [logisticsProject, setLogisticsProject] = useState(null)
 
   useEffect(() => { fetchProjects(); fetchTasks() }, [])
 
@@ -207,6 +280,16 @@ export default function Admin() {
     const res = await fetch('/api/tasks')
     const data = await res.json()
     setTasks(Array.isArray(data) ? data : [])
+  }
+
+  async function handleSaveLogistics(projectId, logisticsData) {
+    await fetch(`/api/projects/${projectId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...projects.find(p => p.id === projectId), ...logisticsData }),
+    })
+    showFeedback('Infos logistiques sauvegardées ✓')
+    fetchProjects()
   }
 
   function showFeedback(msg, type = 'success') {
@@ -587,7 +670,18 @@ export default function Admin() {
                                 📅 <strong>{formatDate(project.deadline)}</strong>
                               </span>
                               <span className="text-gray-200">·</span>
-                              <span className="text-xs text-gray-400">🚚 {project.delivery_type}</span>
+                              <button
+                                onClick={e => { e.stopPropagation(); setLogisticsProject(project) }}
+                                className="text-xs rounded-full px-2 py-0.5 transition-colors"
+                                style={{
+                                  background: project.logistics_address ? '#f0fdf4' : '#f9fafb',
+                                  color: project.logistics_address ? '#16a34a' : '#9ca3af',
+                                  border: project.logistics_address ? '1px solid #bbf7d0' : '1px solid transparent',
+                                }}
+                              >
+                                🚚 {project.delivery_type}
+                                {project.logistics_address && ' ✓'}
+                              </button>
                               <span className="text-gray-200">·</span>
                               <span className="text-xs text-gray-400">👤 {project.responsible}</span>
                               {project.notes && (
@@ -597,6 +691,30 @@ export default function Admin() {
                                 </>
                               )}
                             </div>
+
+                            {/* Prochaine tâche */}
+                            {(() => {
+                              const next = tasks
+                                .filter(t => t.project_id === project.id && t.status === 'active')
+                                .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
+                              if (!next) return null
+                              return (
+                                <div className="flex items-center gap-2 mt-2.5 pt-2 border-t" style={{ borderColor: '#f3f4f6' }}>
+                                  <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                    style={{ background: PERSON_COLORS[next.responsible] || '#64748b' }} />
+                                  <span className="text-xs text-gray-500 flex-1 truncate">{next.title}</span>
+                                  <span className="text-xs font-semibold flex-shrink-0"
+                                    style={{ color: PERSON_COLORS[next.responsible] || '#64748b' }}>
+                                    {next.responsible}
+                                  </span>
+                                  {next.execution_date && (
+                                    <span className="text-xs text-gray-300 flex-shrink-0">
+                                      {formatDate(next.execution_date)}
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
 
                           {/* Actions */}
@@ -687,6 +805,15 @@ export default function Admin() {
           <span>amazing lab — atelier planning</span>
         </div>
       </main>
+
+      {/* Modal logistique */}
+      {logisticsProject && (
+        <LogisticsModal
+          project={logisticsProject}
+          onClose={() => setLogisticsProject(null)}
+          onSave={handleSaveLogistics}
+        />
+      )}
 
       {/* Modal tâches projet */}
       {selectedProjectId && (() => {

@@ -360,6 +360,7 @@ export default function Tasks() {
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [feedback, setFeedback] = useState(null)
+  const [notifStatus, setNotifStatus] = useState('unknown') // 'unknown'|'granted'|'denied'|'unsupported'
 
   // Chargement identité depuis localStorage
   useEffect(() => {
@@ -370,7 +371,43 @@ export default function Tasks() {
     } else {
       setShowWho(true)
     }
+    // Statut notifications
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setNotifStatus('unsupported')
+    } else {
+      setNotifStatus(Notification.permission)
+    }
   }, [])
+
+  async function requestNotifications() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return
+    const permission = await Notification.requestPermission()
+    setNotifStatus(permission)
+    if (permission !== 'granted') return
+
+    const sw = await navigator.serviceWorker.ready
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidKey) return
+
+    // Convertit la clé VAPID base64url → Uint8Array
+    const keyData = vapidKey.replace(/-/g, '+').replace(/_/g, '/')
+    const padding = '='.repeat((4 - keyData.length % 4) % 4)
+    const raw = atob(keyData + padding)
+    const uint8 = new Uint8Array(raw.length)
+    for (let i = 0; i < raw.length; i++) uint8[i] = raw.charCodeAt(i)
+
+    const subscription = await sw.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: uint8,
+    })
+
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription, user: currentUser }),
+    })
+    showMsg('Notifications activées ! 🔔')
+  }
 
   function selectUser(name) {
     localStorage.setItem('al_user', name)
@@ -538,6 +575,19 @@ export default function Tasks() {
               <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200">
                 Admin
               </Link>
+              {/* Bouton notifications */}
+              {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
+                <button
+                  onClick={requestNotifications}
+                  title="Activer les notifications"
+                  className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 text-base">
+                  🔔
+                </button>
+              )}
+              {notifStatus === 'granted' && (
+                <span title="Notifications activées" className="w-8 h-8 flex items-center justify-center rounded-full text-base"
+                  style={{ background: '#f0fdf4' }}>🔔</span>
+              )}
               <button
                 onClick={() => setShowWho(true)}
                 className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"

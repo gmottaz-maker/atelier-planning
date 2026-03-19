@@ -1,0 +1,18 @@
+{
+  "name": "Amazing Lab Planning",
+  "short_name": "AL Planning",
+  "description": "Gestionnaire de projets et tâches — Amazing Lab",
+  "start_url": "/tasks",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#FF4D6D",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
