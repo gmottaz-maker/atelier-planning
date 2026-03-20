@@ -27,7 +27,7 @@ function parseDate(str) {
 }
 
 function toDateStr(date) {
-  return date.toISOString().split('T')[0]
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
 
 function endOfWeek() {
@@ -611,6 +611,7 @@ export default function Tasks() {
 
             {/* Nav + identité */}
             <div className="flex items-center gap-2">
+              <Link href="/home" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Accueil</Link>
               <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Projets</Link>
               <Link href="/activity" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">
                 <span className="hidden sm:inline">Activité</span><span className="sm:hidden">📊</span>

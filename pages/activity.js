@@ -90,6 +90,7 @@ export default function Activity() {
             <span className="font-bold text-gray-900 text-sm">Activité</span>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/home" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Accueil</Link>
             <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Projets</Link>
             <Link href="/tasks" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Tâches</Link>
             {user && (

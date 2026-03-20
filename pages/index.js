@@ -591,6 +591,10 @@ export default function Admin() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
+            <Link href="/home" style={{ border: '1.5px solid #e5e7eb', color: '#374151' }}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white">
+              <span>🏠</span><span className="hidden sm:inline"> Accueil</span>
+            </Link>
             <Link href="/tasks" style={{ border: '1.5px solid #e5e7eb', color: '#374151' }}
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:border-gray-400 transition-colors bg-white">
               <span>✅</span><span className="hidden sm:inline"> Tâches</span>
