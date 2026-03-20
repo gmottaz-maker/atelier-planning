@@ -183,6 +183,38 @@ function AddressInput({ value, onChange, placeholder, className, style }) {
   )
 }
 
+// ─── TimeRangeInput ───────────────────────────────────────────────────────────
+
+function parseTimeRange(value) {
+  if (!value) return { start: '', end: '' }
+  const parts = value.split(/\s*[–\-]\s*/)
+  function toInput(s) {
+    if (!s) return ''
+    s = s.trim().replace(/h/i, ':')
+    return /^\d{2}:\d{2}$/.test(s) ? s : ''
+  }
+  return { start: toInput(parts[0] || ''), end: toInput(parts[1] || '') }
+}
+function fmtTimeRange(start, end) {
+  if (!start && !end) return ''
+  if (start && end) return `${start} – ${end}`
+  return start || end
+}
+function TimeRangeInput({ value, onChange, baseClass }) {
+  const { start, end } = parseTimeRange(value)
+  return (
+    <div className="flex items-center gap-2">
+      <input type="time" value={start}
+        onChange={e => onChange(fmtTimeRange(e.target.value, end))}
+        className={`flex-1 ${baseClass}`} style={{ fontSize: 16 }} />
+      <span className="text-gray-400 text-sm flex-shrink-0">–</span>
+      <input type="time" value={end}
+        onChange={e => onChange(fmtTimeRange(start, e.target.value))}
+        className={`flex-1 ${baseClass}`} style={{ fontSize: 16 }} />
+    </div>
+  )
+}
+
 // ─── Modal logistique (Montage + Démontage) ──────────────────────────────────
 
 function LogisticsModal({ project, onClose, onSave }) {
@@ -263,65 +295,43 @@ function LogisticsModal({ project, onClose, onSave }) {
         {/* Form */}
         <div className="overflow-y-auto flex-1 px-5 py-4" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
           <form onSubmit={handleSave} className="space-y-3">
-            {tab === 'montage' ? (
-              <>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Adresse</label>
-                  <AddressInput value={form.logistics_address} onChange={v => set('logistics_address', v)}
-                    placeholder="Rue, ville..." className={inp} style={inpFocus} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Heure prévue</label>
-                  <input type="text" value={form.logistics_time}
-                    onChange={e => set('logistics_time', e.target.value)}
-                    placeholder="Ex: 08h00 – 10h00" className={inp} style={inpFocus} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Contact sur place</label>
-                  <input type="text" value={form.logistics_contact}
-                    onChange={e => set('logistics_contact', e.target.value)}
-                    placeholder="Nom + téléphone" className={inp} style={inpFocus} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Commentaires</label>
-                  <textarea rows={3} value={form.logistics_notes}
-                    onChange={e => set('logistics_notes', e.target.value)}
-                    placeholder="Accès, matériel, remarques..." className={inp} style={{ ...inpFocus, resize: 'none' }} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Date de démontage</label>
-                  <input type="date" value={form.disassembly_date}
-                    onChange={e => set('disassembly_date', e.target.value)}
-                    className={inp} style={inpFocus} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Adresse</label>
-                  <AddressInput value={form.disassembly_address} onChange={v => set('disassembly_address', v)}
-                    placeholder="Rue, ville..." className={inp} style={inpFocus} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Heure prévue</label>
-                  <input type="text" value={form.disassembly_time}
-                    onChange={e => set('disassembly_time', e.target.value)}
-                    placeholder="Ex: 17h00 – 19h00" className={inp} style={inpFocus} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Contact sur place</label>
-                  <input type="text" value={form.disassembly_contact}
-                    onChange={e => set('disassembly_contact', e.target.value)}
-                    placeholder="Nom + téléphone" className={inp} style={inpFocus} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Commentaires</label>
-                  <textarea rows={3} value={form.disassembly_notes}
-                    onChange={e => set('disassembly_notes', e.target.value)}
-                    placeholder="Accès, matériel, remarques..." className={inp} style={{ ...inpFocus, resize: 'none' }} />
-                </div>
-              </>
+            {/* ── Champs communs : date (démontage seulement), adresse, heure, contact, notes ── */}
+            {tab === 'demontage' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Date de démontage</label>
+                <input type="date" value={form.disassembly_date}
+                  onChange={e => set('disassembly_date', e.target.value)}
+                  className={inp} style={inpFocus} />
+              </div>
             )}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Adresse</label>
+              <AddressInput
+                value={tab === 'montage' ? form.logistics_address : form.disassembly_address}
+                onChange={v => set(tab === 'montage' ? 'logistics_address' : 'disassembly_address', v)}
+                placeholder="Rue, ville..." className={inp} style={inpFocus} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Heure prévue</label>
+              <TimeRangeInput
+                value={tab === 'montage' ? form.logistics_time : form.disassembly_time}
+                onChange={v => set(tab === 'montage' ? 'logistics_time' : 'disassembly_time', v)}
+                baseClass={inp} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Contact sur place</label>
+              <input type="text"
+                value={tab === 'montage' ? form.logistics_contact : form.disassembly_contact}
+                onChange={e => set(tab === 'montage' ? 'logistics_contact' : 'disassembly_contact', e.target.value)}
+                placeholder="Nom + téléphone" className={inp} style={inpFocus} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Commentaires</label>
+              <textarea rows={3}
+                value={tab === 'montage' ? form.logistics_notes : form.disassembly_notes}
+                onChange={e => set(tab === 'montage' ? 'logistics_notes' : 'disassembly_notes', e.target.value)}
+                placeholder="Accès, matériel, remarques..." className={inp} style={{ ...inpFocus, resize: 'none' }} />
+            </div>
 
             <button type="submit" disabled={saving}
               className="w-full py-3 rounded-2xl text-white font-semibold text-sm disabled:opacity-50 transition-opacity"

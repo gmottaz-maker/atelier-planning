@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { title, project_id, responsible, execution_date, due_date, is_private, notes } = req.body
+    const { title, project_id, responsible, execution_date, due_date, is_private, notes, category } = req.body
 
     if (!title || !responsible || !execution_date) {
       return res.status(400).json({ error: 'Champs obligatoires manquants' })
@@ -49,6 +49,7 @@ export default async function handler(req, res) {
       due_date: due_date || null,
       is_private: is_private || false,
       notes: notes || null,
+      category: category || null,
       status: 'active',
     }).select().single()
 

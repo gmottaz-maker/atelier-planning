@@ -33,16 +33,35 @@ export default async function handler(req, res) {
       name, client, description, deadline, delivery_type, responsible, color_override, notes, status,
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date, disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
+      logistics_data,
     } = req.body
 
+    const payload = {
+      name, client, description, deadline, delivery_type, responsible, color_override, notes, status,
+      logistics_address, logistics_time, logistics_contact, logistics_notes,
+      disassembly_date: disassembly_date || null,
+      disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
+      updated_at: new Date().toISOString(),
+    }
+
+    // Persist new logistics_data and keep legacy fields in sync
+    if (logistics_data !== undefined) {
+      payload.logistics_data = logistics_data
+      const m = logistics_data.montage || {}
+      payload.logistics_address = m.address || ''
+      payload.logistics_time    = m.time    || ''
+      payload.logistics_contact = m.contact || ''
+      payload.logistics_notes   = m.notes   || ''
+      const d = logistics_data.demontage || {}
+      payload.disassembly_date    = d.date    || null
+      payload.disassembly_address = d.address || ''
+      payload.disassembly_time    = d.time    || ''
+      payload.disassembly_contact = d.contact || ''
+      payload.disassembly_notes   = d.notes   || ''
+    }
+
     const { data, error } = await supabase.from('projects')
-      .update({
-        name, client, description, deadline, delivery_type, responsible, color_override, notes, status,
-        logistics_address, logistics_time, logistics_contact, logistics_notes,
-        disassembly_date: disassembly_date || null,
-        disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('id', id)
       .select()
 
