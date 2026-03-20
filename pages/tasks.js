@@ -103,9 +103,20 @@ function CountdownBadge({ task }) {
 // ─── Composant TaskCard ───────────────────────────────────────────────────
 
 function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
+  const [striking, setStriking] = useState(false)
   const completed = task.status === 'completed'
   const personColor = PERSON_COLORS[task.responsible] || '#64748b'
   const projectName = task.projects?.name
+
+  // Reset animation lorsqu'on ré-active la tâche
+  useEffect(() => { if (!completed) setStriking(false) }, [completed])
+
+  function handleToggle() {
+    if (!completed) setStriking(true)
+    onToggle(task)
+  }
+
+  const showLine = completed || striking
 
   return (
     <div
@@ -118,7 +129,7 @@ function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
       <div className="flex items-center gap-3 p-4">
         {/* Checkbox — touch target 44px */}
         <button
-          onClick={() => onToggle(task)}
+          onClick={handleToggle}
           className="flex-shrink-0 flex items-center justify-center transition-all"
           style={{ width: 44, height: 44, margin: -10 }}
         >
@@ -140,10 +151,27 @@ function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
         {/* Contenu */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <p className={`text-sm font-semibold text-gray-900 leading-snug ${completed ? 'line-through text-gray-400' : ''}`}>
-              {task.is_private && <span className="mr-1">🔒</span>}
-              {task.title}
-            </p>
+            <div className="relative flex-1 min-w-0">
+              <p className={`text-sm font-semibold leading-snug ${completed ? 'text-gray-400' : 'text-gray-900'}`}>
+                {task.is_private && <span className="mr-1">🔒</span>}
+                {task.title}
+              </p>
+              {showLine && (
+                <span style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '-2px',
+                  right: '-2px',
+                  height: '2px',
+                  background: '#9ca3af',
+                  borderRadius: '2px',
+                  pointerEvents: 'none',
+                  transformOrigin: 'left center',
+                  transform: 'translateY(-50%) rotate(-0.6deg)',
+                  animation: striking && !completed ? 'taskStrike 0.5s cubic-bezier(0.4,0,0.2,1) both' : 'none',
+                }} />
+              )}
+            </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {!completed && (
                 <button onClick={() => onEdit(task)}
@@ -543,6 +571,10 @@ export default function Tasks() {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           * { -webkit-tap-highlight-color: transparent; }
+          @keyframes taskStrike {
+            from { transform: translateY(-50%) rotate(-0.6deg) scaleX(0); }
+            to   { transform: translateY(-50%) rotate(-0.6deg) scaleX(1); }
+          }
           button, a { touch-action: manipulation; }
           input:focus, select:focus { border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; outline: none; }
           @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
@@ -579,7 +611,7 @@ export default function Tasks() {
 
             {/* Nav + identité */}
             <div className="flex items-center gap-2">
-              <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Admin</Link>
+              <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Projets</Link>
               <Link href="/activity" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">
                 <span className="hidden sm:inline">Activité</span><span className="sm:hidden">📊</span>
               </Link>

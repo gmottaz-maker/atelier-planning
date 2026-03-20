@@ -70,16 +70,21 @@ function AtomLogo({ size = 24 }) {
   )
 }
 
-// ─── AddressInput (Google Places autocomplete si clé dispo) ─────────────────
+// ─── AddressInput — Nominatim (gratuit) ou Google Maps si clé dispo ──────────
 
 function AddressInput({ value, onChange, placeholder, className, style }) {
-  const inputRef = useRef(null)
-  const acRef   = useRef(null)
-  const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
+  const inputRef    = useRef(null)
+  const acRef       = useRef(null)
+  const debounceRef = useRef(null)
+  const mapsKey     = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
 
+  const [suggestions, setSuggestions] = useState([])
+  const [open, setOpen]               = useState(false)
+  const [active, setActive]           = useState(-1)
+
+  // ── Google Maps (si clé configurée) ────────────────────────────────────────
   useEffect(() => {
     if (!mapsKey || !inputRef.current) return
-
     function setup() {
       if (!window.google?.maps?.places || !inputRef.current) return
       acRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
@@ -90,39 +95,91 @@ function AddressInput({ value, onChange, placeholder, className, style }) {
         if (place?.formatted_address) onChange(place.formatted_address)
       })
     }
-
-    if (window.google?.maps?.places) {
-      setup()
-    } else if (!document.getElementById('gmaps-script')) {
+    if (window.google?.maps?.places) { setup() }
+    else if (!document.getElementById('gmaps-script')) {
       window.__gmapsReady = setup
       const s = document.createElement('script')
-      s.id  = 'gmaps-script'
+      s.id = 'gmaps-script'
       s.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=places&callback=__gmapsReady`
       s.async = true
       document.head.appendChild(s)
     } else {
-      // Script already loading — chain callback
       const prev = window.__gmapsReady
       window.__gmapsReady = () => { prev?.(); setup() }
     }
-
-    return () => {
-      if (acRef.current && window.google?.maps?.event) {
-        window.google.maps.event.clearInstanceListeners(acRef.current)
-      }
-    }
+    return () => { if (acRef.current && window.google?.maps?.event) window.google.maps.event.clearInstanceListeners(acRef.current) }
   }, [mapsKey])
 
+  // ── Nominatim (OpenStreetMap, sans clé) ────────────────────────────────────
+  function handleChange(e) {
+    const q = e.target.value
+    onChange(q)
+    if (mapsKey) return  // Google Maps gère les suggestions
+    clearTimeout(debounceRef.current)
+    setActive(-1)
+    if (q.length < 3) { setSuggestions([]); setOpen(false); return }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=0`,
+          { headers: { 'Accept-Language': 'fr,en' } }
+        )
+        const d = await r.json()
+        setSuggestions(d.map(x => x.display_name))
+        setOpen(true)
+      } catch { /* réseau indispo */ }
+    }, 350)
+  }
+
+  function pick(addr) {
+    onChange(addr)
+    setSuggestions([])
+    setOpen(false)
+    setActive(-1)
+  }
+
+  function handleKeyDown(e) {
+    if (!open || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(a + 1, suggestions.length - 1)) }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setActive(a => Math.max(a - 1, 0)) }
+    if (e.key === 'Enter' && active >= 0) { e.preventDefault(); pick(suggestions[active]) }
+    if (e.key === 'Escape') { setOpen(false) }
+  }
+
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={className}
-      style={style}
-    />
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        placeholder={placeholder}
+        className={className}
+        style={style}
+        autoComplete="off"
+      />
+      {!mapsKey && open && suggestions.length > 0 && (
+        <ul style={{
+          position: 'absolute', zIndex: 9999, top: '100%', left: 0, right: 0, marginTop: 4,
+          background: 'white', border: '1px solid #e5e7eb', borderRadius: 12,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.1)', overflow: 'hidden', padding: 0, listStyle: 'none',
+        }}>
+          {suggestions.map((s, i) => (
+            <li key={i} onMouseDown={() => pick(s)}
+              style={{
+                padding: '9px 14px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+                overflow: 'hidden', textOverflow: 'ellipsis', color: '#374151',
+                background: i === active ? '#f3f4f6' : 'white',
+              }}>
+              📍 {s}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -508,7 +565,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
       <Head>
-        <title>Atelier Planning — Admin</title>
+        <title>Atelier Planning — Projets</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
