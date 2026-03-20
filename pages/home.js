@@ -31,6 +31,11 @@ function toDateStr(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
 
+function isCompletedToday(task) {
+  if (task.status !== 'completed' || !task.completed_at) return false
+  return task.completed_at.split('T')[0] === toDateStr(today())
+}
+
 function endOfWeek() {
   const d = today()
   const day = d.getDay() || 7
@@ -62,28 +67,60 @@ function fmtTime(iso) {
 
 // ─── Task item ───────────────────────────────────────────────────────────────
 
-function TaskItem({ task }) {
+function TaskItem({ task, onToggle, showPerson = false }) {
   const todayStr = toDateStr(today())
-  const isLate = task.execution_date < todayStr
+  const isLate = task.execution_date && task.execution_date < todayStr
+  const completed = task.status === 'completed'
+
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b" style={{ borderColor: '#f3f4f6' }}>
-      <div className="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0"
-        style={{ background: PERSON_COLORS[task.responsible] || '#ccc' }} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 leading-snug">{task.title}</p>
-        {task.projects?.name && (
-          <p className="text-xs text-gray-400 mt-0.5">{task.projects.name}</p>
+    <div className="flex items-center gap-3 py-2.5 border-b" style={{ borderColor: '#f3f4f6' }}>
+      {/* Checkbox */}
+      <button
+        onClick={() => onToggle && onToggle(task)}
+        className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+        style={{
+          borderColor: completed ? '#22c55e' : '#d1d5db',
+          background: completed ? '#22c55e' : 'white',
+        }}
+      >
+        {completed && (
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         )}
+      </button>
+
+      {/* Person dot */}
+      <div className="w-2 h-2 rounded-full flex-shrink-0"
+        style={{ background: PERSON_COLORS[task.responsible] || '#ccc' }} />
+
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-semibold leading-snug ${completed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+          {task.title}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {task.projects?.name && (
+            <p className="text-xs text-gray-400">{task.projects.name}</p>
+          )}
+          {showPerson && task.responsible && (
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded-full"
+              style={{ background: (PERSON_COLORS[task.responsible] || '#ccc') + '22', color: PERSON_COLORS[task.responsible] || '#ccc' }}>
+              {task.responsible}
+            </span>
+          )}
+        </div>
       </div>
-      {isLate && (
+
+      {!completed && isLate && (
         <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
           style={{ background: '#fef2f2', color: '#ef4444' }}>
           retard
         </span>
       )}
-      {!isLate && task.execution_date && task.execution_date !== todayStr && (
+      {!completed && !isLate && task.execution_date && task.execution_date !== todayStr && (
         <span className="text-xs text-gray-400 flex-shrink-0">
-          {new Date(...task.execution_date.split('-').map((v,i)=>i===1?v-1:+v)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+          {new Date(...task.execution_date.split('-').map((v,i)=>i===1?v-1:+v))
+            .toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
         </span>
       )}
     </div>
@@ -143,8 +180,9 @@ export default function HomePage() {
 
   const [tasks, setTasks] = useState([])
   const [tasksLoading, setTasksLoading] = useState(true)
-  const [calEvents, setCalEvents] = useState([]) // [{ calName, event }]
-  const [calStatus, setCalStatus] = useState('idle') // idle | loading | error | ok
+  const [taskView, setTaskView] = useState('list') // 'list' | 'week'
+  const [calEvents, setCalEvents] = useState([])
+  const [calStatus, setCalStatus] = useState('idle')
   const [calError, setCalError] = useState('')
   const tokenClientRef = useRef(null)
   const gapiReadyRef = useRef(false)
@@ -159,15 +197,64 @@ export default function HomePage() {
       .finally(() => setTasksLoading(false))
   }, [currentUser])
 
-  // ─── Task groups ─────────────────────────────────────────────────────────
+  // ─── Toggle task completion ───────────────────────────────────────────────
+  async function toggleTask(task) {
+    const newStatus = task.status === 'completed' ? 'active' : 'completed'
+    const now = new Date().toISOString()
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === task.id
+      ? { ...t, status: newStatus, completed_at: newStatus === 'completed' ? now : null }
+      : t
+    ))
+    try {
+      const { projects: _p, ...taskData } = task
+      await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify({ ...taskData, status: newStatus, completed_at: newStatus === 'completed' ? now : null }),
+      })
+    } catch (err) {
+      // Revert on error
+      setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+      console.error(err)
+    }
+  }
+
+  // ─── Task groups (list view) ──────────────────────────────────────────────
   const todayStr    = toDateStr(today())
   const weekEndStr  = toDateStr(endOfWeek())
-  const myTasks     = tasks.filter(t => t.responsible === currentUser && t.status === 'active')
-  const todayTasks  = myTasks.filter(t => t.execution_date <= todayStr)
-  const weekTasks   = myTasks.filter(t => t.execution_date > todayStr && t.execution_date <= weekEndStr)
-  const upcomingTasks = myTasks.filter(t => !t.execution_date || t.execution_date > weekEndStr)
+  const myTasks     = tasks.filter(t =>
+    t.responsible === currentUser &&
+    (t.status === 'active' || isCompletedToday(t))
+  )
+  const todayTasks    = myTasks.filter(t => !t.execution_date || t.execution_date <= todayStr)
+  const weekTasks     = myTasks.filter(t => t.execution_date > todayStr && t.execution_date <= weekEndStr)
+  const upcomingTasks = myTasks.filter(t => t.execution_date > weekEndStr)
 
-  // ─── Google Calendar helpers ─────────────────────────────────────────────
+  // ─── Week view helpers ────────────────────────────────────────────────────
+  const weekStart = (() => {
+    const d = today()
+    const dow = d.getDay() || 7
+    return addDays(d, 1 - dow)
+  })()
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+
+  // All active tasks + completed today, for the whole team
+  const allVisibleTasks = tasks.filter(t => t.status === 'active' || isCompletedToday(t))
+
+  function tasksForDay(dayStr) {
+    return allVisibleTasks.filter(t => {
+      if (!t.execution_date) return false
+      return t.execution_date === dayStr
+    }).sort((a, b) => {
+      // Current user first, then alphabetically
+      if (a.responsible === currentUser && b.responsible !== currentUser) return -1
+      if (b.responsible === currentUser && a.responsible !== currentUser) return 1
+      return (a.responsible || '').localeCompare(b.responsible || '')
+    })
+  }
+
+  // ─── Google Calendar helpers ──────────────────────────────────────────────
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
@@ -188,19 +275,17 @@ export default function HomePage() {
       window.gapi.client.setToken({ access_token: token })
       await window.gapi.client.load('https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest')
 
-      // List calendars
       const listRes = await window.gapi.client.calendar.calendarList.list({ maxResults: 100 })
       const allCals = listRes.result.items || []
       const matched = allCals.filter(c => TARGET_CALS.includes(c.summary))
 
       if (matched.length === 0) {
         const names = allCals.map(c => c.summary).join(', ')
-        setCalError(`Aucun des calendriers cibles trouvé. Calendriers disponibles : ${names || '(aucun)'}`)
+        setCalError(`Aucun calendrier cible trouvé. Disponibles : ${names || '(aucun)'}`)
         setCalStatus('error')
         return
       }
 
-      // Fetch events (today → +14 days)
       const timeMin = today().toISOString()
       const timeMax = addDays(today(), 14).toISOString()
       const all = []
@@ -208,8 +293,7 @@ export default function HomePage() {
       await Promise.all(matched.map(async cal => {
         const r = await window.gapi.client.calendar.events.list({
           calendarId: cal.id,
-          timeMin,
-          timeMax,
+          timeMin, timeMax,
           singleEvents: true,
           orderBy: 'startTime',
           maxResults: 100,
@@ -217,7 +301,6 @@ export default function HomePage() {
         ;(r.result.items || []).forEach(e => all.push({ calName: cal.summary, event: e }))
       }))
 
-      // Sort chronologically
       all.sort((a, b) => {
         const da = a.event.start?.dateTime || a.event.start?.date || ''
         const db = b.event.start?.dateTime || b.event.start?.date || ''
@@ -257,7 +340,6 @@ export default function HomePage() {
           await fetchWithToken(resp.access_token)
         },
       })
-      // prompt:'' = silent if already granted, shows consent only first time
       tokenClientRef.current.requestAccessToken({ prompt: '' })
     } catch (err) {
       setCalError(err?.message || 'Erreur de chargement')
@@ -265,7 +347,7 @@ export default function HomePage() {
     }
   }
 
-  // ─── Group events by date ────────────────────────────────────────────────
+  // ─── Group calendar events by date ───────────────────────────────────────
   const eventsByDate = {}
   calEvents.forEach(({ calName, event }) => {
     const dateStr = event.start?.date || event.start?.dateTime?.split('T')[0]
@@ -297,18 +379,9 @@ export default function HomePage() {
             <span className="font-bold text-gray-900 text-sm">accueil</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/tasks"
-              className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">
-              Tâches
-            </Link>
-            <Link href="/"
-              className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">
-              Projets
-            </Link>
-            <Link href="/activity"
-              className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors hidden sm:block">
-              Activité
-            </Link>
+            <Link href="/tasks" title="Tâches" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">✅</Link>
+            <Link href="/" title="Projets" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🗂️</Link>
+            <Link href="/activity" title="Activité" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">📊</Link>
             <button
               onClick={() => signOut()}
               className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
@@ -323,9 +396,34 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-          {/* ══ LEFT: personal tasks ══ */}
+          {/* ══ LEFT: tasks ══ */}
           <div>
-            <h2 className="text-base font-bold text-gray-900 mb-5">Mes tâches</h2>
+            {/* Header + view toggle */}
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold text-gray-900">
+                {taskView === 'list' ? 'Mes tâches' : 'Semaine'}
+              </h2>
+              <div className="flex items-center rounded-full border border-gray-200 overflow-hidden text-xs font-semibold">
+                <button
+                  onClick={() => setTaskView('list')}
+                  className="px-3 py-1.5 transition-colors"
+                  style={{
+                    background: taskView === 'list' ? '#111' : 'white',
+                    color: taskView === 'list' ? 'white' : '#6b7280',
+                  }}>
+                  Liste
+                </button>
+                <button
+                  onClick={() => setTaskView('week')}
+                  className="px-3 py-1.5 transition-colors"
+                  style={{
+                    background: taskView === 'week' ? '#111' : 'white',
+                    color: taskView === 'week' ? 'white' : '#6b7280',
+                  }}>
+                  Semaine
+                </button>
+              </div>
+            </div>
 
             {tasksLoading && (
               <div className="flex items-center justify-center py-12">
@@ -334,20 +432,23 @@ export default function HomePage() {
               </div>
             )}
 
-            {!tasksLoading && (
+            {/* ── LIST VIEW ── */}
+            {!tasksLoading && taskView === 'list' && (
               <>
                 {/* Today */}
                 <section className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Aujourd'hui</span>
-                    {todayTasks.length > 0 && (
+                    {todayTasks.filter(t => t.status === 'active').length > 0 && (
                       <span className="px-1.5 py-0.5 rounded-full text-xs font-bold text-white"
-                        style={{ background: PINK }}>{todayTasks.length}</span>
+                        style={{ background: PINK }}>
+                        {todayTasks.filter(t => t.status === 'active').length}
+                      </span>
                     )}
                   </div>
                   {todayTasks.length === 0
                     ? <p className="text-sm text-gray-400 py-1">Rien pour aujourd'hui 🎉</p>
-                    : todayTasks.map(t => <TaskItem key={t.id} task={t} />)
+                    : todayTasks.map(t => <TaskItem key={t.id} task={t} onToggle={toggleTask} />)
                   }
                 </section>
 
@@ -357,10 +458,10 @@ export default function HomePage() {
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Cette semaine</span>
                       <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
-                        {weekTasks.length}
+                        {weekTasks.filter(t => t.status === 'active').length}
                       </span>
                     </div>
-                    {weekTasks.map(t => <TaskItem key={t.id} task={t} />)}
+                    {weekTasks.map(t => <TaskItem key={t.id} task={t} onToggle={toggleTask} />)}
                   </section>
                 )}
 
@@ -373,14 +474,61 @@ export default function HomePage() {
                         {upcomingTasks.length}
                       </span>
                     </div>
-                    {upcomingTasks.map(t => <TaskItem key={t.id} task={t} />)}
+                    {upcomingTasks.map(t => <TaskItem key={t.id} task={t} onToggle={toggleTask} />)}
                   </section>
                 )}
 
-                {myTasks.length === 0 && !tasksLoading && (
+                {myTasks.length === 0 && (
                   <p className="text-sm text-gray-400">Aucune tâche assignée.</p>
                 )}
               </>
+            )}
+
+            {/* ── WEEK VIEW ── */}
+            {!tasksLoading && taskView === 'week' && (
+              <div>
+                {weekDays.map(day => {
+                  const dayStr = toDateStr(day)
+                  const dayTasks = tasksForDay(dayStr)
+                  const isToday = dayStr === todayStr
+                  const isPast = dayStr < todayStr
+                  const isWeekend = day.getDay() === 0 || day.getDay() === 6
+                  const dayLabel = day.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+
+                  return (
+                    <div key={dayStr} className="mb-4">
+                      {/* Day header */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span
+                          className="text-xs font-bold uppercase tracking-wider capitalize"
+                          style={{ color: isToday ? PINK : isPast ? '#d1d5db' : isWeekend ? '#9ca3af' : '#6b7280' }}>
+                          {dayLabel}
+                        </span>
+                        {isToday && (
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: PINK }} />
+                        )}
+                        {dayTasks.length > 0 && (
+                          <span className="text-xs text-gray-400">{dayTasks.filter(t => t.status === 'active').length} tâche{dayTasks.filter(t => t.status === 'active').length > 1 ? 's' : ''}</span>
+                        )}
+                      </div>
+
+                      {/* Tasks for this day */}
+                      <div className={`rounded-xl border ${isToday ? '' : 'border-gray-100'}`}
+                        style={{ borderColor: isToday ? PINK + '33' : undefined, background: isToday ? PINK + '05' : undefined }}>
+                        {dayTasks.length === 0 ? (
+                          <p className="text-xs text-gray-300 px-3 py-2">—</p>
+                        ) : (
+                          <div className="px-3">
+                            {dayTasks.map(t => (
+                              <TaskItem key={t.id} task={t} onToggle={toggleTask} showPerson={true} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
 
@@ -405,7 +553,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Calendar legend */}
             {calStatus !== 'idle' && (
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {TARGET_CALS.map(c => (
@@ -417,7 +564,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Idle state */}
             {calStatus === 'idle' && (
               <div className="rounded-2xl border border-dashed border-gray-200 p-8 text-center">
                 <div className="text-3xl mb-2">📅</div>
@@ -431,7 +577,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Loading */}
             {calStatus === 'loading' && (
               <div className="flex items-center justify-center py-12">
                 <div className="w-6 h-6 rounded-full border-2 animate-spin"
@@ -439,7 +584,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Error */}
             {calStatus === 'error' && (
               <div className="rounded-2xl bg-red-50 border border-red-100 p-4 text-sm text-red-600 mb-4">
                 <p className="font-semibold mb-1">Erreur de connexion</p>
@@ -452,12 +596,10 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* No events */}
             {calStatus === 'ok' && eventDates.length === 0 && (
               <p className="text-sm text-gray-400 py-4">Aucun événement dans les 14 prochains jours.</p>
             )}
 
-            {/* Events grouped by day */}
             {calStatus === 'ok' && eventDates.map(dateStr => (
               <div key={dateStr} className="mb-5">
                 <p className="text-xs font-bold uppercase tracking-wider mb-2 capitalize"
