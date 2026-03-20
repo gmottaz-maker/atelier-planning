@@ -13,13 +13,16 @@ const PERSON_COLORS = {
 }
 const RESPONSIBLES = ['Arnaud', 'Gabin', 'Guillaume', 'Sous-traitant']
 
-const LOGISTICS_SECTIONS = [
-  { key: 'montage',     label: 'Montage',    icon: '🔨', hasDate: false },
-  { key: 'livraison',   label: 'Livraison',  icon: '🚚', hasDate: false },
-  { key: 'envoi_dhl',   label: 'Envoi DHL',  icon: '✈️', hasDate: false },
-  { key: 'demontage',   label: 'Démontage',  icon: '🔧', hasDate: true  },
-  { key: 'recuperation',label: 'Récupération',icon: '↩️', hasDate: true  },
+const LOGISTICS_TYPES = [
+  { key: 'montage',      label: 'Montage',      icon: '🔨' },
+  { key: 'demontage',    label: 'Démontage',    icon: '🔧' },
+  { key: 'livraison',    label: 'Livraison',    icon: '🚚' },
+  { key: 'recuperation', label: 'Récupération', icon: '↩️' },
+  { key: 'envoi_dhl',    label: 'Envoi DHL',    icon: '✈️' },
+  { key: 'envoi_ete',    label: 'Envoi ETE',    icon: '📦' },
 ]
+// Types that have a date field
+const TYPES_WITH_DATE = ['demontage', 'recuperation', 'livraison', 'envoi_dhl', 'envoi_ete', 'montage']
 
 const TASK_CATEGORIES = [
   { key: 'bureau',         label: 'Bureau',            icon: '🏢' },
@@ -60,29 +63,35 @@ function getProjectColor(p) {
   return '#22c55e'
 }
 
-// Init logistics from project (backward compat with old columns)
+// Init logistics from project → returns an array of items
 function initLogistics(project) {
-  const base = { ...(project.logistics_data || {}) }
-  // Migrate old montage fields if not yet in logistics_data
-  if (!base.montage && (project.logistics_address || project.logistics_time)) {
-    base.montage = {
-      address: project.logistics_address || '',
-      time:    project.logistics_time    || '',
-      contact: project.logistics_contact || '',
-      notes:   project.logistics_notes   || '',
+  const existing = project.logistics_data || {}
+
+  // New format: already an array
+  if (Array.isArray(existing) && existing.length > 0) return existing
+
+  // Old format: object keyed by type — migrate to array
+  if (!Array.isArray(existing)) {
+    const OLD_KEYS = ['montage', 'livraison', 'envoi_dhl', 'demontage', 'recuperation']
+    const items = []
+    for (const key of OLD_KEYS) {
+      const d = existing[key]
+      if (d && Object.values(d).some(v => v && String(v).trim())) {
+        items.push({ type: key, ...d })
+      }
     }
+    if (items.length > 0) return items
   }
-  // Migrate old demontage fields
-  if (!base.demontage && (project.disassembly_address || project.disassembly_date)) {
-    base.demontage = {
-      date:    project.disassembly_date    || '',
-      address: project.disassembly_address || '',
-      time:    project.disassembly_time    || '',
-      contact: project.disassembly_contact || '',
-      notes:   project.disassembly_notes   || '',
-    }
+
+  // Legacy columns fallback
+  const items = []
+  if (project.logistics_address || project.logistics_time) {
+    items.push({ type: 'montage', date: '', address: project.logistics_address || '', time: project.logistics_time || '', contact: project.logistics_contact || '', notes: project.logistics_notes || '' })
   }
-  return base
+  if (project.disassembly_date || project.disassembly_address) {
+    items.push({ type: 'demontage', date: project.disassembly_date || '', address: project.disassembly_address || '', time: project.disassembly_time || '', contact: project.disassembly_contact || '', notes: project.disassembly_notes || '' })
+  }
+  return items
 }
 
 // Parse / format time range "08:00 – 10:00"
@@ -245,10 +254,12 @@ export default function ProjectPage() {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Logistics state
-  const [logistics, setLogistics] = useState({})
+  // Logistics state (array of items)
+  const [logistics, setLogistics] = useState([])
   const [logisticsDirty, setLogisticsDirty] = useState(false)
   const [logisticsSaving, setLogisticsSaving] = useState(false)
+  const [expandedLogIdx, setExpandedLogIdx] = useState(null)
+  const [addingLogistics, setAddingLogistics] = useState(false)
 
   // Task state
   const [addingCategory, setAddingCategory] = useState(null)
@@ -292,21 +303,35 @@ export default function ProjectPage() {
   }, [id, currentUser])
 
   // ── Logistics helpers ────────────────────────────────────────────────────
-  function setLogisticsField(sectionKey, field, value) {
-    setLogistics(prev => ({
-      ...prev,
-      [sectionKey]: { ...(prev[sectionKey] || {}), [field]: value },
-    }))
+  function updateLogItem(idx, field, value) {
+    setLogistics(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
+    setLogisticsDirty(true)
+  }
+  function removeLogItem(idx) {
+    setLogistics(prev => prev.filter((_, i) => i !== idx))
+    if (expandedLogIdx === idx) setExpandedLogIdx(null)
+    else if (expandedLogIdx > idx) setExpandedLogIdx(expandedLogIdx - 1)
+    setLogisticsDirty(true)
+  }
+  function addLogItem(type) {
+    const newItem = { type, date: '', address: '', time: '', contact: '', notes: '' }
+    setLogistics(prev => {
+      const next = [...prev, newItem]
+      setExpandedLogIdx(next.length - 1)
+      return next
+    })
+    setAddingLogistics(false)
     setLogisticsDirty(true)
   }
 
-  async function saveLogistics() {
+  async function saveLogistics(logisticsToSave) {
     setLogisticsSaving(true)
+    const data = logisticsToSave ?? logistics
     try {
       const res = await fetch(`/api/projects/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
-        body: JSON.stringify({ ...project, logistics_data: logistics }),
+        body: JSON.stringify({ ...project, logistics_data: data }),
       })
       const updated = await res.json()
       if (updated && !updated.error) {
@@ -362,7 +387,7 @@ export default function ProjectPage() {
       const res = await fetch(`/api/projects/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
-        body: JSON.stringify({ ...project, logistics_data: logistics, site_visit_data: siteVisit }),
+        body: JSON.stringify({ ...project, logistics_data: logistics, site_visit_data: siteVisit, site_visit_summary: visitSummary || undefined }),
       })
       const updated = await res.json()
       if (updated && !updated.error) { setProject(updated); setVisitDirty(false) }
@@ -551,71 +576,117 @@ export default function ProjectPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Logistique</p>
-              {logisticsDirty && (
-                <button
-                  onClick={saveLogistics}
-                  disabled={logisticsSaving}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-full text-white disabled:opacity-60 transition-opacity"
-                  style={{ background: PINK }}>
-                  {logisticsSaving ? 'Enregistrement...' : '💾 Sauvegarder'}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {logisticsDirty && (
+                  <button onClick={() => saveLogistics()} disabled={logisticsSaving}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full text-white disabled:opacity-60 transition-opacity"
+                    style={{ background: PINK }}>
+                    {logisticsSaving ? 'Enregistrement...' : '💾 Sauvegarder'}
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {LOGISTICS_SECTIONS.map(section => {
-                const data = logistics[section.key] || {}
-                const hasContent = Object.values(data).some(v => v && v.trim?.() !== '')
+            <div className="space-y-2">
+              {logistics.map((item, idx) => {
+                const type = LOGISTICS_TYPES.find(t => t.key === item.type) || { icon: '📋', label: item.type }
+                const isOpen = expandedLogIdx === idx
+                const hasContent = item.date || item.address || item.time || item.contact || item.notes
                 return (
-                  <div key={section.key}
-                    className="bg-white rounded-2xl border overflow-hidden"
+                  <div key={idx} className="bg-white rounded-2xl border overflow-hidden"
                     style={{ borderColor: hasContent ? '#e5e7eb' : '#f3f4f6' }}>
 
-                    {/* Section header */}
-                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-50">
-                      <span className="text-sm">{section.icon}</span>
-                      <span className="text-xs font-bold text-gray-700">{section.label}</span>
-                      {hasContent && <span className="text-xs text-gray-400">✓</span>}
+                    {/* Row header */}
+                    <div
+                      className="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none"
+                      onClick={() => setExpandedLogIdx(isOpen ? null : idx)}>
+                      <span className="text-sm flex-shrink-0">{type.icon}</span>
+                      <span className="text-xs font-bold text-gray-700">{type.label}</span>
+                      {item.date && <span className="text-xs text-gray-400">{fmtDate(item.date)}</span>}
+                      {!item.date && item.address && (
+                        <span className="text-xs text-gray-400 truncate">{item.address}</span>
+                      )}
+                      <div className="ml-auto flex items-center gap-2">
+                        {hasContent && !isOpen && <span className="text-xs text-green-500">✓</span>}
+                        <button
+                          onClick={e => { e.stopPropagation(); removeLogItem(idx) }}
+                          className="text-gray-300 hover:text-red-400 transition-colors text-xs leading-none">✕</button>
+                        <span className="text-gray-300 text-xs">{isOpen ? '▲' : '▼'}</span>
+                      </div>
                     </div>
 
-                    {/* Fields */}
-                    <div className="px-4 py-3 space-y-2.5">
-                      {section.hasDate && (
+                    {/* Expanded form */}
+                    {isOpen && (
+                      <div className="px-4 pb-3 pt-1 space-y-2.5 border-t border-gray-50">
+                        <div className="flex gap-2">
+                          {/* Type selector */}
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-400 mb-1">Type</label>
+                            <select value={item.type}
+                              onChange={e => updateLogItem(idx, 'type', e.target.value)}
+                              className={inp} style={{ fontSize: 14 }}>
+                              {LOGISTICS_TYPES.map(t => (
+                                <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          {/* Date */}
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-400 mb-1">Date</label>
+                            <input type="date" value={item.date || ''} style={{ fontSize: 14 }}
+                              onChange={e => updateLogItem(idx, 'date', e.target.value)}
+                              className={inp} />
+                          </div>
+                        </div>
                         <div>
-                          <label className="block text-xs text-gray-400 mb-1">Date</label>
-                          <input type="date" value={data.date || ''} style={{ fontSize: 14 }}
-                            onChange={e => setLogisticsField(section.key, 'date', e.target.value)}
+                          <label className="block text-xs text-gray-400 mb-1">Adresse</label>
+                          <input type="text" value={item.address || ''} placeholder="Rue, ville..." style={{ fontSize: 14 }}
+                            onChange={e => updateLogItem(idx, 'address', e.target.value)}
                             className={inp} />
                         </div>
-                      )}
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Adresse</label>
-                        <input type="text" value={data.address || ''} placeholder="Rue, ville..." style={{ fontSize: 14 }}
-                          onChange={e => setLogisticsField(section.key, 'address', e.target.value)}
-                          className={inp} />
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Heure prévue</label>
+                          <TimeRangeInput value={item.time || ''} onChange={v => updateLogItem(idx, 'time', v)} />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Contact</label>
+                          <input type="text" value={item.contact || ''} placeholder="Nom + téléphone" style={{ fontSize: 14 }}
+                            onChange={e => updateLogItem(idx, 'contact', e.target.value)}
+                            className={inp} />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Notes</label>
+                          <textarea rows={2} value={item.notes || ''} placeholder="Accès, remarques..." style={{ fontSize: 14, resize: 'none' }}
+                            onChange={e => updateLogItem(idx, 'notes', e.target.value)}
+                            className={inp} />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Heure prévue</label>
-                        <TimeRangeInput
-                          value={data.time || ''}
-                          onChange={v => setLogisticsField(section.key, 'time', v)} />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Contact</label>
-                        <input type="text" value={data.contact || ''} placeholder="Nom + téléphone" style={{ fontSize: 14 }}
-                          onChange={e => setLogisticsField(section.key, 'contact', e.target.value)}
-                          className={inp} />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1">Notes</label>
-                        <textarea rows={2} value={data.notes || ''} placeholder="Accès, remarques..." style={{ fontSize: 14, resize: 'none' }}
-                          onChange={e => setLogisticsField(section.key, 'notes', e.target.value)}
-                          className={inp} />
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )
               })}
+
+              {/* Add logistics item */}
+              {addingLogistics ? (
+                <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3">
+                  <p className="text-xs text-gray-500 mb-2 font-semibold">Choisir un type :</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LOGISTICS_TYPES.map(t => (
+                      <button key={t.key} onClick={() => addLogItem(t.key)}
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400 text-gray-600 transition-colors">
+                        <span>{t.icon}</span>{t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setAddingLogistics(false)}
+                    className="mt-2 text-xs text-gray-400 hover:text-gray-600">Annuler</button>
+                </div>
+              ) : (
+                <button onClick={() => setAddingLogistics(true)}
+                  className="w-full py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 border border-dashed border-gray-200 hover:border-gray-300 rounded-2xl transition-colors">
+                  + Ajouter un point logistique
+                </button>
+              )}
             </div>
           </div>
 

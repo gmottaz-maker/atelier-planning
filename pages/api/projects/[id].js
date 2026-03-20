@@ -49,20 +49,36 @@ export default async function handler(req, res) {
     if (site_visit_data !== undefined) payload.site_visit_data = site_visit_data
     if (site_visit_summary !== undefined) payload.site_visit_summary = site_visit_summary
 
-    // Persist new logistics_data and keep legacy fields in sync
+    // Persist logistics_data and keep legacy columns in sync
     if (logistics_data !== undefined) {
       payload.logistics_data = logistics_data
-      const m = logistics_data.montage || {}
-      payload.logistics_address = m.address || ''
-      payload.logistics_time    = m.time    || ''
-      payload.logistics_contact = m.contact || ''
-      payload.logistics_notes   = m.notes   || ''
-      const d = logistics_data.demontage || {}
-      payload.disassembly_date    = d.date    || null
-      payload.disassembly_address = d.address || ''
-      payload.disassembly_time    = d.time    || ''
-      payload.disassembly_contact = d.contact || ''
-      payload.disassembly_notes   = d.notes   || ''
+      // New array format
+      if (Array.isArray(logistics_data)) {
+        const m = logistics_data.find(i => i.type === 'montage') || {}
+        payload.logistics_address = m.address || ''
+        payload.logistics_time    = m.time    || ''
+        payload.logistics_contact = m.contact || ''
+        payload.logistics_notes   = m.notes   || ''
+        const d = logistics_data.find(i => i.type === 'demontage') || {}
+        payload.disassembly_date    = d.date    || null
+        payload.disassembly_address = d.address || ''
+        payload.disassembly_time    = d.time    || ''
+        payload.disassembly_contact = d.contact || ''
+        payload.disassembly_notes   = d.notes   || ''
+      } else {
+        // Legacy object format fallback
+        const m = logistics_data.montage || {}
+        payload.logistics_address = m.address || ''
+        payload.logistics_time    = m.time    || ''
+        payload.logistics_contact = m.contact || ''
+        payload.logistics_notes   = m.notes   || ''
+        const d = logistics_data.demontage || {}
+        payload.disassembly_date    = d.date    || null
+        payload.disassembly_address = d.address || ''
+        payload.disassembly_time    = d.time    || ''
+        payload.disassembly_contact = d.contact || ''
+        payload.disassembly_notes   = d.notes   || ''
+      }
     }
 
     const { data, error } = await supabase.from('projects')
