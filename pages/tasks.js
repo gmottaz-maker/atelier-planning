@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import { useAuth } from './_app'
 
 const PINK = '#FF4D6D'
 const PEOPLE = ['Arnaud', 'Gabin', 'Guillaume', 'Sous-traitant']
@@ -350,26 +351,23 @@ function WhoAreYou({ onSelect }) {
 // ─── Page principale ──────────────────────────────────────────────────────
 
 export default function Tasks() {
+  const { user, signOut } = useAuth()
+  const currentUser = user?.name || null
+
   const [tasks, setTasks] = useState([])
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
-  const [currentUser, setCurrentUser] = useState(null)
-  const [showWho, setShowWho] = useState(false)
   const [view, setView] = useState('today')       // 'today' | 'week' | 'twoweeks'
-  const [personFilter, setPersonFilter] = useState('all') // 'all' | 'Arnaud' | 'Gabin' | 'Guillaume'
+  const [personFilter, setPersonFilter] = useState(null) // null = not initialized yet
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [feedback, setFeedback] = useState(null)
   const [notifStatus, setNotifStatus] = useState('unknown') // 'unknown'|'granted'|'denied'|'unsupported'
 
-  // Chargement identité depuis localStorage
+  // Init filtre par défaut + notifs
   useEffect(() => {
-    const stored = localStorage.getItem('al_user')
-    if (stored) {
-      setCurrentUser(stored)
-      setPersonFilter(stored)
-    } else {
-      setShowWho(true)
+    if (currentUser && personFilter === null) {
+      setPersonFilter(currentUser)
     }
     // Statut notifications
     if (!('Notification' in window) || !('serviceWorker' in navigator)) {
@@ -377,7 +375,7 @@ export default function Tasks() {
     } else {
       setNotifStatus(Notification.permission)
     }
-  }, [])
+  }, [currentUser])
 
   async function requestNotifications() {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return
@@ -409,11 +407,9 @@ export default function Tasks() {
     showMsg('Notifications activées ! 🔔')
   }
 
-  function selectUser(name) {
-    localStorage.setItem('al_user', name)
-    setCurrentUser(name)
-    setPersonFilter(name)
-    setShowWho(false)
+  // Helper: ajoute l'acteur en header pour les API calls
+  function actorHeaders() {
+    return { 'Content-Type': 'application/json', 'x-actor': currentUser || '' }
   }
 
   const fetchAll = useCallback(async () => {
@@ -429,17 +425,24 @@ export default function Tasks() {
 
   useEffect(() => { if (currentUser) fetchAll() }, [currentUser, fetchAll])
 
+  // Init personFilter when currentUser becomes available
+  useEffect(() => {
+    if (currentUser && personFilter === null) setPersonFilter(currentUser)
+  }, [currentUser])
+
   function showMsg(msg, type = 'ok') {
     setFeedback({ msg, type })
     setTimeout(() => setFeedback(null), 2500)
   }
 
   async function handleToggle(task) {
+    // Strip nested join data (projects) before sending to API
+    const { projects: _p, ...taskData } = task
     const newStatus = task.status === 'completed' ? 'active' : 'completed'
     await fetch(`/api/tasks/${task.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...task, status: newStatus }),
+      headers: actorHeaders(),
+      body: JSON.stringify({ ...taskData, status: newStatus, prev_status: task.status }),
     })
     fetchAll()
   }
@@ -448,14 +451,14 @@ export default function Tasks() {
     if (id) {
       await fetch(`/api/tasks/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: actorHeaders(),
         body: JSON.stringify(body),
       })
       showMsg('Tâche mise à jour ✓')
     } else {
       await fetch('/api/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: actorHeaders(),
         body: JSON.stringify(body),
       })
       showMsg('Tâche créée ✓')
@@ -467,7 +470,10 @@ export default function Tasks() {
 
   async function handleDelete(task) {
     if (!confirm(`Supprimer "${task.title}" ?`)) return
-    await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' })
+    await fetch(`/api/tasks/${task.id}`, {
+      method: 'DELETE',
+      headers: actorHeaders(),
+    })
     showMsg('Tâche supprimée')
     fetchAll()
   }
@@ -505,7 +511,7 @@ export default function Tasks() {
     // Masquer les tâches privées des autres
     if (task.is_private && task.responsible !== currentUser) return false
     // Filtre par personne
-    if (personFilter !== 'all' && task.responsible !== personFilter) return false
+    if (activePersonFilter !== 'all' && task.responsible !== activePersonFilter) return false
     // Filtre par vue temporelle
     return taskInView(task)
   }
@@ -526,7 +532,8 @@ export default function Tasks() {
 
   // ─── Rendu ─────────────────────────────────────────────────────────────
 
-  if (showWho) return <WhoAreYou onSelect={selectUser} />
+  // personFilter defaults to 'all' while loading
+  const activePersonFilter = personFilter === null ? 'all' : personFilter
 
   return (
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
@@ -538,7 +545,7 @@ export default function Tasks() {
           * { -webkit-tap-highlight-color: transparent; }
           button, a { touch-action: manipulation; }
           input:focus, select:focus { border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; outline: none; }
-          input, select, textarea { font-size: 16px !important; }
+          @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
           body { padding-bottom: env(safe-area-inset-bottom); }
         `}</style>
       </Head>
@@ -553,7 +560,7 @@ export default function Tasks() {
 
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
-        <div className="px-4 pt-4 pb-0">
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-0">
           <div className="flex items-center justify-between mb-3">
             {/* Logo + titre */}
             <div className="flex items-center gap-2">
@@ -570,26 +577,20 @@ export default function Tasks() {
               )}
             </div>
 
-            {/* Identité + nav */}
+            {/* Nav + identité */}
             <div className="flex items-center gap-2">
-              <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200">
-                Admin
+              <Link href="/" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">Admin</Link>
+              <Link href="/activity" className="text-xs text-gray-400 px-2 py-1 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">
+                <span className="hidden sm:inline">Activité</span><span className="sm:hidden">📊</span>
               </Link>
-              {/* Bouton notifications */}
               {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
-                <button
-                  onClick={requestNotifications}
-                  title="Activer les notifications"
-                  className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 text-base">
-                  🔔
-                </button>
+                <button onClick={requestNotifications} title="Activer les notifications"
+                  className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 text-base">🔔</button>
               )}
               {notifStatus === 'granted' && (
-                <span title="Notifications activées" className="w-8 h-8 flex items-center justify-center rounded-full text-base"
-                  style={{ background: '#f0fdf4' }}>🔔</span>
+                <span title="Notifications activées" className="w-8 h-8 flex items-center justify-center rounded-full text-base" style={{ background: '#f0fdf4' }}>🔔</span>
               )}
-              <button
-                onClick={() => setShowWho(true)}
+              <button onClick={() => signOut()} title="Se déconnecter"
                 className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
                 style={{ background: PERSON_COLORS[currentUser] || PINK }}>
                 {currentUser}
@@ -597,39 +598,32 @@ export default function Tasks() {
             </div>
           </div>
 
-          {/* Tabs vue */}
-          <div className="flex gap-1 pb-3">
+          {/* Tabs vue — mobile uniquement (desktop: sidebar) */}
+          <div className="flex gap-1 pb-3 md:hidden">
             {[
               { key: 'today', label: "Aujourd'hui" },
-              { key: 'week', label: 'Cette semaine' },
+              { key: 'week', label: 'Semaine' },
               { key: 'twoweeks', label: '2 semaines' },
             ].map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
                 className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
-                style={view === v.key
-                  ? { background: PINK, color: 'white' }
-                  : { background: '#f3f4f6', color: '#6b7280' }
-                }>
+                style={view === v.key ? { background: PINK, color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
                 {v.label}
               </button>
             ))}
           </div>
 
-          {/* Filtre par personne */}
-          <div className="flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {/* Filtre personne — mobile uniquement */}
+          <div className="flex gap-2 pb-3 overflow-x-auto md:hidden" style={{ scrollbarWidth: 'none' }}>
             <button onClick={() => setPersonFilter('all')}
               className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
-              style={personFilter === 'all'
-                ? { background: '#111', color: 'white' }
-                : { background: '#f3f4f6', color: '#6b7280' }}>
+              style={activePersonFilter === 'all' ? { background: '#111', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
               Tous
             </button>
             {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
               <button key={p} onClick={() => setPersonFilter(p)}
                 className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 transition-all"
-                style={personFilter === p
-                  ? { background: PERSON_COLORS[p], color: 'white' }
-                  : { background: '#f3f4f6', color: '#6b7280' }}>
+                style={activePersonFilter === p ? { background: PERSON_COLORS[p], color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
                 {p}
               </button>
             ))}
@@ -637,47 +631,115 @@ export default function Tasks() {
         </div>
       </header>
 
-      {/* Liste */}
-      <main className="px-4 py-4 space-y-2" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}>
-        {loading ? (
-          <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
-        ) : sorted.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-4xl mb-3">✅</div>
-            <p className="text-gray-400 text-sm">Rien pour cette période !</p>
-          </div>
-        ) : (
-          sorted.map(task => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              currentUser={currentUser}
-              onToggle={handleToggle}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))
-        )}
-      </main>
+      {/* Layout : sidebar (desktop) + liste */}
+      <div className="max-w-6xl mx-auto md:flex md:gap-6 px-4 py-4">
 
-      {/* FAB */}
+        {/* ── Sidebar desktop ── */}
+        <aside className="hidden md:flex flex-col gap-3 w-52 flex-shrink-0 pt-2">
+          {/* Vue temporelle */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Période</p>
+            {[
+              { key: 'today', label: "Aujourd'hui" },
+              { key: 'week', label: 'Cette semaine' },
+              { key: 'twoweeks', label: '2 semaines' },
+            ].map(v => (
+              <button key={v.key} onClick={() => setView(v.key)}
+                className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all mb-1"
+                style={view === v.key
+                  ? { background: PINK + '15', color: PINK, fontWeight: 600 }
+                  : { color: '#6b7280', background: 'transparent' }}>
+                {v.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Filtre personne */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-2">Personne</p>
+            <button onClick={() => setPersonFilter('all')}
+              className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all mb-1"
+              style={activePersonFilter === 'all'
+                ? { background: '#11111115', color: '#111', fontWeight: 600 }
+                : { color: '#6b7280' }}>
+              👥 Tous
+            </button>
+            {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
+              <button key={p} onClick={() => setPersonFilter(p)}
+                className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all mb-1 flex items-center gap-2"
+                style={activePersonFilter === p
+                  ? { background: PERSON_COLORS[p] + '18', color: PERSON_COLORS[p], fontWeight: 600 }
+                  : { color: '#6b7280' }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PERSON_COLORS[p] }} />
+                {p}
+              </button>
+            ))}
+          </div>
+
+          {/* Stats rapides */}
+          <div className="mt-4 p-3 rounded-2xl" style={{ background: PINK + '0A' }}>
+            <p className="text-xs font-semibold mb-2" style={{ color: PINK }}>
+              {activeCount} tâche{activeCount > 1 ? 's' : ''} active{activeCount > 1 ? 's' : ''}
+            </p>
+            {['Arnaud', 'Gabin', 'Guillaume'].map(p => {
+              const n = sorted.filter(t => t.responsible === p && t.status === 'active').length
+              if (!n) return null
+              return (
+                <div key={p} className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-500">{p}</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
+                    style={{ background: PERSON_COLORS[p] }}>{n}</span>
+                </div>
+              )
+            })}
+          </div>
+        </aside>
+
+        {/* ── Liste tâches ── */}
+        <div className="flex-1 min-w-0">
+          {/* Bouton "Nouvelle tâche" desktop */}
+          <div className="hidden md:flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold text-gray-700">
+              {activePersonFilter === 'all' ? 'Toutes les tâches' : `Tâches de ${activePersonFilter}`}
+              {activeCount > 0 && <span className="ml-2 text-xs text-gray-400 font-normal">{activeCount} active{activeCount > 1 ? 's' : ''}</span>}
+            </p>
+            <button onClick={() => { setEditingTask(null); setShowForm(true) }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: PINK }}>
+              + Nouvelle tâche
+            </button>
+          </div>
+
+          <div className="space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+            {loading ? (
+              <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
+            ) : sorted.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-4xl mb-3">✅</div>
+                <p className="text-gray-400 text-sm">Rien pour cette période !</p>
+              </div>
+            ) : (
+              sorted.map(task => (
+                <TaskCard key={task.id} task={task} currentUser={currentUser}
+                  onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* FAB mobile uniquement */}
       <button
         onClick={() => { setEditingTask(null); setShowForm(true) }}
-        className="fixed right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-2xl font-light active:scale-95"
-        style={{ background: PINK, bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-      >
+        className="fixed right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-2xl font-light active:scale-95 md:hidden"
+        style={{ background: PINK, bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
         +
       </button>
 
       {/* Formulaire */}
       {showForm && (
-        <TaskForm
-          task={editingTask}
-          projects={projects}
-          currentUser={currentUser}
-          onSave={handleSave}
-          onClose={() => { setShowForm(false); setEditingTask(null) }}
-        />
+        <TaskForm task={editingTask} projects={projects} currentUser={currentUser}
+          onSave={handleSave} onClose={() => { setShowForm(false); setEditingTask(null) }} />
       )}
     </div>
   )
