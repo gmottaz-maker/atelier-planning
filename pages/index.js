@@ -752,7 +752,7 @@ export default function Admin() {
                       <div className="flex-1 px-4 py-4 min-w-0">
                         {/* Ligne 1: nom + actions */}
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedProjectId(project.id)}>
+                          <Link href={`/projects/${project.id}`} className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-gray-900 text-sm leading-tight">{project.name}</span>
                               {fromTodoist && (
@@ -773,7 +773,7 @@ export default function Admin() {
                             {project.description && (
                               <p className="text-xs text-gray-400 mt-0.5 leading-snug">{project.description}</p>
                             )}
-                          </div>
+                          </Link>
 
                           {/* Actions */}
                           <div className="flex items-center gap-0.5 flex-shrink-0">
