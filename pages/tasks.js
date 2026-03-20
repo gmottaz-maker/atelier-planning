@@ -489,6 +489,9 @@ export default function Tasks() {
   const weekEnd = toDateStr(endOfWeek())
   const twoWeeksEnd = toDateStr(addDays(today(), 14))
 
+  // personFilter defaults to 'all' while loading
+  const activePersonFilter = personFilter === null ? 'all' : personFilter
+
   function taskInView(task) {
     const eff = effectiveDate(task)
     const effStr = toDateStr(eff)
@@ -531,9 +534,6 @@ export default function Tasks() {
   const activeCount = sorted.filter(t => t.status === 'active').length
 
   // ─── Rendu ─────────────────────────────────────────────────────────────
-
-  // personFilter defaults to 'all' while loading
-  const activePersonFilter = personFilter === null ? 'all' : personFilter
 
   return (
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
