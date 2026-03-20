@@ -614,6 +614,7 @@ export default function Tasks() {
               <Link href="/home" title="Accueil" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🏠</Link>
               <Link href="/" title="Projets" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🗂️</Link>
               <Link href="/activity" title="Activité" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">📊</Link>
+              <Link href="/settings" title="Paramètres" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">⚙️</Link>
               {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
                 <button onClick={requestNotifications} title="Activer les notifications"
                   className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 text-base">🔔</button>

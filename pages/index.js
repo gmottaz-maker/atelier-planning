@@ -595,6 +595,7 @@ export default function Admin() {
             <Link href="/tasks" title="Tâches" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">✅</Link>
             <Link href="/activity" title="Activité" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">📊</Link>
             <Link href="/display" target="_blank" title="Atelier" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">📺</Link>
+            <Link href="/settings" title="Paramètres" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">⚙️</Link>
             <button onClick={() => { resetForm(); setShowForm(true) }}
               style={{ background: PINK, color: '#fff' }}
               className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
