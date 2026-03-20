@@ -34,6 +34,8 @@ export default async function handler(req, res) {
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date, disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
       logistics_data,
+      site_visit_data,
+      site_visit_summary,
     } = req.body
 
     const payload = {
@@ -43,6 +45,9 @@ export default async function handler(req, res) {
       disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
       updated_at: new Date().toISOString(),
     }
+
+    if (site_visit_data !== undefined) payload.site_visit_data = site_visit_data
+    if (site_visit_summary !== undefined) payload.site_visit_summary = site_visit_summary
 
     // Persist new logistics_data and keep legacy fields in sync
     if (logistics_data !== undefined) {

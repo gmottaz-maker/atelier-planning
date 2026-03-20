@@ -253,6 +253,21 @@ export default function ProjectPage() {
   // Task state
   const [addingCategory, setAddingCategory] = useState(null)
 
+  // Site visit state
+  const EMPTY_VISIT = {
+    date: '', participants: [],
+    address: '', surface: '', ceiling_height: '', floor_type: '',
+    access_notes: '', access_hours: '',
+    electricity: '', lighting: '', wifi: '',
+    contacts: '', constraints: '', observations: '',
+  }
+  const [siteVisit, setSiteVisit] = useState(EMPTY_VISIT)
+  const [visitDirty, setVisitDirty] = useState(false)
+  const [visitSaving, setVisitSaving] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [visitSummary, setVisitSummary] = useState('')
+  const [visitExpanded, setVisitExpanded] = useState(false)
+
   // ── Load data ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id || !currentUser) return
@@ -263,6 +278,11 @@ export default function ProjectPage() {
       if (proj && !proj.error) {
         setProject(proj)
         setLogistics(initLogistics(proj))
+        if (proj.site_visit_data && Object.keys(proj.site_visit_data).length > 0) {
+          setSiteVisit(v => ({ ...v, ...proj.site_visit_data }))
+          setVisitExpanded(true)
+        }
+        if (proj.site_visit_summary) setVisitSummary(proj.site_visit_summary)
       }
       if (Array.isArray(allTasks)) {
         setTasks(allTasks.filter(t => String(t.project_id) === String(id)))
@@ -320,6 +340,58 @@ export default function ProjectPage() {
   function handleTaskAdded(newTask) {
     setTasks(prev => [...prev, newTask])
     setAddingCategory(null)
+  }
+
+  // ── Site visit helpers ────────────────────────────────────────────────────
+  function setVisitField(field, value) {
+    setSiteVisit(prev => ({ ...prev, [field]: value }))
+    setVisitDirty(true)
+  }
+  function toggleParticipant(name) {
+    setSiteVisit(prev => {
+      const list = prev.participants || []
+      const next = list.includes(name) ? list.filter(n => n !== name) : [...list, name]
+      return { ...prev, participants: next }
+    })
+    setVisitDirty(true)
+  }
+
+  async function saveVisit() {
+    setVisitSaving(true)
+    try {
+      const res = await fetch(`/api/projects/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify({ ...project, logistics_data: logistics, site_visit_data: siteVisit }),
+      })
+      const updated = await res.json()
+      if (updated && !updated.error) { setProject(updated); setVisitDirty(false) }
+    } catch (err) { console.error(err) }
+    setVisitSaving(false)
+  }
+
+  async function generateSummary() {
+    setSummaryLoading(true)
+    // Save first
+    await saveVisit()
+    try {
+      const res = await fetch('/api/site-visit-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitData: siteVisit, projectName: project.name }),
+      })
+      const data = await res.json()
+      if (data.summary) {
+        setVisitSummary(data.summary)
+        // Persist summary
+        await fetch(`/api/projects/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+          body: JSON.stringify({ ...project, logistics_data: logistics, site_visit_data: siteVisit, site_visit_summary: data.summary }),
+        })
+      }
+    } catch (err) { console.error(err) }
+    setSummaryLoading(false)
   }
 
   // ── Computed ─────────────────────────────────────────────────────────────
@@ -548,6 +620,186 @@ export default function ProjectPage() {
           </div>
 
         </div>
+
+        {/* ── Visite sur site ── */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => setVisitExpanded(v => !v)}
+              className="flex items-center gap-2 group">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-gray-600 transition-colors">
+                📍 Visite sur site
+              </span>
+              {visitSummary && !visitExpanded && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: PINK + '22', color: PINK }}>✓ Résumé disponible</span>
+              )}
+              <span className="text-gray-300 text-xs">{visitExpanded ? '▲' : '▼'}</span>
+            </button>
+            {visitExpanded && (
+              <div className="flex items-center gap-2">
+                {visitDirty && (
+                  <button onClick={saveVisit} disabled={visitSaving}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 disabled:opacity-50">
+                    {visitSaving ? 'Enregistrement...' : '💾 Sauvegarder'}
+                  </button>
+                )}
+                <button onClick={generateSummary} disabled={summaryLoading}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full text-white disabled:opacity-50 transition-opacity"
+                  style={{ background: PINK }}>
+                  {summaryLoading ? '⏳ Génération...' : '✨ Résumé IA'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {visitExpanded && (
+            <div className="space-y-4">
+              {/* ── Form grid ── */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                  {/* Date */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Date de visite</label>
+                    <input type="date" value={siteVisit.date} style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('date', e.target.value)} className={inp} />
+                  </div>
+
+                  {/* Participants */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Participants</label>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {RESPONSIBLES.filter(r => r !== 'Sous-traitant').map(name => {
+                        const active = (siteVisit.participants || []).includes(name)
+                        return (
+                          <button key={name} type="button" onClick={() => toggleParticipant(name)}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-full border transition-all"
+                            style={{
+                              borderColor: active ? PERSON_COLORS[name] : '#e5e7eb',
+                              background: active ? PERSON_COLORS[name] + '18' : 'white',
+                              color: active ? PERSON_COLORS[name] : '#9ca3af',
+                            }}>{name}</button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Address */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">Adresse du lieu</label>
+                    <input type="text" value={siteVisit.address} placeholder="Rue, ville..." style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('address', e.target.value)} className={inp} />
+                  </div>
+
+                  {/* Space dimensions */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Surface (m²)</label>
+                    <input type="text" value={siteVisit.surface} placeholder="ex: 120" style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('surface', e.target.value)} className={inp} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Hauteur sous plafond (m)</label>
+                    <input type="text" value={siteVisit.ceiling_height} placeholder="ex: 3.5" style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('ceiling_height', e.target.value)} className={inp} />
+                  </div>
+
+                  {/* Floor type */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Type de sol</label>
+                    <select value={siteVisit.floor_type} onChange={e => setVisitField('floor_type', e.target.value)}
+                      className={inp} style={{ fontSize: 14 }}>
+                      <option value="">— Choisir —</option>
+                      {['Parquet', 'Carrelage', 'Béton', 'Moquette', 'Résine', 'Marbre', 'Autre'].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Access */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Accès livraison</label>
+                    <input type="text" value={siteVisit.access_notes} placeholder="Monte-charge, quai, escalier..." style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('access_notes', e.target.value)} className={inp} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Horaires d'accès</label>
+                    <input type="text" value={siteVisit.access_hours} placeholder="ex: 08h00 – 18h00" style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('access_hours', e.target.value)} className={inp} />
+                  </div>
+
+                  {/* Technical */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Électricité</label>
+                    <input type="text" value={siteVisit.electricity} placeholder="ex: 2×16A, triphasé, nb prises..." style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('electricity', e.target.value)} className={inp} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Éclairage</label>
+                    <input type="text" value={siteVisit.lighting} placeholder="ex: naturel + spots, modifiable..." style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('lighting', e.target.value)} className={inp} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Réseau / Wifi</label>
+                    <input type="text" value={siteVisit.wifi} placeholder="ex: Wifi disponible, code: xxx" style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('wifi', e.target.value)} className={inp} />
+                  </div>
+
+                  {/* Contact */}
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Contact sur place</label>
+                    <input type="text" value={siteVisit.contacts} placeholder="Nom + téléphone" style={{ fontSize: 14 }}
+                      onChange={e => setVisitField('contacts', e.target.value)} className={inp} />
+                  </div>
+
+                  {/* Constraints */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">Contraintes particulières</label>
+                    <textarea rows={2} value={siteVisit.constraints} style={{ fontSize: 14, resize: 'none' }}
+                      placeholder="Horaires imposés, règles du lieu, travaux en cours..."
+                      onChange={e => setVisitField('constraints', e.target.value)} className={inp} />
+                  </div>
+
+                  {/* Observations */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">Observations générales</label>
+                    <textarea rows={3} value={siteVisit.observations} style={{ fontSize: 14, resize: 'none' }}
+                      placeholder="Points d'attention, remarques de l'équipe..."
+                      onChange={e => setVisitField('observations', e.target.value)} className={inp} />
+                  </div>
+
+                </div>
+              </div>
+
+              {/* ── AI Summary ── */}
+              {(visitSummary || summaryLoading) && (
+                <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: PINK + '44' }}>
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b" style={{ borderColor: PINK + '22', background: PINK + '08' }}>
+                    <span className="text-sm">✨</span>
+                    <span className="text-xs font-bold text-gray-700">Analyse IA</span>
+                    {visitSummary && (
+                      <button onClick={generateSummary} disabled={summaryLoading}
+                        className="ml-auto text-xs text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50">
+                        {summaryLoading ? '⏳' : '↻ Regénérer'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="px-4 py-4">
+                    {summaryLoading && !visitSummary ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0"
+                          style={{ borderColor: '#e5e7eb', borderTopColor: PINK }} />
+                        Analyse en cours...
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{visitSummary}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )
