@@ -264,6 +264,12 @@ export default function ProjectPage() {
   // Task state
   const [addingCategory, setAddingCategory] = useState(null)
 
+  // Files state
+  const [files, setFiles] = useState([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
   // Site visit state
   const EMPTY_VISIT = {
     date: '', participants: [],
@@ -285,7 +291,8 @@ export default function ProjectPage() {
     Promise.all([
       fetch(`/api/projects/${id}`).then(r => r.json()),
       fetch('/api/tasks', { headers: { 'x-actor': currentUser } }).then(r => r.json()),
-    ]).then(([proj, allTasks]) => {
+      fetch(`/api/projects/${id}/files`).then(r => r.json()),
+    ]).then(([proj, allTasks, fileList]) => {
       if (proj && !proj.error) {
         setProject(proj)
         setLogistics(initLogistics(proj))
@@ -298,6 +305,7 @@ export default function ProjectPage() {
       if (Array.isArray(allTasks)) {
         setTasks(allTasks.filter(t => String(t.project_id) === String(id)))
       }
+      if (Array.isArray(fileList)) setFiles(fileList)
     }).catch(console.error)
     .finally(() => setLoading(false))
   }, [id, currentUser])
@@ -419,6 +427,47 @@ export default function ProjectPage() {
     setSummaryLoading(false)
   }
 
+  // ── File helpers ─────────────────────────────────────────────────────────
+  async function uploadFile(file) {
+    const ALLOWED = ['image/jpeg','image/png','image/gif','image/webp','application/pdf']
+    if (!ALLOWED.includes(file.type)) { setUploadError('Format non supporté (JPG, PNG, GIF, WEBP, PDF uniquement)'); return }
+    if (file.size > 10 * 1024 * 1024) { setUploadError('Fichier trop grand (max 10 MB)'); return }
+    setUploadError('')
+    setUploading(true)
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => resolve(e.target.result.split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch(`/api/projects/${id}/files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, mime_type: file.type, base64, size: file.size }),
+      })
+      const data = await res.json()
+      if (data.error) { setUploadError(data.error); return }
+      setFiles(prev => [data, ...prev])
+    } catch (err) { setUploadError('Erreur lors de l\'upload') }
+    setUploading(false)
+  }
+
+  async function deleteFile(file) {
+    setFiles(prev => prev.filter(f => f.id !== file.id))
+    await fetch(`/api/projects/${id}/files`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId: file.id, storagePath: file.storage_path }),
+    })
+  }
+
+  function handleDrop(e) {
+    e.preventDefault(); setIsDragging(false)
+    const dropped = Array.from(e.dataTransfer.files)
+    dropped.forEach(uploadFile)
+  }
+
   // ── Computed ─────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#fafafa' }}>
@@ -447,6 +496,15 @@ export default function ProjectPage() {
         <style>{`
           * { -webkit-tap-highlight-color: transparent; }
           input[type=time]::-webkit-calendar-picker-indicator { opacity: 0.4; }
+          @media print {
+            body { background: white !important; font-family: 'Inter', sans-serif; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            header, footer { display: none !important; }
+            .print-form { display: block !important; }
+          }
+          .print-only { display: none; }
+          .print-form { display: none; }
         `}</style>
       </Head>
 
@@ -510,7 +568,7 @@ export default function ProjectPage() {
         {/* ── Résumé ── */}
         {project.description && (
           <div className="mb-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Résumé du projet</p>
+            <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: PINK }}>Résumé du projet</p>
             <div className="bg-white rounded-2xl border border-gray-100 p-4">
               <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{project.description}</p>
             </div>
@@ -522,7 +580,7 @@ export default function ProjectPage() {
 
           {/* ════ LEFT: Tâches groupées ════ */}
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Tâches du projet</p>
+            <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: PINK }}>Tâches du projet</p>
             <div className="space-y-3">
               {TASK_CATEGORIES.map(cat => {
                 const catTasks = tasks.filter(t =>
@@ -575,7 +633,7 @@ export default function ProjectPage() {
           {/* ════ RIGHT: Logistique ════ */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Logistique</p>
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: PINK }}>Logistique</p>
               <div className="flex items-center gap-2">
                 {logisticsDirty && (
                   <button onClick={() => saveLogistics()} disabled={logisticsSaving}
@@ -698,7 +756,7 @@ export default function ProjectPage() {
             <button
               onClick={() => setVisitExpanded(v => !v)}
               className="flex items-center gap-2 group">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 group-hover:text-gray-600 transition-colors">
+              <span className="text-xs font-bold uppercase tracking-wider transition-colors" style={{ color: PINK }}>
                 📍 Visite sur site
               </span>
               {visitSummary && !visitExpanded && (
@@ -718,6 +776,10 @@ export default function ProjectPage() {
                   className="text-xs font-semibold px-3 py-1.5 rounded-full text-white disabled:opacity-50 transition-opacity"
                   style={{ background: PINK }}>
                   {summaryLoading ? '⏳ Génération...' : '✨ Résumé IA'}
+                </button>
+                <button onClick={() => window.print()}
+                  className="no-print text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors">
+                  🖨️ Imprimer
                 </button>
               </div>
             )}
@@ -871,7 +933,142 @@ export default function ProjectPage() {
           )}
         </div>
 
+        {/* ── Fichiers du projet ── */}
+        <div className="mt-6 no-print">
+          <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: PINK }}>Fichiers</p>
+
+          {/* Drop zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className="rounded-2xl border-2 border-dashed transition-colors mb-3 cursor-pointer"
+            style={{ borderColor: isDragging ? PINK : '#e5e7eb', background: isDragging ? PINK + '08' : 'white' }}
+            onClick={() => document.getElementById('file-input-hidden').click()}>
+            <input id="file-input-hidden" type="file" multiple accept="image/*,.pdf"
+              className="hidden"
+              onChange={e => Array.from(e.target.files).forEach(uploadFile)} />
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              {uploading ? (
+                <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: PINK }} />
+              ) : (
+                <>
+                  <span className="text-2xl">📎</span>
+                  <p className="text-xs text-gray-400 font-medium">Glisser des fichiers ici ou <span style={{ color: PINK }}>parcourir</span></p>
+                  <p className="text-xs text-gray-300">Images (JPG, PNG, WEBP) · PDF · max 10 MB</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {uploadError && (
+            <p className="text-xs text-red-500 mb-2">{uploadError}</p>
+          )}
+
+          {/* File grid */}
+          {files.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {files.map(f => {
+                const isImage = f.mime_type?.startsWith('image/')
+                const isPdf = f.mime_type === 'application/pdf'
+                return (
+                  <div key={f.id} className="group relative bg-white rounded-xl border border-gray-100 overflow-hidden">
+                    {/* Thumbnail */}
+                    <a href={f.url} target="_blank" rel="noreferrer" className="block">
+                      {isImage ? (
+                        <img src={f.url} alt={f.filename}
+                          className="w-full h-32 object-cover" />
+                      ) : (
+                        <div className="w-full h-32 flex flex-col items-center justify-center gap-1 bg-gray-50">
+                          <span className="text-3xl">📄</span>
+                          <span className="text-xs text-gray-400 font-medium">PDF</span>
+                        </div>
+                      )}
+                    </a>
+                    {/* Label + delete */}
+                    <div className="px-2 py-1.5 flex items-center gap-1">
+                      <p className="text-xs text-gray-600 truncate flex-1">{f.filename}</p>
+                      <button onClick={() => deleteFile(f)}
+                        className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors text-xs opacity-0 group-hover:opacity-100">✕</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Print form (hidden on screen, shown on print) ── */}
+        <div className="print-form" style={{ padding: '2cm', fontFamily: 'Inter, sans-serif' }}>
+          {/* Header */}
+          <div style={{ borderBottom: '2px solid #FF4D6D', paddingBottom: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#FF4D6D', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Amazing Lab — Visite sur site</p>
+                <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111', margin: 0 }}>{project.name}</h1>
+                {project.client && <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0 0' }}>{project.client}</p>}
+              </div>
+              {project.deadline && (
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase' }}>Deadline</p>
+                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#374151' }}>{fmtDate(project.deadline)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Form fields */}
+          {[
+            ['Date de visite', ''],
+            ['Participants', ''],
+            ['Adresse du lieu', ''],
+          ].map(([label]) => (
+            <PrintField key={label} label={label} />
+          ))}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <PrintField label="Surface (m²)" />
+            <PrintField label="Hauteur sous plafond (m)" />
+            <PrintField label="Type de sol" />
+          </div>
+
+          {[
+            'Accès livraison',
+            'Horaires d\'accès',
+            'Électricité',
+            'Éclairage',
+            'Réseau / Wifi',
+            'Contact sur place',
+          ].map(label => (
+            <PrintField key={label} label={label} />
+          ))}
+
+          <PrintField label="Contraintes particulières" tall />
+          <PrintField label="Observations générales" tall />
+
+          <div style={{ marginTop: '32px', borderTop: '1px solid #e5e7eb', paddingTop: '12px', display: 'flex', justifyContent: 'space-between' }}>
+            <p style={{ fontSize: '10px', color: '#9ca3af' }}>Amazing Lab © {new Date().getFullYear()}</p>
+            <p style={{ fontSize: '10px', color: '#9ca3af' }}>amazinglab.ch</p>
+          </div>
+        </div>
+
       </div>
+    </div>
+  )
+}
+
+// ── PrintField helper ──────────────────────────────────────────────────────────
+function PrintField({ label, tall }) {
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <p style={{ fontSize: '9px', fontWeight: 700, color: '#FF4D6D', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>{label}</p>
+      <div style={{
+        borderBottom: tall ? 'none' : '1px solid #d1d5db',
+        border: tall ? '1px solid #d1d5db' : undefined,
+        borderRadius: tall ? '6px' : undefined,
+        minHeight: tall ? '60px' : '24px',
+        width: '100%',
+      }} />
     </div>
   )
 }
