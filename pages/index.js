@@ -575,7 +575,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
       <Head>
-        <title>Atelier Planning — Projets</title>
+        <title>Maze Project — Projets</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -888,7 +888,7 @@ export default function Admin() {
         {/* Footer */}
         <div className="pt-4 pb-8 flex items-center justify-center gap-2 text-xs text-gray-300">
           <AtomLogo size={16} />
-          <span>amazing lab — atelier planning</span>
+          <span>amazing lab — maze project</span>
         </div>
       </main>
 

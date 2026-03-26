@@ -1,4 +1,4 @@
-# Atelier Planning
+# Maze Project
 
 Outil de planning pour atelier de fabrication sur mesure.
 
@@ -12,7 +12,7 @@ Outil de planning pour atelier de fabrication sur mesure.
 ### 1. Créer la base de données Supabase (gratuit)
 
 1. Aller sur [supabase.com](https://supabase.com) → **New project**
-2. Choisir un nom (ex: `atelier-planning`) et un mot de passe
+2. Choisir un nom (ex: `maze-project`) et un mot de passe
 3. Une fois créé, aller dans **SQL Editor** → **New query**
 4. Coller le contenu de `schema.sql` → cliquer **Run**
 5. Aller dans **Settings → API** → copier :
@@ -26,19 +26,19 @@ Outil de planning pour atelier de fabrication sur mesure.
 git init
 git add .
 git commit -m "Initial commit"
-git remote add origin https://github.com/VOTRE_USERNAME/atelier-planning.git
+git remote add origin https://github.com/VOTRE_USERNAME/maze-project.git
 git push -u origin main
 ```
 
 ### 3. Déployer sur Vercel
 
 1. Aller sur [vercel.com](https://vercel.com) → **Add New Project**
-2. Importer votre repo GitHub `atelier-planning`
+2. Importer votre repo GitHub `maze-project`
 3. Dans **Environment Variables**, ajouter :
    - `NEXT_PUBLIC_SUPABASE_URL` → votre URL Supabase
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` → votre clé Supabase
 4. Cliquer **Deploy** → attendre ~2 minutes
-5. Votre app est en ligne ! (ex: `atelier-planning.vercel.app`)
+5. Votre app est en ligne ! (ex: `maze-project.vercel.app`)
 
 ### 4. Tester en local (optionnel)
 
@@ -85,7 +85,7 @@ L'écran se rafraîchit **automatiquement toutes les 60 secondes**.
 ## Structure du projet
 
 ```
-atelier-planning/
+maze-project/
 ├── pages/
 │   ├── index.js          ← Interface admin
 │   ├── display.js        ← Écran atelier
