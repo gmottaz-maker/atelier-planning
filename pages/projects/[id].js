@@ -431,7 +431,7 @@ export default function ProjectPage() {
   async function uploadFile(file) {
     const ALLOWED = ['image/jpeg','image/png','image/gif','image/webp','application/pdf']
     if (!ALLOWED.includes(file.type)) { setUploadError('Format non supporté (JPG, PNG, GIF, WEBP, PDF uniquement)'); return }
-    if (file.size > 10 * 1024 * 1024) { setUploadError('Fichier trop grand (max 10 MB)'); return }
+    if (file.size > 20 * 1024 * 1024) { setUploadError('Fichier trop grand (max 20 MB)'); return }
     setUploadError('')
     setUploading(true)
     try {

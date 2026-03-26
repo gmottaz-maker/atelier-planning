@@ -1,6 +1,6 @@
 import { supabase } from '../../../../lib/supabase'
 
-const MAX_SIZE_MB = 10
+const MAX_SIZE_MB = 20
 const NAS_HOST   = process.env.SYNOLOGY_HOST  // ex: https://amazinglabserver.de7.quickconnect.to
 const NAS_USER   = process.env.SYNOLOGY_USER  // atelier-api
 const NAS_PASS   = process.env.SYNOLOGY_PASS  // mot de passe généré
@@ -16,6 +16,10 @@ async function getSid() {
     `&account=${encodeURIComponent(NAS_USER)}&passwd=${encodeURIComponent(NAS_PASS)}` +
     `&session=FileStation&format=sid`
   const resp = await fetch(url, { cache: 'no-store' })
+  const ct = resp.headers.get('content-type') || ''
+  if (!ct.includes('json')) {
+    throw new Error('NAS auth: réponse non-JSON (HTML), vérifier SYNOLOGY_HOST')
+  }
   const data = await resp.json()
   if (!data.success) throw new Error('NAS auth failed: ' + JSON.stringify(data.error))
   _sid = data.data.sid
@@ -23,7 +27,44 @@ async function getSid() {
   return _sid
 }
 
-export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
+// Upload avec retry automatique si la session a expiré (NAS renvoie du HTML)
+async function uploadToNAS(buffer, mimeType, folderPath, safeFilename, retry = true) {
+  const sid = await getSid()
+  const blob = new Blob([buffer], { type: mimeType })
+  const form = new FormData()
+  form.append('api',            'SYNO.FileStation.Upload')
+  form.append('version',        '2')
+  form.append('method',         'upload')
+  form.append('path',           folderPath)
+  form.append('create_parents', 'true')
+  form.append('overwrite',      'true')
+  form.append('_sid',           sid)
+  form.append('file',           blob, safeFilename)
+
+  const uploadResp = await fetch(`${NAS_HOST}/webapi/entry.cgi`, {
+    method: 'POST',
+    body: form,
+  })
+
+  const ct = uploadResp.headers.get('content-type') || ''
+  if (!ct.includes('json')) {
+    // NAS a renvoyé du HTML → session probablement expirée, on ré-authentifie et on réessaie une fois
+    _sid = null
+    _sidExpiry = 0
+    if (retry) return uploadToNAS(buffer, mimeType, folderPath, safeFilename, false)
+    const text = await uploadResp.text()
+    throw new Error('NAS upload: réponse non-JSON après retry — ' + text.substring(0, 200))
+  }
+
+  const uploadData = await uploadResp.json()
+  if (!uploadData.success) {
+    _sid = null // reset cache si erreur auth (code 119 = invalid SID)
+    throw new Error('Upload NAS échoué: ' + JSON.stringify(uploadData.error || uploadData))
+  }
+  return uploadData
+}
+
+export const config = { api: { bodyParser: { sizeLimit: '27mb' } } }  // buffer pour overhead base64 (~33%)
 
 export default async function handler(req, res) {
   const { id } = req.query
@@ -57,29 +98,7 @@ export default async function handler(req, res) {
     const storagePath = `${folderPath}/${Date.now()}_${safeFilename}`
 
     try {
-      const sid = await getSid()
-
-      // Upload via SYNO.FileStation.Upload (multipart)
-      const blob = new Blob([buffer], { type: mime_type })
-      const form = new FormData()
-      form.append('api',            'SYNO.FileStation.Upload')
-      form.append('version',        '2')
-      form.append('method',         'upload')
-      form.append('path',           folderPath)
-      form.append('create_parents', 'true')
-      form.append('overwrite',      'true')
-      form.append('_sid',           sid)
-      form.append('file',           blob, safeFilename)
-
-      const uploadResp = await fetch(`${NAS_HOST}/webapi/entry.cgi`, {
-        method: 'POST',
-        body: form,
-      })
-      const uploadData = await uploadResp.json()
-      if (!uploadData.success) {
-        _sid = null // reset cache si erreur auth
-        return res.status(500).json({ error: 'Upload NAS échoué: ' + JSON.stringify(uploadData.error || uploadData) })
-      }
+      await uploadToNAS(buffer, mime_type, folderPath, safeFilename)
     } catch (e) {
       return res.status(500).json({ error: 'NAS error: ' + e.message })
     }
