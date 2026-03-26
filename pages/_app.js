@@ -35,9 +35,18 @@ export default function App({ Component, pageProps }) {
 
   // ─── Auth state ─────────────────────────────────────────────────────────
   useEffect(() => {
-    // Init session
+    // Init session — vérifier si la session est éphémère (sessionOnly sans sessionAlive)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
+        const sessionOnly = localStorage.getItem('sessionOnly') === 'true'
+        const sessionAlive = sessionStorage.getItem('sessionAlive')
+        if (sessionOnly && !sessionAlive) {
+          // Navigateur rouvert sans "rester connecté" → déconnecter
+          localStorage.removeItem('sessionOnly')
+          await supabase.auth.signOut()
+          setAuthReady(true)
+          return
+        }
         const profile = await fetchProfile(session.user.id)
         setUser({ id: session.user.id, email: session.user.email, name: profile?.name || session.user.email })
       }
@@ -64,7 +73,7 @@ export default function App({ Component, pageProps }) {
     if (!user && !isPublic) {
       router.replace('/login')
     } else if (user && router.pathname === '/login') {
-      router.replace('/tasks')
+      router.replace('/')
     }
   }, [user, authReady, router.pathname])
 

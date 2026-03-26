@@ -7,6 +7,7 @@ const PINK = '#FF4D6D'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -17,6 +18,15 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError('Email ou mot de passe incorrect')
+    } else {
+      if (!rememberMe) {
+        // Session éphémère : marquer pour déconnexion à la fermeture du navigateur
+        localStorage.setItem('sessionOnly', 'true')
+        sessionStorage.setItem('sessionAlive', '1')
+      } else {
+        // Session persistante : effacer le flag éphémère si présent
+        localStorage.removeItem('sessionOnly')
+      }
     }
     // Redirect handled by _app.js via onAuthStateChange
     setLoading(false)
@@ -75,6 +85,32 @@ export default function Login() {
               className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm bg-white transition-all"
             />
           </div>
+
+          {/* Remember me */}
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
+                className="sr-only"
+              />
+              <div
+                className="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+                style={{
+                  borderColor: rememberMe ? PINK : '#d1d5db',
+                  background: rememberMe ? PINK : 'white',
+                }}
+              >
+                {rememberMe && (
+                  <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                    <path d="M1 4l3 3 6-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="text-sm text-gray-500">Rester connecté</span>
+          </label>
 
           {error && (
             <p className="text-sm text-red-500 text-center py-1">{error}</p>
