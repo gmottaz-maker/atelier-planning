@@ -1,7 +1,8 @@
-import { supabase } from '../../../lib/supabase'
+import { getSupabaseServer } from '../../../lib/supabase-server'
 
 async function logActivity(actor, action, project) {
   if (!actor) return
+  const supabase = getSupabaseServer()
   try {
     await supabase.from('activity_log').insert({
       actor,
@@ -15,6 +16,7 @@ async function logActivity(actor, action, project) {
 }
 
 export default async function handler(req, res) {
+  const supabase = getSupabaseServer()
   const { id } = req.query
   const actor = req.headers['x-actor'] || null
 

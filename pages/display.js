@@ -338,6 +338,7 @@ function CardView({ projects, dark, theme }) {
 export default function Display() {
   const [projects, setProjects]       = useState([])
   const [loading, setLoading]         = useState(true)
+  const [fetchError, setFetchError]   = useState(null)
   const [viewMode, setViewMode]       = useState('weeks')
   const [dark, setDark]               = useState(true)
   const [now, setNow]                 = useState(new Date())
@@ -358,15 +359,22 @@ export default function Display() {
   }
 
   const fetchProjects = useCallback(async () => {
-    const res = await fetch('/api/projects')
-    const data = await res.json()
-    const active = (Array.isArray(data) ? data : [])
-      .filter(p => p.status === 'active')
-      .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
-    setProjects(active)
-    setLoading(false)
-    setLastRefresh(new Date())
-    setCountdown(60)
+    try {
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      const active = (Array.isArray(data) ? data : [])
+        .filter(p => p.status === 'active')
+        .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+      setProjects(active)
+      setFetchError(null)
+      setLastRefresh(new Date())
+      setCountdown(60)
+    } catch (err) {
+      setFetchError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
@@ -490,6 +498,21 @@ export default function Display() {
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-xl" style={{ color: theme.textMuted }}>
           Chargement…
+        </div>
+      ) : fetchError ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <div className="text-xl font-bold mb-2" style={{ color: PINK }}>Erreur de chargement</div>
+            <div className="text-base mb-6" style={{ color: theme.textSecondary }}>{fetchError}</div>
+            <button
+              onClick={fetchProjects}
+              className="px-6 py-3 rounded-2xl font-semibold text-white"
+              style={{ background: PINK }}
+            >
+              Réessayer
+            </button>
+          </div>
         </div>
       ) : viewMode === 'cards' ? (
         <CardView projects={projects} dark={dark} theme={theme} />
