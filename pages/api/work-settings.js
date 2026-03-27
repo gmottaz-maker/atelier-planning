@@ -33,6 +33,7 @@ export default async function handler(req, res) {
         year,
         vacation_days: 20,
         weekly_hours: 42.0,
+        off_days: [],
       })
     }
     if (error) return res.status(500).json({ error: error.message })
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
 
   // POST – upsert settings
   if (req.method === 'POST') {
-    const { userName, vacation_days, weekly_hours } = req.body
+    const { userName, vacation_days, weekly_hours, off_days } = req.body
 
     if (!userName) return res.status(400).json({ error: 'userName requis' })
 
@@ -53,6 +54,7 @@ export default async function handler(req, res) {
           year,
           vacation_days: parseInt(vacation_days),
           weekly_hours:  parseFloat(weekly_hours),
+          off_days:      Array.isArray(off_days) ? off_days : [],
         },
         { onConflict: 'user_name,year' }
       )

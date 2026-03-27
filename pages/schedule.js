@@ -9,10 +9,16 @@ const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
 const DEFAULT_PAUSE = 1.0
 
 const TYPES = {
-  WORK:     { label: 'Travail',  color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: '⏱' },
-  VACATION: { label: 'Congé',   color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: '🏖' },
-  SICK:     { label: 'Maladie', color: '#ea580c', bg: '#fff7ed', border: '#fed7aa', icon: '🤒' },
+  WORK:        { label: 'Travail',   color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: '⏱' },
+  VACATION:    { label: 'Congé J',   color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: '🏖' },
+  VACATION_AM: { label: '½ Matin',   color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', icon: '🌅' },
+  VACATION_PM: { label: '½ Après-m', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', icon: '🌇' },
+  SICK:        { label: 'Maladie',   color: '#ea580c', bg: '#fff7ed', border: '#fed7aa', icon: '🤒' },
 }
+// Types comptant comme demi-journée de congé
+const HALF_DAY_TYPES = ['VACATION_AM', 'VACATION_PM']
+// Types comptant comme journée entière
+const FULL_DAY_VACATION_TYPES = ['VACATION']
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 const DAYS_FR   = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
@@ -101,9 +107,10 @@ function exportCSV(entries, userName, year) {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
   sorted.forEach(e => {
     const d = parseDate(e.date)
-    const presence = e.type === 'WORK' ? (parseFloat(e.hours) || 0) : ''
-    const pause    = e.type === 'WORK' ? (parseFloat(e.pause_hours) ?? DEFAULT_PAUSE) : ''
-    const effectif = e.type === 'WORK' ? Math.max(0, (parseFloat(e.hours) || 0) - (parseFloat(e.pause_hours) ?? DEFAULT_PAUSE)) : ''
+    const isWork = e.type === 'WORK'
+    const presence = isWork ? (parseFloat(e.hours) || 0) : ''
+    const pause    = isWork ? (parseFloat(e.pause_hours) ?? DEFAULT_PAUSE) : ''
+    const effectif = isWork ? Math.max(0, (parseFloat(e.hours) || 0) - (parseFloat(e.pause_hours) ?? DEFAULT_PAUSE)) : ''
     rows.push([
       e.date,
       DAY_NAMES[d.getDay()],
@@ -145,7 +152,7 @@ export default function SchedulePage() {
 
   // Data
   const [entries, setEntries]     = useState([])
-  const [settings, setSettings]   = useState({ vacation_days: 20, weekly_hours: 42.0 })
+  const [settings, setSettings]   = useState({ vacation_days: 20, weekly_hours: 42.0, off_days: [] })
   const [allSettings, setAllSettings] = useState([]) // admin overview
   const [loading, setLoading]     = useState(false)
 
@@ -163,6 +170,7 @@ export default function SchedulePage() {
   const [settingsOpen, setSettingsOpen]   = useState(false)
   const [setVacation, setSetVacation]     = useState(20)
   const [setWeeklyH, setSetWeeklyH]       = useState(42.0)
+  const [setOffDays, setSetOffDays]       = useState([])  // days of week that are off (getDay() values)
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsError, setSettingsError] = useState('')
 
@@ -191,6 +199,7 @@ export default function SchedulePage() {
       setSettings(data)
       setSetVacation(data.vacation_days)
       setSetWeeklyH(data.weekly_hours)
+      setSetOffDays(data.off_days || [])
     } catch (e) {
       console.error('loadSettings', e)
     }
@@ -226,13 +235,40 @@ export default function SchedulePage() {
   }
 
   // ── Year stats ────────────────────────────────────────────────────────────
+  const offDays        = settings.off_days || []  // e.g. [3] = Wednesday off (JS getDay())
+  const workDaysPerWeek = Math.max(1, 5 - offDays.length)
+  const dailyTarget    = settings.weekly_hours / workDaysPerWeek
+
   const workEntries    = entries.filter(e => e.type === 'WORK')
   const workedHours    = workEntries.reduce((s, e) => s + effectiveHours(e), 0)
-  const vacationTaken  = entries.filter(e => e.type === 'VACATION').length
+  const vacationTaken  = entries.filter(e => FULL_DAY_VACATION_TYPES.includes(e.type)).length
+                       + entries.filter(e => HALF_DAY_TYPES.includes(e.type)).length * 0.5
   const sickDays       = entries.filter(e => e.type === 'SICK').length
-  const dailyTarget    = settings.weekly_hours / 5
-  const overtime       = workedHours - workEntries.length * dailyTarget
   const vacationLeft   = settings.vacation_days - vacationTaken
+
+  // Hours worked on off-days (Wednesday etc.) → automatically overtime
+  const offDayWorkH = workEntries.filter(e => offDays.includes(parseDate(e.date).getDay()))
+    .reduce((s, e) => s + effectiveHours(e), 0)
+
+  // Count all past scheduled work days (Mon–Fri minus off_days) where the user
+  // had no vacation / sick entry → those are "should have worked" days
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  let expectedWorkDays = 0
+  let scan = new Date(year, 0, 1)
+  while (scan < todayStart) {
+    const dow = scan.getDay()
+    if (dow >= 1 && dow <= 5 && !offDays.includes(dow)) {
+      const ds = dateStr(scan)
+      const hasVac  = ['VACATION','VACATION_AM','VACATION_PM'].some(t => byDate[ds]?.[t])
+      const hasSick = !!byDate[ds]?.SICK
+      if (!hasVac && !hasSick) expectedWorkDays++
+    }
+    scan = addDays(scan, 1)
+  }
+
+  const expectedHours = expectedWorkDays * dailyTarget
+  // overtime: positive = heures sup, negative = rattrapage
+  const overtime = workedHours - expectedHours
 
   // This week hours
   const thisMonday   = startOfWeek(new Date())
@@ -241,6 +277,21 @@ export default function SchedulePage() {
     const e = byDate[dateStr(d)]?.WORK
     return s + effectiveHours(e)
   }, 0)
+
+  // ── Month stats (for current displayed month) ─────────────────────────────
+  const displayMonth = currentDate.getMonth()
+  const displayYear  = currentDate.getFullYear()
+  const monthEntries = entries.filter(e => {
+    const d = parseDate(e.date)
+    return d.getFullYear() === displayYear && d.getMonth() === displayMonth
+  })
+  const monthWorkH    = monthEntries.filter(e => e.type === 'WORK').reduce((s, e) => s + effectiveHours(e), 0)
+  const monthVacDays  = monthEntries.filter(e => FULL_DAY_VACATION_TYPES.includes(e.type)).length
+                      + monthEntries.filter(e => HALF_DAY_TYPES.includes(e.type)).length * 0.5
+  const monthSickDays = monthEntries.filter(e => e.type === 'SICK').length
+  const monthWorkDays = monthEntries.filter(e => e.type === 'WORK').length
+  // Expected work hours for the month (based on working days actually logged)
+  const monthTarget   = monthWorkDays * dailyTarget
 
   // ── Navigation ────────────────────────────────────────────────────────────
   function prevPeriod() {
@@ -264,34 +315,48 @@ export default function SchedulePage() {
   }
 
   // ── Open day modal ────────────────────────────────────────────────────────
-  function openDay(ds) {
-    const d = parseDate(ds)
-    if (isFuture(d)) return
-    if (d.getDay() === 0 || d.getDay() === 6) return
-    const existing = byDate[ds]
-    const entry = existing?.WORK || existing?.VACATION || existing?.SICK
+  function populateFormForType(t, existing) {
+    const entry = existing?.[t] || null
+    const defaultArrival   = '08:00'
+    const defaultPresenceH = dailyTarget + DEFAULT_PAUSE
+    const defaultDeparture = addMinutesToTime(defaultArrival, defaultPresenceH * 60)
 
-    setFormType(entry?.type || 'WORK')
+    setFormType(t)
     setFormPause(entry?.pause_hours != null ? parseFloat(entry.pause_hours) : DEFAULT_PAUSE)
     setFormNote(entry?.note || '')
     setSaveError('')
 
-    // Restore arrival/departure if stored, else compute defaults from daily target
-    const defaultArrival = '08:00'
-    const defaultPresenceH = dailyTarget + DEFAULT_PAUSE // presence = effective + pause
-    const defaultDeparture = addMinutesToTime(defaultArrival, defaultPresenceH * 60)
-
-    if (entry?.type === 'WORK') {
-      const arrival   = entry.arrival_time   || defaultArrival
-      const departure = entry.departure_time || addMinutesToTime(arrival, (parseFloat(entry.hours) || defaultPresenceH) * 60)
+    if (t === 'WORK') {
+      const arrival   = entry?.arrival_time   || defaultArrival
+      const departure = entry?.departure_time || addMinutesToTime(arrival, (parseFloat(entry?.hours) || defaultPresenceH) * 60)
       setFormArrival(arrival)
       setFormDeparture(departure)
     } else {
       setFormArrival(defaultArrival)
       setFormDeparture(defaultDeparture)
     }
+    return entry
+  }
 
+  function openDay(ds) {
+    const d = parseDate(ds)
+    if (d.getDay() === 0 || d.getDay() === 6) return
+    const existing = byDate[ds]
+
+    // Pick the best existing entry to display first
+    const firstEntry = existing?.WORK || existing?.VACATION || existing?.VACATION_AM || existing?.VACATION_PM || existing?.SICK
+    const defaultType = isFuture(d) ? 'VACATION' : (firstEntry?.type || 'WORK')
+
+    const entry = populateFormForType(defaultType, existing)
     setModal({ date: ds, entry: entry || null })
+  }
+
+  // Switch type in modal (loads existing entry for that type if any)
+  function switchModalType(t) {
+    if (!modal) return
+    const existing = byDate[modal.date]
+    const entry = populateFormForType(t, existing)
+    setModal(m => ({ ...m, entry: entry || null }))
   }
 
   // ── Save entry ────────────────────────────────────────────────────────────
@@ -364,6 +429,7 @@ export default function SchedulePage() {
           year,
           vacation_days: parseInt(setVacation),
           weekly_hours:  parseFloat(setWeeklyH),
+          off_days:      setOffDays,
         }),
       })
       await loadSettings()
@@ -435,8 +501,8 @@ export default function SchedulePage() {
           <StatCard
             icon="🏖"
             label="Congés restants"
-            value={vacationLeft}
-            sub={`/ ${settings.vacation_days} jours`}
+            value={vacationLeft % 1 === 0 ? vacationLeft : vacationLeft.toFixed(1)}
+            sub={`pris: ${vacationTaken % 1 === 0 ? vacationTaken : vacationTaken.toFixed(1)}j / ${settings.vacation_days}j`}
             color={vacationLeft > 5 ? '#16a34a' : vacationLeft > 0 ? '#ea580c' : '#dc2626'}
           />
           <StatCard
@@ -447,10 +513,10 @@ export default function SchedulePage() {
             color={thisWeekH >= settings.weekly_hours ? '#16a34a' : '#2563eb'}
           />
           <StatCard
-            icon="📊"
-            label={overtime >= 0 ? 'Heures sup' : 'Heures manq.'}
+            icon={overtime >= 0 ? '📈' : '📉'}
+            label={overtime >= 0 ? 'Heures sup' : 'Rattrapage'}
             value={`${overtime >= 0 ? '+' : ''}${overtime.toFixed(1)}h`}
-            sub={`${workedHours.toFixed(1)}h effectives`}
+            sub={`${workedHours.toFixed(1)}h / ${expectedHours.toFixed(0)}h attendues`}
             color={overtime >= 0 ? '#16a34a' : '#ea580c'}
           />
           <StatCard
@@ -535,19 +601,25 @@ export default function SchedulePage() {
               {/* Week header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '1px solid #f0f0f0' }}>
                 {weekDays.map((d, i) => {
-                  const today = isToday(d)
+                  const today  = isToday(d)
+                  const isOff  = offDays.includes(d.getDay())
                   return (
                     <div
                       key={i}
                       className="text-center py-3 px-2"
-                      style={{ borderRight: i < 4 ? '1px solid #f0f0f0' : 'none' }}
+                      style={{
+                        borderRight: i < 4 ? '1px solid #f0f0f0' : 'none',
+                        background: isOff ? '#f9fafb' : 'white',
+                      }}
                     >
-                      <div className="text-xs font-medium text-gray-400 mb-1">{DAYS_FR[i]}</div>
+                      <div className="text-xs font-medium mb-1" style={{ color: isOff ? '#d1d5db' : '#9ca3af' }}>
+                        {DAYS_FR[i]}{isOff ? ' ·off' : ''}
+                      </div>
                       <div
                         className="text-sm font-bold mx-auto flex items-center justify-center w-7 h-7 rounded-full"
                         style={{
                           background: today ? PINK : 'transparent',
-                          color: today ? 'white' : '#111',
+                          color: today ? 'white' : isOff ? '#d1d5db' : '#111',
                         }}
                       >
                         {d.getDate()}
@@ -560,36 +632,47 @@ export default function SchedulePage() {
               {/* Week cells */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', minHeight: 180 }}>
                 {weekDays.map((d, i) => {
-                  const ds = dateStr(d)
-                  const future = isFuture(d)
+                  const ds       = dateStr(d)
+                  const future   = isFuture(d)
+                  const isOff    = offDays.includes(d.getDay())
                   const dayEntries = byDate[ds] || {}
-                  const work    = dayEntries.WORK
+                  const work     = dayEntries.WORK
                   const vacation = dayEntries.VACATION
-                  const sick    = dayEntries.SICK
+                  const vacAM    = dayEntries.VACATION_AM
+                  const vacPM    = dayEntries.VACATION_PM
+                  const sick     = dayEntries.SICK
+                  const hasAny   = work || vacation || vacAM || vacPM || sick
+                  // Work on an off day = overtime marker
+                  const hasOT    = isOff && !!work
 
                   return (
                     <div
                       key={i}
                       className="day-cell p-2"
-                      onClick={() => !future && openDay(ds)}
+                      onClick={() => openDay(ds)}
                       style={{
                         borderRight: i < 4 ? '1px solid #f8f8f8' : 'none',
-                        cursor: future ? 'default' : 'pointer',
-                        opacity: future ? 0.4 : 1,
+                        cursor: 'pointer',
+                        background: isOff ? '#f9fafb' : 'white',
+                        opacity: future ? 0.55 : 1,
                         minHeight: 120,
                       }}
                     >
+                      {isOff && !hasAny && (
+                        <div className="text-center mt-4">
+                          <div className="text-xs font-medium" style={{ color: '#d1d5db' }}>Jour off</div>
+                          <div className="text-xs" style={{ color: '#e5e7eb', marginTop: 2 }}>⚡ + OT</div>
+                        </div>
+                      )}
                       <div className="flex flex-col gap-1.5 mt-1">
                         {work && (
-                          <EntryChip type="WORK" hours={effectiveHours(work)} arrival={work.arrival_time} departure={work.departure_time} note={work.note} />
+                          <EntryChip type="WORK" hours={effectiveHours(work)} arrival={work.arrival_time} departure={work.departure_time} note={work.note} overtime={hasOT} />
                         )}
-                        {vacation && (
-                          <EntryChip type="VACATION" note={vacation.note} />
-                        )}
-                        {sick && (
-                          <EntryChip type="SICK" note={sick.note} />
-                        )}
-                        {!work && !vacation && !sick && !future && (
+                        {vacation && <EntryChip type="VACATION" note={vacation.note} />}
+                        {vacAM    && <EntryChip type="VACATION_AM" note={vacAM.note} />}
+                        {vacPM    && <EntryChip type="VACATION_PM" note={vacPM.note} />}
+                        {sick     && <EntryChip type="SICK" note={sick.note} />}
+                        {!hasAny && !isOff && (
                           <div className="text-xs text-gray-300 text-center mt-4">+</div>
                         )}
                       </div>
@@ -624,62 +707,107 @@ export default function SchedulePage() {
             {/* Month grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {monthGrid.map((d, i) => {
-                const ds   = dateStr(d)
+                const ds      = dateStr(d)
                 const inMonth = d.getMonth() === currentDate.getMonth()
                 const today   = isToday(d)
                 const future  = isFuture(d)
                 const weekend = d.getDay() === 0 || d.getDay() === 6
+                const isOff   = !weekend && offDays.includes(d.getDay())
                 const dayEntries = byDate[ds] || {}
                 const work    = dayEntries.WORK
                 const vacation = dayEntries.VACATION
+                const vacAM   = dayEntries.VACATION_AM
+                const vacPM   = dayEntries.VACATION_PM
                 const sick    = dayEntries.SICK
 
                 return (
                   <div
                     key={i}
                     className="day-cell p-1.5"
-                    onClick={() => inMonth && !future && !weekend && openDay(ds)}
+                    onClick={() => inMonth && !weekend && openDay(ds)}
                     style={{
                       borderRight: (i + 1) % 7 !== 0 ? '1px solid #f8f8f8' : 'none',
                       borderBottom: i < monthGrid.length - 7 ? '1px solid #f8f8f8' : 'none',
                       minHeight: 72,
-                      background: weekend ? '#fafafa' : 'white',
-                      opacity: !inMonth ? 0.25 : future ? 0.5 : 1,
-                      cursor: inMonth && !future && !weekend ? 'pointer' : 'default',
+                      background: weekend ? '#fafafa' : isOff ? '#f9fafb' : 'white',
+                      opacity: !inMonth ? 0.25 : future ? 0.55 : 1,
+                      cursor: inMonth && !weekend ? 'pointer' : 'default',
                     }}
                   >
                     <div
                       className="text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full mx-auto"
                       style={{
                         background: today ? PINK : 'transparent',
-                        color: today ? 'white' : weekend ? '#9ca3af' : '#374151',
+                        color: today ? 'white' : (weekend || isOff) ? '#d1d5db' : '#374151',
                       }}
                     >
                       {d.getDate()}
                     </div>
                     <div className="flex flex-col gap-0.5 px-0.5">
                       {work && (
-                        <div className="rounded text-center text-xs font-medium px-1 py-0.5 truncate"
+                        <div className="rounded text-center font-medium px-1 py-0.5 truncate"
                           style={{ background: TYPES.WORK.bg, color: TYPES.WORK.color, fontSize: 10 }}>
                           {work.hours ? `${effectiveHours(work).toFixed(1)}h` : 'Travail'}
                         </div>
                       )}
                       {vacation && (
-                        <div className="rounded text-center text-xs font-medium px-1 py-0.5"
+                        <div className="rounded text-center font-medium px-1 py-0.5"
                           style={{ background: TYPES.VACATION.bg, color: TYPES.VACATION.color, fontSize: 10 }}>
-                          Congé
+                          🏖 Congé
+                        </div>
+                      )}
+                      {vacAM && (
+                        <div className="rounded text-center font-medium px-1 py-0.5"
+                          style={{ background: TYPES.VACATION_AM.bg, color: TYPES.VACATION_AM.color, fontSize: 10 }}>
+                          🌅 ½ Mat.
+                        </div>
+                      )}
+                      {vacPM && (
+                        <div className="rounded text-center font-medium px-1 py-0.5"
+                          style={{ background: TYPES.VACATION_PM.bg, color: TYPES.VACATION_PM.color, fontSize: 10 }}>
+                          🌇 ½ Apr.
                         </div>
                       )}
                       {sick && (
-                        <div className="rounded text-center text-xs font-medium px-1 py-0.5"
+                        <div className="rounded text-center font-medium px-1 py-0.5"
                           style={{ background: TYPES.SICK.bg, color: TYPES.SICK.color, fontSize: 10 }}>
-                          Maladie
+                          🤒 Maladie
                         </div>
                       )}
                     </div>
                   </div>
                 )
               })}
+            </div>
+            {/* Month footer – totals */}
+            <div
+              className="border-t px-5 py-3 flex flex-wrap items-center gap-4"
+              style={{ borderColor: '#f0f0f0', background: '#fafafa' }}
+            >
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                {MONTHS_FR[displayMonth]} {displayYear}
+              </span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <span style={{ color: TYPES.WORK.color, fontWeight: 600 }}>⏱ {monthWorkH.toFixed(1)}h</span>
+                <span className="text-gray-400 text-xs">effectifs</span>
+              </span>
+              {monthVacDays > 0 && (
+                <span className="flex items-center gap-1.5 text-sm">
+                  <span style={{ color: TYPES.VACATION.color, fontWeight: 600 }}>🏖 {monthVacDays}j</span>
+                  <span className="text-gray-400 text-xs">de congé</span>
+                </span>
+              )}
+              {monthSickDays > 0 && (
+                <span className="flex items-center gap-1.5 text-sm">
+                  <span style={{ color: TYPES.SICK.color, fontWeight: 600 }}>🤒 {monthSickDays}j</span>
+                  <span className="text-gray-400 text-xs">maladie</span>
+                </span>
+              )}
+              {monthWorkH > 0 && (
+                <span className="ml-auto text-xs text-gray-400">
+                  {monthWorkDays} jour{monthWorkDays > 1 ? 's' : ''} travaillé{monthWorkDays > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -722,33 +850,76 @@ export default function SchedulePage() {
       {/* ── Day entry modal ── */}
       {modal && (
         <Modal onClose={() => !saving && setModal(null)}>
-          <h3 className="font-bold text-gray-900 mb-1">
-            {(() => {
-              const d = parseDate(modal.date)
-              return `${DAYS_FR[d.getDay() === 0 ? 6 : d.getDay() - 1]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`
-            })()}
-          </h3>
-          <p className="text-xs text-gray-400 mb-4">
-            {effectiveUser} · {year}
-          </p>
+          {(() => {
+            const d   = parseDate(modal.date)
+            const isOff = offDays.includes(d.getDay())
+            const fut   = isFuture(d)
+            return (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-gray-900">
+                    {DAYS_FR[d.getDay() === 0 ? 6 : d.getDay() - 1]} {d.getDate()} {MONTHS_FR[d.getMonth()]}
+                  </h3>
+                  {isOff && formType === 'WORK' && (
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: '#fef3c7', color: '#d97706' }}
+                    >⚡ Heures sup</span>
+                  )}
+                  {fut && (
+                    <span
+                      className="text-xs font-medium px-2 py-0.5 rounded-full"
+                      style={{ background: '#eff6ff', color: '#3b82f6' }}
+                    >Planifié</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mb-4">{effectiveUser} · {year}</p>
+              </>
+            )
+          })()}
 
-          {/* Type selector */}
-          <div className="flex gap-2 mb-4">
-            {Object.entries(TYPES).map(([t, cfg]) => (
-              <button
-                key={t}
-                onClick={() => setFormType(t)}
-                className="flex-1 flex flex-col items-center py-2.5 rounded-xl border-2 transition-all text-sm font-medium"
-                style={{
-                  borderColor: formType === t ? cfg.color : '#e5e7eb',
-                  background:  formType === t ? cfg.bg : 'white',
-                  color:       formType === t ? cfg.color : '#6b7280',
-                }}
-              >
-                <span style={{ fontSize: 18 }}>{cfg.icon}</span>
-                <span style={{ fontSize: 11, marginTop: 2 }}>{cfg.label}</span>
-              </button>
-            ))}
+          {/* Type selector — row 1: WORK / VACATION / SICK, row 2: ½ Matin / ½ Après-m */}
+          <div className="mb-4 space-y-2">
+            <div className="flex gap-2">
+              {(['WORK', 'VACATION', 'SICK']).map(t => {
+                const cfg = TYPES[t]
+                return (
+                  <button
+                    key={t}
+                    onClick={() => switchModalType(t)}
+                    className="flex-1 flex flex-col items-center py-2 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: formType === t ? cfg.color : '#e5e7eb',
+                      background:  formType === t ? cfg.bg : 'white',
+                      color:       formType === t ? cfg.color : '#6b7280',
+                    }}
+                  >
+                    <span style={{ fontSize: 16 }}>{cfg.icon}</span>
+                    <span style={{ fontSize: 11, marginTop: 1, fontWeight: 500 }}>{cfg.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex gap-2">
+              {(['VACATION_AM', 'VACATION_PM']).map(t => {
+                const cfg = TYPES[t]
+                return (
+                  <button
+                    key={t}
+                    onClick={() => switchModalType(t)}
+                    className="flex-1 flex flex-row items-center justify-center gap-2 py-2 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: formType === t ? cfg.color : '#e5e7eb',
+                      background:  formType === t ? cfg.bg : 'white',
+                      color:       formType === t ? cfg.color : '#6b7280',
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>{cfg.icon}</span>
+                    <span style={{ fontSize: 11, fontWeight: 500 }}>{cfg.label} <span style={{ opacity: 0.6 }}>(½ j)</span></span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Arrivée / Départ / Pause (only for WORK) */}
@@ -909,7 +1080,48 @@ export default function SchedulePage() {
               style={{ borderColor: '#e5e7eb' }}
             />
             <p className="text-xs text-gray-400 mt-1">
-              → {(parseFloat(setWeeklyH) / 5).toFixed(1)}h par jour · Ex: 42h (100%), 33.6h (80%), 21h (50%)
+              → {(parseFloat(setWeeklyH) / Math.max(1, 5 - setOffDays.length)).toFixed(1)}h/jour
+              · {5 - setOffDays.length}j/sem
+              · Ex: 42h (100%), 33.6h (80%)
+            </p>
+          </div>
+
+          {/* Jours non travaillés */}
+          <div className="mb-5">
+            <label className="block text-xs font-medium text-gray-500 mb-2">
+              Jours non travaillés (cochez les jours off)
+            </label>
+            <div className="flex gap-2">
+              {[
+                { dow: 1, label: 'Lun' },
+                { dow: 2, label: 'Mar' },
+                { dow: 3, label: 'Mer' },
+                { dow: 4, label: 'Jeu' },
+                { dow: 5, label: 'Ven' },
+              ].map(({ dow, label }) => {
+                const isChecked = setOffDays.includes(dow)
+                return (
+                  <button
+                    key={dow}
+                    type="button"
+                    onClick={() => setSetOffDays(prev =>
+                      prev.includes(dow) ? prev.filter(d => d !== dow) : [...prev, dow]
+                    )}
+                    className="flex-1 py-2 rounded-lg border-2 text-xs font-semibold transition-all"
+                    style={{
+                      borderColor: isChecked ? PINK : '#e5e7eb',
+                      background:  isChecked ? '#fff1f4' : 'white',
+                      color:       isChecked ? PINK : '#9ca3af',
+                    }}
+                  >
+                    {label}
+                    {isChecked && <div style={{ fontSize: 8, marginTop: 1 }}>OFF</div>}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              Les heures saisies sur ces jours comptent automatiquement comme heures supplémentaires.
             </p>
           </div>
 
@@ -961,7 +1173,7 @@ function StatCard({ icon, label, value, sub, color }) {
   )
 }
 
-function EntryChip({ type, hours, arrival, departure, note }) {
+function EntryChip({ type, hours, arrival, departure, note, overtime }) {
   const cfg = TYPES[type]
   const timeRange = arrival && departure ? `${arrival}–${departure}` : null
   return (
@@ -977,6 +1189,12 @@ function EntryChip({ type, hours, arrival, departure, note }) {
             ? `${typeof hours === 'number' ? hours.toFixed(1) : hours}h`
             : cfg.label}
         </span>
+        {overtime && (
+          <span
+            className="ml-auto text-xs font-bold rounded px-1"
+            style={{ background: '#fef3c7', color: '#d97706', fontSize: 9 }}
+          >⚡ OT</span>
+        )}
       </div>
       {timeRange && <div className="mt-0.5 font-normal" style={{ fontSize: 10, opacity: 0.8 }}>{timeRange}</div>}
       {note && <div className="truncate text-gray-400 mt-0.5" style={{ fontSize: 10 }}>{note}</div>}
