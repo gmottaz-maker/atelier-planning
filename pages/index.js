@@ -604,6 +604,7 @@ export default function Admin() {
             <Link href="/home" title="Accueil" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">🏠</Link>
             <Link href="/tasks" title="Tâches" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">✅</Link>
             <Link href="/activity" title="Activité" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">📊</Link>
+            <Link href="/schedule" title="Horaires" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">🗓</Link>
             <Link href="/display" target="_blank" title="Atelier" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">📺</Link>
             <Link href="/settings" title="Paramètres" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">⚙️</Link>
             <button onClick={() => { resetForm(); setShowForm(true) }}
