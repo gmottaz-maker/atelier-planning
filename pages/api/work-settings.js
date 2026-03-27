@@ -1,18 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-}
-
-const ADMIN_USER = 'Guillaume'
+import { getSupabaseServer } from '../../lib/supabase-server'
 
 export default async function handler(req, res) {
-  const supabase = getSupabase()
+  const supabase = getSupabaseServer()
   const year = parseInt(req.query.year) || new Date().getFullYear()
-  const actor = req.headers['x-actor'] || null
 
   // GET – settings for one user (or all users for admin)
   if (req.method === 'GET') {

@@ -73,12 +73,30 @@ async function apiFetch(path, options = {}) {
   return r.json()
 }
 
+// ─── Time helpers ────────────────────────────────────────────────────────────
+
+function timeDiffHours(arrival, departure) {
+  if (!arrival || !departure) return 0
+  const [ah, am] = arrival.split(':').map(Number)
+  const [dh, dm] = departure.split(':').map(Number)
+  const diff = (dh * 60 + dm) - (ah * 60 + am)
+  return Math.max(0, diff / 60)
+}
+
+function addMinutesToTime(time, minutes) {
+  const [h, m] = time.split(':').map(Number)
+  const total = h * 60 + m + Math.round(minutes)
+  const nh = Math.floor(total / 60) % 24
+  const nm = total % 60
+  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
+}
+
 // ─── CSV Export ──────────────────────────────────────────────────────────────
 
 function exportCSV(entries, userName, year) {
   const DAY_NAMES = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
   const rows = [
-    ['Date', 'Jour', 'Type', 'Présence (h)', 'Pause (h)', 'Effectif (h)', 'Note'],
+    ['Date', 'Jour', 'Type', 'Arrivée', 'Départ', 'Présence (h)', 'Pause (h)', 'Effectif (h)', 'Note'],
   ]
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
   sorted.forEach(e => {
@@ -90,6 +108,8 @@ function exportCSV(entries, userName, year) {
       e.date,
       DAY_NAMES[d.getDay()],
       TYPES[e.type]?.label || e.type,
+      e.arrival_time || '',
+      e.departure_time || '',
       presence,
       pause,
       effectif,
@@ -130,13 +150,14 @@ export default function SchedulePage() {
   const [loading, setLoading]     = useState(false)
 
   // Modal – day entry
-  const [modal, setModal]         = useState(null) // { date, entry }
-  const [formType, setFormType]   = useState('WORK')
-  const [formHours, setFormHours] = useState('')
-  const [formPause, setFormPause] = useState(DEFAULT_PAUSE)
-  const [formNote, setFormNote]   = useState('')
-  const [saving, setSaving]       = useState(false)
-  const [saveError, setSaveError] = useState('')
+  const [modal, setModal]             = useState(null) // { date, entry }
+  const [formType, setFormType]       = useState('WORK')
+  const [formArrival, setFormArrival] = useState('08:00')
+  const [formDeparture, setFormDeparture] = useState('17:00')
+  const [formPause, setFormPause]     = useState(DEFAULT_PAUSE)
+  const [formNote, setFormNote]       = useState('')
+  const [saving, setSaving]           = useState(false)
+  const [saveError, setSaveError]     = useState('')
 
   // Modal – settings
   const [settingsOpen, setSettingsOpen]   = useState(false)
@@ -249,11 +270,27 @@ export default function SchedulePage() {
     if (d.getDay() === 0 || d.getDay() === 6) return
     const existing = byDate[ds]
     const entry = existing?.WORK || existing?.VACATION || existing?.SICK
+
     setFormType(entry?.type || 'WORK')
-    setFormHours(entry?.hours != null ? String(entry.hours) : dailyTarget.toFixed(1))
     setFormPause(entry?.pause_hours != null ? parseFloat(entry.pause_hours) : DEFAULT_PAUSE)
     setFormNote(entry?.note || '')
     setSaveError('')
+
+    // Restore arrival/departure if stored, else compute defaults from daily target
+    const defaultArrival = '08:00'
+    const defaultPresenceH = dailyTarget + DEFAULT_PAUSE // presence = effective + pause
+    const defaultDeparture = addMinutesToTime(defaultArrival, defaultPresenceH * 60)
+
+    if (entry?.type === 'WORK') {
+      const arrival   = entry.arrival_time   || defaultArrival
+      const departure = entry.departure_time || addMinutesToTime(arrival, (parseFloat(entry.hours) || defaultPresenceH) * 60)
+      setFormArrival(arrival)
+      setFormDeparture(departure)
+    } else {
+      setFormArrival(defaultArrival)
+      setFormDeparture(defaultDeparture)
+    }
+
     setModal({ date: ds, entry: entry || null })
   }
 
@@ -261,6 +298,14 @@ export default function SchedulePage() {
   async function saveEntry() {
     if (!modal) return
     if (!effectiveUser) { setSaveError('Utilisateur non identifié'); return }
+
+    const presenceH = formType === 'WORK' ? timeDiffHours(formArrival, formDeparture) : null
+
+    if (formType === 'WORK' && presenceH <= 0) {
+      setSaveError("L'heure de départ doit être après l'heure d'arrivée")
+      return
+    }
+
     setSaving(true)
     setSaveError('')
     try {
@@ -268,12 +313,14 @@ export default function SchedulePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userName:    effectiveUser,
-          date:        modal.date,
-          type:        formType,
-          hours:       formType === 'WORK' ? formHours : null,
-          pause_hours: formType === 'WORK' ? formPause : null,
-          note:        formNote || null,
+          userName:       effectiveUser,
+          date:           modal.date,
+          type:           formType,
+          hours:          presenceH,
+          pause_hours:    formType === 'WORK' ? formPause : null,
+          arrival_time:   formType === 'WORK' ? formArrival : null,
+          departure_time: formType === 'WORK' ? formDeparture : null,
+          note:           formNote || null,
         }),
       })
       await loadEntries()
@@ -337,8 +384,9 @@ export default function SchedulePage() {
   const monthGrid = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth())
 
   // Computed effective hours for form display
+  const formPresence  = formType === 'WORK' ? timeDiffHours(formArrival, formDeparture) : 0
   const formEffective = formType === 'WORK'
-    ? Math.max(0, (parseFloat(formHours) || 0) - (parseFloat(formPause) || 0))
+    ? Math.max(0, formPresence - (parseFloat(formPause) || 0))
     : null
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -533,7 +581,7 @@ export default function SchedulePage() {
                     >
                       <div className="flex flex-col gap-1.5 mt-1">
                         {work && (
-                          <EntryChip type="WORK" hours={effectiveHours(work)} rawHours={work.hours} note={work.note} />
+                          <EntryChip type="WORK" hours={effectiveHours(work)} arrival={work.arrival_time} departure={work.departure_time} note={work.note} />
                         )}
                         {vacation && (
                           <EntryChip type="VACATION" note={vacation.note} />
@@ -703,40 +751,30 @@ export default function SchedulePage() {
             ))}
           </div>
 
-          {/* Hours + Pause inputs (only for WORK) */}
+          {/* Arrivée / Départ / Pause (only for WORK) */}
           {formType === 'WORK' && (
             <div className="mb-4 space-y-3">
-              {/* Présence totale */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Présence totale (h)</label>
-                <div className="flex items-center gap-2">
+              {/* Arrivée + Départ */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Arrivée</label>
                   <input
-                    type="number"
-                    min="0"
-                    max="24"
-                    step="0.5"
-                    value={formHours}
-                    onChange={e => setFormHours(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-gray-900"
+                    type="time"
+                    value={formArrival}
+                    onChange={e => setFormArrival(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-gray-900 text-center"
                     style={{ borderColor: '#e5e7eb' }}
                   />
-                  <span className="text-sm text-gray-400">h</span>
                 </div>
-                <div className="flex gap-2 mt-2">
-                  {[dailyTarget.toFixed(1), '8.5', '9'].map(v => (
-                    <button
-                      key={v}
-                      onClick={() => setFormHours(v)}
-                      className="px-2 py-1 text-xs rounded-md border"
-                      style={{
-                        borderColor: formHours === v ? PINK : '#e5e7eb',
-                        color:       formHours === v ? PINK : '#6b7280',
-                        background:  formHours === v ? `${PINK}11` : 'white',
-                      }}
-                    >
-                      {v}h
-                    </button>
-                  ))}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Départ</label>
+                  <input
+                    type="time"
+                    value={formDeparture}
+                    onChange={e => setFormDeparture(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-gray-900 text-center"
+                    style={{ borderColor: '#e5e7eb' }}
+                  />
                 </div>
               </div>
 
@@ -758,15 +796,25 @@ export default function SchedulePage() {
                 </div>
               </div>
 
-              {/* Effective preview */}
+              {/* Summary: présence → effectif */}
               <div
-                className="flex items-center justify-between px-3 py-2 rounded-lg"
-                style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}
+                className="rounded-lg px-3 py-2.5 space-y-1"
+                style={{ background: '#f8faff', border: '1px solid #e0e7ff' }}
               >
-                <span className="text-xs font-medium text-green-700">Temps effectif</span>
-                <span className="text-sm font-bold text-green-700">
-                  {formEffective != null ? `${formEffective.toFixed(2)}h` : '—'}
-                </span>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Présence ({formArrival} → {formDeparture})</span>
+                  <span className="font-medium text-gray-700">{formPresence.toFixed(2)}h</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Pause</span>
+                  <span className="font-medium text-gray-700">− {formPause}h</span>
+                </div>
+                <div className="flex items-center justify-between border-t pt-1 mt-1" style={{ borderColor: '#e0e7ff' }}>
+                  <span className="text-xs font-semibold text-green-700">Temps effectif</span>
+                  <span className="text-sm font-bold text-green-700">
+                    {formEffective != null ? `${formEffective.toFixed(2)}h` : '—'}
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -913,8 +961,9 @@ function StatCard({ icon, label, value, sub, color }) {
   )
 }
 
-function EntryChip({ type, hours, rawHours, note }) {
+function EntryChip({ type, hours, arrival, departure, note }) {
   const cfg = TYPES[type]
+  const timeRange = arrival && departure ? `${arrival}–${departure}` : null
   return (
     <div
       className="rounded-lg px-2 py-1.5 text-xs font-medium"
@@ -929,6 +978,7 @@ function EntryChip({ type, hours, rawHours, note }) {
             : cfg.label}
         </span>
       </div>
+      {timeRange && <div className="mt-0.5 font-normal" style={{ fontSize: 10, opacity: 0.8 }}>{timeRange}</div>}
       {note && <div className="truncate text-gray-400 mt-0.5" style={{ fontSize: 10 }}>{note}</div>}
     </div>
   )

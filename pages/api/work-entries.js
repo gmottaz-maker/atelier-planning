@@ -1,14 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-}
+import { getSupabaseServer } from '../../lib/supabase-server'
 
 export default async function handler(req, res) {
-  const supabase = getSupabase()
+  const supabase = getSupabaseServer()
 
   // ── GET – list entries ────────────────────────────────────────────────────
   if (req.method === 'GET') {
@@ -31,7 +24,7 @@ export default async function handler(req, res) {
 
   // ── POST – create / update entry (upsert by user_name+date+type) ──────────
   if (req.method === 'POST') {
-    const { userName, date, type, hours, note } = req.body
+    const { userName, date, type, hours, pause_hours, note, arrival_time, departure_time } = req.body
 
     if (!userName || !date || !type) {
       return res.status(400).json({ error: 'userName, date et type requis' })
@@ -41,13 +34,15 @@ export default async function handler(req, res) {
       .from('work_entries')
       .upsert(
         {
-          user_name:   userName,
+          user_name:      userName,
           date,
           type,
-          hours:       type === 'WORK' ? parseFloat(hours) || null : null,
-          pause_hours: type === 'WORK' ? parseFloat(req.body.pause_hours ?? 1.0) : null,
-          note:        note || null,
-          updated_at:  new Date().toISOString(),
+          hours:          type === 'WORK' ? parseFloat(hours) || null : null,
+          pause_hours:    type === 'WORK' ? parseFloat(pause_hours ?? 1.0) : null,
+          arrival_time:   type === 'WORK' ? (arrival_time || null) : null,
+          departure_time: type === 'WORK' ? (departure_time || null) : null,
+          note:           note || null,
+          updated_at:     new Date().toISOString(),
         },
         { onConflict: 'user_name,date,type' }
       )
