@@ -246,29 +246,15 @@ export default function SchedulePage() {
   const sickDays       = entries.filter(e => e.type === 'SICK').length
   const vacationLeft   = settings.vacation_days - vacationTaken
 
-  // Hours worked on off-days (Wednesday etc.) → automatically overtime
-  const offDayWorkH = workEntries.filter(e => offDays.includes(parseDate(e.date).getDay()))
-    .reduce((s, e) => s + effectiveHours(e), 0)
-
-  // Count all past scheduled work days (Mon–Fri minus off_days) where the user
-  // had no vacation / sick entry → those are "should have worked" days
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-  let expectedWorkDays = 0
-  let scan = new Date(year, 0, 1)
-  while (scan < todayStart) {
-    const dow = scan.getDay()
-    if (dow >= 1 && dow <= 5 && !offDays.includes(dow)) {
-      const ds = dateStr(scan)
-      const hasVac  = ['VACATION','VACATION_AM','VACATION_PM'].some(t => byDate[ds]?.[t])
-      const hasSick = !!byDate[ds]?.SICK
-      if (!hasVac && !hasSick) expectedWorkDays++
-    }
-    scan = addDays(scan, 1)
-  }
-
-  const expectedHours = expectedWorkDays * dailyTarget
-  // overtime: positive = heures sup, negative = rattrapage
-  const overtime = workedHours - expectedHours
+  // ── Solde heures sup : basé uniquement sur les entrées saisies ───────────────
+  // Pour chaque jour travaillé :
+  //   · jour normal  → contribution = heures_effectives − quota_journalier
+  //   · jour off     → contribution = heures_effectives (100% heures sup, aucun quota déduit)
+  // Les jours sans entrée ne modifient pas le compteur.
+  const overtime = workEntries.reduce((s, e) => {
+    const isOff = offDays.includes(parseDate(e.date).getDay())
+    return s + (isOff ? effectiveHours(e) : effectiveHours(e) - dailyTarget)
+  }, 0)
 
   // This week hours
   const thisMonday   = startOfWeek(new Date())
@@ -514,9 +500,9 @@ export default function SchedulePage() {
           />
           <StatCard
             icon={overtime >= 0 ? '📈' : '📉'}
-            label={overtime >= 0 ? 'Heures sup' : 'Rattrapage'}
+            label="Solde heures"
             value={`${overtime >= 0 ? '+' : ''}${overtime.toFixed(1)}h`}
-            sub={`${workedHours.toFixed(1)}h / ${expectedHours.toFixed(0)}h attendues`}
+            sub={`${workedHours.toFixed(1)}h effectuées cette année`}
             color={overtime >= 0 ? '#16a34a' : '#ea580c'}
           />
           <StatCard

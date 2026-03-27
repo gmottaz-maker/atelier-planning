@@ -12,16 +12,55 @@ let _sidExpiry = 0
 
 async function getSid() {
   if (_sid && Date.now() < _sidExpiry) return _sid
-  const url = `${NAS_HOST}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login` +
+
+  // ── Vérification des variables d'environnement ────────────────────────────
+  const missing = []
+  if (!NAS_HOST) missing.push('SYNOLOGY_HOST')
+  if (!NAS_USER) missing.push('SYNOLOGY_USER')
+  if (!NAS_PASS) missing.push('SYNOLOGY_PASS')
+  if (missing.length > 0) {
+    throw new Error(`NAS: variable(s) Vercel manquante(s): ${missing.join(', ')}`)
+  }
+
+  // Supprimer le slash final s'il existe
+  const host = NAS_HOST.replace(/\/$/, '')
+
+  const url = `${host}/webapi/auth.cgi?api=SYNO.API.Auth&version=3&method=login` +
     `&account=${encodeURIComponent(NAS_USER)}&passwd=${encodeURIComponent(NAS_PASS)}` +
     `&session=FileStation&format=sid`
-  const resp = await fetch(url, { cache: 'no-store' })
+
+  let resp
+  try {
+    resp = await fetch(url, { cache: 'no-store' })
+  } catch (fetchErr) {
+    throw new Error(`NAS auth: impossible de joindre ${host} — ${fetchErr.message}. Vérifiez que l'URL est accessible depuis internet (pas seulement en local).`)
+  }
+
   const ct = resp.headers.get('content-type') || ''
   if (!ct.includes('json')) {
-    throw new Error('NAS auth: réponse non-JSON (HTML), vérifier SYNOLOGY_HOST')
+    // Lire les premiers caractères pour aider au diagnostic
+    let preview = ''
+    try { preview = (await resp.text()).substring(0, 120) } catch (_) {}
+    throw new Error(
+      `NAS auth: réponse non-JSON depuis ${host} (HTTP ${resp.status}, type: "${ct}"). ` +
+      `Vérifiez SYNOLOGY_HOST — si c'est une URL QuickConnect, utilisez l'URL directe (DDNS ou IP publique:port). ` +
+      `Début réponse: ${preview}`
+    )
   }
+
   const data = await resp.json()
-  if (!data.success) throw new Error('NAS auth failed: ' + JSON.stringify(data.error))
+  if (!data.success) {
+    const code = data.error?.code
+    const msg = {
+      400: 'Identifiants incorrects (account/passwd)',
+      401: 'Compte invité désactivé',
+      402: 'Compte désactivé',
+      403: '2FA requis',
+      404: 'Permission refusée',
+    }[code] || `code ${code}`
+    throw new Error(`NAS auth échoué: ${msg}`)
+  }
+
   _sid = data.data.sid
   _sidExpiry = Date.now() + 20 * 60 * 1000 // 20 min
   return _sid
