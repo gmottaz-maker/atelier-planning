@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
-import Link from 'next/link'
 import { useAuth } from './_app'
+import NavBar from '../components/NavBar'
 
 const PINK = '#FF4D6D'
 const PEOPLE = ['Arnaud', 'Gabin', 'Guillaume', 'Sous-traitant']
@@ -591,77 +591,51 @@ export default function Tasks() {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
-        <div className="max-w-6xl mx-auto px-4 pt-3 pb-0">
-          <div className="flex items-center justify-between mb-3">
-            {/* Logo + titre */}
-            <div className="flex items-center gap-2">
-              <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
-                <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
-                <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
-                <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
-                <circle cx="20" cy="20" r="3" fill={PINK} />
-              </svg>
-              <span className="font-bold text-gray-900 text-sm">tâches</span>
-              {activeCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold text-white"
-                  style={{ background: PINK }}>{activeCount}</span>
-              )}
-            </div>
+      <NavBar title="tâches">
+        {activeCount > 0 && (
+          <span className="px-1.5 py-0.5 rounded-full text-xs font-bold text-white"
+            style={{ background: PINK }}>{activeCount}</span>
+        )}
+        {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
+          <button onClick={requestNotifications} title="Activer les notifications"
+            className="w-8 h-8 flex items-center justify-center rounded-full border text-base"
+            style={{ borderColor: '#e5e7eb', color: '#9ca3af' }}>🔔</button>
+        )}
+        {notifStatus === 'granted' && (
+          <span title="Notifications activées" className="w-8 h-8 flex items-center justify-center rounded-full text-base" style={{ background: '#f0fdf4' }}>🔔</span>
+        )}
+      </NavBar>
 
-            {/* Nav + identité */}
-            <div className="flex items-center gap-2">
-              <Link href="/home" title="Accueil" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🏠</Link>
-              <Link href="/" title="Projets" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🗂️</Link>
-              <Link href="/activity" title="Activité" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">📊</Link>
-              <Link href="/settings" title="Paramètres" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">⚙️</Link>
-              {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
-                <button onClick={requestNotifications} title="Activer les notifications"
-                  className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 text-base">🔔</button>
-              )}
-              {notifStatus === 'granted' && (
-                <span title="Notifications activées" className="w-8 h-8 flex items-center justify-center rounded-full text-base" style={{ background: '#f0fdf4' }}>🔔</span>
-              )}
-              <button onClick={() => signOut()} title="Se déconnecter"
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
-                style={{ background: PERSON_COLORS[currentUser] || PINK }}>
-                {currentUser}
-              </button>
-            </div>
-          </div>
-
-          {/* Tabs vue — mobile uniquement (desktop: sidebar) */}
-          <div className="flex gap-1 pb-3 md:hidden">
-            {[
-              { key: 'today', label: "Aujourd'hui" },
-              { key: 'week', label: 'Semaine' },
-              { key: 'twoweeks', label: '2 semaines' },
-            ].map(v => (
-              <button key={v.key} onClick={() => setView(v.key)}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
-                style={view === v.key ? { background: PINK, color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
-                {v.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Filtre personne — mobile uniquement */}
-          <div className="flex gap-2 pb-3 overflow-x-auto md:hidden" style={{ scrollbarWidth: 'none' }}>
-            <button onClick={() => setPersonFilter('all')}
-              className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
-              style={activePersonFilter === 'all' ? { background: '#111', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
-              Tous
+      {/* Tabs vue + Filtre personne — mobile uniquement */}
+      <div className="md:hidden bg-white border-b px-4 pb-3 pt-2 space-y-2" style={{ borderColor: '#f0f0f0' }}>
+        <div className="flex gap-1">
+          {[
+            { key: 'today', label: "Aujourd'hui" },
+            { key: 'week', label: 'Semaine' },
+            { key: 'twoweeks', label: '2 semaines' },
+          ].map(v => (
+            <button key={v.key} onClick={() => setView(v.key)}
+              className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+              style={view === v.key ? { background: PINK, color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+              {v.label}
             </button>
-            {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
-              <button key={p} onClick={() => setPersonFilter(p)}
-                className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 transition-all"
-                style={activePersonFilter === p ? { background: PERSON_COLORS[p], color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
-                {p}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
-      </header>
+        <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          <button onClick={() => setPersonFilter('all')}
+            className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
+            style={activePersonFilter === 'all' ? { background: '#111', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+            Tous
+          </button>
+          {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
+            <button key={p} onClick={() => setPersonFilter(p)}
+              className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 transition-all"
+              style={activePersonFilter === p ? { background: PERSON_COLORS[p], color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Layout : sidebar (desktop) + liste */}
       <div className="max-w-6xl mx-auto md:flex md:gap-6 px-4 py-4">

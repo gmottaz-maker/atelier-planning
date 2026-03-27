@@ -41,12 +41,13 @@ export default async function handler(req, res) {
       .from('work_entries')
       .upsert(
         {
-          user_name: userName,
+          user_name:   userName,
           date,
           type,
-          hours:      type === 'WORK' ? parseFloat(hours) || null : null,
-          note:       note || null,
-          updated_at: new Date().toISOString(),
+          hours:       type === 'WORK' ? parseFloat(hours) || null : null,
+          pause_hours: type === 'WORK' ? parseFloat(req.body.pause_hours ?? 1.0) : null,
+          note:        note || null,
+          updated_at:  new Date().toISOString(),
         },
         { onConflict: 'user_name,date,type' }
       )

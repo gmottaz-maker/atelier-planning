@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase'
 export const AuthContext = createContext(null)
 export function useAuth() { return useContext(AuthContext) }
 
-const PUBLIC_ROUTES = ['/login']
+const PUBLIC_ROUTES = ['/login', '/display']
 const PINK = '#FF4D6D'
 
 async function fetchProfile(userId) {

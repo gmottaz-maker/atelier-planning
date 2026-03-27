@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
-import Link from 'next/link'
 import { useAuth } from './_app'
+import NavBar from '../components/NavBar'
 
 const PINK = '#FF4D6D'
 const ADMIN_USER = 'Guillaume'
 const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
+const DEFAULT_PAUSE = 1.0
 
 const TYPES = {
   WORK:     { label: 'Travail',  color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: '⏱' },
@@ -60,28 +61,50 @@ function getMonthGrid(year, month) {
   return days
 }
 
-// ─── Logo ────────────────────────────────────────────────────────────────────
-
-function Logo() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
-      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
-      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
-      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
-      <circle cx="20" cy="20" r="3" fill={PINK} />
-    </svg>
-  )
-}
-
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
 async function apiFetch(path, options = {}) {
   const r = await fetch(path, options)
   if (!r.ok) {
-    const txt = await r.text()
-    throw new Error(txt)
+    let msg = `Erreur ${r.status}`
+    try { const j = await r.json(); msg = j.error || msg } catch (_) {}
+    throw new Error(msg)
   }
   return r.json()
+}
+
+// ─── CSV Export ──────────────────────────────────────────────────────────────
+
+function exportCSV(entries, userName, year) {
+  const DAY_NAMES = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
+  const rows = [
+    ['Date', 'Jour', 'Type', 'Présence (h)', 'Pause (h)', 'Effectif (h)', 'Note'],
+  ]
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
+  sorted.forEach(e => {
+    const d = parseDate(e.date)
+    const presence = e.type === 'WORK' ? (parseFloat(e.hours) || 0) : ''
+    const pause    = e.type === 'WORK' ? (parseFloat(e.pause_hours) ?? DEFAULT_PAUSE) : ''
+    const effectif = e.type === 'WORK' ? Math.max(0, (parseFloat(e.hours) || 0) - (parseFloat(e.pause_hours) ?? DEFAULT_PAUSE)) : ''
+    rows.push([
+      e.date,
+      DAY_NAMES[d.getDay()],
+      TYPES[e.type]?.label || e.type,
+      presence,
+      pause,
+      effectif,
+      e.note || '',
+    ])
+  })
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n')
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `horaires_${userName}_${year}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
@@ -107,17 +130,20 @@ export default function SchedulePage() {
   const [loading, setLoading]     = useState(false)
 
   // Modal – day entry
-  const [modal, setModal]         = useState(null) // { date }
+  const [modal, setModal]         = useState(null) // { date, entry }
   const [formType, setFormType]   = useState('WORK')
   const [formHours, setFormHours] = useState('')
+  const [formPause, setFormPause] = useState(DEFAULT_PAUSE)
   const [formNote, setFormNote]   = useState('')
   const [saving, setSaving]       = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   // Modal – settings
   const [settingsOpen, setSettingsOpen]   = useState(false)
   const [setVacation, setSetVacation]     = useState(20)
   const [setWeeklyH, setSetWeeklyH]       = useState(42.0)
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
 
   // ── Load entries for full year ────────────────────────────────────────────
   const loadEntries = useCallback(async () => {
@@ -170,9 +196,17 @@ export default function SchedulePage() {
     byDate[e.date][e.type] = e
   })
 
+  // ── Effective hours helper ────────────────────────────────────────────────
+  function effectiveHours(entry) {
+    if (!entry || entry.type !== 'WORK') return 0
+    const h = parseFloat(entry.hours) || 0
+    const p = parseFloat(entry.pause_hours) ?? DEFAULT_PAUSE
+    return Math.max(0, h - p)
+  }
+
   // ── Year stats ────────────────────────────────────────────────────────────
   const workEntries    = entries.filter(e => e.type === 'WORK')
-  const workedHours    = workEntries.reduce((s, e) => s + (parseFloat(e.hours) || 0), 0)
+  const workedHours    = workEntries.reduce((s, e) => s + effectiveHours(e), 0)
   const vacationTaken  = entries.filter(e => e.type === 'VACATION').length
   const sickDays       = entries.filter(e => e.type === 'SICK').length
   const dailyTarget    = settings.weekly_hours / 5
@@ -184,7 +218,7 @@ export default function SchedulePage() {
   const thisWeekDays = getWeekDays(thisMonday)
   const thisWeekH    = thisWeekDays.reduce((s, d) => {
     const e = byDate[dateStr(d)]?.WORK
-    return s + (parseFloat(e?.hours) || 0)
+    return s + effectiveHours(e)
   }, 0)
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -210,34 +244,42 @@ export default function SchedulePage() {
 
   // ── Open day modal ────────────────────────────────────────────────────────
   function openDay(ds) {
-    if (isFuture(parseDate(ds))) return // pas d'entrée dans le futur
+    const d = parseDate(ds)
+    if (isFuture(d)) return
+    if (d.getDay() === 0 || d.getDay() === 6) return
     const existing = byDate[ds]
-    // prefer WORK, else VACATION, else SICK
     const entry = existing?.WORK || existing?.VACATION || existing?.SICK
     setFormType(entry?.type || 'WORK')
     setFormHours(entry?.hours != null ? String(entry.hours) : dailyTarget.toFixed(1))
+    setFormPause(entry?.pause_hours != null ? parseFloat(entry.pause_hours) : DEFAULT_PAUSE)
     setFormNote(entry?.note || '')
+    setSaveError('')
     setModal({ date: ds, entry: entry || null })
   }
 
   // ── Save entry ────────────────────────────────────────────────────────────
   async function saveEntry() {
     if (!modal) return
+    if (!effectiveUser) { setSaveError('Utilisateur non identifié'); return }
     setSaving(true)
+    setSaveError('')
     try {
       await apiFetch('/api/work-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userName: effectiveUser,
-          date:     modal.date,
-          type:     formType,
-          hours:    formType === 'WORK' ? formHours : null,
-          note:     formNote || null,
+          userName:    effectiveUser,
+          date:        modal.date,
+          type:        formType,
+          hours:       formType === 'WORK' ? formHours : null,
+          pause_hours: formType === 'WORK' ? formPause : null,
+          note:        formNote || null,
         }),
       })
       await loadEntries()
       setModal(null)
+    } catch (e) {
+      setSaveError(e.message || 'Erreur lors de la sauvegarde')
     } finally {
       setSaving(false)
     }
@@ -247,6 +289,7 @@ export default function SchedulePage() {
   async function deleteEntry() {
     if (!modal?.entry?.id) return
     setSaving(true)
+    setSaveError('')
     try {
       await apiFetch(
         `/api/work-entries?id=${modal.entry.id}&userName=${encodeURIComponent(effectiveUser)}`,
@@ -254,6 +297,8 @@ export default function SchedulePage() {
       )
       await loadEntries()
       setModal(null)
+    } catch (e) {
+      setSaveError(e.message || 'Erreur lors de la suppression')
     } finally {
       setSaving(false)
     }
@@ -262,6 +307,7 @@ export default function SchedulePage() {
   // ── Save settings ─────────────────────────────────────────────────────────
   async function saveSettings() {
     setSettingsSaving(true)
+    setSettingsError('')
     try {
       await apiFetch('/api/work-settings', {
         method: 'POST',
@@ -275,6 +321,8 @@ export default function SchedulePage() {
       })
       await loadSettings()
       setSettingsOpen(false)
+    } catch (e) {
+      setSettingsError(e.message || 'Erreur lors de la sauvegarde')
     } finally {
       setSettingsSaving(false)
     }
@@ -283,16 +331,21 @@ export default function SchedulePage() {
   // ── Week view ─────────────────────────────────────────────────────────────
   const monday   = startOfWeek(currentDate)
   const weekDays = getWeekDays(monday)
-  const weekH    = weekDays.reduce((s, d) => s + (parseFloat(byDate[dateStr(d)]?.WORK?.hours) || 0), 0)
+  const weekH    = weekDays.reduce((s, d) => s + effectiveHours(byDate[dateStr(d)]?.WORK), 0)
 
   // ── Month view ────────────────────────────────────────────────────────────
   const monthGrid = getMonthGrid(currentDate.getFullYear(), currentDate.getMonth())
+
+  // Computed effective hours for form display
+  const formEffective = formType === 'WORK'
+    ? Math.max(0, (parseFloat(formHours) || 0) - (parseFloat(formPause) || 0))
+    : null
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
-        <title>Horaires — Maze Project</title>
+        <title>Horaires — Atelier Planning</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
@@ -306,33 +359,26 @@ export default function SchedulePage() {
         `}</style>
       </Head>
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-20 bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" style={{ textDecoration: 'none' }}>
-              <Logo />
-            </Link>
-            <span className="font-bold text-gray-900 text-sm">horaires</span>
-            {loading && (
-              <span className="text-xs text-gray-400 animate-pulse">chargement…</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/" style={{ textDecoration: 'none', color: '#6b7280', fontSize: 13 }}>projets</Link>
-            <Link href="/tasks" style={{ textDecoration: 'none', color: '#6b7280', fontSize: 13, marginLeft: 12 }}>tâches</Link>
-            {/* Settings gear */}
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="ml-3 flex items-center gap-1 px-2 py-1 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-              title="Paramètres horaires"
-              style={{ fontSize: 18 }}
-            >
-              ⚙️
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* ── NavBar ── */}
+      <NavBar title="horaires">
+        {loading && <span className="text-xs text-gray-400 animate-pulse mr-1">…</span>}
+        <button
+          onClick={() => exportCSV(entries, effectiveUser, year)}
+          className="w-8 h-8 flex items-center justify-center rounded-full border transition-colors text-sm"
+          style={{ borderColor: '#e5e7eb', color: '#6b7280' }}
+          title="Exporter CSV"
+        >
+          ⬇
+        </button>
+        <button
+          onClick={() => { setSettingsError(''); setSettingsOpen(true) }}
+          className="w-8 h-8 flex items-center justify-center rounded-full border transition-colors text-sm"
+          style={{ borderColor: '#e5e7eb', color: '#6b7280' }}
+          title="Paramètres horaires"
+        >
+          ⚙️
+        </button>
+      </NavBar>
 
       <div className="max-w-5xl mx-auto px-4 py-5">
 
@@ -356,7 +402,7 @@ export default function SchedulePage() {
             icon="📊"
             label={overtime >= 0 ? 'Heures sup' : 'Heures manq.'}
             value={`${overtime >= 0 ? '+' : ''}${overtime.toFixed(1)}h`}
-            sub={`${workedHours.toFixed(1)}h travaillées`}
+            sub={`${workedHours.toFixed(1)}h effectives`}
             color={overtime >= 0 ? '#16a34a' : '#ea580c'}
           />
           <StatCard
@@ -441,7 +487,6 @@ export default function SchedulePage() {
               {/* Week header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '1px solid #f0f0f0' }}>
                 {weekDays.map((d, i) => {
-                  const ds = dateStr(d)
                   const today = isToday(d)
                   return (
                     <div
@@ -486,10 +531,9 @@ export default function SchedulePage() {
                         minHeight: 120,
                       }}
                     >
-                      {/* Entry chips */}
                       <div className="flex flex-col gap-1.5 mt-1">
                         {work && (
-                          <EntryChip type="WORK" hours={work.hours} note={work.note} />
+                          <EntryChip type="WORK" hours={effectiveHours(work)} rawHours={work.hours} note={work.note} />
                         )}
                         {vacation && (
                           <EntryChip type="VACATION" note={vacation.note} />
@@ -508,7 +552,7 @@ export default function SchedulePage() {
 
               {/* Week footer – total */}
               <div className="border-t px-4 py-2 flex items-center justify-between" style={{ borderColor: '#f0f0f0' }}>
-                <span className="text-xs text-gray-500">Total semaine</span>
+                <span className="text-xs text-gray-500">Total semaine (effectif)</span>
                 <span
                   className="text-sm font-bold"
                   style={{ color: weekH >= settings.weekly_hours ? '#16a34a' : weekH > 0 ? '#ea580c' : '#d1d5db' }}
@@ -565,12 +609,11 @@ export default function SchedulePage() {
                     >
                       {d.getDate()}
                     </div>
-                    {/* Type dots */}
                     <div className="flex flex-col gap-0.5 px-0.5">
                       {work && (
                         <div className="rounded text-center text-xs font-medium px-1 py-0.5 truncate"
                           style={{ background: TYPES.WORK.bg, color: TYPES.WORK.color, fontSize: 10 }}>
-                          {work.hours ? `${work.hours}h` : 'Travail'}
+                          {work.hours ? `${effectiveHours(work).toFixed(1)}h` : 'Travail'}
                         </div>
                       )}
                       {vacation && (
@@ -630,7 +673,7 @@ export default function SchedulePage() {
 
       {/* ── Day entry modal ── */}
       {modal && (
-        <Modal onClose={() => setModal(null)}>
+        <Modal onClose={() => !saving && setModal(null)}>
           <h3 className="font-bold text-gray-900 mb-1">
             {(() => {
               const d = parseDate(modal.date)
@@ -660,44 +703,76 @@ export default function SchedulePage() {
             ))}
           </div>
 
-          {/* Hours input (only for WORK) */}
+          {/* Hours + Pause inputs (only for WORK) */}
           {formType === 'WORK' && (
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Heures travaillées</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  max="24"
-                  step="0.5"
-                  value={formHours}
-                  onChange={e => setFormHours(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-gray-900"
-                  style={{ borderColor: '#e5e7eb' }}
-                />
-                <span className="text-sm text-gray-400">h</span>
+            <div className="mb-4 space-y-3">
+              {/* Présence totale */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Présence totale (h)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    step="0.5"
+                    value={formHours}
+                    onChange={e => setFormHours(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-gray-900"
+                    style={{ borderColor: '#e5e7eb' }}
+                  />
+                  <span className="text-sm text-gray-400">h</span>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  {[dailyTarget.toFixed(1), '8.5', '9'].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setFormHours(v)}
+                      className="px-2 py-1 text-xs rounded-md border"
+                      style={{
+                        borderColor: formHours === v ? PINK : '#e5e7eb',
+                        color:       formHours === v ? PINK : '#6b7280',
+                        background:  formHours === v ? `${PINK}11` : 'white',
+                      }}
+                    >
+                      {v}h
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-2 mt-2">
-                {[dailyTarget.toFixed(1), '8', '4'].map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setFormHours(v)}
-                    className="px-2 py-1 text-xs rounded-md border"
-                    style={{
-                      borderColor: formHours === v ? PINK : '#e5e7eb',
-                      color:       formHours === v ? PINK : '#6b7280',
-                      background:  formHours === v ? `${PINK}11` : 'white',
-                    }}
-                  >
-                    {v}h
-                  </button>
-                ))}
+
+              {/* Pause */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Pause (h)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="4"
+                    step="0.25"
+                    value={formPause}
+                    onChange={e => setFormPause(parseFloat(e.target.value) || 0)}
+                    className="w-full border rounded-lg px-3 py-2 text-gray-900"
+                    style={{ borderColor: '#e5e7eb' }}
+                  />
+                  <span className="text-sm text-gray-400">h</span>
+                </div>
+              </div>
+
+              {/* Effective preview */}
+              <div
+                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}
+              >
+                <span className="text-xs font-medium text-green-700">Temps effectif</span>
+                <span className="text-sm font-bold text-green-700">
+                  {formEffective != null ? `${formEffective.toFixed(2)}h` : '—'}
+                </span>
               </div>
             </div>
           )}
 
           {/* Note */}
-          <div className="mb-5">
+          <div className="mb-4">
             <label className="block text-xs font-medium text-gray-500 mb-1">Note (optionnel)</label>
             <input
               type="text"
@@ -708,6 +783,16 @@ export default function SchedulePage() {
               style={{ borderColor: '#e5e7eb' }}
             />
           </div>
+
+          {/* Error */}
+          {saveError && (
+            <div
+              className="mb-4 px-3 py-2 rounded-lg text-sm"
+              style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}
+            >
+              ⚠️ {saveError}
+            </div>
+          )}
 
           <div className="flex gap-2">
             {modal.entry && (
@@ -722,6 +807,7 @@ export default function SchedulePage() {
             )}
             <button
               onClick={() => setModal(null)}
+              disabled={saving}
               className="flex-1 px-4 py-2 rounded-xl border text-sm font-medium text-gray-600"
               style={{ borderColor: '#e5e7eb' }}
             >
@@ -741,7 +827,7 @@ export default function SchedulePage() {
 
       {/* ── Settings modal ── */}
       {settingsOpen && (
-        <Modal onClose={() => setSettingsOpen(false)}>
+        <Modal onClose={() => !settingsSaving && setSettingsOpen(false)}>
           <h3 className="font-bold text-gray-900 mb-1">Paramètres horaires</h3>
           <p className="text-xs text-gray-400 mb-4">{effectiveUser} · {year}</p>
 
@@ -779,9 +865,19 @@ export default function SchedulePage() {
             </p>
           </div>
 
+          {settingsError && (
+            <div
+              className="mb-4 px-3 py-2 rounded-lg text-sm"
+              style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}
+            >
+              ⚠️ {settingsError}
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               onClick={() => setSettingsOpen(false)}
+              disabled={settingsSaving}
               className="flex-1 px-4 py-2 rounded-xl border text-sm font-medium text-gray-600"
               style={{ borderColor: '#e5e7eb' }}
             >
@@ -817,7 +913,7 @@ function StatCard({ icon, label, value, sub, color }) {
   )
 }
 
-function EntryChip({ type, hours, note }) {
+function EntryChip({ type, hours, rawHours, note }) {
   const cfg = TYPES[type]
   return (
     <div
@@ -827,7 +923,11 @@ function EntryChip({ type, hours, note }) {
     >
       <div className="flex items-center gap-1">
         <span>{cfg.icon}</span>
-        <span>{type === 'WORK' && hours ? `${hours}h` : cfg.label}</span>
+        <span>
+          {type === 'WORK' && hours != null
+            ? `${typeof hours === 'number' ? hours.toFixed(1) : hours}h`
+            : cfg.label}
+        </span>
       </div>
       {note && <div className="truncate text-gray-400 mt-0.5" style={{ fontSize: 10 }}>{note}</div>}
     </div>

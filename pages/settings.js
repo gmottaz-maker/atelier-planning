@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import Head from 'next/head'
-import Link from 'next/link'
 import { useAuth } from './_app'
 import { supabase } from '../lib/supabase'
+import NavBar from '../components/NavBar'
 
 const PINK = '#FF4D6D'
 const PERSON_COLORS = {
@@ -70,26 +70,14 @@ export default function SettingsPage() {
         `}</style>
       </Head>
 
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Logo />
-            <span className="font-bold text-gray-900 text-sm">paramètres</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/home" title="Accueil" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🏠</Link>
-            <Link href="/" title="Projets" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🗂️</Link>
-            <Link href="/tasks" title="Tâches" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">✅</Link>
-            <button
-              onClick={() => signOut()}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
-              style={{ background: PERSON_COLORS[currentUser] || PINK }}>
-              {currentUser}
-            </button>
-          </div>
-        </div>
-      </header>
+      <NavBar title="paramètres">
+        <button
+          onClick={() => signOut()}
+          className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
+          style={{ background: PERSON_COLORS[currentUser] || PINK }}>
+          {currentUser}
+        </button>
+      </NavBar>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
 

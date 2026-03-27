@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
-import Link from 'next/link'
 import { useAuth } from './_app'
+import NavBar from '../components/NavBar'
 
 const PINK = '#FF4D6D'
 const PERSON_COLORS = {
@@ -77,35 +77,11 @@ export default function Activity() {
         <style>{`body { font-family: 'Inter', sans-serif; } * { -webkit-tap-highlight-color: transparent; }`}</style>
       </Head>
 
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
-              <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
-              <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
-              <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
-              <circle cx="20" cy="20" r="3" fill={PINK} />
-            </svg>
-            <span className="font-bold text-gray-900 text-sm">Activité</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/home" title="Accueil" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🏠</Link>
-            <Link href="/" title="Projets" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🗂️</Link>
-            <Link href="/tasks" title="Tâches" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">✅</Link>
-            <Link href="/settings" title="Paramètres" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">⚙️</Link>
-            {user && (
-              <button onClick={signOut}
-                className="px-3 py-1 rounded-full text-xs font-semibold text-white"
-                style={{ background: PERSON_COLORS[user.name] || PINK }}>
-                {user.name}
-              </button>
-            )}
-          </div>
-        </div>
+      <NavBar title="activité" />
 
-        {/* Filtre par personne */}
-        <div className="max-w-3xl mx-auto px-4 pb-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {/* Filtre par personne */}
+      <div className="bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
+        <div className="max-w-3xl mx-auto px-4 py-2 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {['all', 'Arnaud', 'Gabin', 'Guillaume'].map(p => (
             <button key={p} onClick={() => setFilter(p)}
               className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
@@ -116,7 +92,7 @@ export default function Activity() {
             </button>
           ))}
         </div>
-      </header>
+      </div>
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         {loading ? (

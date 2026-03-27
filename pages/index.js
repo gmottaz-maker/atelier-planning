@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
-import Link from 'next/link'
 import { useAuth } from './_app'
+import NavBar from '../components/NavBar'
 
 const RESPONSIBLES  = ['Arnaud', 'Gabin', 'Arnaud & Gabin', 'Sous-traitant']
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
@@ -591,37 +591,13 @@ export default function Admin() {
       </Head>
 
       {/* Header */}
-      <header style={{ background: '#fff', borderBottom: '1px solid #f0f0f0' }} className="sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <AtomLogo size={26} />
-            <div className="hidden sm:block">
-              <span className="font-bold text-gray-900 text-base tracking-tight">amazing lab</span>
-              <span className="ml-2 text-xs text-gray-400 font-normal">planning</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Link href="/home" title="Accueil" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">🏠</Link>
-            <Link href="/tasks" title="Tâches" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">✅</Link>
-            <Link href="/activity" title="Activité" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">📊</Link>
-            <Link href="/schedule" title="Horaires" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">🗓</Link>
-            <Link href="/display" target="_blank" title="Atelier" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">📺</Link>
-            <Link href="/settings" title="Paramètres" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors bg-white text-base">⚙️</Link>
-            <button onClick={() => { resetForm(); setShowForm(true) }}
-              style={{ background: PINK, color: '#fff' }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
-              <span className="text-lg leading-none">+</span><span className="hidden sm:inline"> Nouveau projet</span>
-            </button>
-            {user && (
-              <button onClick={signOut} title="Se déconnecter"
-                className="px-3 py-2 text-sm font-semibold rounded-full text-white hidden sm:flex items-center"
-                style={{ background: PERSON_COLORS[user.name] || PINK }}>
-                {user.name}
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+      <NavBar title="projets">
+        <button onClick={() => { resetForm(); setShowForm(true) }}
+          style={{ background: PINK, color: '#fff' }}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
+          <span className="text-lg leading-none">+</span><span className="hidden sm:inline"> Nouveau projet</span>
+        </button>
+      </NavBar>
 
       {/* Feedback toast */}
       {feedback && (
