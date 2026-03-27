@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
+import Link from 'next/link'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 
