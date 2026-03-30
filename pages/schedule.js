@@ -14,6 +14,7 @@ const TYPES = {
   VACATION_AM: { label: '½ Matin',   color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', icon: '🌅' },
   VACATION_PM: { label: '½ Après-m', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', icon: '🌇' },
   SICK:        { label: 'Maladie',   color: '#ea580c', bg: '#fff7ed', border: '#fed7aa', icon: '🤒' },
+  HOLIDAY:     { label: 'Férié',     color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '🇨🇭' },
 }
 // Types comptant comme demi-journée de congé
 const HALF_DAY_TYPES = ['VACATION_AM', 'VACATION_PM']
@@ -65,6 +66,35 @@ function getMonthGrid(year, month) {
     if (days.length > 42) break
   }
   return days
+}
+
+// ─── Vaud public holidays ────────────────────────────────────────────────────
+
+function getEasterDate(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25)
+  const g = Math.floor((b - f + 1) / 3), h = (19*a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2*e + 2*i - h - k) % 7
+  const m = Math.floor((a + 11*h + 22*l) / 451)
+  const month = Math.floor((h + l - 7*m + 114) / 31) - 1
+  const day   = ((h + l - 7*m + 114) % 31) + 1
+  return new Date(year, month, day)
+}
+
+function getVaudHolidays(year) {
+  const e    = getEasterDate(year)
+  const add  = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r }
+  const fmt  = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  return [
+    { date: fmt(new Date(year, 0, 1)),   label: 'Nouvel An' },
+    { date: fmt(new Date(year, 0, 2)),   label: 'Berchtoldstag' },
+    { date: fmt(add(e, -2)),             label: 'Vendredi Saint' },
+    { date: fmt(add(e,  1)),             label: 'Lundi de Pâques' },
+    { date: fmt(add(e, 39)),             label: 'Ascension' },
+    { date: fmt(add(e, 50)),             label: 'Lundi de Pentecôte' },
+    { date: fmt(new Date(year, 7, 1)),   label: 'Fête nationale 🇨🇭' },
+    { date: fmt(new Date(year, 11, 25)), label: 'Noël' },
+  ]
 }
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -166,6 +196,12 @@ export default function SchedulePage() {
   const [saving, setSaving]           = useState(false)
   const [saveError, setSaveError]     = useState('')
 
+  // Clock-in / clock-out
+  const [clockInTime, setClockInTime]   = useState(null) // 'HH:MM'
+  const [clockInDate, setClockInDate]   = useState(null) // 'YYYY-MM-DD'
+  const [clockElapsed, setClockElapsed] = useState('') // display string
+  const [clockOutModal, setClockOutModal] = useState(false)
+
   // Modal – settings
   const [settingsOpen, setSettingsOpen]   = useState(false)
   const [setVacation, setSetVacation]     = useState(20)
@@ -218,6 +254,83 @@ export default function SchedulePage() {
   useEffect(() => { loadEntries() }, [loadEntries])
   useEffect(() => { loadSettings() }, [loadSettings])
   useEffect(() => { loadAllSettings() }, [loadAllSettings])
+
+  // ── Clock-in persistence ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!effectiveUser) return
+    const key = `pointeuse_${effectiveUser}`
+    const stored = localStorage.getItem(key)
+    if (stored) {
+      try {
+        const { time, date } = JSON.parse(stored)
+        if (date === dateStr(new Date())) { setClockInTime(time); setClockInDate(date) }
+        else localStorage.removeItem(key)
+      } catch (_) { localStorage.removeItem(key) }
+    }
+  }, [effectiveUser])
+
+  // Update elapsed display every minute
+  useEffect(() => {
+    if (!clockInTime) { setClockElapsed(''); return }
+    const update = () => {
+      const now = new Date()
+      const [h, m] = clockInTime.split(':').map(Number)
+      const diff = (now.getHours() * 60 + now.getMinutes()) - (h * 60 + m)
+      if (diff < 0) { setClockElapsed(''); return }
+      const dh = Math.floor(diff / 60), dm = diff % 60
+      setClockElapsed(`${dh}h${dm.toString().padStart(2, '0')}`)
+    }
+    update()
+    const id = setInterval(update, 60000)
+    return () => clearInterval(id)
+  }, [clockInTime])
+
+  function handleClockIn() {
+    const now  = new Date()
+    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+    const date = dateStr(now)
+    setClockInTime(time)
+    setClockInDate(date)
+    localStorage.setItem(`pointeuse_${effectiveUser}`, JSON.stringify({ time, date }))
+  }
+
+  function handleClockOut() {
+    setClockOutModal(true)
+  }
+
+  async function confirmClockOut() {
+    const now = new Date()
+    const departure = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+    const totalH = timeDiffHours(clockInTime, departure)
+    const pause  = totalH >= 8 ? 1.0 : totalH >= 5.5 ? 0.5 : 0
+    setSaving(true)
+    try {
+      await apiFetch('/api/work-entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userName: effectiveUser,
+          date: clockInDate,
+          type: 'WORK',
+          hours: totalH,
+          pause_hours: pause,
+          arrival_time: clockInTime,
+          departure_time: departure,
+          note: null,
+        }),
+      })
+      await loadEntries()
+    } catch (e) { console.error(e) }
+    setSaving(false)
+    setClockInTime(null); setClockInDate(null)
+    localStorage.removeItem(`pointeuse_${effectiveUser}`)
+    setClockOutModal(false)
+  }
+
+  // ── Vaud holidays for current year ───────────────────────────────────────
+  const vaudHolidays  = getVaudHolidays(year)
+  const holidaysMap   = {} // date string → label
+  vaudHolidays.forEach(h => { holidaysMap[h.date] = h.label })
 
   // ── Index entries by date ─────────────────────────────────────────────────
   const byDate = {}
@@ -331,7 +444,8 @@ export default function SchedulePage() {
 
     // Pick the best existing entry to display first
     const firstEntry = existing?.WORK || existing?.VACATION || existing?.VACATION_AM || existing?.VACATION_PM || existing?.SICK
-    const defaultType = isFuture(d) ? 'VACATION' : (firstEntry?.type || 'WORK')
+    const isHoliday = !!holidaysMap[ds]
+    const defaultType = firstEntry?.type || (isHoliday ? 'HOLIDAY' : isFuture(d) ? 'VACATION' : 'WORK')
 
     const entry = populateFormForType(defaultType, existing)
     setModal({ date: ds, entry: entry || null })
@@ -455,7 +569,11 @@ export default function SchedulePage() {
           .day-cell:hover { background: #f8f8f8; }
           input:focus, select:focus { outline: none; border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; }
           input { font-size: 16px !important; }
-          @media (max-width: 640px) { .week-grid { overflow-x: auto; } }
+          @media (max-width: 640px) {
+            .week-grid { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .week-inner { min-width: 420px; }
+            .month-footer { flex-direction: column; align-items: flex-start; gap: 6px; }
+          }
         `}</style>
       </Head>
 
@@ -513,6 +631,34 @@ export default function SchedulePage() {
             color={sickDays > 0 ? '#ea580c' : '#6b7280'}
           />
         </div>
+
+        {/* ── Pointeuse (clock-in/out) ── */}
+        {clockInTime ? (
+          <div className="mb-4 px-4 py-3 rounded-2xl border flex items-center gap-3 flex-wrap" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+            <div className="flex items-center gap-2 flex-1">
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: '#22c55e', boxShadow: '0 0 0 3px #bbf7d0', animation: 'pulse 2s infinite' }} />
+              <span className="text-sm font-semibold" style={{ color: '#15803d' }}>En service depuis {clockInTime}</span>
+              {clockElapsed && <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#dcfce7', color: '#15803d' }}>{clockElapsed}</span>}
+            </div>
+            <button
+              onClick={handleClockOut}
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white flex-shrink-0"
+              style={{ background: PINK }}
+            >
+              Pointer le départ
+            </button>
+          </div>
+        ) : (
+          <div className="mb-4">
+            <button
+              onClick={handleClockIn}
+              className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2"
+              style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}
+            >
+              <span style={{ fontSize: 16 }}>🟢</span> Pointer l'arrivée
+            </button>
+          </div>
+        )}
 
         {/* ── Controls bar ── */}
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -583,33 +729,39 @@ export default function SchedulePage() {
         {/* ── Week View ── */}
         {view === 'week' && (
           <div className="week-grid">
-            <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+            <div className="week-inner bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
               {/* Week header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '1px solid #f0f0f0' }}>
                 {weekDays.map((d, i) => {
-                  const today  = isToday(d)
-                  const isOff  = offDays.includes(d.getDay())
+                  const today     = isToday(d)
+                  const isOff     = offDays.includes(d.getDay())
+                  const holiday   = holidaysMap[dateStr(d)]
                   return (
                     <div
                       key={i}
                       className="text-center py-3 px-2"
                       style={{
                         borderRight: i < 4 ? '1px solid #f0f0f0' : 'none',
-                        background: isOff ? '#f9fafb' : 'white',
+                        background: holiday ? '#fffbeb' : isOff ? '#f9fafb' : 'white',
                       }}
                     >
-                      <div className="text-xs font-medium mb-1" style={{ color: isOff ? '#d1d5db' : '#9ca3af' }}>
-                        {DAYS_FR[i]}{isOff ? ' ·off' : ''}
+                      <div className="text-xs font-medium mb-1" style={{ color: holiday ? '#b45309' : isOff ? '#d1d5db' : '#9ca3af' }}>
+                        {DAYS_FR[i]}{isOff && !holiday ? ' ·off' : ''}
                       </div>
                       <div
                         className="text-sm font-bold mx-auto flex items-center justify-center w-7 h-7 rounded-full"
                         style={{
                           background: today ? PINK : 'transparent',
-                          color: today ? 'white' : isOff ? '#d1d5db' : '#111',
+                          color: today ? 'white' : holiday ? '#b45309' : isOff ? '#d1d5db' : '#111',
                         }}
                       >
                         {d.getDate()}
                       </div>
+                      {holiday && (
+                        <div className="text-center mt-0.5 truncate px-1" style={{ fontSize: 9, color: '#b45309', fontWeight: 600 }}>
+                          🇨🇭 {holiday}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -621,13 +773,15 @@ export default function SchedulePage() {
                   const ds       = dateStr(d)
                   const future   = isFuture(d)
                   const isOff    = offDays.includes(d.getDay())
+                  const holiday  = holidaysMap[ds]
                   const dayEntries = byDate[ds] || {}
                   const work     = dayEntries.WORK
                   const vacation = dayEntries.VACATION
                   const vacAM    = dayEntries.VACATION_AM
                   const vacPM    = dayEntries.VACATION_PM
                   const sick     = dayEntries.SICK
-                  const hasAny   = work || vacation || vacAM || vacPM || sick
+                  const hdEntry  = dayEntries.HOLIDAY
+                  const hasAny   = work || vacation || vacAM || vacPM || sick || hdEntry
                   // Work on an off day = overtime marker
                   const hasOT    = isOff && !!work
 
@@ -658,8 +812,14 @@ export default function SchedulePage() {
                         {vacAM    && <EntryChip type="VACATION_AM" note={vacAM.note} />}
                         {vacPM    && <EntryChip type="VACATION_PM" note={vacPM.note} />}
                         {sick     && <EntryChip type="SICK" note={sick.note} />}
-                        {!hasAny && !isOff && (
+                        {hdEntry  && <EntryChip type="HOLIDAY" note={hdEntry.note} />}
+                        {!hasAny && !isOff && !holiday && (
                           <div className="text-xs text-gray-300 text-center mt-4">+</div>
+                        )}
+                        {!hasAny && holiday && !isOff && (
+                          <div className="text-xs text-center mt-3 px-1" style={{ color: '#d97706' }}>
+                            🇨🇭 Férié
+                          </div>
                         )}
                       </div>
                     </div>
@@ -699,12 +859,14 @@ export default function SchedulePage() {
                 const future  = isFuture(d)
                 const weekend = d.getDay() === 0 || d.getDay() === 6
                 const isOff   = !weekend && offDays.includes(d.getDay())
+                const holiday = holidaysMap[ds]
                 const dayEntries = byDate[ds] || {}
                 const work    = dayEntries.WORK
                 const vacation = dayEntries.VACATION
                 const vacAM   = dayEntries.VACATION_AM
                 const vacPM   = dayEntries.VACATION_PM
                 const sick    = dayEntries.SICK
+                const hdEntry = dayEntries.HOLIDAY
 
                 return (
                   <div
@@ -715,7 +877,7 @@ export default function SchedulePage() {
                       borderRight: (i + 1) % 7 !== 0 ? '1px solid #f8f8f8' : 'none',
                       borderBottom: i < monthGrid.length - 7 ? '1px solid #f8f8f8' : 'none',
                       minHeight: 72,
-                      background: weekend ? '#fafafa' : isOff ? '#f9fafb' : 'white',
+                      background: holiday && inMonth ? '#fffbeb' : weekend ? '#fafafa' : isOff ? '#f9fafb' : 'white',
                       opacity: !inMonth ? 0.25 : future ? 0.55 : 1,
                       cursor: inMonth && !weekend ? 'pointer' : 'default',
                     }}
@@ -724,11 +886,16 @@ export default function SchedulePage() {
                       className="text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full mx-auto"
                       style={{
                         background: today ? PINK : 'transparent',
-                        color: today ? 'white' : (weekend || isOff) ? '#d1d5db' : '#374151',
+                        color: today ? 'white' : holiday ? '#b45309' : (weekend || isOff) ? '#d1d5db' : '#374151',
                       }}
                     >
                       {d.getDate()}
                     </div>
+                    {holiday && inMonth && (
+                      <div className="truncate text-center mb-0.5 font-semibold" style={{ fontSize: 8, color: '#b45309' }}>
+                        🇨🇭 {holiday}
+                      </div>
+                    )}
                     <div className="flex flex-col gap-0.5 px-0.5">
                       {work && (
                         <div className="rounded text-center font-medium px-1 py-0.5 truncate"
@@ -760,6 +927,12 @@ export default function SchedulePage() {
                           🤒 Maladie
                         </div>
                       )}
+                      {hdEntry && (
+                        <div className="rounded text-center font-medium px-1 py-0.5"
+                          style={{ background: TYPES.HOLIDAY.bg, color: TYPES.HOLIDAY.color, fontSize: 10 }}>
+                          🇨🇭 Férié
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -767,7 +940,7 @@ export default function SchedulePage() {
             </div>
             {/* Month footer – totals */}
             <div
-              className="border-t px-5 py-3 flex flex-wrap items-center gap-4"
+              className="month-footer border-t px-5 py-3 flex flex-wrap items-center gap-4"
               style={{ borderColor: '#f0f0f0', background: '#fafafa' }}
             >
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -864,10 +1037,10 @@ export default function SchedulePage() {
             )
           })()}
 
-          {/* Type selector — row 1: WORK / VACATION / SICK, row 2: ½ Matin / ½ Après-m */}
+          {/* Type selector — row 1: WORK / VACATION / SICK / HOLIDAY, row 2: ½ Matin / ½ Après-m */}
           <div className="mb-4 space-y-2">
             <div className="flex gap-2">
-              {(['WORK', 'VACATION', 'SICK']).map(t => {
+              {(['WORK', 'VACATION', 'SICK', 'HOLIDAY']).map(t => {
                 const cfg = TYPES[t]
                 return (
                   <button
@@ -1029,6 +1202,51 @@ export default function SchedulePage() {
           </div>
         </Modal>
       )}
+
+      {/* ── Clock-out confirmation modal ── */}
+      {clockOutModal && (() => {
+        const now = new Date()
+        const dep = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+        const totalH = timeDiffHours(clockInTime, dep)
+        const pause  = totalH >= 8 ? 1.0 : totalH >= 5.5 ? 0.5 : 0
+        const effectif = Math.max(0, totalH - pause)
+        return (
+          <Modal onClose={() => setClockOutModal(false)}>
+            <h3 className="font-bold text-gray-900 mb-1">Confirmer le départ</h3>
+            <p className="text-xs text-gray-400 mb-4">{effectiveUser} · {clockInDate}</p>
+            <div className="rounded-xl p-4 mb-4 space-y-2" style={{ background: '#f8faff', border: '1px solid #e0e7ff' }}>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Arrivée</span>
+                <span className="font-semibold text-gray-800">{clockInTime}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Départ</span>
+                <span className="font-semibold text-gray-800">{dep}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Présence</span>
+                <span className="font-semibold text-gray-800">{totalH.toFixed(2)}h</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Pause auto</span>
+                <span className="font-semibold text-gray-800">− {pause}h</span>
+              </div>
+              <div className="flex justify-between border-t pt-2 mt-1" style={{ borderColor: '#e0e7ff' }}>
+                <span className="text-sm font-bold text-green-700">Temps effectif</span>
+                <span className="text-base font-bold text-green-700">{effectif.toFixed(2)}h</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setClockOutModal(false)} className="flex-1 px-4 py-2 rounded-xl border text-sm font-medium text-gray-600" style={{ borderColor: '#e5e7eb' }}>
+                Annuler
+              </button>
+              <button onClick={confirmClockOut} disabled={saving} className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: PINK, opacity: saving ? 0.7 : 1 }}>
+                {saving ? '…' : 'Enregistrer'}
+              </button>
+            </div>
+          </Modal>
+        )
+      })()}
 
       {/* ── Settings modal ── */}
       {settingsOpen && (

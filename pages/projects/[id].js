@@ -144,15 +144,120 @@ function TimeRangeInput({ value, onChange }) {
   )
 }
 
+// ─── EditTaskModal ────────────────────────────────────────────────────────────
+function EditTaskModal({ task, currentUser, onSave, onDelete, onClose }) {
+  const [form, setForm] = useState({
+    title: task.title || '',
+    responsible: task.responsible || RESPONSIBLES[0],
+    execution_date: task.execution_date || toDateStr(today()),
+    category: task.category || 'bureau',
+  })
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleSave() {
+    if (!form.title.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify({ ...form, title: form.title.trim(), prev_status: task.status }),
+      })
+      const updated = await res.json()
+      if (updated.id) { onSave(updated); onClose() }
+    } catch (err) { console.error(err) }
+    setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (!confirm('Supprimer cette tâche ?')) return
+    setDeleting(true)
+    try {
+      await fetch(`/api/tasks/${task.id}`, { method: 'DELETE', headers: { 'x-actor': currentUser } })
+      onDelete(task.id)
+      onClose()
+    } catch (err) { console.error(err) }
+    setDeleting(false)
+  }
+
+  const inp = "w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:border-gray-400 focus:outline-none"
+
+  return (
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.35)' }} onClick={onClose}>
+      <div
+        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-900">Modifier la tâche</h3>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600" style={{ background: '#f3f4f6' }}>✕</button>
+        </div>
+
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Titre</label>
+            <input
+              autoFocus type="text" value={form.title}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              className={inp}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Responsable</label>
+              <select value={form.responsible} onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))} className={inp}>
+                {RESPONSIBLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+              <input type="date" value={form.execution_date}
+                onChange={e => setForm(f => ({ ...f, execution_date: e.target.value }))}
+                className={inp} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
+            <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
+              {TASK_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleDelete} disabled={deleting}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold border"
+            style={{ borderColor: '#fca5a5', color: '#dc2626', background: '#fff5f5' }}>
+            {deleting ? '…' : 'Supprimer'}
+          </button>
+          <button
+            onClick={handleSave} disabled={saving || !form.title.trim()}
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+            style={{ background: PINK }}>
+            {saving ? '…' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── TaskItem ─────────────────────────────────────────────────────────────────
-function TaskItem({ task, onToggle }) {
+function TaskItem({ task, onToggle, onEdit }) {
   const todayStr = toDateStr(today())
   const isLate = task.execution_date && task.execution_date < todayStr
   const completed = task.status === 'completed'
   return (
-    <div className="flex items-center gap-2.5 py-2 border-b last:border-b-0" style={{ borderColor: '#f3f4f6' }}>
+    <div
+      className="flex items-center gap-2.5 py-2.5 border-b last:border-b-0 group"
+      style={{ borderColor: '#f3f4f6', cursor: onEdit ? 'pointer' : 'default' }}
+      onClick={() => onEdit && onEdit(task)}
+    >
       <button
-        onClick={() => onToggle(task)}
+        onClick={e => { e.stopPropagation(); onToggle(task) }}
         className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
         style={{ borderColor: completed ? '#22c55e' : '#d1d5db', background: completed ? '#22c55e' : 'white' }}>
         {completed && (
@@ -175,6 +280,11 @@ function TaskItem({ task, onToggle }) {
         <span className="text-xs text-gray-400 flex-shrink-0">
           {new Date(...task.execution_date.split('-').map((v,i)=>i===1?v-1:+v)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
         </span>
+      )}
+      {onEdit && (
+        <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-400 flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
       )}
     </div>
   )
@@ -263,6 +373,7 @@ export default function ProjectPage() {
 
   // Task state
   const [addingCategory, setAddingCategory] = useState(null)
+  const [editingTask, setEditingTask]       = useState(null) // task object being edited
 
   // Files state
   const [files, setFiles] = useState([])
@@ -373,6 +484,14 @@ export default function ProjectPage() {
   function handleTaskAdded(newTask) {
     setTasks(prev => [...prev, newTask])
     setAddingCategory(null)
+  }
+
+  function handleTaskUpdated(updated) {
+    setTasks(prev => prev.map(t => t.id === updated.id ? updated : t))
+  }
+
+  function handleTaskDeleted(id) {
+    setTasks(prev => prev.filter(t => t.id !== id))
   }
 
   // ── Site visit helpers ────────────────────────────────────────────────────
@@ -488,6 +607,7 @@ export default function ProjectPage() {
   const inp = "w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:border-gray-400 focus:outline-none transition-colors"
 
   return (
+    <>
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
         <title>{project.name} — Amazing Lab</title>
@@ -613,7 +733,7 @@ export default function ProjectPage() {
                       {catTasks.length === 0 && addingCategory !== cat.key && (
                         <p className="text-xs text-gray-300 py-3">Aucune tâche</p>
                       )}
-                      {catTasks.map(t => <TaskItem key={t.id} task={t} onToggle={toggleTask} />)}
+                      {catTasks.map(t => <TaskItem key={t.id} task={t} onToggle={toggleTask} onEdit={t => setEditingTask(t)} />)}
                       {addingCategory === cat.key && (
                         <AddTaskForm
                           projectId={project.id}
@@ -1054,6 +1174,18 @@ export default function ProjectPage() {
 
       </div>
     </div>
+
+    {/* ── Edit task modal ── */}
+    {editingTask && (
+      <EditTaskModal
+        task={editingTask}
+        currentUser={currentUser}
+        onSave={handleTaskUpdated}
+        onDelete={handleTaskDeleted}
+        onClose={() => setEditingTask(null)}
+      />
+    )}
+    </>
   )
 }
 
