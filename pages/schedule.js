@@ -21,6 +21,16 @@ const HALF_DAY_TYPES = ['VACATION_AM', 'VACATION_PM']
 // Types comptant comme journée entière
 const FULL_DAY_VACATION_TYPES = ['VACATION']
 
+const EXPENSE_CATEGORIES = [
+  { key: 'Repas',       icon: '🍽',  color: '#ea580c' },
+  { key: 'Transport',   icon: '🚗',  color: '#3b82f6' },
+  { key: 'Hébergement', icon: '🏨',  color: '#8b5cf6' },
+  { key: 'Fournitures', icon: '🛒',  color: '#16a34a' },
+  { key: 'Matériel',    icon: '🔧',  color: '#64748b' },
+  { key: 'Autre',       icon: '📋',  color: '#9ca3af' },
+]
+const CURRENCIES = ['CHF', 'EUR', 'USD']
+
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 const DAYS_FR   = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
 
@@ -196,6 +206,20 @@ export default function SchedulePage() {
   const [saving, setSaving]           = useState(false)
   const [saveError, setSaveError]     = useState('')
 
+  // ── Expenses state ───────────────────────────────────────────────────────
+  const [expenses, setExpenses]           = useState([])
+  const [expenseModal, setExpenseModal]   = useState(false)
+  const [expEditId, setExpEditId]         = useState(null)
+  const EMPTY_EXP = { date: dateStr(new Date()), amount: '', currency: 'CHF', category: 'Autre', merchant: '', description: '' }
+  const [expForm, setExpForm]             = useState(EMPTY_EXP)
+  const [expReceiptB64, setExpReceiptB64] = useState(null)
+  const [expReceiptMime, setExpReceiptMime] = useState(null)
+  const [expReceiptPreview, setExpReceiptPreview] = useState(null)
+  const [expScanLoading, setExpScanLoading] = useState(false)
+  const [expScanError, setExpScanError]   = useState('')
+  const [expSaving, setExpSaving]         = useState(false)
+  const [expSaveError, setExpSaveError]   = useState('')
+
   // Clock-in / clock-out
   const [clockInTime, setClockInTime]   = useState(null) // 'HH:MM'
   const [clockInDate, setClockInDate]   = useState(null) // 'YYYY-MM-DD'
@@ -347,6 +371,114 @@ export default function SchedulePage() {
     setClockInDate(null)
     setClockOutModal(false)
   }
+
+  // ── Expenses ─────────────────────────────────────────────────────────────
+  const loadExpenses = useCallback(async () => {
+    if (!effectiveUser) return
+    try {
+      const data = await apiFetch(`/api/expenses?userName=${encodeURIComponent(effectiveUser)}&year=${year}`)
+      setExpenses(data)
+    } catch (e) { console.error('loadExpenses', e) }
+  }, [effectiveUser, year])
+
+  useEffect(() => { loadExpenses() }, [loadExpenses])
+
+  function openAddExpense() {
+    setExpEditId(null)
+    setExpForm({ ...EMPTY_EXP, date: dateStr(new Date()) })
+    setExpReceiptB64(null); setExpReceiptMime(null); setExpReceiptPreview(null)
+    setExpScanError(''); setExpSaveError('')
+    setExpenseModal(true)
+  }
+
+  function openEditExpense(exp) {
+    setExpEditId(exp.id)
+    setExpForm({ date: exp.date, amount: exp.amount ?? '', currency: exp.currency || 'CHF', category: exp.category || 'Autre', merchant: exp.merchant || '', description: exp.description || '' })
+    setExpReceiptB64(null); setExpReceiptMime(null)
+    setExpReceiptPreview(exp.receipt_url || null)
+    setExpScanError(''); setExpSaveError('')
+    setExpenseModal(true)
+  }
+
+  function handleReceiptFile(file) {
+    if (!file) return
+    const mime = file.type || 'image/jpeg'
+    setExpReceiptMime(mime)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target.result
+      setExpReceiptPreview(dataUrl)
+      // Extract base64 part
+      setExpReceiptB64(dataUrl.split(',')[1])
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function scanReceipt() {
+    if (!expReceiptB64) return
+    setExpScanLoading(true); setExpScanError('')
+    try {
+      const result = await apiFetch('/api/expenses/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: expReceiptB64, mimeType: expReceiptMime }),
+      })
+      if (result.error) { setExpScanError(result.error); return }
+      setExpForm(f => ({
+        ...f,
+        date:     result.date     || f.date,
+        amount:   result.amount   != null ? String(result.amount) : f.amount,
+        currency: result.currency || f.currency,
+        merchant: result.merchant || f.merchant,
+        category: result.category || f.category,
+      }))
+    } catch (e) { setExpScanError(e.message) }
+    finally { setExpScanLoading(false) }
+  }
+
+  async function saveExpense() {
+    if (!expForm.date) return
+    setExpSaving(true); setExpSaveError('')
+    try {
+      if (expEditId) {
+        // Update: delete + re-create (simple approach)
+        await apiFetch(`/api/expenses?id=${expEditId}&userName=${encodeURIComponent(effectiveUser)}`, { method: 'DELETE' })
+      }
+      await apiFetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userName:        effectiveUser,
+          date:            expForm.date,
+          amount:          expForm.amount !== '' ? parseFloat(expForm.amount) : null,
+          currency:        expForm.currency,
+          category:        expForm.category,
+          merchant:        expForm.merchant || null,
+          description:     expForm.description || null,
+          receiptBase64:   expReceiptB64 || null,
+          receiptMimeType: expReceiptMime || null,
+        }),
+      })
+      await loadExpenses()
+      setExpenseModal(false)
+    } catch (e) { setExpSaveError(e.message) }
+    finally { setExpSaving(false) }
+  }
+
+  async function deleteExpense(id) {
+    if (!confirm('Supprimer ce frais ?')) return
+    try {
+      await apiFetch(`/api/expenses?id=${id}&userName=${encodeURIComponent(effectiveUser)}`, { method: 'DELETE' })
+      await loadExpenses()
+      setExpenseModal(false)
+    } catch (e) { console.error(e) }
+  }
+
+  // ── Expense stats ─────────────────────────────────────────────────────────
+  const expTotal      = expenses.reduce((s, e) => s + (e.amount || 0), 0)
+  const expThisMonth  = expenses.filter(e => {
+    const d = new Date(e.date); return d.getMonth() === displayMonth && d.getFullYear() === displayYear
+  }).reduce((s, e) => s + (e.amount || 0), 0)
 
   // ── Vaud holidays for current year ───────────────────────────────────────
   const vaudHolidays  = getVaudHolidays(year)
@@ -704,7 +836,7 @@ export default function SchedulePage() {
             )}
             {/* View toggle */}
             <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
-              {['week', 'month'].map(v => (
+              {[['week','Semaine'], ['month','Mois'], ['expenses','💰 Frais']].map(([v, label]) => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
@@ -716,7 +848,7 @@ export default function SchedulePage() {
                     cursor: 'pointer',
                   }}
                 >
-                  {v === 'week' ? 'Semaine' : 'Mois'}
+                  {label}
                 </button>
               ))}
             </div>
@@ -1094,6 +1226,81 @@ export default function SchedulePage() {
           </div>
         )}
 
+        {/* ── Expenses view ── */}
+        {view === 'expenses' && (
+          <div>
+            {/* Stats row */}
+            <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))' }}>
+              <StatCard icon="💰" label={`Total ${year}`} value={`${expTotal.toFixed(2)} CHF`} sub={`${expenses.length} frais`} color={PINK} />
+              <StatCard icon="📅" label={`${MONTHS_FR[displayMonth]}`} value={`${expThisMonth.toFixed(2)} CHF`} sub={`${expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===displayMonth&&d.getFullYear()===displayYear }).length} frais`} color="#8b5cf6" />
+              {EXPENSE_CATEGORIES.map(cat => {
+                const total = expenses.filter(e=>e.category===cat.key).reduce((s,e)=>s+(e.amount||0),0)
+                if (total === 0) return null
+                return <StatCard key={cat.key} icon={cat.icon} label={cat.key} value={`${total.toFixed(2)}`} sub="CHF" color={cat.color} />
+              })}
+            </div>
+
+            {/* Add button */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Frais {year}</h3>
+              <button
+                onClick={openAddExpense}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                style={{ background: PINK }}
+              >
+                + Ajouter un frais
+              </button>
+            </div>
+
+            {/* Expense list */}
+            {expenses.length === 0 ? (
+              <div className="bg-white rounded-2xl border p-12 text-center" style={{ borderColor: '#e5e7eb' }}>
+                <div style={{ fontSize: 40 }}>💰</div>
+                <p className="text-gray-400 mt-3 text-sm">Aucun frais enregistré pour {year}</p>
+                <button onClick={openAddExpense} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: PINK }}>
+                  Ajouter mon premier frais
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+                {expenses.map((exp, i) => {
+                  const cat = EXPENSE_CATEGORIES.find(c => c.key === exp.category) || EXPENSE_CATEGORIES[5]
+                  return (
+                    <div
+                      key={exp.id}
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                      style={{ borderBottom: i < expenses.length - 1 ? '1px solid #f3f4f6' : 'none' }}
+                      onClick={() => openEditExpense(exp)}
+                    >
+                      {/* Receipt thumbnail or category icon */}
+                      <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
+                        style={{ background: exp.receipt_url ? '#f3f4f6' : `${cat.color}18`, fontSize: exp.receipt_url ? 10 : 20 }}>
+                        {exp.receipt_url
+                          ? <img src={exp.receipt_url} alt="reçu" className="w-full h-full object-cover" onError={e => { e.target.style.display='none' }} />
+                          : cat.icon
+                        }
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{exp.merchant || exp.category}</p>
+                        <p className="text-xs text-gray-400">{new Date(exp.date+'T12:00:00').toLocaleDateString('fr-CH', { day:'numeric', month:'short' })} · <span style={{ color: cat.color }}>{cat.icon} {exp.category}</span></p>
+                      </div>
+                      {/* Amount */}
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-gray-800">{exp.amount != null ? `${parseFloat(exp.amount).toFixed(2)}` : '—'}</p>
+                        <p className="text-xs text-gray-400">{exp.currency}</p>
+                      </div>
+                      <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Admin overview ── */}
         {isAdmin && allSettings.length > 0 && (
           <div className="mt-8">
@@ -1321,6 +1528,148 @@ export default function SchedulePage() {
               style={{ background: PINK, opacity: saving ? 0.7 : 1 }}
             >
               {saving ? '…' : 'Enregistrer'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Expense modal ── */}
+      {expenseModal && (
+        <Modal onClose={() => !expSaving && setExpenseModal(false)}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-gray-900">{expEditId ? 'Modifier le frais' : 'Nouveau frais'}</h3>
+          </div>
+
+          {/* Receipt upload zone */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Photo du reçu (optionnel)</label>
+            <label
+              className="block w-full rounded-xl border-2 border-dashed cursor-pointer overflow-hidden transition-colors"
+              style={{ borderColor: expReceiptPreview ? '#bbf7d0' : '#e5e7eb', background: expReceiptPreview ? '#f0fdf4' : '#fafafa', minHeight: 80 }}
+            >
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={e => handleReceiptFile(e.target.files?.[0])}
+              />
+              {expReceiptPreview ? (
+                <div className="flex items-center gap-3 p-3">
+                  <img src={expReceiptPreview} alt="reçu" className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-green-700">📎 Reçu attaché</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Appuyer pour changer</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-5 gap-1">
+                  <span style={{ fontSize: 28 }}>📸</span>
+                  <span className="text-xs text-gray-400">Prendre une photo ou choisir une image</span>
+                </div>
+              )}
+            </label>
+
+            {/* Scan button */}
+            {expReceiptPreview && expReceiptB64 && (
+              <button
+                onClick={scanReceipt}
+                disabled={expScanLoading}
+                className="mt-2 w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: expScanLoading ? '#f3f4f6' : '#eff6ff', color: expScanLoading ? '#9ca3af' : '#2563eb', border: '1px solid #bfdbfe' }}
+              >
+                {expScanLoading ? (
+                  <><span className="animate-spin">⟳</span> Analyse en cours…</>
+                ) : (
+                  <><span>🤖</span> Scanner avec l'IA</>
+                )}
+              </button>
+            )}
+            {expScanError && (
+              <p className="mt-1 text-xs text-orange-600 px-1">⚠️ {expScanError}</p>
+            )}
+          </div>
+
+          {/* Form fields */}
+          <div className="space-y-3 mb-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                <input type="date" value={expForm.date} onChange={e => setExpForm(f=>({...f,date:e.target.value}))}
+                  className="w-full border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Montant</label>
+                <div className="flex gap-1.5">
+                  <input type="number" step="0.01" min="0" placeholder="0.00" value={expForm.amount}
+                    onChange={e => setExpForm(f=>({...f,amount:e.target.value}))}
+                    className="flex-1 border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
+                  <select value={expForm.currency} onChange={e => setExpForm(f=>({...f,currency:e.target.value}))}
+                    className="border rounded-xl px-2 py-2 text-sm text-gray-700" style={{ borderColor: '#e5e7eb' }}>
+                    {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Commerçant</label>
+              <input type="text" placeholder="Ex: Migros, SBB, Hôtel Ibis…" value={expForm.merchant}
+                onChange={e => setExpForm(f=>({...f,merchant:e.target.value}))}
+                className="w-full border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {EXPENSE_CATEGORIES.map(cat => (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => setExpForm(f=>({...f,category:cat.key}))}
+                    className="py-2 rounded-xl border-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5"
+                    style={{
+                      borderColor: expForm.category === cat.key ? cat.color : '#e5e7eb',
+                      background:  expForm.category === cat.key ? `${cat.color}18` : 'white',
+                      color:       expForm.category === cat.key ? cat.color : '#6b7280',
+                    }}
+                  >
+                    <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                    <span style={{ fontSize: 10 }}>{cat.key}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Note (optionnel)</label>
+              <input type="text" placeholder="Détails supplémentaires…" value={expForm.description}
+                onChange={e => setExpForm(f=>({...f,description:e.target.value}))}
+                className="w-full border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
+            </div>
+          </div>
+
+          {expSaveError && (
+            <div className="mb-3 px-3 py-2 rounded-xl text-sm" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
+              ⚠️ {expSaveError}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            {expEditId && (
+              <button onClick={() => deleteExpense(expEditId)} className="px-4 py-2.5 rounded-xl text-sm font-semibold border"
+                style={{ borderColor: '#fca5a5', color: '#dc2626', background: '#fff5f5' }}>
+                Supprimer
+              </button>
+            )}
+            <button onClick={() => setExpenseModal(false)} disabled={expSaving}
+              className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium text-gray-600" style={{ borderColor: '#e5e7eb' }}>
+              Annuler
+            </button>
+            <button onClick={saveExpense} disabled={expSaving || !expForm.date}
+              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+              style={{ background: PINK }}>
+              {expSaving ? '…' : 'Enregistrer'}
             </button>
           </div>
         </Modal>
