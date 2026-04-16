@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+
+# Capacitor iOS (generated locally - run 'npx cap add ios' on your Mac)
+ios/
+
+# Env
+.env.local
+.env.*.local
+
+# Mac
+.DS_Store
+**/.DS_Store
