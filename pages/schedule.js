@@ -474,6 +474,10 @@ export default function SchedulePage() {
     } catch (e) { console.error(e) }
   }
 
+  // ── Display month/year (needed early for expense stats) ──────────────────
+  const displayMonth = currentDate.getMonth()
+  const displayYear  = currentDate.getFullYear()
+
   // ── Expense stats ─────────────────────────────────────────────────────────
   const expTotal      = expenses.reduce((s, e) => s + (e.amount || 0), 0)
   const expThisMonth  = expenses.filter(e => {
@@ -531,8 +535,7 @@ export default function SchedulePage() {
   }, 0)
 
   // ── Month stats (for current displayed month) ─────────────────────────────
-  const displayMonth = currentDate.getMonth()
-  const displayYear  = currentDate.getFullYear()
+  // displayMonth / displayYear are declared above (near expense stats)
   const monthEntries = entries.filter(e => {
     const d = parseDate(e.date)
     return d.getFullYear() === displayYear && d.getMonth() === displayMonth
