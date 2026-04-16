@@ -255,19 +255,29 @@ export default function SchedulePage() {
   useEffect(() => { loadSettings() }, [loadSettings])
   useEffect(() => { loadAllSettings() }, [loadAllSettings])
 
-  // ── Clock-in persistence ──────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Clock-in — synced via DB (cross-device) ───────────────────────────────
+  const loadClockSession = useCallback(async () => {
     if (!effectiveUser) return
-    const key = `pointeuse_${effectiveUser}`
-    const stored = localStorage.getItem(key)
-    if (stored) {
-      try {
-        const { time, date } = JSON.parse(stored)
-        if (date === dateStr(new Date())) { setClockInTime(time); setClockInDate(date) }
-        else localStorage.removeItem(key)
-      } catch (_) { localStorage.removeItem(key) }
-    }
+    try {
+      const data = await apiFetch(`/api/clock-session?userName=${encodeURIComponent(effectiveUser)}`)
+      if (data && data.clock_in_at) {
+        // clock_in_at is stored as "HH:MM" (local time string)
+        setClockInTime(data.clock_in_at)
+        setClockInDate(data.date)
+      } else {
+        setClockInTime(null)
+        setClockInDate(null)
+      }
+    } catch (e) { /* ignore — table may not exist yet */ }
   }, [effectiveUser])
+
+  useEffect(() => { loadClockSession() }, [loadClockSession])
+
+  // Poll every 30s to stay in sync with other devices
+  useEffect(() => {
+    const id = setInterval(loadClockSession, 30000)
+    return () => clearInterval(id)
+  }, [loadClockSession])
 
   // Update elapsed display every minute
   useEffect(() => {
@@ -285,13 +295,22 @@ export default function SchedulePage() {
     return () => clearInterval(id)
   }, [clockInTime])
 
-  function handleClockIn() {
+  async function handleClockIn() {
     const now  = new Date()
     const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
     const date = dateStr(now)
+    // Optimistic update
     setClockInTime(time)
     setClockInDate(date)
-    localStorage.setItem(`pointeuse_${effectiveUser}`, JSON.stringify({ time, date }))
+    try {
+      await apiFetch('/api/clock-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: effectiveUser, clock_in_at: time, date }),
+      })
+    } catch (e) {
+      console.error('clock-in save error', e)
+    }
   }
 
   function handleClockOut() {
@@ -319,11 +338,13 @@ export default function SchedulePage() {
           note: null,
         }),
       })
+      // Clear clock session from DB
+      await apiFetch(`/api/clock-session?userName=${encodeURIComponent(effectiveUser)}`, { method: 'DELETE' })
       await loadEntries()
     } catch (e) { console.error(e) }
     setSaving(false)
-    setClockInTime(null); setClockInDate(null)
-    localStorage.removeItem(`pointeuse_${effectiveUser}`)
+    setClockInTime(null)
+    setClockInDate(null)
     setClockOutModal(false)
   }
 
@@ -570,9 +591,13 @@ export default function SchedulePage() {
           input:focus, select:focus { outline: none; border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; }
           input { font-size: 16px !important; }
           @media (max-width: 640px) {
-            .week-grid { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-            .week-inner { min-width: 420px; }
+            .week-desktop { display: none !important; }
+            .week-mobile  { display: block !important; }
             .month-footer { flex-direction: column; align-items: flex-start; gap: 6px; }
+          }
+          @media (min-width: 641px) {
+            .week-desktop { display: block !important; }
+            .week-mobile  { display: none !important; }
           }
         `}</style>
       </Head>
@@ -728,8 +753,104 @@ export default function SchedulePage() {
 
         {/* ── Week View ── */}
         {view === 'week' && (
-          <div className="week-grid">
-            <div className="week-inner bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+          <>
+          {/* ── Mobile week view ── */}
+          <div className="week-mobile" style={{ display: 'none' }}>
+            <div className="space-y-2">
+              {weekDays.map((d, i) => {
+                const ds         = dateStr(d)
+                const today      = isToday(d)
+                const future     = isFuture(d)
+                const isOff      = offDays.includes(d.getDay())
+                const holiday    = holidaysMap[ds]
+                const dayEntries = byDate[ds] || {}
+                const work       = dayEntries.WORK
+                const vacation   = dayEntries.VACATION
+                const vacAM      = dayEntries.VACATION_AM
+                const vacPM      = dayEntries.VACATION_PM
+                const sick       = dayEntries.SICK
+                const hdEntry    = dayEntries.HOLIDAY
+                const hasAny     = work || vacation || vacAM || vacPM || sick || hdEntry
+                const hasOT      = isOff && !!work
+                return (
+                  <div
+                    key={i}
+                    onClick={() => openDay(ds)}
+                    style={{
+                      background: holiday ? '#fffbeb' : isOff ? '#f9fafb' : 'white',
+                      border: `1px solid ${today ? PINK : '#e5e7eb'}`,
+                      borderRadius: 16,
+                      padding: '12px 14px',
+                      opacity: future ? 0.6 : 1,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                    }}
+                  >
+                    {/* Date circle */}
+                    <div style={{ flexShrink: 0, textAlign: 'center', width: 40 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%',
+                        background: today ? PINK : 'transparent',
+                        color: today ? 'white' : holiday ? '#b45309' : isOff ? '#d1d5db' : '#111',
+                        fontWeight: 700, fontSize: 16,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto',
+                      }}>
+                        {d.getDate()}
+                      </div>
+                      <div style={{
+                        fontSize: 10, fontWeight: 600, marginTop: 2,
+                        color: holiday ? '#b45309' : isOff ? '#d1d5db' : '#9ca3af',
+                      }}>
+                        {DAYS_FR[i]}
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {holiday && (
+                        <div style={{ fontSize: 11, color: '#b45309', fontWeight: 600, marginBottom: 4 }}>
+                          🇨🇭 {holiday}
+                        </div>
+                      )}
+                      {!hasAny && isOff && !holiday && (
+                        <span style={{ fontSize: 12, color: '#d1d5db' }}>Jour off</span>
+                      )}
+                      {!hasAny && !isOff && !holiday && (
+                        <span style={{ fontSize: 12, color: '#d1d5db' }}>Appuyer pour ajouter</span>
+                      )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {work    && <EntryChip type="WORK"        hours={effectiveHours(work)} arrival={work.arrival_time} departure={work.departure_time} note={work.note} overtime={hasOT} />}
+                        {vacation && <EntryChip type="VACATION"   note={vacation.note} />}
+                        {vacAM   && <EntryChip type="VACATION_AM" note={vacAM.note} />}
+                        {vacPM   && <EntryChip type="VACATION_PM" note={vacPM.note} />}
+                        {sick    && <EntryChip type="SICK"        note={sick.note} />}
+                        {hdEntry && <EntryChip type="HOLIDAY"     note={hdEntry.note} />}
+                      </div>
+                    </div>
+
+                    {/* Arrow */}
+                    <svg style={{ flexShrink: 0, color: '#d1d5db', marginTop: 8 }} width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                )
+              })}
+            </div>
+            {/* Mobile week footer */}
+            <div className="mt-3 px-1 flex items-center justify-between text-sm">
+              <span className="text-gray-500 text-xs">Total semaine</span>
+              <span className="font-bold" style={{ color: weekH >= settings.weekly_hours ? '#16a34a' : weekH > 0 ? '#ea580c' : '#d1d5db' }}>
+                {weekH.toFixed(1)}h <span className="font-normal text-gray-400">/ {settings.weekly_hours}h</span>
+              </span>
+            </div>
+          </div>
+
+          {/* ── Desktop week view ── */}
+          <div className="week-desktop">
+            <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
               {/* Week header */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '1px solid #f0f0f0' }}>
                 {weekDays.map((d, i) => {
@@ -839,6 +960,8 @@ export default function SchedulePage() {
               </div>
             </div>
           </div>
+          {/* end .week-desktop */}
+          </>
         )}
 
         {/* ── Month View ── */}
