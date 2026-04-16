@@ -51,6 +51,10 @@ export default function App({ Component, pageProps }) {
         setUser({ id: session.user.id, email: session.user.email, name: profile?.name || session.user.email })
       }
       setAuthReady(true)
+    }).catch((err) => {
+      // Supabase Web Lock conflict (multiple tabs) — don't crash, just continue
+      console.warn('Auth init error (multi-tab lock?):', err?.message)
+      setAuthReady(true)
     })
 
     // Watch changes
