@@ -199,8 +199,8 @@ export default function SchedulePage() {
   // Modal – day entry
   const [modal, setModal]             = useState(null) // { date, entry }
   const [formType, setFormType]       = useState('WORK')
-  const [formArrival, setFormArrival] = useState('08:00')
-  const [formDeparture, setFormDeparture] = useState('17:00')
+  const [formArrival, setFormArrival] = useState('08:30')
+  const [formDeparture, setFormDeparture] = useState('18:00')
   const [formPause, setFormPause]     = useState(DEFAULT_PAUSE)
   const [formNote, setFormNote]       = useState('')
   const [saving, setSaving]           = useState(false)
@@ -572,7 +572,7 @@ export default function SchedulePage() {
   // ── Open day modal ────────────────────────────────────────────────────────
   function populateFormForType(t, existing) {
     const entry = existing?.[t] || null
-    const defaultArrival   = '08:00'
+    const defaultArrival   = '08:30'
     const defaultPresenceH = dailyTarget + DEFAULT_PAUSE
     const defaultDeparture = addMinutesToTime(defaultArrival, defaultPresenceH * 60)
 
@@ -839,7 +839,7 @@ export default function SchedulePage() {
             )}
             {/* View toggle */}
             <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
-              {[['week','Semaine'], ['month','Mois'], ['expenses','💰 Frais']].map(([v, label]) => (
+              {[['week','Semaine'], ['month','Mois']].map(([v, label]) => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
@@ -1229,80 +1229,78 @@ export default function SchedulePage() {
           </div>
         )}
 
-        {/* ── Expenses view ── */}
-        {view === 'expenses' && (
-          <div>
-            {/* Stats row */}
-            <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))' }}>
-              <StatCard icon="💰" label={`Total ${year}`} value={`${expTotal.toFixed(2)} CHF`} sub={`${expenses.length} frais`} color={PINK} />
-              <StatCard icon="📅" label={`${MONTHS_FR[displayMonth]}`} value={`${expThisMonth.toFixed(2)} CHF`} sub={`${expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===displayMonth&&d.getFullYear()===displayYear }).length} frais`} color="#8b5cf6" />
-              {EXPENSE_CATEGORIES.map(cat => {
-                const total = expenses.filter(e=>e.category===cat.key).reduce((s,e)=>s+(e.amount||0),0)
-                if (total === 0) return null
-                return <StatCard key={cat.key} icon={cat.icon} label={cat.key} value={`${total.toFixed(2)}`} sub="CHF" color={cat.color} />
-              })}
-            </div>
+        {/* ── Expenses section (always visible below schedule) ── */}
+        <div className="mt-8">
+          {/* Section header */}
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">💰 Frais {year}</h3>
+            <button
+              onClick={openAddExpense}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+              style={{ background: PINK }}
+            >
+              + Ajouter un frais
+            </button>
+          </div>
 
-            {/* Add button */}
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Frais {year}</h3>
-              <button
-                onClick={openAddExpense}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-                style={{ background: PINK }}
-              >
-                + Ajouter un frais
+          {/* Stats row */}
+          <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))' }}>
+            <StatCard icon="💰" label={`Total ${year}`} value={`${expTotal.toFixed(2)} CHF`} sub={`${expenses.length} frais`} color={PINK} />
+            <StatCard icon="📅" label={`${MONTHS_FR[displayMonth]}`} value={`${expThisMonth.toFixed(2)} CHF`} sub={`${expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===displayMonth&&d.getFullYear()===displayYear }).length} frais`} color="#8b5cf6" />
+            {EXPENSE_CATEGORIES.map(cat => {
+              const total = expenses.filter(e=>e.category===cat.key).reduce((s,e)=>s+(e.amount||0),0)
+              if (total === 0) return null
+              return <StatCard key={cat.key} icon={cat.icon} label={cat.key} value={`${total.toFixed(2)}`} sub="CHF" color={cat.color} />
+            })}
+          </div>
+
+          {/* Expense list */}
+          {expenses.length === 0 ? (
+            <div className="bg-white rounded-2xl border p-12 text-center" style={{ borderColor: '#e5e7eb' }}>
+              <div style={{ fontSize: 40 }}>💰</div>
+              <p className="text-gray-400 mt-3 text-sm">Aucun frais enregistré pour {year}</p>
+              <button onClick={openAddExpense} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: PINK }}>
+                Ajouter mon premier frais
               </button>
             </div>
-
-            {/* Expense list */}
-            {expenses.length === 0 ? (
-              <div className="bg-white rounded-2xl border p-12 text-center" style={{ borderColor: '#e5e7eb' }}>
-                <div style={{ fontSize: 40 }}>💰</div>
-                <p className="text-gray-400 mt-3 text-sm">Aucun frais enregistré pour {year}</p>
-                <button onClick={openAddExpense} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: PINK }}>
-                  Ajouter mon premier frais
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
-                {expenses.map((exp, i) => {
-                  const cat = EXPENSE_CATEGORIES.find(c => c.key === exp.category) || EXPENSE_CATEGORIES[5]
-                  return (
-                    <div
-                      key={exp.id}
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                      style={{ borderBottom: i < expenses.length - 1 ? '1px solid #f3f4f6' : 'none' }}
-                      onClick={() => openEditExpense(exp)}
-                    >
-                      {/* Receipt thumbnail or category icon */}
-                      <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
-                        style={{ background: exp.receipt_url ? '#f3f4f6' : `${cat.color}18`, fontSize: exp.receipt_url ? 10 : 20 }}>
-                        {exp.receipt_url
-                          ? <img src={exp.receipt_url} alt="reçu" className="w-full h-full object-cover" onError={e => { e.target.style.display='none' }} />
-                          : cat.icon
-                        }
-                      </div>
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{exp.merchant || exp.category}</p>
-                        <p className="text-xs text-gray-400">{new Date(exp.date+'T12:00:00').toLocaleDateString('fr-CH', { day:'numeric', month:'short' })} · <span style={{ color: cat.color }}>{cat.icon} {exp.category}</span></p>
-                      </div>
-                      {/* Amount */}
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold text-gray-800">{exp.amount != null ? `${parseFloat(exp.amount).toFixed(2)}` : '—'}</p>
-                        <p className="text-xs text-gray-400">{exp.currency}</p>
-                      </div>
-                      <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+          ) : (
+            <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+              {expenses.map((exp, i) => {
+                const cat = EXPENSE_CATEGORIES.find(c => c.key === exp.category) || EXPENSE_CATEGORIES[5]
+                return (
+                  <div
+                    key={exp.id}
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                    style={{ borderBottom: i < expenses.length - 1 ? '1px solid #f3f4f6' : 'none' }}
+                    onClick={() => openEditExpense(exp)}
+                  >
+                    {/* Receipt thumbnail or category icon */}
+                    <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
+                      style={{ background: exp.receipt_url ? '#f3f4f6' : `${cat.color}18`, fontSize: exp.receipt_url ? 10 : 20 }}>
+                      {exp.receipt_url
+                        ? <img src={exp.receipt_url} alt="reçu" className="w-full h-full object-cover" onError={e => { e.target.style.display='none' }} />
+                        : cat.icon
+                      }
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{exp.merchant || exp.category}</p>
+                      <p className="text-xs text-gray-400">{new Date(exp.date+'T12:00:00').toLocaleDateString('fr-CH', { day:'numeric', month:'short' })} · <span style={{ color: cat.color }}>{cat.icon} {exp.category}</span></p>
+                    </div>
+                    {/* Amount */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-gray-800">{exp.amount != null ? `${parseFloat(exp.amount).toFixed(2)}` : '—'}</p>
+                      <p className="text-xs text-gray-400">{exp.currency}</p>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
         {/* ── Admin overview ── */}
         {isAdmin && allSettings.length > 0 && (
