@@ -65,7 +65,7 @@ export default function NavBar({ title, children }) {
         className="sticky top-0 z-20 bg-white border-b"
         style={{ borderColor: '#f0f0f0', fontFamily: 'Inter, sans-serif' }}
       >
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           {/* Gauche : logo + titre */}
           <div className="flex items-center gap-2.5">
             <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>

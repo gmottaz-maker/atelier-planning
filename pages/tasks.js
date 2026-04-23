@@ -638,7 +638,7 @@ export default function Tasks() {
       </div>
 
       {/* Layout : sidebar (desktop) + liste */}
-      <div className="max-w-6xl mx-auto md:flex md:gap-6 px-4 py-4">
+      <div className="w-full md:flex md:gap-6 px-4 sm:px-6 lg:px-8 py-4">
 
         {/* ── Sidebar desktop ── */}
         <aside className="hidden md:flex flex-col gap-3 w-52 flex-shrink-0 pt-2">

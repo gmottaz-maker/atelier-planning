@@ -758,7 +758,7 @@ export default function SchedulePage() {
         </button>
       </NavBar>
 
-      <div className="max-w-5xl mx-auto px-4 py-5">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-5">
 
         {/* ── Stats cards ── */}
         <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
