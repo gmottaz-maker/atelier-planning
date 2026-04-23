@@ -71,64 +71,66 @@ function AtomLogo({ size = 24 }) {
   )
 }
 
-// ─── AddressInput — Nominatim (gratuit) ou Google Maps si clé dispo ──────────
+// ─── AddressInput — Google Maps (nouvelle API) ou Nominatim en fallback ──────
 
 function AddressInput({ value, onChange, placeholder, className, style }) {
-  const inputRef    = useRef(null)
-  const acRef       = useRef(null)
-  const debounceRef = useRef(null)
-  const mapsKey     = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
+  const debounceRef  = useRef(null)
+  const sessionRef   = useRef(null)
+  const mapsKey      = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
 
   const [suggestions, setSuggestions] = useState([])
   const [open, setOpen]               = useState(false)
   const [active, setActive]           = useState(-1)
 
-  // ── Google Maps (si clé configurée) ────────────────────────────────────────
+  // ── Charger le script Google Maps (nouvelle méthode loading=async) ─────────
   useEffect(() => {
-    if (!mapsKey || !inputRef.current) return
-    function setup() {
-      if (!window.google?.maps?.places || !inputRef.current) return
-      acRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
-        fields: ['formatted_address'],
-      })
-      acRef.current.addListener('place_changed', () => {
-        const place = acRef.current.getPlace()
-        if (place?.formatted_address) onChange(place.formatted_address)
-      })
-    }
-    if (window.google?.maps?.places) { setup() }
-    else if (!document.getElementById('gmaps-script')) {
-      window.__gmapsReady = setup
-      const s = document.createElement('script')
-      s.id = 'gmaps-script'
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=places&callback=__gmapsReady`
-      s.async = true
-      document.head.appendChild(s)
-    } else {
-      const prev = window.__gmapsReady
-      window.__gmapsReady = () => { prev?.(); setup() }
-    }
-    return () => { if (acRef.current && window.google?.maps?.event) window.google.maps.event.clearInstanceListeners(acRef.current) }
+    if (!mapsKey || document.getElementById('gmaps-script')) return
+    const s = document.createElement('script')
+    s.id    = 'gmaps-script'
+    s.src   = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&loading=async`
+    s.async = true
+    document.head.appendChild(s)
   }, [mapsKey])
 
-  // ── Nominatim (OpenStreetMap, sans clé) ────────────────────────────────────
+  // ── Suggestions Google Maps (nouvelle API AutocompleteSuggestion) ──────────
+  async function fetchGoogleSuggestions(q) {
+    try {
+      if (!window.google?.maps?.importLibrary) return null
+      const { AutocompleteSuggestion, AutocompleteSessionToken } =
+        await window.google.maps.importLibrary('places')
+      if (!sessionRef.current) sessionRef.current = new AutocompleteSessionToken()
+      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: q,
+        sessionToken: sessionRef.current,
+      })
+      return suggestions.map(s => s.placePrediction.text.toString())
+    } catch { return null }
+  }
+
+  // ── Suggestions Nominatim (OpenStreetMap, fallback gratuit) ───────────────
+  async function fetchNominatimSuggestions(q) {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=0`,
+        { headers: { 'Accept-Language': 'fr,en' } }
+      )
+      const d = await r.json()
+      return d.map(x => x.display_name)
+    } catch { return [] }
+  }
+
   function handleChange(e) {
     const q = e.target.value
     onChange(q)
-    if (mapsKey) return  // Google Maps gère les suggestions
     clearTimeout(debounceRef.current)
     setActive(-1)
     if (q.length < 3) { setSuggestions([]); setOpen(false); return }
     debounceRef.current = setTimeout(async () => {
-      try {
-        const r = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=0`,
-          { headers: { 'Accept-Language': 'fr,en' } }
-        )
-        const d = await r.json()
-        setSuggestions(d.map(x => x.display_name))
-        setOpen(true)
-      } catch { /* réseau indispo */ }
+      let results = null
+      if (mapsKey) results = await fetchGoogleSuggestions(q)
+      if (!results || results.length === 0) results = await fetchNominatimSuggestions(q)
+      setSuggestions(results || [])
+      setOpen((results?.length || 0) > 0)
     }, 350)
   }
 
@@ -137,6 +139,7 @@ function AddressInput({ value, onChange, placeholder, className, style }) {
     setSuggestions([])
     setOpen(false)
     setActive(-1)
+    sessionRef.current = null  // reset session token après sélection
   }
 
   function handleKeyDown(e) {
@@ -150,7 +153,6 @@ function AddressInput({ value, onChange, placeholder, className, style }) {
   return (
     <div className="relative">
       <input
-        ref={inputRef}
         type="text"
         value={value}
         onChange={handleChange}
@@ -162,7 +164,7 @@ function AddressInput({ value, onChange, placeholder, className, style }) {
         style={style}
         autoComplete="off"
       />
-      {!mapsKey && open && suggestions.length > 0 && (
+      {open && suggestions.length > 0 && (
         <ul style={{
           position: 'absolute', zIndex: 9999, top: '100%', left: 0, right: 0, marginTop: 4,
           background: 'white', border: '1px solid #e5e7eb', borderRadius: 12,
