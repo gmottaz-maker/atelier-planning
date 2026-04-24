@@ -719,8 +719,8 @@ export default function Admin() {
               <p className="text-gray-400 text-sm">Aucun projet actif.</p>
             </div>
           ) : (
-            // ─── Desktop : grille 2 colonnes, Mobile : liste ───────────────
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            // ─── Desktop : grille 3 colonnes, Mobile : liste ───────────────
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
               {activeProjects.map(project => {
                 const color      = getProjectColor(project)
                 const fromTodoist = isFromTodoist(project)
@@ -838,7 +838,7 @@ export default function Admin() {
               Projets archivés ({archivedProjects.length})
             </button>
             {showArchived && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2">
                 {archivedProjects.map(project => (
                   <div key={project.id} className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden opacity-50 hover:opacity-70 transition-opacity">
                     <div className="flex items-stretch">
