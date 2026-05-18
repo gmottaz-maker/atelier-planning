@@ -2,15 +2,36 @@ import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import { useResponsibles } from '../lib/useResponsibles'
 
-const PINK = '#FF4D6D'
-const PEOPLE = ['Arnaud', 'Gabin', 'Guillaume', 'Sous-traitant']
+const PINK = '#111827'
+const PEOPLE = ['Arnaud', 'Guillaume', 'Gabin', 'non défini']  // valeur par défaut, surchargée par useResponsibles()
 const PERSON_COLORS = {
   Arnaud: '#3b82f6',
   Gabin: '#8b5cf6',
   Guillaume: PINK,
   'Sous-traitant': '#64748b',
+  'non défini': '#9ca3af',
+  'Coople': '#64748b',
 }
+
+function colorForName(name) {
+  if (PERSON_COLORS[name]) return PERSON_COLORS[name]
+  if (!name) return '#9ca3af'
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return `hsl(${Math.abs(hash) % 360}, 45%, 48%)`
+}
+
+const SECTIONS = [
+  { key: 'overdue',        label: 'En retard',                color: '#dc2626' },
+  { key: 'today',          label: "Aujourd'hui",              color: '#d97706' },
+  { key: 'tomorrow',       label: 'Demain',                   color: '#f59e0b' },
+  { key: 'thisWeek',       label: 'Cette semaine',            color: '#0ea5e9' },
+  { key: 'nextWeek',       label: 'Semaine prochaine',        color: '#6366f1' },
+  { key: 'later',          label: 'Plus tard',                color: '#6b7280' },
+  { key: 'completedToday', label: "Terminées aujourd'hui",    color: '#22c55e' },
+]
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -103,131 +124,121 @@ function CountdownBadge({ task }) {
 // ─── Composant TaskCard ───────────────────────────────────────────────────
 
 function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
-  const [striking, setStriking] = useState(false)
-  const completed = task.status === 'completed'
-  const personColor = PERSON_COLORS[task.responsible] || '#64748b'
+  const completed   = task.status === 'completed'
+  const personColor = colorForName(task.responsible)
   const projectName = task.projects?.name
-
-  // Reset animation lorsqu'on ré-active la tâche
-  useEffect(() => { if (!completed) setStriking(false) }, [completed])
-
-  function handleToggle() {
-    if (!completed) setStriking(true)
-    onToggle(task)
-  }
-
-  const showLine = completed || striking
+  const canDelete   = task.responsible === currentUser || currentUser === 'Guillaume'
+  const dateInfo    = !completed && fmtTaskDate(task)
 
   return (
     <div
-      className="bg-white rounded-2xl border transition-all"
+      className="group bg-white rounded-lg border transition-all hover:border-gray-300"
       style={{
-        borderColor: completed ? '#e5e7eb' : '#f3f4f6',
-        opacity: completed ? 0.65 : 1,
+        borderColor: completed ? '#f3f4f6' : '#e5e7eb',
+        opacity: completed ? 0.55 : 1,
       }}
     >
-      <div className="flex items-center gap-3 p-4">
-        {/* Checkbox — touch target 44px */}
+      <div className="flex items-center gap-4 px-5 py-4">
         <button
-          onClick={handleToggle}
-          className="flex-shrink-0 flex items-center justify-center transition-all"
-          style={{ width: 44, height: 44, margin: -10 }}
+          onClick={() => onToggle(task)}
+          className="flex-shrink-0 flex items-center justify-center transition-all hover:scale-110"
+          style={{ width: 28, height: 28 }}
         >
-          <div
-            className="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
+          <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
             style={{
               borderColor: completed ? '#22c55e' : '#d1d5db',
               background: completed ? '#22c55e' : 'white',
-            }}
-          >
+            }}>
             {completed && (
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
           </div>
         </button>
 
-        {/* Contenu */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="relative flex-1 min-w-0">
-              <p className={`text-sm font-semibold leading-snug ${completed ? 'text-gray-400' : 'text-gray-900'}`}>
-                {task.is_private && <span className="mr-1">🔒</span>}
+          <button onClick={() => !completed && onEdit(task)}
+            className={`text-left w-full ${completed ? 'cursor-default' : ''}`}>
+            <div className="flex items-center gap-2">
+              {task.is_private && (
+                <span className="text-xs text-gray-400" title="Tâche privée">🔒</span>
+              )}
+              <p className={`leading-snug ${completed ? 'text-gray-400 line-through' : 'text-gray-900 font-medium'}`}
+                style={{ fontSize: 14 }}>
                 {task.title}
               </p>
-              {showLine && (
-                <span style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '-2px',
-                  right: '-2px',
-                  height: '2px',
-                  background: '#9ca3af',
-                  borderRadius: '2px',
-                  pointerEvents: 'none',
-                  transformOrigin: 'left center',
-                  transform: 'translateY(-50%) rotate(-0.6deg)',
-                  animation: striking && !completed ? 'taskStrike 0.5s cubic-bezier(0.4,0,0.2,1) both' : 'none',
-                }} />
-              )}
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {!completed && (
-                <button onClick={() => onEdit(task)}
-                  className="p-1.5 text-gray-300 hover:text-gray-600 rounded-xl transition-colors">
-                  ✏️
-                </button>
-              )}
-              {(task.responsible === currentUser || currentUser === 'Guillaume') && (
-                <button onClick={() => onDelete(task)}
-                  className="p-1.5 text-gray-300 hover:text-red-400 rounded-xl transition-colors">
-                  🗑️
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {/* Responsable */}
-            <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-              style={{ background: personColor }}>
-              {task.responsible}
-            </span>
-
-            {/* Projet */}
-            {projectName && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                {projectName}
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs">
+              <span className="font-medium px-2 py-0.5 rounded-md"
+                style={{ background: personColor + '15', color: personColor }}>
+                {task.responsible}
               </span>
-            )}
+              {projectName && (
+                <span className="text-gray-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                  {projectName}
+                </span>
+              )}
+              {dateInfo && (
+                <span className="font-medium tabular-nums" style={{ color: dateInfo.color }}>
+                  {dateInfo.label}
+                </span>
+              )}
+              {task.notes && (
+                <span className="text-gray-400 italic truncate max-w-xs">{task.notes}</span>
+              )}
+            </div>
+          </button>
+        </div>
 
-            {/* Countdown */}
-            {!completed && <CountdownBadge task={task} />}
-
-            {/* Date d'exécution si différente de aujourd'hui */}
-            {!completed && task.execution_date !== toDateStr(today()) && (
-              <span className="text-xs text-gray-400">📅 {formatDate(task.execution_date)}</span>
+        {/* Actions au survol */}
+        {!completed && (
+          <div className="flex items-center gap-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs">
+            <button onClick={() => onEdit(task)}
+              className="font-medium text-gray-500 hover:text-gray-900">
+              Modifier
+            </button>
+            {canDelete && (
+              <>
+                <span className="text-gray-200">·</span>
+                <button onClick={() => onDelete(task)}
+                  className="font-medium text-gray-500 hover:text-red-600">
+                  Supprimer
+                </button>
+              </>
             )}
           </div>
-
-          {task.notes && (
-            <p className="text-xs text-gray-400 mt-1 italic">{task.notes}</p>
-          )}
-        </div>
+        )}
       </div>
     </div>
   )
 }
 
+// Helper : libellé court de date pour la tâche
+function fmtTaskDate(task) {
+  const ref = task.due_date && task.due_date !== task.execution_date ? task.due_date : task.execution_date
+  if (!ref) return null
+  const todayStr = toDateStr(today())
+  if (ref === todayStr) return { label: "Aujourd'hui", color: '#d97706' }
+  const [y, m, d] = ref.split('-').map(Number)
+  const date = new Date(y, m-1, d); date.setHours(0,0,0,0)
+  const diff = Math.round((date - today()) / 86400000)
+  if (diff < 0) return { label: `${Math.abs(diff)}j en retard`, color: '#dc2626' }
+  if (diff === 1) return { label: 'Demain', color: '#d97706' }
+  if (diff <= 7) return { label: `Dans ${diff}j`, color: '#0284c7' }
+  return { label: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), color: '#6b7280' }
+}
+
 // ─── Formulaire (slide-up mobile) ─────────────────────────────────────────
 
 function TaskForm({ task, projects, currentUser, onSave, onClose }) {
+  const { responsibles } = useResponsibles()
   const isEdit = !!task?.id
   const [form, setForm] = useState({
     title: task?.title || '',
     project_id: task?.project_id || '',
-    responsible: task?.responsible || currentUser || 'Arnaud',
+    responsible: task?.responsible || currentUser || 'non défini',
     execution_date: task?.execution_date || toDateStr(today()),
     due_date: task?.due_date || '',
     is_private: task?.is_private || false,
@@ -250,100 +261,146 @@ function TaskForm({ task, projects, currentUser, onSave, onClose }) {
     setSaving(false)
   }
 
-  const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white"
+  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none transition-colors"
+
+  // Esc pour fermer
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ background: 'rgba(0,0,0,0.4)' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-t-3xl px-5 pt-5" style={{ maxHeight: '92vh', overflowY: 'auto', paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
-        {/* Handle */}
-        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-gray-900 text-base">
-            {isEdit ? 'Modifier la tâche' : <><span style={{ color: PINK }}>Nouvelle</span> tâche</>}
-          </h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">×</button>
+    <>
+      <style>{`
+        @keyframes drawerSlide {
+          from { transform: translateX(100%); }
+          to   { transform: translateX(0); }
+        }
+        @keyframes drawerFade {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+      `}</style>
+      <div className="fixed inset-0 z-50" style={{ background: 'rgba(15, 23, 42, 0.35)', animation: 'drawerFade 0.15s ease-out both' }}
+        onClick={e => e.target === e.currentTarget && onClose()}>
+        <div
+          className="fixed top-0 right-0 bottom-0 bg-white flex flex-col shadow-2xl"
+          style={{
+            width: '100%',
+            maxWidth: 520,
+            animation: 'drawerSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) both',
+            fontFamily: 'Inter, sans-serif',
+          }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">{isEdit ? 'Modifier' : 'Nouvelle tâche'}</p>
+              <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 20 }}>
+                {isEdit ? task.title : 'Créer une tâche'}
+              </h2>
+            </div>
+            <button onClick={onClose}
+              className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              style={{ fontSize: 22 }}>
+              ×
+            </button>
+          </div>
+
+          {/* Form body */}
+          <form id="task-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
+            {/* Titre */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Titre</label>
+              <input type="text" required autoFocus
+                value={form.title} onChange={e => set('title', e.target.value)}
+                placeholder="Ex : Découpe panneaux bar" className={inputCls} />
+            </div>
+
+            {/* Projet */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Projet lié</label>
+              <select value={form.project_id} onChange={e => set('project_id', e.target.value)} className={inputCls}>
+                <option value="">— Aucun projet —</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name} · {p.client}</option>)}
+              </select>
+            </div>
+
+            {/* Responsable */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-2">Responsable</label>
+              <div className="flex gap-2 flex-wrap">
+                {responsibles.map(p => {
+                  const color = colorForName(p)
+                  const active = form.responsible === p
+                  return (
+                    <button key={p} type="button"
+                      onClick={() => set('responsible', p)}
+                      className="px-3 py-1.5 rounded-md text-sm font-medium transition-colors border"
+                      style={active
+                        ? { background: color + '15', borderColor: color, color: color }
+                        : { background: 'white', borderColor: '#e5e7eb', color: '#6b7280' }
+                      }>
+                      {p}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Date d'exécution</label>
+                <input type="date" required value={form.execution_date}
+                  onChange={e => set('execution_date', e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Échéance (optionnel)</label>
+                <input type="date" value={form.due_date}
+                  onChange={e => set('due_date', e.target.value)} className={inputCls} />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Note</label>
+              <textarea rows={3} value={form.notes} onChange={e => set('notes', e.target.value)}
+                placeholder="Détail ou info utile…" className={inputCls}
+                style={{ resize: 'vertical' }} />
+            </div>
+
+            {/* Privée */}
+            <label className="flex items-center gap-3 py-2 cursor-pointer">
+              <div
+                onClick={() => set('is_private', !form.is_private)}
+                className="w-10 h-5.5 rounded-full transition-colors flex items-center px-0.5 flex-shrink-0"
+                style={{ background: form.is_private ? '#111827' : '#d1d5db', width: 36, height: 20 }}>
+                <div className="w-4 h-4 bg-white rounded-full shadow transition-transform"
+                  style={{ transform: form.is_private ? 'translateX(16px)' : 'translateX(0)' }} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Tâche privée</p>
+                <p className="text-xs text-gray-500">Visible uniquement par toi</p>
+              </div>
+            </label>
+          </form>
+
+          {/* Footer */}
+          <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+              Annuler
+            </button>
+            <button type="submit" form="task-form" disabled={saving || !form.title.trim()}
+              className="px-5 py-2 rounded-md text-white font-medium text-sm transition-opacity disabled:opacity-50"
+              style={{ background: '#111827' }}>
+              {saving ? 'Enregistrement…' : isEdit ? 'Mettre à jour' : 'Créer la tâche'}
+            </button>
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Titre */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Titre *</label>
-            <input type="text" required autoFocus
-              value={form.title} onChange={e => set('title', e.target.value)}
-              placeholder="Ex: Découpe panneaux bar" className={inputCls}
-              style={{ fontSize: 16 }} // évite le zoom iOS
-            />
-          </div>
-
-          {/* Projet */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Projet lié</label>
-            <select value={form.project_id} onChange={e => set('project_id', e.target.value)} className={inputCls} style={{ fontSize: 16 }}>
-              <option value="">— Aucun projet —</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name} · {p.client}</option>)}
-            </select>
-          </div>
-
-          {/* Responsable */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Responsable</label>
-            <div className="flex gap-2 flex-wrap">
-              {PEOPLE.filter(p => p !== 'Sous-traitant').map(p => (
-                <button key={p} type="button"
-                  onClick={() => set('responsible', p)}
-                  className="px-3 py-1.5 rounded-full text-sm font-medium transition-all"
-                  style={form.responsible === p
-                    ? { background: PERSON_COLORS[p], color: 'white' }
-                    : { background: '#f3f4f6', color: '#374151' }
-                  }>
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Date d'exécution *</label>
-              <input type="date" required value={form.execution_date}
-                onChange={e => set('execution_date', e.target.value)} className={inputCls} style={{ fontSize: 16 }} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Échéance (optionnel)</label>
-              <input type="date" value={form.due_date}
-                onChange={e => set('due_date', e.target.value)} className={inputCls} style={{ fontSize: 16 }} />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Note</label>
-            <input type="text" value={form.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Détail ou info utile..." className={inputCls} style={{ fontSize: 16 }} />
-          </div>
-
-          {/* Privée */}
-          <label className="flex items-center gap-3 py-1 cursor-pointer">
-            <div
-              onClick={() => set('is_private', !form.is_private)}
-              className="w-11 h-6 rounded-full transition-colors flex items-center px-0.5"
-              style={{ background: form.is_private ? PINK : '#d1d5db' }}>
-              <div className="w-5 h-5 bg-white rounded-full shadow transition-transform"
-                style={{ transform: form.is_private ? 'translateX(20px)' : 'translateX(0)' }} />
-            </div>
-            <span className="text-sm text-gray-700">🔒 Tâche privée (visible uniquement par moi)</span>
-          </label>
-
-          <button type="submit" disabled={saving}
-            className="w-full py-3 rounded-2xl text-white font-semibold text-base transition-opacity disabled:opacity-50"
-            style={{ background: PINK }}>
-            {saving ? 'Enregistrement...' : isEdit ? 'Mettre à jour' : 'Créer la tâche'}
-          </button>
-        </form>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -380,13 +437,15 @@ function WhoAreYou({ onSelect }) {
 
 export default function Tasks() {
   const { user, signOut } = useAuth()
+  const { responsibles } = useResponsibles()
   const currentUser = user?.name || null
 
   const [tasks, setTasks] = useState([])
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState('today')       // 'today' | 'week' | 'twoweeks'
+  const [view, setView] = useState('week')       // 'today' | 'week' | 'twoweeks' | 'all'
   const [personFilter, setPersonFilter] = useState(null) // null = not initialized yet
+  const [projectFilter, setProjectFilter] = useState('all') // 'all' | project_id
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [feedback, setFeedback] = useState(null)
@@ -520,53 +579,71 @@ export default function Tasks() {
   // personFilter defaults to 'all' while loading
   const activePersonFilter = personFilter === null ? 'all' : personFilter
 
-  function taskInView(task) {
-    const eff = effectiveDate(task)
-    const effStr = toDateStr(eff)
-    const completed = task.status === 'completed'
+  const tomorrowStr = toDateStr(addDays(today(), 1))
+  const nextWeekEnd = toDateStr(addDays(parseDate(weekEnd), 7))
 
-    // Tâches terminées : afficher seulement si complétées aujourd'hui
-    if (completed && !isCompletedToday(task)) return false
-
-    if (view === 'today') {
-      // Auto-rollover : tâches actives en retard = aujourd'hui
-      if (!completed && task.execution_date < todayStr) return true
-      return effStr === todayStr
-    }
-    if (view === 'week') return effStr <= weekEnd
-    if (view === 'twoweeks') return effStr <= twoWeeksEnd
-    return true
+  function getTaskSection(task) {
+    if (task.status === 'completed' && isCompletedToday(task)) return 'completedToday'
+    if (task.status === 'active' && task.execution_date < todayStr) return 'overdue'
+    const eff = toDateStr(effectiveDate(task))
+    if (eff === todayStr) return 'today'
+    if (eff === tomorrowStr) return 'tomorrow'
+    if (eff <= weekEnd) return 'thisWeek'
+    if (eff <= nextWeekEnd) return 'nextWeek'
+    return 'later'
   }
 
+  // Sections visibles selon la vue choisie
+  const sectionsForView = {
+    today:    ['overdue', 'today', 'completedToday'],
+    week:     ['overdue', 'today', 'tomorrow', 'thisWeek', 'completedToday'],
+    twoweeks: ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'completedToday'],
+    all:      ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'later', 'completedToday'],
+  }[view] || []
+
   function taskVisible(task) {
-    // Masquer les tâches privées des autres
     if (task.is_private && task.responsible !== currentUser) return false
-    // Filtre par personne
     if (activePersonFilter !== 'all' && task.responsible !== activePersonFilter) return false
-    // Filtre par vue temporelle
-    return taskInView(task)
+    if (projectFilter !== 'all' && String(task.project_id) !== String(projectFilter)) return false
+    if (task.status === 'completed' && !isCompletedToday(task)) return false
+    return sectionsForView.includes(getTaskSection(task))
   }
 
   const visibleTasks = tasks.filter(taskVisible)
 
-  // Tri : tâches actives d'abord (par date), puis complétées
-  const sorted = [
-    ...visibleTasks.filter(t => t.status === 'active').sort((a, b) => {
+  // Groupes par section
+  const grouped = SECTIONS.reduce((acc, s) => { acc[s.key] = []; return acc }, {})
+  for (const t of visibleTasks) grouped[getTaskSection(t)].push(t)
+  // Tri intra-section par date d'effet, puis par titre
+  for (const key of Object.keys(grouped)) {
+    grouped[key].sort((a, b) => {
       const da = toDateStr(effectiveDate(a))
       const db = toDateStr(effectiveDate(b))
-      return da.localeCompare(db)
-    }),
-    ...visibleTasks.filter(t => t.status === 'completed'),
-  ]
+      if (da !== db) return da.localeCompare(db)
+      return (a.title || '').localeCompare(b.title || '')
+    })
+  }
 
-  const activeCount = sorted.filter(t => t.status === 'active').length
+  const activeCount = visibleTasks.filter(t => t.status === 'active').length
+  const totalActiveByPerson = tasks.filter(t => t.status === 'active' && (!t.is_private || t.responsible === currentUser))
+
+  // Projets avec des tâches actives
+  const projectTaskCounts = {}
+  for (const t of totalActiveByPerson) {
+    if (t.project_id) {
+      projectTaskCounts[t.project_id] = (projectTaskCounts[t.project_id] || 0) + 1
+    }
+  }
+  const projectsWithTasks = projects
+    .filter(p => projectTaskCounts[p.id])
+    .sort((a, b) => (projectTaskCounts[b.id] || 0) - (projectTaskCounts[a.id] || 0))
 
   // ─── Rendu ─────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
-        <title>Tâches — Amazing Lab</title>
+        <title>Tâches — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
@@ -638,99 +715,151 @@ export default function Tasks() {
       </div>
 
       {/* Layout : sidebar (desktop) + liste */}
-      <div className="w-full md:flex md:gap-6 px-4 sm:px-6 lg:px-8 py-4">
+      <div className="w-full md:flex md:gap-8 px-6 sm:px-8 lg:px-10 py-8" style={{ maxWidth: 1800, margin: '0 auto' }}>
 
         {/* ── Sidebar desktop ── */}
-        <aside className="hidden md:flex flex-col gap-3 w-52 flex-shrink-0 pt-2">
-          {/* Vue temporelle */}
+        <aside className="hidden md:flex flex-col gap-6 flex-shrink-0 pt-1" style={{ width: 240 }}>
+          {/* Période */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Période</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Période</p>
             {[
-              { key: 'today', label: "Aujourd'hui" },
-              { key: 'week', label: 'Cette semaine' },
+              { key: 'today',    label: "Aujourd'hui" },
+              { key: 'week',     label: 'Cette semaine' },
               { key: 'twoweeks', label: '2 semaines' },
+              { key: 'all',      label: 'Tout' },
             ].map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
-                className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all mb-1"
+                className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5"
                 style={view === v.key
-                  ? { background: PINK + '15', color: PINK, fontWeight: 600 }
-                  : { color: '#6b7280', background: 'transparent' }}>
+                  ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 14 }
+                  : { color: '#6b7280', background: 'transparent', fontWeight: 500, fontSize: 14 }}>
                 {v.label}
               </button>
             ))}
           </div>
 
-          {/* Filtre personne */}
+          {/* Personne */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 mt-2">Personne</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Personne</p>
             <button onClick={() => setPersonFilter('all')}
-              className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all mb-1"
+              className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5 flex items-center justify-between"
               style={activePersonFilter === 'all'
-                ? { background: '#11111115', color: '#111', fontWeight: 600 }
-                : { color: '#6b7280' }}>
-              👥 Tous
+                ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 14 }
+                : { color: '#6b7280', fontSize: 14, fontWeight: 500 }}>
+              <span>Toute l'équipe</span>
             </button>
-            {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
-              <button key={p} onClick={() => setPersonFilter(p)}
-                className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-all mb-1 flex items-center gap-2"
-                style={activePersonFilter === p
-                  ? { background: PERSON_COLORS[p] + '18', color: PERSON_COLORS[p], fontWeight: 600 }
-                  : { color: '#6b7280' }}>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PERSON_COLORS[p] }} />
-                {p}
-              </button>
-            ))}
-          </div>
-
-          {/* Stats rapides */}
-          <div className="mt-4 p-3 rounded-2xl" style={{ background: PINK + '0A' }}>
-            <p className="text-xs font-semibold mb-2" style={{ color: PINK }}>
-              {activeCount} tâche{activeCount > 1 ? 's' : ''} active{activeCount > 1 ? 's' : ''}
-            </p>
-            {['Arnaud', 'Gabin', 'Guillaume'].map(p => {
-              const n = sorted.filter(t => t.responsible === p && t.status === 'active').length
-              if (!n) return null
+            {(responsibles || []).filter(p => p !== 'non défini').map(p => {
+              const color = colorForName(p)
+              const n = totalActiveByPerson.filter(t => t.responsible === p).length
               return (
-                <div key={p} className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-gray-500">{p}</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-                    style={{ background: PERSON_COLORS[p] }}>{n}</span>
-                </div>
+                <button key={p} onClick={() => setPersonFilter(p)}
+                  className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5 flex items-center justify-between"
+                  style={activePersonFilter === p
+                    ? { background: color + '14', color: color, fontWeight: 600, fontSize: 14 }
+                    : { color: '#6b7280', fontSize: 14, fontWeight: 500 }}>
+                  <span className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                    {p}
+                  </span>
+                  {n > 0 && (
+                    <span className="text-xs tabular-nums" style={{ color: activePersonFilter === p ? color : '#9ca3af' }}>{n}</span>
+                  )}
+                </button>
               )
             })}
           </div>
+
+          {/* Projet */}
+          {projectsWithTasks.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Projet</p>
+              <button onClick={() => setProjectFilter('all')}
+                className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5"
+                style={projectFilter === 'all'
+                  ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 14 }
+                  : { color: '#6b7280', fontSize: 14, fontWeight: 500 }}>
+                Tous les projets
+              </button>
+              {projectsWithTasks.slice(0, 12).map(p => {
+                const n = projectTaskCounts[p.id]
+                return (
+                  <button key={p.id} onClick={() => setProjectFilter(p.id)}
+                    className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5 flex items-center justify-between gap-2"
+                    style={projectFilter === p.id
+                      ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 13 }
+                      : { color: '#6b7280', fontSize: 13, fontWeight: 500 }}>
+                    <span className="truncate flex-1">{p.name}</span>
+                    {n > 0 && (
+                      <span className="text-xs text-gray-400 tabular-nums">{n}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </aside>
 
         {/* ── Liste tâches ── */}
         <div className="flex-1 min-w-0">
-          {/* Bouton "Nouvelle tâche" desktop */}
-          <div className="hidden md:flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-gray-700">
-              {activePersonFilter === 'all' ? 'Toutes les tâches' : `Tâches de ${activePersonFilter}`}
-              {activeCount > 0 && <span className="ml-2 text-xs text-gray-400 font-normal">{activeCount} active{activeCount > 1 ? 's' : ''}</span>}
-            </p>
+          {/* Header desktop */}
+          <div className="hidden md:flex items-baseline justify-between mb-6">
+            <div>
+              <h1 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 26 }}>
+                {activePersonFilter === 'all' ? 'Tâches' : `Tâches · ${activePersonFilter}`}
+              </h1>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {activeCount > 0
+                  ? `${activeCount} tâche${activeCount > 1 ? 's' : ''} active${activeCount > 1 ? 's' : ''}`
+                  : 'Aucune tâche active'}
+                {projectFilter !== 'all' && projects.find(p => p.id === projectFilter) && (
+                  <> · sur <span className="text-gray-900 font-medium">{projects.find(p => p.id === projectFilter).name}</span></>
+                )}
+              </p>
+            </div>
             <button onClick={() => { setEditingTask(null); setShowForm(true) }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: PINK }}>
+              className="px-4 py-2 rounded-md text-sm font-medium text-white transition-opacity hover:opacity-90"
+              style={{ background: '#111827' }}>
               + Nouvelle tâche
             </button>
           </div>
 
-          <div className="space-y-2" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
-            {loading ? (
-              <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
-            ) : sorted.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-4xl mb-3">✅</div>
-                <p className="text-gray-400 text-sm">Rien pour cette période !</p>
-              </div>
-            ) : (
-              sorted.map(task => (
-                <TaskCard key={task.id} task={task} currentUser={currentUser}
-                  onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
-              ))
-            )}
-          </div>
+          {loading ? (
+            <div className="text-center py-20 text-gray-400 text-sm">Chargement…</div>
+          ) : visibleTasks.length === 0 ? (
+            <div className="text-center py-24 bg-white rounded-lg border border-gray-200">
+              <p className="text-gray-400 text-sm">Aucune tâche dans cette vue.</p>
+              <button onClick={() => { setEditingTask(null); setShowForm(true) }}
+                className="mt-4 text-sm font-medium text-gray-700 hover:text-gray-900">
+                + Créer une tâche
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-8" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+              {SECTIONS.filter(s => sectionsForView.includes(s.key)).map(section => {
+                const items = grouped[section.key] || []
+                if (items.length === 0) return null
+                return (
+                  <section key={section.key}>
+                    <div className="flex items-baseline gap-3 mb-3">
+                      <div className="flex items-baseline gap-2.5">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: section.color }} />
+                        <h2 className="font-semibold tracking-tight" style={{ color: section.color, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {section.label}
+                        </h2>
+                      </div>
+                      <span className="text-xs text-gray-400 tabular-nums">{items.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {items.map(task => (
+                        <TaskCard key={task.id} task={task} currentUser={currentUser}
+                          onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 

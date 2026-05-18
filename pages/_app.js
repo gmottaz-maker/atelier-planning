@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { useState, useEffect, createContext, useContext } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
+import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -10,7 +11,8 @@ export const AuthContext = createContext(null)
 export function useAuth() { return useContext(AuthContext) }
 
 const PUBLIC_ROUTES = ['/login', '/display']
-const PINK = '#FF4D6D'
+const NO_CHROME_ROUTES = ['/login', '/display']
+const PINK = '#111827'
 
 async function fetchProfile(userId) {
   const { data } = await supabase.from('profiles').select('name').eq('id', userId).single()
@@ -100,6 +102,8 @@ export default function App({ Component, pageProps }) {
   // Don't render protected pages while redirecting
   if (!user && !PUBLIC_ROUTES.includes(router.pathname)) return null
 
+  const showChrome = user && !NO_CHROME_ROUTES.includes(router.pathname)
+
   return (
     <AuthContext.Provider value={{ user, signOut: () => supabase.auth.signOut() }}>
       <Head>
@@ -107,11 +111,20 @@ export default function App({ Component, pageProps }) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="AL Planning" />
+        <meta name="apple-mobile-web-app-title" content="Maze Project" />
         <link rel="apple-touch-icon" href="/icon.svg" />
-        <meta name="theme-color" content="#FF4D6D" />
+        <meta name="theme-color" content="#111827" />
       </Head>
-      <Component {...pageProps} />
+      {showChrome ? (
+        <>
+          <Sidebar />
+          <div style={{ marginLeft: SIDEBAR_WIDTH, minHeight: '100vh' }}>
+            <Component {...pageProps} />
+          </div>
+        </>
+      ) : (
+        <Component {...pageProps} />
+      )}
     </AuthContext.Provider>
   )
 }

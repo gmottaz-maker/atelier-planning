@@ -1,0 +1,13 @@
+{
+  "appId": "ch.amazinglab.planning",
+  "appName": "Maze Project",
+  "webDir": "out",
+  "server": {
+    "url": "https://mazeproject.amazinglab.ch",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "scrollEnabled": false
+  }
+}

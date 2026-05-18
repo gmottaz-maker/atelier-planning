@@ -3,7 +3,7 @@ import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 
-const PINK = '#FF4D6D'
+const PINK = '#111827'
 const ADMIN_USER = 'Guillaume'
 const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
 const DEFAULT_PAUSE = 1.0
@@ -715,7 +715,7 @@ export default function SchedulePage() {
   return (
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
-        <title>Horaires — Atelier Planning</title>
+        <title>Horaires — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
@@ -738,97 +738,106 @@ export default function SchedulePage() {
       </Head>
 
       {/* ── NavBar ── */}
-      <NavBar title="horaires">
+      <NavBar title="Horaires">
         {loading && <span className="text-xs text-gray-400 animate-pulse mr-1">…</span>}
         <button
           onClick={() => exportCSV(entries, effectiveUser, year)}
-          className="w-8 h-8 flex items-center justify-center rounded-full border transition-colors text-sm"
-          style={{ borderColor: '#e5e7eb', color: '#6b7280' }}
+          className="px-3 py-2 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors"
           title="Exporter CSV"
         >
-          ⬇
+          Exporter
         </button>
         <button
           onClick={() => { setSettingsError(''); setSettingsOpen(true) }}
-          className="w-8 h-8 flex items-center justify-center rounded-full border transition-colors text-sm"
-          style={{ borderColor: '#e5e7eb', color: '#6b7280' }}
+          className="px-3 py-2 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors"
           title="Paramètres horaires"
         >
-          ⚙️
+          Paramètres
         </button>
       </NavBar>
 
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-5">
+      <div className="w-full px-10 py-10 space-y-10" style={{ maxWidth: 1800, margin: '0 auto' }}>
+
+        {/* ── Header ── */}
+        <header className="flex items-baseline justify-between">
+          <div>
+            <h1 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 28 }}>
+              Horaires {isAdmin && selectedUser ? `· ${selectedUser}` : ''}
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              {effectiveUser} · {year}
+            </p>
+          </div>
+        </header>
 
         {/* ── Stats cards ── */}
-        <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            icon="🏖"
             label="Congés restants"
-            value={vacationLeft % 1 === 0 ? vacationLeft : vacationLeft.toFixed(1)}
-            sub={`pris: ${vacationTaken % 1 === 0 ? vacationTaken : vacationTaken.toFixed(1)}j / ${settings.vacation_days}j`}
+            value={vacationLeft % 1 === 0 ? `${vacationLeft}j` : `${vacationLeft.toFixed(1)}j`}
+            sub={`Pris : ${vacationTaken % 1 === 0 ? vacationTaken : vacationTaken.toFixed(1)} / ${settings.vacation_days}j`}
             color={vacationLeft > 5 ? '#16a34a' : vacationLeft > 0 ? '#ea580c' : '#dc2626'}
           />
           <StatCard
-            icon="⏱"
             label="Semaine en cours"
             value={`${thisWeekH.toFixed(1)}h`}
-            sub={`/ ${settings.weekly_hours}h`}
-            color={thisWeekH >= settings.weekly_hours ? '#16a34a' : '#2563eb'}
+            sub={`Objectif ${settings.weekly_hours}h`}
+            color={thisWeekH >= settings.weekly_hours ? '#16a34a' : '#111827'}
           />
           <StatCard
-            icon={overtime >= 0 ? '📈' : '📉'}
             label="Solde heures"
             value={`${overtime >= 0 ? '+' : ''}${overtime.toFixed(1)}h`}
-            sub={`${workedHours.toFixed(1)}h effectuées cette année`}
+            sub={`${workedHours.toFixed(1)}h cette année`}
             color={overtime >= 0 ? '#16a34a' : '#ea580c'}
           />
           <StatCard
-            icon="🤒"
             label="Maladie"
-            value={sickDays}
-            sub={sickDays === 1 ? 'jour cette année' : 'jours cette année'}
+            value={`${sickDays}j`}
+            sub={sickDays === 1 ? 'cette année' : 'cette année'}
             color={sickDays > 0 ? '#ea580c' : '#6b7280'}
           />
         </div>
 
         {/* ── Pointeuse (clock-in/out) ── */}
         {clockInTime ? (
-          <div className="mb-4 px-4 py-3 rounded-2xl border flex items-center gap-3 flex-wrap" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
-            <div className="flex items-center gap-2 flex-1">
-              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: '#22c55e', boxShadow: '0 0 0 3px #bbf7d0', animation: 'pulse 2s infinite' }} />
-              <span className="text-sm font-semibold" style={{ color: '#15803d' }}>En service depuis {clockInTime}</span>
-              {clockElapsed && <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#dcfce7', color: '#15803d' }}>{clockElapsed}</span>}
+          <div className="px-6 py-4 rounded-lg border flex items-center gap-4 flex-wrap" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: '#22c55e', boxShadow: '0 0 0 4px #bbf7d0', animation: 'pulse 2s infinite' }} />
+              <div>
+                <p className="font-semibold" style={{ color: '#15803d', fontSize: 15 }}>En service depuis {clockInTime}</p>
+                {clockElapsed && <p className="text-xs mt-0.5" style={{ color: '#15803d' }}>Durée : <span className="font-semibold tabular-nums">{clockElapsed}</span></p>}
+              </div>
             </div>
             <button
               onClick={handleClockOut}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white flex-shrink-0"
-              style={{ background: PINK }}
+              className="px-4 py-2 rounded-md text-sm font-medium text-white flex-shrink-0"
+              style={{ background: '#111827' }}
             >
               Pointer le départ
             </button>
           </div>
         ) : (
-          <div className="mb-4">
+          <div>
             <button
               onClick={handleClockIn}
-              className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2"
-              style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}
+              className="px-4 py-2.5 rounded-md text-sm font-medium border transition-colors"
+              style={{ background: 'white', color: '#15803d', borderColor: '#bbf7d0' }}
             >
-              <span style={{ fontSize: 16 }}>🟢</span> Pointer l'arrivée
+              <span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: '#22c55e' }} />
+              Pointer l'arrivée
             </button>
           </div>
         )}
 
         {/* ── Controls bar ── */}
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
             {/* Admin user switcher */}
             {isAdmin && (
               <select
                 value={selectedUser || ''}
                 onChange={e => setSelectedUser(e.target.value || null)}
-                className="text-sm border rounded-lg px-3 py-1.5"
+                className="text-sm border rounded-md px-3 py-2 bg-white"
                 style={{ borderColor: '#e5e7eb', color: '#374151' }}
               >
                 <option value="">Moi ({user?.name})</option>
@@ -838,14 +847,14 @@ export default function SchedulePage() {
               </select>
             )}
             {/* View toggle */}
-            <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+            <div className="flex rounded-md border overflow-hidden bg-white" style={{ borderColor: '#e5e7eb' }}>
               {[['week','Semaine'], ['month','Mois']].map(([v, label]) => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
-                  className="px-3 py-1.5 text-sm font-medium transition-colors"
+                  className="px-4 py-2 text-sm font-medium transition-colors"
                   style={{
-                    background: view === v ? PINK : 'white',
+                    background: view === v ? '#111827' : 'white',
                     color: view === v ? 'white' : '#6b7280',
                     border: 'none',
                     cursor: 'pointer',
@@ -861,24 +870,24 @@ export default function SchedulePage() {
           <div className="flex items-center gap-2">
             <button
               onClick={prevPeriod}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border text-gray-600 hover:bg-gray-50"
+              className="w-9 h-9 flex items-center justify-center rounded-md border text-gray-600 hover:bg-gray-50 bg-white"
               style={{ borderColor: '#e5e7eb' }}
             >
               ‹
             </button>
             <button
               onClick={goToday}
-              className="px-3 py-1 text-sm rounded-lg border font-medium"
+              className="px-3 py-2 text-sm rounded-md border font-medium bg-white hover:border-gray-400 transition-colors"
               style={{ borderColor: '#e5e7eb', color: '#374151' }}
             >
               Aujourd'hui
             </button>
-            <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">
+            <span className="font-semibold text-gray-900 min-w-[220px] text-center" style={{ fontSize: 15 }}>
               {periodLabel}
             </span>
             <button
               onClick={nextPeriod}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border text-gray-600 hover:bg-gray-50"
+              className="w-9 h-9 flex items-center justify-center rounded-md border text-gray-600 hover:bg-gray-50 bg-white"
               style={{ borderColor: '#e5e7eb' }}
             >
               ›
@@ -1229,42 +1238,44 @@ export default function SchedulePage() {
           </div>
         )}
 
-        {/* ── Expenses section (always visible below schedule) ── */}
-        <div className="mt-8">
+        {/* ── Expenses section ── */}
+        <div>
           {/* Section header */}
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">💰 Frais {year}</h3>
+          <div className="flex justify-between items-baseline mb-5">
+            <div>
+              <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 22 }}>Frais</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{year} · {expenses.length} note{expenses.length > 1 ? 's' : ''}</p>
+            </div>
             <button
               onClick={openAddExpense}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-              style={{ background: PINK }}
+              className="px-4 py-2 rounded-md text-sm font-medium text-white"
+              style={{ background: '#111827' }}
             >
               + Ajouter un frais
             </button>
           </div>
 
           {/* Stats row */}
-          <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))' }}>
-            <StatCard icon="💰" label={`Total ${year}`} value={`${expTotal.toFixed(2)} CHF`} sub={`${expenses.length} frais`} color={PINK} />
-            <StatCard icon="📅" label={`${MONTHS_FR[displayMonth]}`} value={`${expThisMonth.toFixed(2)} CHF`} sub={`${expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===displayMonth&&d.getFullYear()===displayYear }).length} frais`} color="#8b5cf6" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+            <StatCard label={`Total ${year}`} value={`${expTotal.toFixed(2)} CHF`} sub={`${expenses.length} frais`} />
+            <StatCard label={MONTHS_FR[displayMonth]} value={`${expThisMonth.toFixed(2)} CHF`} sub={`${expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===displayMonth&&d.getFullYear()===displayYear }).length} frais`} />
             {EXPENSE_CATEGORIES.map(cat => {
               const total = expenses.filter(e=>e.category===cat.key).reduce((s,e)=>s+(e.amount||0),0)
               if (total === 0) return null
-              return <StatCard key={cat.key} icon={cat.icon} label={cat.key} value={`${total.toFixed(2)}`} sub="CHF" color={cat.color} />
+              return <StatCard key={cat.key} label={cat.key} value={`${total.toFixed(2)} CHF`} sub={`${expenses.filter(e=>e.category===cat.key).length} frais`} color={cat.color} />
             })}
           </div>
 
           {/* Expense list */}
           {expenses.length === 0 ? (
-            <div className="bg-white rounded-2xl border p-12 text-center" style={{ borderColor: '#e5e7eb' }}>
-              <div style={{ fontSize: 40 }}>💰</div>
-              <p className="text-gray-400 mt-3 text-sm">Aucun frais enregistré pour {year}</p>
-              <button onClick={openAddExpense} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: PINK }}>
+            <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+              <p className="text-gray-400 text-sm">Aucun frais enregistré pour {year}</p>
+              <button onClick={openAddExpense} className="mt-4 px-4 py-2 rounded-md text-sm font-medium text-white" style={{ background: '#111827' }}>
                 Ajouter mon premier frais
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               {expenses.map((exp, i) => {
                 const cat = EXPENSE_CATEGORIES.find(c => c.key === exp.category) || EXPENSE_CATEGORIES[5]
                 return (
@@ -1534,146 +1545,24 @@ export default function SchedulePage() {
         </Modal>
       )}
 
-      {/* ── Expense modal ── */}
+      {/* ── Expense drawer ── */}
       {expenseModal && (
-        <Modal onClose={() => !expSaving && setExpenseModal(false)}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-900">{expEditId ? 'Modifier le frais' : 'Nouveau frais'}</h3>
-          </div>
-
-          {/* Receipt upload zone */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Photo du reçu (optionnel)</label>
-            <label
-              className="block w-full rounded-xl border-2 border-dashed cursor-pointer overflow-hidden transition-colors"
-              style={{ borderColor: expReceiptPreview ? '#bbf7d0' : '#e5e7eb', background: expReceiptPreview ? '#f0fdf4' : '#fafafa', minHeight: 80 }}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={e => handleReceiptFile(e.target.files?.[0])}
-              />
-              {expReceiptPreview ? (
-                <div className="flex items-center gap-3 p-3">
-                  <img src={expReceiptPreview} alt="reçu" className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-green-700">📎 Reçu attaché</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Appuyer pour changer</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-5 gap-1">
-                  <span style={{ fontSize: 28 }}>📸</span>
-                  <span className="text-xs text-gray-400">Prendre une photo ou choisir une image</span>
-                </div>
-              )}
-            </label>
-
-            {/* Scan button */}
-            {expReceiptPreview && expReceiptB64 && (
-              <button
-                onClick={scanReceipt}
-                disabled={expScanLoading}
-                className="mt-2 w-full py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
-                style={{ background: expScanLoading ? '#f3f4f6' : '#eff6ff', color: expScanLoading ? '#9ca3af' : '#2563eb', border: '1px solid #bfdbfe' }}
-              >
-                {expScanLoading ? (
-                  <><span className="animate-spin">⟳</span> Analyse en cours…</>
-                ) : (
-                  <><span>🤖</span> Scanner avec l'IA</>
-                )}
-              </button>
-            )}
-            {expScanError && (
-              <p className="mt-1 text-xs text-orange-600 px-1">⚠️ {expScanError}</p>
-            )}
-          </div>
-
-          {/* Form fields */}
-          <div className="space-y-3 mb-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
-                <input type="date" value={expForm.date} onChange={e => setExpForm(f=>({...f,date:e.target.value}))}
-                  className="w-full border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Montant</label>
-                <div className="flex gap-1.5">
-                  <input type="number" step="0.01" min="0" placeholder="0.00" value={expForm.amount}
-                    onChange={e => setExpForm(f=>({...f,amount:e.target.value}))}
-                    className="flex-1 border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
-                  <select value={expForm.currency} onChange={e => setExpForm(f=>({...f,currency:e.target.value}))}
-                    className="border rounded-xl px-2 py-2 text-sm text-gray-700" style={{ borderColor: '#e5e7eb' }}>
-                    {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Commerçant</label>
-              <input type="text" placeholder="Ex: Migros, SBB, Hôtel Ibis…" value={expForm.merchant}
-                onChange={e => setExpForm(f=>({...f,merchant:e.target.value}))}
-                className="w-full border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {EXPENSE_CATEGORIES.map(cat => (
-                  <button
-                    key={cat.key}
-                    type="button"
-                    onClick={() => setExpForm(f=>({...f,category:cat.key}))}
-                    className="py-2 rounded-xl border-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5"
-                    style={{
-                      borderColor: expForm.category === cat.key ? cat.color : '#e5e7eb',
-                      background:  expForm.category === cat.key ? `${cat.color}18` : 'white',
-                      color:       expForm.category === cat.key ? cat.color : '#6b7280',
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>{cat.icon}</span>
-                    <span style={{ fontSize: 10 }}>{cat.key}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Note (optionnel)</label>
-              <input type="text" placeholder="Détails supplémentaires…" value={expForm.description}
-                onChange={e => setExpForm(f=>({...f,description:e.target.value}))}
-                className="w-full border rounded-xl px-3 py-2 text-sm text-gray-900" style={{ borderColor: '#e5e7eb' }} />
-            </div>
-          </div>
-
-          {expSaveError && (
-            <div className="mb-3 px-3 py-2 rounded-xl text-sm" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
-              ⚠️ {expSaveError}
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            {expEditId && (
-              <button onClick={() => deleteExpense(expEditId)} className="px-4 py-2.5 rounded-xl text-sm font-semibold border"
-                style={{ borderColor: '#fca5a5', color: '#dc2626', background: '#fff5f5' }}>
-                Supprimer
-              </button>
-            )}
-            <button onClick={() => setExpenseModal(false)} disabled={expSaving}
-              className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium text-gray-600" style={{ borderColor: '#e5e7eb' }}>
-              Annuler
-            </button>
-            <button onClick={saveExpense} disabled={expSaving || !expForm.date}
-              className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: PINK }}>
-              {expSaving ? '…' : 'Enregistrer'}
-            </button>
-          </div>
-        </Modal>
+        <ExpenseDrawer
+          editId={expEditId}
+          form={expForm}
+          setForm={setExpForm}
+          receiptPreview={expReceiptPreview}
+          receiptB64={expReceiptB64}
+          onReceiptFile={handleReceiptFile}
+          onScan={scanReceipt}
+          scanLoading={expScanLoading}
+          scanError={expScanError}
+          saving={expSaving}
+          saveError={expSaveError}
+          onSave={saveExpense}
+          onDelete={deleteExpense}
+          onClose={() => !expSaving && setExpenseModal(false)}
+        />
       )}
 
       {/* ── Clock-out confirmation modal ── */}
@@ -1837,15 +1726,195 @@ export default function SchedulePage() {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StatCard({ icon, label, value, sub, color }) {
+function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onReceiptFile, onScan, scanLoading, scanError, saving, saveError, onSave, onDelete, onClose }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape' && !saving) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, saving])
+
+  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none transition-colors"
+
   return (
-    <div className="bg-white rounded-2xl border p-4" style={{ borderColor: '#e5e7eb' }}>
-      <div className="flex items-center gap-2 mb-2">
-        <span style={{ fontSize: 18 }}>{icon}</span>
-        <span className="text-xs font-medium text-gray-500">{label}</span>
+    <>
+      <style>{`
+        @keyframes drawerSlide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes drawerFade  { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
+      <div className="fixed inset-0 z-50"
+        style={{ background: 'rgba(15, 23, 42, 0.35)', animation: 'drawerFade 0.15s ease-out both' }}
+        onClick={e => e.target === e.currentTarget && onClose()}>
+        <div
+          className="fixed top-0 right-0 bottom-0 bg-white flex flex-col shadow-2xl"
+          style={{
+            width: '100%',
+            maxWidth: 520,
+            animation: 'drawerSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) both',
+            fontFamily: 'Inter, sans-serif',
+          }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">{editId ? 'Modifier' : 'Nouveau frais'}</p>
+              <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 20 }}>
+                {editId ? (form.merchant || 'Frais') : 'Ajouter un frais'}
+              </h2>
+            </div>
+            <button onClick={onClose}
+              className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              style={{ fontSize: 22 }}>
+              ×
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
+            {/* Receipt */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Photo du reçu</label>
+              <label
+                className="block w-full rounded-md border border-dashed cursor-pointer overflow-hidden transition-colors"
+                style={{ borderColor: receiptPreview ? '#bbf7d0' : '#e5e7eb', background: receiptPreview ? '#f0fdf4' : '#fafafa', minHeight: 84 }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={e => onReceiptFile(e.target.files?.[0])}
+                />
+                {receiptPreview ? (
+                  <div className="flex items-center gap-3 p-3">
+                    <img src={receiptPreview} alt="reçu" className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold" style={{ color: '#15803d' }}>Reçu attaché</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Cliquer pour changer</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 gap-1">
+                    <p className="text-sm text-gray-600 font-medium">Glisser une image ou <span className="text-gray-900 underline">parcourir</span></p>
+                    <p className="text-xs text-gray-400">JPG / PNG / HEIC</p>
+                  </div>
+                )}
+              </label>
+
+              {receiptPreview && receiptB64 && (
+                <button
+                  onClick={onScan}
+                  disabled={scanLoading}
+                  className="mt-3 w-full py-2 rounded-md text-sm font-medium border transition-colors"
+                  style={{
+                    background: scanLoading ? '#f3f4f6' : 'white',
+                    color: scanLoading ? '#9ca3af' : '#2563eb',
+                    borderColor: '#bfdbfe',
+                  }}>
+                  {scanLoading ? 'Analyse en cours…' : 'Scanner avec l\'IA'}
+                </button>
+              )}
+              {scanError && (
+                <p className="mt-2 text-xs text-orange-600">{scanError}</p>
+              )}
+            </div>
+
+            {/* Date + Montant */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Date</label>
+                <input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))}
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Montant</label>
+                <div className="flex gap-2">
+                  <input type="number" step="0.01" min="0" placeholder="0.00" value={form.amount}
+                    onChange={e => setForm(f=>({...f,amount:e.target.value}))}
+                    className={`${inputCls} flex-1`} />
+                  <select value={form.currency} onChange={e => setForm(f=>({...f,currency:e.target.value}))}
+                    className={inputCls} style={{ width: 80 }}>
+                    {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Commerçant */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Commerçant</label>
+              <input type="text" placeholder="Ex : Migros, SBB, Hôtel Ibis…" value={form.merchant}
+                onChange={e => setForm(f=>({...f,merchant:e.target.value}))}
+                className={inputCls} />
+            </div>
+
+            {/* Catégorie */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-2">Catégorie</label>
+              <div className="grid grid-cols-3 gap-2">
+                {EXPENSE_CATEGORIES.map(cat => {
+                  const active = form.category === cat.key
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => setForm(f=>({...f,category:cat.key}))}
+                      className="py-2.5 rounded-md text-sm font-medium transition-colors border"
+                      style={active
+                        ? { borderColor: cat.color, background: cat.color + '14', color: cat.color }
+                        : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }
+                      }>
+                      {cat.key}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Note */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Note</label>
+              <textarea rows={2} placeholder="Détails supplémentaires…" value={form.description}
+                onChange={e => setForm(f=>({...f,description:e.target.value}))}
+                className={inputCls} style={{ resize: 'vertical' }} />
+            </div>
+
+            {saveError && (
+              <div className="px-4 py-3 rounded-md text-sm" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
+                {saveError}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+            {editId ? (
+              <button onClick={() => onDelete(editId)} disabled={saving}
+                className="text-sm font-medium text-red-600 hover:text-red-700">
+                Supprimer
+              </button>
+            ) : <span />}
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={onClose} disabled={saving}
+                className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+                Annuler
+              </button>
+              <button onClick={onSave} disabled={saving || !form.date}
+                className="px-5 py-2 rounded-md text-white font-medium text-sm transition-opacity disabled:opacity-50"
+                style={{ background: '#111827' }}>
+                {saving ? 'Enregistrement…' : editId ? 'Mettre à jour' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="text-2xl font-bold" style={{ color }}>{value}</div>
-      <div className="text-xs text-gray-400 mt-0.5">{sub}</div>
+    </>
+  )
+}
+
+function StatCard({ label, value, sub, color }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <p className="text-xs uppercase tracking-wider text-gray-400">{label}</p>
+      <p className="font-semibold tabular-nums mt-2" style={{ color: color || '#111827', fontSize: 28, letterSpacing: '-0.02em' }}>{value}</p>
+      <p className="text-xs text-gray-500 mt-1">{sub}</p>
     </div>
   )
 }

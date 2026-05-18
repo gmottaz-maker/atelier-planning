@@ -3,11 +3,11 @@ import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 
-const PINK = '#FF4D6D'
+const PINK = '#111827'
 const PERSON_COLORS = {
   Arnaud: '#3b82f6',
   Gabin: '#8b5cf6',
-  Guillaume: '#FF4D6D',
+  Guillaume: '#111827',
 }
 
 const ACTION_LABELS = {
@@ -71,7 +71,7 @@ export default function Activity() {
   return (
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
-        <title>Activité — Amazing Lab</title>
+        <title>Activité — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`body { font-family: 'Inter', sans-serif; } * { -webkit-tap-highlight-color: transparent; }`}</style>

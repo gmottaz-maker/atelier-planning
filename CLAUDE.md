@@ -1,4 +1,4 @@
-# atelier-planning — Contexte projet
+# Maze Project — Contexte projet
 
 Application de gestion de projets, horaires et frais pour Amazing Lab (atelier de fabrication).
 URL production : https://mazeproject.amazinglab.ch

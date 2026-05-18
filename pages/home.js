@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useAuth } from './_app'
+import NavBar from '../components/NavBar'
 
-const PINK = '#FF4D6D'
+const PINK = '#111827'
 const PERSON_COLORS = {
   Arnaud: '#3b82f6',
   Gabin: '#8b5cf6',
@@ -361,7 +362,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
-        <title>Accueil — Amazing Lab</title>
+        <title>Accueil — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
@@ -371,27 +372,7 @@ export default function HomePage() {
         `}</style>
       </Head>
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-10 bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Logo />
-            <span className="font-bold text-gray-900 text-sm">accueil</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/tasks" title="Tâches" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">✅</Link>
-            <Link href="/" title="Projets" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">🗂️</Link>
-            <Link href="/activity" title="Activité" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">📊</Link>
-            <Link href="/settings" title="Paramètres" className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-400 hover:border-gray-400 transition-colors text-base">⚙️</Link>
-            <button
-              onClick={() => signOut()}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
-              style={{ background: PERSON_COLORS[currentUser] || PINK }}>
-              {currentUser}
-            </button>
-          </div>
-        </div>
-      </header>
+      <NavBar title="accueil" />
 
       {/* ── Two-column layout ── */}
       <div className="w-full px-4 sm:px-6 lg:px-8 py-6">

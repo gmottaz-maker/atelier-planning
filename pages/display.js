@@ -3,47 +3,48 @@ import Head from 'next/head'
 import Link from 'next/link'
 
 const REFRESH_INTERVAL = 60 * 1000
-const PINK = '#FF4D6D'
 
 // ─── Thèmes ────────────────────────────────────────────────────────────────
 
 const DARK = {
-  bg:           '#0d0d0d',
+  bg:           '#0a0a0a',
   headerBg:     '#111111',
-  headerBorder: '#1f1f1f',
-  cardBg:       '#161616',
+  headerBorder: '#262626',
+  cardBg:       '#171717',
   textPrimary:  '#ffffff',
-  textSecondary:'#9ca3af',
-  textMuted:    '#4b5563',
-  gridLine:     '#1f1f1f',
-  todayLine:    PINK + '55',
-  todayBg:      PINK + '08',
+  textSecondary:'#d4d4d8',
+  textMuted:    '#71717a',
+  accent:       '#ffffff',
+  gridLine:     '#262626',
+  todayLine:    '#ffffff55',
+  todayBg:      '#ffffff0a',
   weekendBg:    '#141414',
   scrollbar:    '#333 #111',
-  toggleBg:     '#1a1a1a',
-  btnBg:        '#1a1a1a',
-  btnText:      '#666666',
-  legendText:   '#6b7280',
+  toggleBg:     '#1f1f1f',
+  btnBg:        '#1f1f1f',
+  btnText:      '#a3a3a3',
+  legendText:   '#a3a3a3',
   overdueBg:    '#1a0508',
   overdueBorder:'#7f1d1d',
 }
 
 const LIGHT = {
-  bg:           '#f0f0f0',
+  bg:           '#ffffff',
   headerBg:     '#ffffff',
   headerBorder: '#e5e7eb',
   cardBg:       '#ffffff',
-  textPrimary:  '#111827',
+  textPrimary:  '#0a0a0a',
   textSecondary:'#374151',
-  textMuted:    '#9ca3af',
+  textMuted:    '#6b7280',
+  accent:       '#111827',
   gridLine:     '#e5e7eb',
-  todayLine:    PINK + '66',
-  todayBg:      PINK + '10',
-  weekendBg:    '#f3f4f6',
+  todayLine:    '#11182766',
+  todayBg:      '#11182710',
+  weekendBg:    '#f9fafb',
   scrollbar:    '#ccc #f0f0f0',
   toggleBg:     '#f3f4f6',
   btnBg:        '#f3f4f6',
-  btnText:      '#6b7280',
+  btnText:      '#374151',
   legendText:   '#6b7280',
   overdueBg:    '#fff1f2',
   overdueBorder:'#fca5a5',
@@ -105,22 +106,12 @@ function isWeekend(date) {
 
 // ─── Logo ──────────────────────────────────────────────────────────────────
 
-function AtomLogo({ size = 28 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
-      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
-      <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
-      <circle cx="20" cy="20" r="3" fill={PINK} />
-    </svg>
-  )
-}
 
 // ─── Timeline ─────────────────────────────────────────────────────────────
 
-const COL_W = 96   // largeur colonne jour
-const ROW_H = 56   // hauteur ligne projet
-const LABEL_W = 260 // largeur colonne infos
+const COL_W = 130   // largeur colonne jour
+const ROW_H = 84    // hauteur ligne projet
+const LABEL_W = 340 // largeur colonne infos
 
 function Timeline({ projects, viewMode, dark, theme }) {
   const numDays = viewMode === 'month' ? 28 : 14
@@ -141,17 +132,17 @@ function Timeline({ projects, viewMode, dark, theme }) {
 
       {/* Projets en retard */}
       {overdueProjects.length > 0 && (
-        <div className="px-8 pt-5 pb-3">
-          <div className="rounded-2xl p-4 border" style={{ background: theme.overdueBg, borderColor: theme.overdueBorder }}>
-            <div className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: PINK }}>⚠ En retard</div>
+        <div className="px-10 pt-6 pb-4">
+          <div className="rounded-xl p-5 border" style={{ background: theme.overdueBg, borderColor: theme.overdueBorder }}>
+            <div className="font-bold uppercase tracking-wider mb-4" style={{ color: '#ef4444', fontSize: 17 }}>⚠ En retard</div>
             <div className="flex flex-wrap gap-3">
               {overdueProjects.map(p => {
                 const colors = getAutoColor(p.deadline, dark)
                 return (
-                  <div key={p.id} className="rounded-xl px-4 py-3 border" style={{ background: colors.bg, borderColor: colors.border }}>
-                    <div className="font-bold text-base" style={{ color: theme.textPrimary }}>{p.client}</div>
-                    <div className="text-sm mt-0.5" style={{ color: colors.text }}>{p.name}</div>
-                    <div className="text-sm mt-1" style={{ color: theme.textMuted }}>Prévu: {formatDate(p.deadline)}</div>
+                  <div key={p.id} className="rounded-lg px-5 py-3.5 border" style={{ background: colors.bg, borderColor: colors.border }}>
+                    <div className="font-bold" style={{ color: theme.textPrimary, fontSize: 18 }}>{p.client}</div>
+                    <div className="mt-0.5" style={{ color: colors.text, fontSize: 15 }}>{p.name}</div>
+                    <div className="mt-1" style={{ color: theme.textMuted, fontSize: 14 }}>Prévu: {formatDate(p.deadline)}</div>
                   </div>
                 )
               })}
@@ -161,10 +152,10 @@ function Timeline({ projects, viewMode, dark, theme }) {
       )}
 
       {/* Gantt */}
-      <div className="px-8 pt-5 pb-10" style={{ minWidth: numDays * COL_W + LABEL_W + 64 }}>
+      <div className="px-10 pt-8 pb-12" style={{ minWidth: numDays * COL_W + LABEL_W + 80 }}>
 
         {/* Header dates */}
-        <div className="flex mb-3" style={{ paddingLeft: LABEL_W }}>
+        <div className="flex mb-5" style={{ paddingLeft: LABEL_W }}>
           {days.map((day, i) => {
             const isToday = isSameDay(day, today)
             const weekend = isWeekend(day)
@@ -173,14 +164,17 @@ function Timeline({ projects, viewMode, dark, theme }) {
                 key={i}
                 style={{
                   width: COL_W, flexShrink: 0,
-                  borderBottomColor: isToday ? PINK : theme.gridLine,
-                  borderBottomWidth: isToday ? 2 : 1,
+                  borderBottomColor: isToday ? theme.accent : theme.gridLine,
+                  borderBottomWidth: isToday ? 3 : 1,
                   borderBottomStyle: 'solid',
-                  color: isToday ? PINK : weekend ? theme.textMuted : theme.textSecondary,
+                  color: isToday ? theme.accent : weekend ? theme.textMuted : theme.textSecondary,
+                  fontSize: 18,
+                  fontWeight: isToday ? 700 : 500,
+                  paddingBottom: 10,
                 }}
-                className="text-center text-sm pb-2 font-medium"
+                className="text-center"
               >
-                {isToday ? '● Auj.' : formatDayLabel(day)}
+                {isToday ? '● Aujourd\'hui' : formatDayLabel(day)}
               </div>
             )
           })}
@@ -188,11 +182,11 @@ function Timeline({ projects, viewMode, dark, theme }) {
 
         {/* Lignes */}
         {visibleProjects.length === 0 ? (
-          <div className="text-center py-20 text-lg" style={{ color: theme.textMuted }}>
+          <div className="text-center py-24" style={{ color: theme.textMuted, fontSize: 22 }}>
             Aucun projet à venir dans cette période
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {visibleProjects.map(project => {
               const colors = getProjectColors(project, dark)
               const daysLeft = getDaysRemaining(project.deadline)
@@ -201,15 +195,15 @@ function Timeline({ projects, viewMode, dark, theme }) {
               return (
                 <div key={project.id} className="flex items-center">
                   {/* Infos */}
-                  <div style={{ width: LABEL_W, flexShrink: 0 }} className="pr-5">
-                    <div className="font-bold text-base leading-tight truncate" style={{ color: theme.textPrimary }}>{project.client}</div>
-                    <div className="text-sm mt-0.5 truncate" style={{ color: theme.textSecondary }}>{project.name}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-sm font-bold" style={{ color: colors.badge }}>
+                  <div style={{ width: LABEL_W, flexShrink: 0 }} className="pr-6">
+                    <div className="leading-tight truncate" style={{ color: theme.textPrimary, fontSize: 22, fontWeight: 700 }}>{project.client}</div>
+                    <div className="mt-1 truncate" style={{ color: theme.textSecondary, fontSize: 17 }}>{project.name}</div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="font-bold" style={{ color: colors.badge, fontSize: 16 }}>
                         {daysLeft === 0 ? "Aujourd'hui !" : `J-${daysLeft}`}
                       </span>
                       {project.responsible && (
-                        <span className="text-sm" style={{ color: theme.textMuted }}>· {project.responsible}</span>
+                        <span style={{ color: theme.textMuted, fontSize: 16 }}>· {project.responsible}</span>
                       )}
                     </div>
                   </div>
@@ -232,20 +226,20 @@ function Timeline({ projects, viewMode, dark, theme }) {
 
                     {/* Barre colorée */}
                     <div
-                      className="absolute rounded-2xl flex items-center px-4 overflow-hidden"
+                      className="absolute rounded-lg flex items-center px-5 overflow-hidden"
                       style={{
-                        top: 6, bottom: 6,
+                        top: 8, bottom: 8,
                         left: 0,
-                        width: barDays * COL_W - 8,
+                        width: barDays * COL_W - 10,
                         backgroundColor: colors.bg,
-                        border: `1.5px solid ${colors.border}`,
+                        border: `2px solid ${colors.border}`,
                       }}
                     >
-                      <span className="text-sm font-medium truncate" style={{ color: colors.text }}>
-                        {project.delivery_type && `🚚 ${project.delivery_type}`}
+                      <span className="font-medium truncate" style={{ color: colors.text, fontSize: 17 }}>
+                        {project.delivery_type}
                         {project.description && ` · ${project.description}`}
                       </span>
-                      <span className="ml-auto text-sm font-bold flex-shrink-0 pl-3" style={{ color: colors.badge }}>
+                      <span className="ml-auto font-bold flex-shrink-0 pl-4" style={{ color: colors.badge, fontSize: 17 }}>
                         {formatDate(project.deadline)}
                       </span>
                     </div>
@@ -272,7 +266,7 @@ function CardView({ projects, dark, theme }) {
 
   if (groups.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-xl" style={{ color: theme.textMuted }}>
+      <div className="flex-1 flex items-center justify-center" style={{ color: theme.textMuted, fontSize: 24 }}>
         Aucun projet en cours
       </div>
     )
@@ -280,12 +274,12 @@ function CardView({ projects, dark, theme }) {
 
   return (
     <div
-      className="flex-1 overflow-auto p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 content-start"
+      className="flex-1 overflow-auto p-10 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 content-start"
       style={{ scrollbarWidth: 'thin', scrollbarColor: theme.scrollbar }}
     >
       {groups.map(group => (
-        <div key={group.label} className="space-y-4">
-          <div className="text-sm font-bold uppercase tracking-widest" style={{ color: group.color }}>
+        <div key={group.label} className="space-y-5">
+          <div className="font-bold uppercase tracking-widest" style={{ color: group.color, fontSize: 16 }}>
             {group.label}
           </div>
           {group.items.map(project => {
@@ -294,34 +288,36 @@ function CardView({ projects, dark, theme }) {
             return (
               <div
                 key={project.id}
-                className="rounded-2xl p-5 border"
+                className="rounded-xl p-7 border"
                 style={{ backgroundColor: colors.bg, borderColor: colors.border }}
               >
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between mb-4 gap-3">
                   <div
-                    className="text-sm font-bold px-3 py-1 rounded-full"
-                    style={{ background: colors.badge + '22', color: colors.badge }}
+                    className="font-bold px-4 py-1.5 rounded-md"
+                    style={{ background: colors.badge + '22', color: colors.badge, fontSize: 16 }}
                   >
-                    {daysLeft < 0 ? `En retard de ${Math.abs(daysLeft)}j` :
+                    {daysLeft < 0 ? `Retard ${Math.abs(daysLeft)}j` :
                      daysLeft === 0 ? "Aujourd'hui !" :
                      `J-${daysLeft}`}
                   </div>
-                  <div className="text-sm" style={{ color: theme.textMuted }}>{project.responsible}</div>
+                  {project.responsible && (
+                    <div className="font-semibold" style={{ color: theme.textSecondary, fontSize: 16 }}>{project.responsible}</div>
+                  )}
                 </div>
-                <div className="font-bold text-xl leading-snug" style={{ color: theme.textPrimary }}>{project.client}</div>
-                <div className="text-base mt-1" style={{ color: theme.textSecondary }}>{project.name}</div>
+                <div className="font-bold leading-tight" style={{ color: theme.textPrimary, fontSize: 26 }}>{project.client}</div>
+                <div className="mt-1.5" style={{ color: theme.textSecondary, fontSize: 18 }}>{project.name}</div>
                 {project.description && (
-                  <div className="text-sm mt-1.5" style={{ color: theme.textMuted }}>{project.description}</div>
+                  <div className="mt-2 leading-snug" style={{ color: theme.textMuted, fontSize: 15 }}>{project.description}</div>
                 )}
                 <div
-                  className="mt-4 pt-3 border-t flex items-center justify-between"
+                  className="mt-5 pt-4 border-t flex items-center justify-between"
                   style={{ borderColor: colors.border + '66' }}
                 >
-                  <span className="text-base font-bold" style={{ color: colors.badge }}>
-                    📅 {formatDate(project.deadline)}
+                  <span className="font-bold" style={{ color: colors.badge, fontSize: 19 }}>
+                    {formatDate(project.deadline)}
                   </span>
                   {project.delivery_type && (
-                    <span className="text-sm" style={{ color: theme.textMuted }}>{project.delivery_type}</span>
+                    <span style={{ color: theme.textMuted, fontSize: 15 }}>{project.delivery_type}</span>
                   )}
                 </div>
               </div>
@@ -406,41 +402,32 @@ export default function Display() {
 
       {/* ── Header ── */}
       <header
-        className="flex-shrink-0 px-8 py-4 border-b"
+        className="flex-shrink-0 px-10 py-6 border-b"
         style={{ background: theme.headerBg, borderColor: theme.headerBorder }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-8">
 
-          {/* Gauche : logo + heure */}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2.5">
-              <AtomLogo size={28} />
-              <span className="font-bold text-base tracking-tight" style={{ color: theme.textPrimary }}>amazing lab</span>
+          {/* Gauche : heure + date */}
+          <div className="flex items-baseline gap-6">
+            <div className="font-semibold tabular-nums tracking-tight" style={{ color: theme.textPrimary, fontSize: 56, lineHeight: 1 }}>
+              {timeLabel.slice(0, 5)}
             </div>
-            <div className="w-px h-8" style={{ background: theme.headerBorder }} />
-            <div>
-              <div className="font-bold text-2xl tabular-nums" style={{ color: PINK }}>{timeLabel}</div>
-              <div className="text-sm capitalize mt-0.5" style={{ color: theme.textSecondary }}>{dateLabel}</div>
-            </div>
-            <div className="hidden md:flex items-center gap-2 pl-1">
-              <div className="w-px h-8" style={{ background: theme.headerBorder }} />
-              <div className="text-center px-3">
-                <div className="text-2xl font-bold" style={{ color: theme.textPrimary }}>{projects.length}</div>
-                <div className="text-sm" style={{ color: theme.textMuted }}>projet{projects.length !== 1 ? 's' : ''}</div>
-              </div>
+            <div className="capitalize" style={{ color: theme.textSecondary, fontSize: 22, fontWeight: 500 }}>
+              {dateLabel}
             </div>
           </div>
 
-          {/* Centre */}
-          <div className="text-center hidden md:block">
-            <div className="font-bold text-lg tracking-widest" style={{ color: theme.textSecondary }}>PLANNING ATELIER</div>
+          {/* Centre : compteur projets */}
+          <div className="hidden md:flex items-baseline gap-3">
+            <div className="font-semibold tabular-nums" style={{ color: theme.textPrimary, fontSize: 32, lineHeight: 1 }}>{projects.length}</div>
+            <div style={{ color: theme.textMuted, fontSize: 18 }}>projet{projects.length !== 1 ? 's' : ''} actif{projects.length !== 1 ? 's' : ''}</div>
           </div>
 
           {/* Droite : contrôles */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
 
             {/* Sélecteur de vue */}
-            <div className="flex rounded-2xl p-1 gap-0.5" style={{ background: theme.toggleBg }}>
+            <div className="flex rounded-lg p-1 gap-1" style={{ background: theme.toggleBg }}>
               {[
                 { key: 'weeks', label: '2 sem.' },
                 { key: 'month', label: 'Mois' },
@@ -449,10 +436,10 @@ export default function Display() {
                 <button
                   key={v.key}
                   onClick={() => setViewMode(v.key)}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                  className="px-4 py-2 rounded-md font-semibold transition-all"
                   style={viewMode === v.key
-                    ? { background: PINK, color: '#fff' }
-                    : { color: theme.btnText, background: 'transparent' }
+                    ? { background: theme.accent, color: dark ? '#000' : '#fff', fontSize: 16 }
+                    : { color: theme.btnText, background: 'transparent', fontSize: 16 }
                   }
                 >
                   {v.label}
@@ -463,32 +450,32 @@ export default function Display() {
             {/* Toggle jour/nuit */}
             <button
               onClick={toggleTheme}
-              className="px-3.5 py-2.5 rounded-2xl text-lg transition-colors"
-              style={{ background: theme.btnBg, color: theme.btnText }}
+              className="w-12 h-12 flex items-center justify-center rounded-lg transition-colors"
+              style={{ background: theme.btnBg, color: theme.btnText, fontSize: 22 }}
               title={dark ? 'Passer en mode jour' : 'Passer en mode nuit'}
             >
-              {dark ? '☀️' : '🌙'}
+              {dark ? '☀' : '☾'}
             </button>
 
             {/* Refresh */}
             <button
               onClick={fetchProjects}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-sm font-medium transition-colors"
-              style={{ background: theme.btnBg, color: theme.btnText }}
+              className="flex items-center gap-2 px-4 py-3 rounded-lg font-semibold transition-colors"
+              style={{ background: theme.btnBg, color: theme.btnText, fontSize: 16 }}
               title="Actualiser maintenant"
             >
-              <span className="text-base">↻</span>
+              <span>↻</span>
               <span className="tabular-nums">{countdown}s</span>
             </button>
 
             {/* Admin */}
             <Link
               href="/"
-              className="px-3.5 py-2.5 rounded-2xl text-base transition-colors"
-              style={{ background: theme.btnBg, color: theme.btnText }}
+              className="w-12 h-12 flex items-center justify-center rounded-lg transition-colors"
+              style={{ background: theme.btnBg, color: theme.btnText, fontSize: 20 }}
               title="Interface admin"
             >
-              ⚙️
+              ⚙
             </Link>
           </div>
         </div>
@@ -503,12 +490,12 @@ export default function Display() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="text-4xl mb-4">⚠️</div>
-            <div className="text-xl font-bold mb-2" style={{ color: PINK }}>Erreur de chargement</div>
-            <div className="text-base mb-6" style={{ color: theme.textSecondary }}>{fetchError}</div>
+            <div className="font-bold mb-2" style={{ color: theme.textPrimary, fontSize: 22 }}>Erreur de chargement</div>
+            <div className="mb-6" style={{ color: theme.textSecondary, fontSize: 17 }}>{fetchError}</div>
             <button
               onClick={fetchProjects}
-              className="px-6 py-3 rounded-2xl font-semibold text-white"
-              style={{ background: PINK }}
+              className="px-6 py-3 rounded-lg font-semibold"
+              style={{ background: theme.accent, color: dark ? '#000' : '#fff', fontSize: 16 }}
             >
               Réessayer
             </button>
@@ -522,27 +509,27 @@ export default function Display() {
 
       {/* ── Footer ── */}
       <footer
-        className="flex-shrink-0 px-8 py-3 flex items-center justify-between border-t"
+        className="flex-shrink-0 px-10 py-4 flex items-center justify-between border-t"
         style={{ background: theme.headerBg, borderColor: theme.headerBorder }}
       >
-        <div className="text-sm" style={{ color: theme.legendText }}>
+        <div style={{ color: theme.legendText, fontSize: 15 }}>
           Mis à jour : {lastRefresh ? lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}
         </div>
-        <div className="flex items-center gap-5 text-sm" style={{ color: theme.legendText }}>
+        <div className="flex items-center gap-6" style={{ color: theme.legendText, fontSize: 15 }}>
           <span className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#22c55e' }} />
+            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#22c55e' }} />
             &gt; 2 semaines
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#f59e0b' }} />
+            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#f59e0b' }} />
             &lt; 2 semaines
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#ef4444' }} />
+            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#ef4444' }} />
             &lt; 1 semaine
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#7f1d1d' }} />
+            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#7f1d1d' }} />
             En retard
           </span>
         </div>

@@ -3,8 +3,8 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import { useResponsibles } from '../lib/useResponsibles'
 
-const RESPONSIBLES  = ['Arnaud', 'Gabin', 'Arnaud & Gabin', 'Sous-traitant']
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
 const COLOR_OPTIONS  = [
   { value: null,      label: 'Auto (selon urgence)', icon: '🤖' },
@@ -15,8 +15,21 @@ const COLOR_OPTIONS  = [
   { value: '#8b5cf6', label: 'Violet', icon: '🟣' },
   { value: '#64748b', label: 'Gris',   icon: '⚫' },
 ]
-const PINK = '#FF4D6D'
-const PERSON_COLORS = { Arnaud: '#3b82f6', Gabin: '#8b5cf6', Guillaume: '#FF4D6D', 'Sous-traitant': '#64748b' }
+const PINK = '#111827'
+const PERSON_COLORS = { Arnaud: '#3b82f6', Gabin: '#8b5cf6', Guillaume: '#111827', 'Sous-traitant': '#64748b', 'non défini': '#9ca3af' }
+
+function colorForName(name) {
+  if (!name) return '#9ca3af'
+  if (PERSON_COLORS[name]) return PERSON_COLORS[name]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return `hsl(${Math.abs(hash) % 360}, 45%, 48%)`
+}
+
+function initials(name) {
+  if (!name) return '?'
+  return name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -436,13 +449,14 @@ function ProjectTasksModal({ project, tasks, onClose }) {
 
 const emptyForm = {
   name: '', client: '', description: '', deadline: '',
-  delivery_type: 'Livraison', responsible: 'Arnaud', color_override: null, notes: '',
+  delivery_type: 'Livraison', responsible: 'non défini', color_override: null, notes: '',
 }
 
 // ─── Page Admin ───────────────────────────────────────────────────────────────
 
 export default function Admin() {
   const { user, signOut } = useAuth()
+  const { responsibles } = useResponsibles()
 
   const [projects, setProjects]         = useState([])
   const [tasks, setTasks]               = useState([])
@@ -553,7 +567,7 @@ export default function Admin() {
       description: project.description || '',
       deadline: project.deadline,
       delivery_type: project.delivery_type || 'Livraison',
-      responsible: project.responsible || 'Arnaud',
+      responsible: project.responsible || 'non défini',
       color_override: project.color_override || null,
       notes: isFromTodoist(project) ? '' : (project.notes || ''),
     })
@@ -573,7 +587,7 @@ export default function Admin() {
 
   const activeProjects   = projects.filter(p => p.status === 'active').sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
   const archivedProjects = projects.filter(p => p.status !== 'active')
-  const inputClass = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none transition-colors bg-white"
+  const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 transition-colors bg-white"
 
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
@@ -585,7 +599,7 @@ export default function Admin() {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <style>{`
           body { font-family: 'Inter', sans-serif; }
-          input:focus, select:focus, textarea:focus { border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; }
+          input:focus, select:focus, textarea:focus { border-color: #9ca3af !important; box-shadow: 0 0 0 3px rgba(17,24,39,0.06) !important; }
           * { -webkit-tap-highlight-color: transparent; }
           button, a { touch-action: manipulation; }
           @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
@@ -594,11 +608,11 @@ export default function Admin() {
       </Head>
 
       {/* Header */}
-      <NavBar title="projets">
+      <NavBar title="Projets">
         <button onClick={() => { resetForm(); setShowForm(true) }}
-          style={{ background: PINK, color: '#fff' }}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full hover:opacity-90 transition-opacity">
-          <span className="text-lg leading-none">+</span><span className="hidden sm:inline"> Nouveau projet</span>
+          style={{ background: '#111827', color: '#fff' }}
+          className="px-4 py-2 text-sm font-medium rounded-md hover:opacity-90 transition-opacity">
+          Nouveau projet
         </button>
       </NavBar>
 
@@ -610,23 +624,21 @@ export default function Admin() {
         </div>
       )}
 
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8">
+      <main className="w-full px-10 py-10 space-y-12" style={{ maxWidth: 1800, margin: '0 auto' }}>
 
         {/* Formulaire Add/Edit */}
         {showForm && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-semibold text-gray-900 text-base">
-                {editingProject
-                  ? <><span style={{ color: PINK }}>Modifier</span> — {editingProject.name}</>
-                  : <><span style={{ color: PINK }}>Nouveau</span> projet</>}
+                {editingProject ? `Modifier — ${editingProject.name}` : 'Nouveau projet'}
               </h2>
               <button onClick={resetForm}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition-colors text-xl">
+                className="w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 transition-colors text-xl">
                 ×
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6">
+            <form onSubmit={handleSubmit} className="p-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Nom du projet *</label>
@@ -660,7 +672,7 @@ export default function Admin() {
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Responsable</label>
                   <select value={form.responsible} onChange={e => handleFieldChange('responsible', e.target.value)} className={inputClass}>
-                    {RESPONSIBLES.map(r => <option key={r}>{r}</option>)}
+                    {responsibles.map(r => <option key={r}>{r}</option>)}
                   </select>
                 </div>
                 <div>
@@ -677,13 +689,13 @@ export default function Admin() {
                     placeholder="Info logistique, remarques..." className={inputClass} />
                 </div>
               </div>
-              <div className="mt-5 flex items-center gap-3">
+              <div className="mt-8 flex items-center gap-3">
                 <button type="submit" disabled={saving}
-                  style={{ background: PINK, color: '#fff' }}
-                  className="px-6 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
-                  {saving ? 'Enregistrement...' : editingProject ? 'Mettre à jour' : 'Créer le projet'}
+                  style={{ background: '#111827', color: '#fff' }}
+                  className="px-5 py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
+                  {saving ? 'Enregistrement…' : editingProject ? 'Mettre à jour' : 'Créer le projet'}
                 </button>
-                <button type="button" onClick={resetForm} className="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-800">
+                <button type="button" onClick={resetForm} className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800">
                   Annuler
                 </button>
               </div>
@@ -693,134 +705,143 @@ export default function Admin() {
 
         {/* Projets actifs */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-gray-900 text-lg">
-              Projets en cours
-              <span className="ml-2 text-sm font-normal text-gray-400">({activeProjects.length})</span>
-            </h2>
+          <div className="flex items-baseline gap-3 mb-8">
+            <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 28 }}>Projets en cours</h2>
+            <span className="text-base text-gray-400">{activeProjects.length}</span>
           </div>
 
           {/* Bannière Todoist */}
           {activeProjects.some(needsCompletion) && (
-            <div className="mb-4 px-4 py-3 rounded-2xl border flex items-center gap-3"
+            <div className="mb-6 px-5 py-4 rounded-md border"
               style={{ background: '#fff8f0', borderColor: '#fed7aa' }}>
-              <span className="text-lg">🔔</span>
               <p className="text-sm text-orange-800">
-                <strong>{activeProjects.filter(needsCompletion).length} projet{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''}</strong> importé{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''} depuis Todoist — clique sur ✏️ pour compléter les infos.
+                <strong>{activeProjects.filter(needsCompletion).length} projet{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''}</strong> importé{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''} depuis Todoist — clique sur Modifier pour compléter les infos.
               </p>
             </div>
           )}
 
           {loading ? (
-            <div className="text-center py-16 text-gray-400 text-sm">Chargement...</div>
+            <div className="text-center py-20 text-gray-400 text-sm">Chargement…</div>
           ) : activeProjects.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-3xl border border-gray-100">
-              <div className="text-4xl mb-3">🛠️</div>
+            <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
               <p className="text-gray-400 text-sm">Aucun projet actif.</p>
             </div>
           ) : (
-            // ─── Desktop : grille 3 colonnes, Mobile : liste ───────────────
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
               {activeProjects.map(project => {
-                const color      = getProjectColor(project)
+                const color       = getProjectColor(project)
                 const fromTodoist = isFromTodoist(project)
                 const incomplete  = needsCompletion(project)
-                const taskCount   = tasks.filter(t => t.project_id === project.id && t.status === 'active').length
-                const nextTask    = tasks
-                  .filter(t => t.project_id === project.id && t.status === 'active')
+                const allTasks    = tasks.filter(t => t.project_id === project.id)
+                const doneCount   = allTasks.filter(t => t.status === 'completed').length
+                const totalCount  = allTasks.length
+                const progress    = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
+                const respColor   = colorForName(project.responsible)
+                const nextTask    = allTasks
+                  .filter(t => t.status === 'active')
                   .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
 
                 return (
                   <div key={project.id}
-                    className="bg-white rounded-2xl border hover:shadow-sm transition-all overflow-hidden flex flex-col"
-                    style={{ borderColor: incomplete ? '#fed7aa' : '#f3f4f6' }}>
-                    <div className="flex items-stretch flex-1">
-                      {/* Barre couleur */}
-                      <div className="w-1 flex-shrink-0 rounded-l-2xl" style={{ backgroundColor: color }} />
+                    className="group bg-white rounded-xl border hover:border-gray-300 hover:shadow-sm transition-all overflow-hidden flex flex-col"
+                    style={{ borderColor: incomplete ? '#fed7aa' : '#e5e7eb' }}>
 
-                      {/* Contenu */}
-                      <div className="flex-1 px-4 py-4 min-w-0">
-                        {/* Ligne 1: nom + actions */}
-                        <div className="flex items-start justify-between gap-2">
-                          <Link href={`/projects/${project.id}`} className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-gray-900 text-sm leading-tight">{project.name}</span>
-                              {fromTodoist && (
-                                <span className="px-1.5 py-0.5 rounded-full text-xs font-medium"
-                                  style={{ background: '#e8f5e9', color: '#2e7d32' }}>Todoist</span>
-                              )}
-                              {taskCount > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold"
-                                  style={{ background: PINK + '18', color: PINK }}>
-                                  {taskCount} tâche{taskCount > 1 ? 's' : ''}
-                                </span>
-                              )}
-                            </div>
-                            <p className={`text-sm mt-0.5 ${incomplete ? 'font-semibold' : 'text-gray-500'}`}
-                              style={incomplete ? { color: '#ea580c' } : {}}>
-                              {project.client}
-                            </p>
-                            {project.description && (
-                              <p className="text-xs text-gray-400 mt-0.5 leading-snug">{project.description}</p>
-                            )}
-                          </Link>
+                    {/* Urgency stripe */}
+                    <div className="h-1.5 w-full" style={{ background: color }} />
 
-                          {/* Actions */}
-                          <div className="flex items-center gap-0.5 flex-shrink-0">
-                            <button onClick={() => handleEdit(project)} title="Modifier"
-                              className="p-2 text-gray-300 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-colors text-sm">✏️</button>
-                            <button onClick={() => handleArchive(project)} title="Archiver"
-                              className="p-2 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-xl transition-colors text-sm">✅</button>
-                            <button onClick={() => handleDelete(project)} title="Supprimer"
-                              className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm">🗑️</button>
-                          </div>
+                    <Link href={`/projects/${project.id}`} className="block px-7 py-6 flex-1 hover:bg-gray-50/50 transition-colors">
+                      {/* Header: title + responsable avatar */}
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 18 }}>
+                            {project.name}
+                          </h3>
+                          <p className={`mt-1 ${incomplete ? 'font-medium' : 'text-gray-500'}`}
+                            style={{ fontSize: 14, ...(incomplete ? { color: '#ea580c' } : {}) }}>
+                            {project.client}
+                          </p>
                         </div>
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+                          style={{ background: respColor, fontSize: 13, letterSpacing: '-0.02em' }}
+                          title={project.responsible}>
+                          {initials(project.responsible)}
+                        </div>
+                      </div>
 
-                        {/* Ligne 2: chips d'info */}
-                        <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                          <span className="text-xs text-gray-500">
-                            📅 <strong>{formatDate(project.deadline)}</strong>
-                          </span>
+                      {project.description && (
+                        <p className="text-gray-500 leading-relaxed line-clamp-2 mb-4" style={{ fontSize: 13 }}>{project.description}</p>
+                      )}
+
+                      {/* Deadline — proeminent */}
+                      <div className="mb-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="font-semibold text-gray-900" style={{ fontSize: 15 }}>{formatDate(project.deadline)}</span>
                           {!incomplete && <DaysChip deadline={project.deadline} />}
                           {incomplete && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-bold"
-                              style={{ background: '#fff7ed', color: '#ea580c' }}>À compléter</span>
+                            <span className="text-xs font-medium" style={{ color: '#ea580c' }}>À compléter</span>
                           )}
-                          <button
-                            onClick={e => { e.stopPropagation(); setLogisticsProject(project) }}
-                            className="text-xs rounded-full px-2 py-0.5 transition-colors"
-                            style={{
-                              background: project.logistics_address ? '#f0fdf4' : '#f9fafb',
-                              color: project.logistics_address ? '#16a34a' : '#9ca3af',
-                              border: project.logistics_address ? '1px solid #bbf7d0' : '1px solid transparent',
-                            }}>
-                            🚚 {project.delivery_type}{project.logistics_address && ' ✓'}
-                          </button>
-                          {project.disassembly_date && (
-                            <span className="text-xs rounded-full px-2 py-0.5"
-                              style={{ background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
-                              🔧 {formatDateShort(project.disassembly_date)}
-                            </span>
-                          )}
-                          <span className="text-xs text-gray-400">👤 {project.responsible}</span>
                         </div>
+                      </div>
 
-                        {/* Ligne 3: prochaine tâche */}
-                        {nextTask && (
-                          <div className="flex items-center gap-2 mt-2.5 pt-2 border-t" style={{ borderColor: '#f3f4f6' }}>
-                            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                              style={{ background: PERSON_COLORS[nextTask.responsible] || '#64748b' }} />
-                            <span className="text-xs text-gray-500 flex-1 truncate">{nextTask.title}</span>
-                            <span className="text-xs font-semibold flex-shrink-0"
-                              style={{ color: PERSON_COLORS[nextTask.responsible] || '#64748b' }}>
-                              {nextTask.responsible}
-                            </span>
-                            {nextTask.execution_date && (
-                              <span className="text-xs text-gray-300 flex-shrink-0">{formatDateShort(nextTask.execution_date)}</span>
-                            )}
-                          </div>
+                      {/* Meta line */}
+                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-5" style={{ fontSize: 12 }}>
+                        <span className="font-semibold" style={{ color: respColor }}>{project.responsible || 'non défini'}</span>
+                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-500">{project.delivery_type}</span>
+                        {fromTodoist && (
+                          <>
+                            <span className="text-gray-300">·</span>
+                            <span style={{ color: '#16a34a' }}>Todoist</span>
+                          </>
                         )}
                       </div>
+
+                      {/* Progress bar — bigger */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2" style={{ fontSize: 12 }}>
+                          <span className="text-gray-500">
+                            {totalCount === 0
+                              ? 'Aucune tâche'
+                              : `${doneCount} / ${totalCount} tâche${totalCount > 1 ? 's' : ''}`}
+                          </span>
+                          <span className="font-semibold tabular-nums" style={{ color: totalCount === 0 ? '#9ca3af' : '#111827', fontSize: 13 }}>
+                            {totalCount === 0 ? '—' : `${progress}%`}
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
+                          <div className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${progress}%`,
+                              background: totalCount === 0 ? '#e5e7eb' : progress === 100 ? '#22c55e' : '#111827',
+                            }} />
+                        </div>
+                      </div>
+
+                      {/* Next task */}
+                      {nextTask && (
+                        <div className="mt-5 pt-4 border-t flex items-center gap-2" style={{ borderColor: '#f3f4f6' }}>
+                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ background: colorForName(nextTask.responsible) }} />
+                          <span className="text-gray-600 flex-1 truncate" style={{ fontSize: 12 }}>{nextTask.title}</span>
+                          <span className="text-gray-400 flex-shrink-0" style={{ fontSize: 11 }}>
+                            {nextTask.responsible}{nextTask.execution_date ? ` · ${formatDateShort(nextTask.execution_date)}` : ''}
+                          </span>
+                        </div>
+                      )}
+                    </Link>
+
+                    {/* Actions — toujours visibles mais discrètes */}
+                    <div className="px-7 py-3 flex items-center gap-3 border-t" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
+                      <button onClick={() => setLogisticsProject(project)}
+                        className="text-gray-500 hover:text-gray-900 transition-colors">
+                        Logistique{project.logistics_address && ' ✓'}
+                      </button>
+                      <span className="text-gray-200">·</span>
+                      <button onClick={() => handleEdit(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Modifier</button>
+                      <span className="ml-auto text-gray-200">·</span>
+                      <button onClick={() => handleArchive(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Archiver</button>
+                      <span className="text-gray-200">·</span>
+                      <button onClick={() => handleDelete(project)} className="text-gray-500 hover:text-red-600 transition-colors">Supprimer</button>
                     </div>
                   </div>
                 )
@@ -833,30 +854,23 @@ export default function Admin() {
         {archivedProjects.length > 0 && (
           <div>
             <button onClick={() => setShowArchived(v => !v)}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-4">
-              <span>{showArchived ? '▾' : '▸'}</span>
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-5">
+              <span className="text-xs">{showArchived ? '▾' : '▸'}</span>
               Projets archivés ({archivedProjects.length})
             </button>
             {showArchived && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2">
+              <div className="space-y-2">
                 {archivedProjects.map(project => (
-                  <div key={project.id} className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden opacity-50 hover:opacity-70 transition-opacity">
-                    <div className="flex items-stretch">
-                      <div className="w-1 flex-shrink-0 rounded-l-2xl bg-gray-200" />
-                      <div className="flex-1 px-4 py-3 flex items-center justify-between">
-                        <div>
-                          <span className="font-medium text-gray-500 text-sm">{project.name}</span>
-                          <span className="mx-2 text-gray-300">·</span>
-                          <span className="text-sm text-gray-400">{project.client}</span>
-                          <span className="ml-3 text-xs text-gray-400">{formatDate(project.deadline)}</span>
-                        </div>
-                        <div className="flex gap-1">
-                          <button onClick={() => handleRestore(project)} title="Remettre en cours"
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors text-sm">↩️</button>
-                          <button onClick={() => handleDelete(project)} title="Supprimer définitivement"
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm">🗑️</button>
-                        </div>
-                      </div>
+                  <div key={project.id} className="bg-white rounded-md border border-gray-100 px-5 py-3 flex items-center justify-between hover:border-gray-200 transition-colors">
+                    <div className="flex items-baseline gap-3 text-sm">
+                      <span className="font-medium text-gray-600">{project.name}</span>
+                      <span className="text-gray-400">{project.client}</span>
+                      <span className="text-xs text-gray-400">{formatDate(project.deadline)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <button onClick={() => handleRestore(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Restaurer</button>
+                      <span className="text-gray-200">·</span>
+                      <button onClick={() => handleDelete(project)} className="text-gray-500 hover:text-red-600 transition-colors">Supprimer</button>
                     </div>
                   </div>
                 ))}
@@ -868,7 +882,7 @@ export default function Admin() {
         {/* Footer */}
         <div className="pt-4 pb-8 flex items-center justify-center gap-2 text-xs text-gray-300">
           <AtomLogo size={16} />
-          <span>amazing lab — maze project</span>
+          <span>maze project</span>
         </div>
       </main>
 

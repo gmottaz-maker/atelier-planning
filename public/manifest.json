@@ -1,11 +1,11 @@
 {
-  "name": "Amazing Lab Planning",
-  "short_name": "AL Planning",
+  "name": "Maze Project",
+  "short_name": "Maze Project",
   "description": "Gestionnaire de projets et tâches — Amazing Lab",
   "start_url": "/tasks",
   "display": "standalone",
   "background_color": "#fafafa",
-  "theme_color": "#FF4D6D",
+  "theme_color": "#111827",
   "orientation": "portrait",
   "icons": [
     {

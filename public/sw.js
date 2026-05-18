@@ -1,4 +1,4 @@
-// Amazing Lab Planning — Service Worker
+// Maze Project — Service Worker
 // Gère les push notifications et le cache PWA
 
 const CACHE_NAME = 'al-planning-v1'

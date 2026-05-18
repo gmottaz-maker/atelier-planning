@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../lib/supabase'
 
-const PINK = '#FF4D6D'
+const PINK = '#111827'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -36,7 +36,7 @@ export default function Login() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6"
       style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
       <Head>
-        <title>Connexion — Amazing Lab</title>
+        <title>Connexion — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
