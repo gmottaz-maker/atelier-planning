@@ -4,6 +4,8 @@ import { useState, useEffect, createContext, useContext } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar'
+import BottomNav, { BOTTOM_NAV_HEIGHT } from '../components/BottomNav'
+import useIsMobile from '../lib/useIsMobile'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -25,6 +27,7 @@ export default function App({ Component, pageProps }) {
   const [user, setUser]       = useState(null)   // { id, email, name }
   const [authReady, setAuthReady] = useState(false)
   const router = useRouter()
+  const isMobile = useIsMobile()
 
   // ─── Service worker ────────────────────────────────────────────────────
   useEffect(() => {
@@ -108,6 +111,7 @@ export default function App({ Component, pageProps }) {
     <AuthContext.Provider value={{ user, signOut: () => supabase.auth.signOut() }}>
       <Head>
         <link rel="manifest" href="/manifest.json" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -117,10 +121,17 @@ export default function App({ Component, pageProps }) {
       </Head>
       {showChrome ? (
         <>
-          <Sidebar />
-          <div style={{ marginLeft: SIDEBAR_WIDTH, minHeight: '100vh' }}>
+          {!isMobile && <Sidebar />}
+          <div
+            style={{
+              marginLeft: isMobile ? 0 : SIDEBAR_WIDTH,
+              minHeight: '100vh',
+              paddingBottom: isMobile ? `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom))` : 0,
+            }}
+          >
             <Component {...pageProps} />
           </div>
+          {isMobile && <BottomNav />}
         </>
       ) : (
         <Component {...pageProps} />

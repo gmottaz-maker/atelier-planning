@@ -624,12 +624,12 @@ export default function Admin() {
         </div>
       )}
 
-      <main className="w-full px-10 py-10 space-y-12" style={{ maxWidth: 1800, margin: '0 auto' }}>
+      <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-8 md:space-y-12" style={{ maxWidth: 1800, margin: '0 auto' }}>
 
         {/* Formulaire Add/Edit */}
         {showForm && (
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-5 md:px-8 py-4 md:py-5 border-b border-gray-100 flex items-center justify-between">
               <h2 className="font-semibold text-gray-900 text-base">
                 {editingProject ? `Modifier — ${editingProject.name}` : 'Nouveau projet'}
               </h2>
@@ -638,7 +638,7 @@ export default function Admin() {
                 ×
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-8">
+            <form onSubmit={handleSubmit} className="p-5 md:p-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Nom du projet *</label>
@@ -706,7 +706,7 @@ export default function Admin() {
         {/* Projets actifs */}
         <div>
           <div className="flex items-baseline gap-3 mb-8">
-            <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 28 }}>Projets en cours</h2>
+            <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>Projets en cours</h2>
             <span className="text-base text-gray-400">{activeProjects.length}</span>
           </div>
 

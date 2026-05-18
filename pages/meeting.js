@@ -125,7 +125,7 @@ export default function MeetingPage() {
         </button>
       </NavBar>
 
-      <main className="max-w-5xl mx-auto px-8 py-10 meeting-doc">
+      <main className="max-w-5xl mx-auto px-4 md:px-8 py-6 md:py-10 meeting-doc">
         {!generated ? (
           <EmptyState onGenerate={generate} loading={loading} />
         ) : (

@@ -1317,16 +1317,16 @@ export default function ProjectPage() {
         <Link href="/" style={{ fontSize: 12, color: '#6b7280', textDecoration: 'none' }}>← Projets</Link>
       </NavBar>
 
-      <div className="w-full px-10 py-10" style={{ maxWidth: 1800, margin: '0 auto' }}>
+      <div className="w-full px-4 md:px-10 py-6 md:py-10" style={{ maxWidth: 1800, margin: '0 auto' }}>
 
         {/* ── Hero header ── */}
-        <div className="mb-12 bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="mb-8 md:mb-12 bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="h-2 w-full" style={{ background: color }} />
-          <div className="px-10 py-8">
-            <div className="flex items-start gap-8">
+          <div className="px-5 md:px-10 py-6 md:py-8">
+            <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8">
               <div className="flex-1 min-w-0">
                 <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Projet</p>
-                <h1 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 36 }}>
+                <h1 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 'clamp(24px, 6vw, 36px)' }}>
                   {project.name}
                 </h1>
                 {project.client && (
@@ -1364,7 +1364,7 @@ export default function ProjectPage() {
               </div>
 
               {/* Right side: responsable + progress */}
-              <div className="flex flex-col items-stretch gap-5 flex-shrink-0" style={{ minWidth: 260 }}>
+              <div className="flex flex-col items-stretch gap-5 flex-shrink-0 w-full md:w-auto" style={{ minWidth: 260 }}>
                 {project.responsible && (
                   <div className="flex items-center gap-3 justify-end">
                     <div className="text-right">

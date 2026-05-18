@@ -756,12 +756,12 @@ export default function SchedulePage() {
         </button>
       </NavBar>
 
-      <div className="w-full px-10 py-10 space-y-10" style={{ maxWidth: 1800, margin: '0 auto' }}>
+      <div className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6 md:space-y-10" style={{ maxWidth: 1800, margin: '0 auto' }}>
 
         {/* ── Header ── */}
         <header className="flex items-baseline justify-between">
           <div>
-            <h1 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 28 }}>
+            <h1 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>
               Horaires {isAdmin && selectedUser ? `· ${selectedUser}` : ''}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -771,7 +771,7 @@ export default function SchedulePage() {
         </header>
 
         {/* ── Stats cards ── */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Congés restants"
             value={vacationLeft % 1 === 0 ? `${vacationLeft}j` : `${vacationLeft.toFixed(1)}j`}

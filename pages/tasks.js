@@ -867,7 +867,7 @@ export default function Tasks() {
       <button
         onClick={() => { setEditingTask(null); setShowForm(true) }}
         className="fixed right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-2xl font-light active:scale-95 md:hidden"
-        style={{ background: PINK, bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
+        style={{ background: PINK, bottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
         +
       </button>
 

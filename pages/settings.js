@@ -39,7 +39,7 @@ export default function SettingsPage() {
 
       <NavBar title="Paramètres" />
 
-      <div className="max-w-3xl mx-auto px-8 py-10 space-y-10">
+      <div className="max-w-3xl mx-auto px-4 md:px-8 py-6 md:py-10 space-y-8 md:space-y-10">
 
         {/* Compte */}
         <section>
