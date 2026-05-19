@@ -32,21 +32,25 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     const {
-      name, client, description, deadline, delivery_type, responsible, color_override, notes, status,
+      name, client, description, short_description, deadline, delivery_type, responsible, color_override, notes, status,
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date, disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
       logistics_data,
       site_visit_data,
       site_visit_summary,
+      kdrive_folder_id,
     } = req.body
 
     const payload = {
-      name, client, description, deadline, delivery_type, responsible, color_override, notes, status,
+      name, client, description, short_description, delivery_type, responsible, color_override, notes, status,
+      deadline: deadline || null,
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date: disassembly_date || null,
       disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
       updated_at: new Date().toISOString(),
     }
+
+    if (kdrive_folder_id !== undefined) payload.kdrive_folder_id = kdrive_folder_id || null
 
     if (site_visit_data !== undefined) payload.site_visit_data = site_visit_data
     if (site_visit_summary !== undefined) payload.site_visit_summary = site_visit_summary

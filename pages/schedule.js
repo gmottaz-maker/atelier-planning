@@ -1774,7 +1774,15 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Photo du reçu</label>
               <label
                 className="block w-full rounded-md border border-dashed cursor-pointer overflow-hidden transition-colors"
-                style={{ borderColor: receiptPreview ? '#bbf7d0' : '#e5e7eb', background: receiptPreview ? '#f0fdf4' : '#fafafa', minHeight: 84 }}>
+                style={{ borderColor: receiptPreview ? '#bbf7d0' : '#e5e7eb', background: receiptPreview ? '#f0fdf4' : '#fafafa', minHeight: 84 }}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#111827' }}
+                onDragLeave={e => { e.currentTarget.style.borderColor = receiptPreview ? '#bbf7d0' : '#e5e7eb' }}
+                onDrop={e => {
+                  e.preventDefault()
+                  e.currentTarget.style.borderColor = receiptPreview ? '#bbf7d0' : '#e5e7eb'
+                  const file = e.dataTransfer.files?.[0]
+                  if (file && file.type.startsWith('image/')) onReceiptFile(file)
+                }}>
                 <input
                   type="file"
                   accept="image/*"

@@ -987,6 +987,14 @@ export default function ProjectPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
+  // Updates state
+  const [updates, setUpdates] = useState([])
+  const [newUpdate, setNewUpdate] = useState('')
+  const [newUpdateImage, setNewUpdateImage] = useState(null) // { base64, mime_type, filename, preview }
+  const [postingUpdate, setPostingUpdate] = useState(false)
+  const [updateError, setUpdateError] = useState('')
+  const [updateDragging, setUpdateDragging] = useState(false)
+
   // Site visit state
   const EMPTY_VISIT = {
     date: '', participants: [],
@@ -1009,7 +1017,9 @@ export default function ProjectPage() {
       fetch(`/api/projects/${id}`).then(r => r.json()),
       fetch('/api/tasks', { headers: { 'x-actor': currentUser } }).then(r => r.json()),
       fetch(`/api/projects/${id}/files`).then(r => r.json()),
-    ]).then(([proj, allTasks, fileList]) => {
+      fetch(`/api/projects/${id}/updates`).then(r => r.json()),
+    ]).then(([proj, allTasks, fileList, updateList]) => {
+      if (Array.isArray(updateList)) setUpdates(updateList)
       if (proj && !proj.error) {
         setProject(proj)
         setLogistics(initLogistics(proj))
@@ -1231,6 +1241,78 @@ export default function ProjectPage() {
     setSummaryLoading(false)
   }
 
+  // ── Updates helpers ──────────────────────────────────────────────────────
+  async function pickUpdateImage(file) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setUpdateError('Image uniquement'); return }
+    if (file.size > 10 * 1024 * 1024) { setUpdateError('Image trop grande (max 10 MB)'); return }
+    setUpdateError('')
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = e => resolve(e.target.result)
+      r.onerror = reject
+      r.readAsDataURL(file)
+    })
+    setNewUpdateImage({
+      base64: dataUrl.split(',')[1],
+      mime_type: file.type,
+      filename: `update_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+      preview: dataUrl,
+    })
+  }
+
+  async function postUpdate() {
+    if (!newUpdate.trim()) return
+    setPostingUpdate(true)
+    setUpdateError('')
+    try {
+      const body = {
+        author: currentUser || 'Inconnu',
+        content: newUpdate.trim(),
+        image: newUpdateImage ? {
+          base64: newUpdateImage.base64,
+          mime_type: newUpdateImage.mime_type,
+          filename: newUpdateImage.filename,
+        } : null,
+      }
+      const r = await fetch(`/api/projects/${id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await r.json()
+      if (data.error) { setUpdateError(data.error); return }
+      setUpdates(prev => [data, ...prev])
+      setNewUpdate('')
+      setNewUpdateImage(null)
+    } catch (e) {
+      setUpdateError('Erreur lors de la publication')
+    } finally {
+      setPostingUpdate(false)
+    }
+  }
+
+  async function deleteUpdate(updateId) {
+    if (!confirm('Supprimer cette mise à jour ?')) return
+    setUpdates(prev => prev.filter(u => u.id !== updateId))
+    await fetch(`/api/projects/${id}/updates`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updateId }),
+    })
+  }
+
+  function fmtRelative(iso) {
+    const d = new Date(iso)
+    const diff = (Date.now() - d.getTime()) / 1000
+    if (diff < 60)      return `à l'instant`
+    if (diff < 3600)    return `il y a ${Math.floor(diff / 60)} min`
+    if (diff < 86400)   return `il y a ${Math.floor(diff / 3600)} h`
+    if (diff < 172800)  return `hier`
+    if (diff < 604800)  return `il y a ${Math.floor(diff / 86400)} j`
+    return d.toLocaleDateString('fr-CH', { day: '2-digit', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })
+  }
+
   // ── File helpers ─────────────────────────────────────────────────────────
   async function uploadFile(file) {
     const ALLOWED = ['image/jpeg','image/png','image/gif','image/webp','application/pdf']
@@ -1412,6 +1494,111 @@ export default function ProjectPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* ── Mises à jour ── */}
+        <div className="mb-8 md:mb-12">
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Mises à jour</h2>
+            <span className="text-xs text-gray-500">{updates.length} note{updates.length > 1 ? 's' : ''}</span>
+          </div>
+
+          {/* Form */}
+          <div
+            className="bg-white rounded-2xl border p-4 md:p-5 mb-4 transition-colors"
+            style={{ borderColor: updateDragging ? '#111827' : '#e5e7eb', background: updateDragging ? '#f9fafb' : 'white' }}
+            onDragOver={e => { e.preventDefault(); setUpdateDragging(true) }}
+            onDragLeave={() => setUpdateDragging(false)}
+            onDrop={e => {
+              e.preventDefault(); setUpdateDragging(false)
+              const file = e.dataTransfer.files?.[0]
+              if (file && file.type.startsWith('image/')) pickUpdateImage(file)
+            }}>
+            <textarea
+              value={newUpdate}
+              onChange={e => setNewUpdate(e.target.value)}
+              placeholder="Téléphone client, mail, changement de scope, photo chantier… (glisser-déposer une image OK)"
+              rows={3}
+              className="w-full text-sm text-gray-900 placeholder-gray-400 border-0 focus:outline-none resize-y leading-relaxed bg-transparent"
+              style={{ minHeight: 64 }}
+            />
+            {newUpdateImage && (
+              <div className="mt-3 relative inline-block">
+                <img src={newUpdateImage.preview} alt="" style={{ maxHeight: 160, borderRadius: 8 }} />
+                <button
+                  onClick={() => setNewUpdateImage(null)}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black"
+                  type="button">×</button>
+              </div>
+            )}
+            {updateError && <p className="text-xs text-red-500 mt-2">{updateError}</p>}
+            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+              <label className="text-xs font-medium text-gray-500 hover:text-gray-900 cursor-pointer flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Joindre une image
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={e => { pickUpdateImage(e.target.files?.[0]); e.target.value = '' }} />
+              </label>
+              <button
+                onClick={postUpdate}
+                disabled={postingUpdate || !newUpdate.trim()}
+                className="px-4 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-40"
+                style={{ background: '#111827' }}>
+                {postingUpdate ? 'Publication…' : 'Publier'}
+              </button>
+            </div>
+          </div>
+
+          {/* Timeline */}
+          {updates.length === 0 ? (
+            <p className="text-sm text-gray-400 px-2">Aucune mise à jour. Note ici les téléphones, mails ou décisions au fil du projet.</p>
+          ) : (
+            <ol className="space-y-3">
+              {updates.map(u => {
+                const initials = (u.author || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
+                const c = PERSON_COLORS[u.author] || '#9ca3af'
+                return (
+                  <li key={u.id} className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+                        style={{ background: c, fontSize: 13 }}>
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="font-semibold text-gray-900" style={{ fontSize: 14 }}>{u.author}</span>
+                            <span className="text-xs text-gray-400">{fmtRelative(u.created_at)}</span>
+                          </div>
+                          {currentUser === 'Guillaume' && (
+                            <button onClick={() => deleteUpdate(u.id)}
+                              className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">
+                              Supprimer
+                            </button>
+                          )}
+                        </div>
+                        <p className="mt-1.5 text-gray-700 whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
+                          {u.content}
+                        </p>
+                        {u.image_kdrive_id && (
+                          <div className="mt-3">
+                            <a href={`/api/update-image?updateId=${u.id}`} target="_blank" rel="noopener">
+                              <img src={`/api/update-image?updateId=${u.id}`} alt={u.image_filename || ''}
+                                style={{ maxHeight: 320, maxWidth: '100%', borderRadius: 10, border: '1px solid #e5e7eb' }} />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
         </div>
 
         {/* ── Two columns ── */}

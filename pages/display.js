@@ -53,6 +53,7 @@ const LIGHT = {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function getDaysRemaining(deadline) {
+  if (!deadline) return null
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const d = new Date(deadline)
@@ -63,11 +64,13 @@ function getDaysRemaining(deadline) {
 function getAutoColor(deadline, dark) {
   const days = getDaysRemaining(deadline)
   if (dark) {
+    if (days === null) return { bg: '#0f1115', border: '#374151', text: '#9ca3af', badge: '#6b7280' }
     if (days < 0)  return { bg: '#2d0a10', border: '#7f1d1d', text: '#fca5a5', badge: '#ef4444' }
     if (days < 7)  return { bg: '#1f0a0a', border: '#991b1b', text: '#fca5a5', badge: '#ef4444' }
     if (days < 14) return { bg: '#1c1000', border: '#92400e', text: '#fcd34d', badge: '#f59e0b' }
     return          { bg: '#071a10', border: '#166534', text: '#86efac', badge: '#22c55e' }
   } else {
+    if (days === null) return { bg: '#f9fafb', border: '#e5e7eb', text: '#6b7280', badge: '#9ca3af' }
     if (days < 0)  return { bg: '#fff1f2', border: '#fca5a5', text: '#9f1239', badge: '#ef4444' }
     if (days < 7)  return { bg: '#fff1f2', border: '#fca5a5', text: '#b91c1c', badge: '#ef4444' }
     if (days < 14) return { bg: '#fffbeb', border: '#fde68a', text: '#92400e', badge: '#f59e0b' }
@@ -124,8 +127,8 @@ function Timeline({ projects, viewMode, dark, theme }) {
     return d
   })
 
-  const overdueProjects = projects.filter(p => getDaysRemaining(p.deadline) < 0)
-  const visibleProjects = projects.filter(p => getDaysRemaining(p.deadline) >= 0)
+  const overdueProjects = projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d < 0 })
+  const visibleProjects = projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 0 })
 
   return (
     <div className="flex-1 overflow-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: theme.scrollbar }}>
@@ -237,7 +240,7 @@ function Timeline({ projects, viewMode, dark, theme }) {
                     >
                       <span className="font-medium truncate" style={{ color: colors.text, fontSize: 17 }}>
                         {project.delivery_type}
-                        {project.description && ` · ${project.description}`}
+                        {(project.short_description || project.description) && ` · ${project.short_description || project.description}`}
                       </span>
                       <span className="ml-auto font-bold flex-shrink-0 pl-4" style={{ color: colors.badge, fontSize: 17 }}>
                         {formatDate(project.deadline)}
@@ -258,10 +261,11 @@ function Timeline({ projects, viewMode, dark, theme }) {
 
 function CardView({ projects, dark, theme }) {
   const groups = [
-    { label: 'En retard',            color: '#ef4444', items: projects.filter(p => getDaysRemaining(p.deadline) < 0) },
-    { label: 'Cette semaine',        color: '#ef4444', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d >= 0 && d < 7 }) },
-    { label: '2 prochaines semaines',color: '#f59e0b', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d >= 7 && d < 14 }) },
-    { label: 'Plus tard',            color: '#22c55e', items: projects.filter(p => getDaysRemaining(p.deadline) >= 14) },
+    { label: 'En retard',            color: '#ef4444', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d < 0 }) },
+    { label: 'Cette semaine',        color: '#ef4444', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 0 && d < 7 }) },
+    { label: '2 prochaines semaines',color: '#f59e0b', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 7 && d < 14 }) },
+    { label: 'Plus tard',            color: '#22c55e', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 14 }) },
+    { label: 'Sans date',            color: '#9ca3af', items: projects.filter(p => !p.deadline) },
   ].filter(g => g.items.length > 0)
 
   if (groups.length === 0) {
@@ -296,7 +300,8 @@ function CardView({ projects, dark, theme }) {
                     className="font-bold px-4 py-1.5 rounded-md"
                     style={{ background: colors.badge + '22', color: colors.badge, fontSize: 16 }}
                   >
-                    {daysLeft < 0 ? `Retard ${Math.abs(daysLeft)}j` :
+                    {daysLeft === null ? 'Sans date' :
+                     daysLeft < 0 ? `Retard ${Math.abs(daysLeft)}j` :
                      daysLeft === 0 ? "Aujourd'hui !" :
                      `J-${daysLeft}`}
                   </div>
@@ -306,15 +311,17 @@ function CardView({ projects, dark, theme }) {
                 </div>
                 <div className="font-bold leading-tight" style={{ color: theme.textPrimary, fontSize: 26 }}>{project.client}</div>
                 <div className="mt-1.5" style={{ color: theme.textSecondary, fontSize: 18 }}>{project.name}</div>
-                {project.description && (
-                  <div className="mt-2 leading-snug" style={{ color: theme.textMuted, fontSize: 15 }}>{project.description}</div>
+                {(project.short_description || project.description) && (
+                  <div className="mt-2 leading-snug" style={{ color: theme.textMuted, fontSize: 15 }}>
+                    {project.short_description || project.description}
+                  </div>
                 )}
                 <div
                   className="mt-5 pt-4 border-t flex items-center justify-between"
                   style={{ borderColor: colors.border + '66' }}
                 >
                   <span className="font-bold" style={{ color: colors.badge, fontSize: 19 }}>
-                    {formatDate(project.deadline)}
+                    {project.deadline ? formatDate(project.deadline) : '—'}
                   </span>
                   {project.delivery_type && (
                     <span style={{ color: theme.textMuted, fontSize: 15 }}>{project.delivery_type}</span>
@@ -361,7 +368,12 @@ export default function Display() {
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
       const active = (Array.isArray(data) ? data : [])
         .filter(p => p.status === 'active')
-        .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+        .sort((a, b) => {
+          if (!a.deadline && !b.deadline) return 0
+          if (!a.deadline) return 1
+          if (!b.deadline) return -1
+          return new Date(a.deadline) - new Date(b.deadline)
+        })
       setProjects(active)
       setFetchError(null)
       setLastRefresh(new Date())

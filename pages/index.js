@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
+import KDriveFolderPicker from '../components/KDriveFolderPicker'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
 const COLOR_OPTIONS  = [
@@ -34,12 +35,14 @@ function initials(name) {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function getDaysRemaining(deadline) {
+  if (!deadline) return null
   const today = new Date(); today.setHours(0,0,0,0)
   const d = new Date(deadline); d.setHours(0,0,0,0)
   return Math.ceil((d - today) / 86400000)
 }
 function getAutoColor(deadline) {
   const d = getDaysRemaining(deadline)
+  if (d === null) return '#9ca3af'
   if (d < 0)  return '#dc2626'
   if (d < 7)  return '#ef4444'
   if (d < 14) return '#f59e0b'
@@ -63,6 +66,7 @@ function formatDateShort(s) {
 
 function DaysChip({ deadline }) {
   const d = getDaysRemaining(deadline)
+  if (d === null) return <span style={{ background:'#f3f4f6',color:'#6b7280' }} className="px-2 py-0.5 rounded-full text-xs font-medium">Sans date</span>
   if (d < 0)  return <span style={{ background:'#fee2e2',color:'#dc2626' }} className="px-2 py-0.5 rounded-full text-xs font-bold">En retard ({Math.abs(d)}j)</span>
   if (d === 0) return <span style={{ background:'#fee2e2',color:'#dc2626' }} className="px-2 py-0.5 rounded-full text-xs font-bold">Aujourd'hui !</span>
   if (d === 1) return <span style={{ background:'#fff7ed',color:'#ea580c' }} className="px-2 py-0.5 rounded-full text-xs font-bold">Demain</span>
@@ -448,8 +452,9 @@ function ProjectTasksModal({ project, tasks, onClose }) {
 // ─── Formulaire projet ────────────────────────────────────────────────────────
 
 const emptyForm = {
-  name: '', client: '', description: '', deadline: '',
+  name: '', client: '', description: '', short_description: '', deadline: '',
   delivery_type: 'Livraison', responsible: 'non défini', color_override: null, notes: '',
+  kdrive_folder_id: null, kdrive_folder_path: '',
 }
 
 // ─── Page Admin ───────────────────────────────────────────────────────────────
@@ -469,6 +474,7 @@ export default function Admin() {
   const [feedback, setFeedback]         = useState(null)
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [logisticsProject, setLogisticsProject]   = useState(null)
+  const [pickerOpen, setPickerOpen]               = useState(false)
 
   useEffect(() => { fetchProjects(); fetchTasks() }, [])
 
@@ -565,11 +571,14 @@ export default function Admin() {
       name: project.name,
       client: project.client,
       description: project.description || '',
-      deadline: project.deadline,
+      short_description: project.short_description || '',
+      deadline: project.deadline || '',
       delivery_type: project.delivery_type || 'Livraison',
       responsible: project.responsible || 'non défini',
       color_override: project.color_override || null,
       notes: isFromTodoist(project) ? '' : (project.notes || ''),
+      kdrive_folder_id: project.kdrive_folder_id || null,
+      kdrive_folder_path: '',
     })
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -585,7 +594,12 @@ export default function Admin() {
     setForm(f => ({ ...f, [field]: value }))
   }
 
-  const activeProjects   = projects.filter(p => p.status === 'active').sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+  const activeProjects   = projects.filter(p => p.status === 'active').sort((a, b) => {
+    if (!a.deadline && !b.deadline) return 0
+    if (!a.deadline) return 1
+    if (!b.deadline) return -1
+    return new Date(a.deadline) - new Date(b.deadline)
+  })
   const archivedProjects = projects.filter(p => p.status !== 'active')
   const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 transition-colors bg-white"
 
@@ -652,15 +666,28 @@ export default function Admin() {
                     onChange={e => handleFieldChange('client', e.target.value)}
                     placeholder="Ex: Hôtel du Lac" className={inputClass} />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Description</label>
-                  <input type="text" value={form.description}
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Description courte (vue Atelier)</label>
+                  <input type="text" value={form.short_description}
+                    onChange={e => handleFieldChange('short_description', e.target.value)}
+                    maxLength={80}
+                    placeholder="Ex: 2 bars LED + podium"
+                    className={inputClass} />
+                  <p className="text-xs text-gray-400 mt-1">Visible sur l'écran mural. Max 80 caractères.</p>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Description longue</label>
+                  <textarea value={form.description}
                     onChange={e => handleFieldChange('description', e.target.value)}
-                    placeholder="Ex: 2 bars LED + podium" className={inputClass} />
+                    rows={6}
+                    placeholder="Colle ici un mail, des infos détaillées, le brief client…"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 transition-colors bg-white resize-y leading-relaxed"
+                    style={{ minHeight: 140 }}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Date de livraison *</label>
-                  <input type="date" required value={form.deadline}
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Date de livraison</label>
+                  <input type="date" value={form.deadline}
                     onChange={e => handleFieldChange('deadline', e.target.value)} className={inputClass} />
                 </div>
                 <div>
@@ -687,6 +714,31 @@ export default function Admin() {
                   <input type="text" value={form.notes}
                     onChange={e => handleFieldChange('notes', e.target.value)}
                     placeholder="Info logistique, remarques..." className={inputClass} />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Dossier kDrive</label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button type="button" onClick={() => setPickerOpen(true)}
+                      className="px-3 py-2 text-sm rounded-md border border-gray-200 hover:border-gray-400 transition-colors text-gray-700 inline-flex items-center gap-2">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                      </svg>
+                      {form.kdrive_folder_id ? 'Changer' : 'Choisir un dossier'}
+                    </button>
+                    {form.kdrive_folder_id && (
+                      <>
+                        <span className="text-sm text-gray-600 truncate">
+                          {form.kdrive_folder_path || `Dossier #${form.kdrive_folder_id}`}
+                        </span>
+                        <button type="button"
+                          onClick={() => setForm(f => ({ ...f, kdrive_folder_id: null, kdrive_folder_path: '' }))}
+                          className="text-xs text-gray-400 hover:text-red-500">
+                          retirer
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">Lie le projet à un dossier existant sur kDrive. Sinon, un dossier sera créé automatiquement au premier upload.</p>
                 </div>
               </div>
               <div className="mt-8 flex items-center gap-3">
@@ -898,6 +950,18 @@ export default function Admin() {
           <ProjectTasksModal project={proj} tasks={tasks} onClose={() => setSelectedProjectId(null)} />
         ) : null
       })()}
+
+      {/* Picker dossier kDrive */}
+      {pickerOpen && (
+        <KDriveFolderPicker
+          initialFolderId={form.kdrive_folder_id}
+          onSelect={({ id, name, path }) => {
+            setForm(f => ({ ...f, kdrive_folder_id: id, kdrive_folder_path: path || name }))
+            setPickerOpen(false)
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
     </div>
   )
 }

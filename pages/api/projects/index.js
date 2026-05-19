@@ -30,20 +30,23 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const {
-      name, client, description, deadline, delivery_type, responsible, color_override, notes,
+      name, client, description, short_description, deadline, delivery_type, responsible, color_override, notes,
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date, disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
+      kdrive_folder_id,
     } = req.body
 
-    if (!name || !client || !deadline) {
-      return res.status(400).json({ error: 'Champs obligatoires manquants' })
+    if (!name || !client) {
+      return res.status(400).json({ error: 'Nom et client requis' })
     }
 
     const { data, error } = await supabase.from('projects').insert([{
-      name, client, description, deadline, delivery_type, responsible, color_override, notes,
+      name, client, description, short_description, delivery_type, responsible, color_override, notes,
+      deadline: deadline || null,
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date: disassembly_date || null,
       disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
+      kdrive_folder_id: kdrive_folder_id || null,
       status: 'active',
     }]).select()
 
