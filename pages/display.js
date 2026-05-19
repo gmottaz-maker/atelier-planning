@@ -195,10 +195,14 @@ function Timeline({ projects, viewMode, dark, theme }) {
               const daysLeft = getDaysRemaining(project.deadline)
               const barDays = Math.min(daysLeft + 1, numDays)
 
+              const desc = project.short_description
               return (
-                <div key={project.id} className="flex items-center">
+                <div key={project.id} className="flex items-stretch">
+                  {/* Accent vertical lié à la barre (renfort visuel client ↔ description) */}
+                  <div style={{ width: 4, flexShrink: 0, background: colors.badge, borderRadius: 2, marginRight: 16 }} />
+
                   {/* Infos */}
-                  <div style={{ width: LABEL_W, flexShrink: 0 }} className="pr-6">
+                  <div style={{ width: LABEL_W - 20, flexShrink: 0 }} className="pr-6 flex flex-col justify-center">
                     <div className="leading-tight truncate" style={{ color: theme.textPrimary, fontSize: 22, fontWeight: 700 }}>{project.client}</div>
                     <div className="mt-1 truncate" style={{ color: theme.textSecondary, fontSize: 17 }}>{project.name}</div>
                     <div className="flex items-center gap-2 mt-1.5">
@@ -227,7 +231,7 @@ function Timeline({ projects, viewMode, dark, theme }) {
                       ))}
                     </div>
 
-                    {/* Barre colorée */}
+                    {/* Barre colorée — description seule */}
                     <div
                       className="absolute rounded-lg flex items-center px-5 overflow-hidden"
                       style={{
@@ -238,12 +242,8 @@ function Timeline({ projects, viewMode, dark, theme }) {
                         border: `2px solid ${colors.border}`,
                       }}
                     >
-                      <span className="font-medium truncate" style={{ color: colors.text, fontSize: 17 }}>
-                        {project.delivery_type}
-                        {(project.short_description || project.description) && ` · ${project.short_description || project.description}`}
-                      </span>
-                      <span className="ml-auto font-bold flex-shrink-0 pl-4" style={{ color: colors.badge, fontSize: 17 }}>
-                        {formatDate(project.deadline)}
+                      <span className="font-medium truncate" style={{ color: colors.text, fontSize: 18 }}>
+                        {desc || <span style={{ opacity: 0.5 }}>—</span>}
                       </span>
                     </div>
                   </div>
@@ -311,9 +311,9 @@ function CardView({ projects, dark, theme }) {
                 </div>
                 <div className="font-bold leading-tight" style={{ color: theme.textPrimary, fontSize: 26 }}>{project.client}</div>
                 <div className="mt-1.5" style={{ color: theme.textSecondary, fontSize: 18 }}>{project.name}</div>
-                {(project.short_description || project.description) && (
+                {project.short_description && (
                   <div className="mt-2 leading-snug" style={{ color: theme.textMuted, fontSize: 15 }}>
-                    {project.short_description || project.description}
+                    {project.short_description}
                   </div>
                 )}
                 <div

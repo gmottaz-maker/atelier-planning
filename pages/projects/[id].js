@@ -995,6 +995,12 @@ export default function ProjectPage() {
   const [updateError, setUpdateError] = useState('')
   const [updateDragging, setUpdateDragging] = useState(false)
 
+  // kDrive preview state
+  const [kdriveItems, setKdriveItems] = useState([])
+  const [kdrivePath, setKdrivePath]   = useState([])   // [{ id, name }]
+  const [kdriveLoading, setKdriveLoading] = useState(false)
+  const [kdriveError, setKdriveError] = useState('')
+
   // Site visit state
   const EMPTY_VISIT = {
     date: '', participants: [],
@@ -1036,6 +1042,14 @@ export default function ProjectPage() {
     }).catch(console.error)
     .finally(() => setLoading(false))
   }, [id, currentUser])
+
+  // Charger l'aperçu kDrive dès que le projet est chargé
+  useEffect(() => {
+    if (project && project.kdrive_folder_id) {
+      setKdrivePath([])
+      loadKdrive(null)
+    }
+  }, [project?.id, project?.kdrive_folder_id])
 
   // ── Logistics helpers ────────────────────────────────────────────────────
   function updateLogItem(idx, field, value) {
@@ -1239,6 +1253,45 @@ export default function ProjectPage() {
       }
     } catch (err) { console.error(err) }
     setSummaryLoading(false)
+  }
+
+  // ── kDrive preview helpers ───────────────────────────────────────────────
+  const KDRIVE_DRIVE_ID = 1936508 // pour bâtir les liens externes (drive Infomaniak)
+
+  async function loadKdrive(folderId) {
+    setKdriveLoading(true); setKdriveError('')
+    try {
+      const url = folderId
+        ? `/api/projects/${id}/kdrive-listing?folderId=${folderId}`
+        : `/api/projects/${id}/kdrive-listing`
+      const r = await fetch(url)
+      const data = await r.json()
+      if (data.error) { setKdriveError(data.error); setKdriveItems([]); return }
+      setKdriveItems(data.items || [])
+    } catch (e) {
+      setKdriveError('Erreur kDrive')
+      setKdriveItems([])
+    } finally {
+      setKdriveLoading(false)
+    }
+  }
+
+  function enterKdriveFolder(folder) {
+    setKdrivePath(p => [...p, { id: folder.id, name: folder.name }])
+    loadKdrive(folder.id)
+  }
+
+  function kdriveGoTo(index) {
+    const next = kdrivePath.slice(0, index + 1)
+    setKdrivePath(next)
+    loadKdrive(next.length > 0 ? next[next.length - 1].id : null)
+  }
+
+  function fmtSize(b) {
+    if (!b) return ''
+    if (b < 1024) return `${b} B`
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`
   }
 
   // ── Updates helpers ──────────────────────────────────────────────────────
@@ -2159,6 +2212,112 @@ export default function ProjectPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Aperçu dossier kDrive ── */}
+        <div className="mt-12 no-print">
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Dossier kDrive</h2>
+            {project.kdrive_folder_id && (
+              <a
+                href={`https://kdrive.infomaniak.com/app/drive/${KDRIVE_DRIVE_ID}/files/${kdrivePath.length > 0 ? kdrivePath[kdrivePath.length - 1].id : project.kdrive_folder_id}`}
+                target="_blank" rel="noopener noreferrer"
+                className="text-xs font-medium text-gray-500 hover:text-gray-900">
+                Ouvrir sur kDrive ↗
+              </a>
+            )}
+          </div>
+
+          {!project.kdrive_folder_id ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
+              <p className="text-sm text-gray-500">Aucun dossier kDrive lié à ce projet.</p>
+              <p className="text-xs text-gray-400 mt-1">Modifie le projet pour le lier à un dossier existant sur kDrive.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              {/* Breadcrumb */}
+              {kdrivePath.length > 0 && (
+                <div className="px-5 py-3 border-b border-gray-100 flex items-center flex-wrap gap-1 text-xs">
+                  <button onClick={() => kdriveGoTo(-1)}
+                    className="px-1.5 py-0.5 rounded text-gray-500 hover:text-gray-900">
+                    📁 Racine
+                  </button>
+                  {kdrivePath.map((p, i) => (
+                    <span key={i} className="flex items-center gap-1">
+                      <span className="text-gray-300">/</span>
+                      <button onClick={() => kdriveGoTo(i)}
+                        className={`px-1.5 py-0.5 rounded ${i === kdrivePath.length - 1 ? 'font-semibold text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}>
+                        {p.name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Grid */}
+              <div className="p-4">
+                {kdriveLoading ? (
+                  <p className="text-center text-sm text-gray-400 py-8">Chargement…</p>
+                ) : kdriveError ? (
+                  <p className="text-center text-sm text-red-500 py-8">{kdriveError}</p>
+                ) : kdriveItems.length === 0 ? (
+                  <p className="text-center text-sm text-gray-400 py-8">Dossier vide</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {kdriveItems.map(item => {
+                      if (item.type === 'dir') {
+                        return (
+                          <button key={item.id} onClick={() => enterKdriveFolder(item)}
+                            className="group flex flex-col items-center text-center p-3 rounded-xl border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+                            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                            </svg>
+                            <span className="mt-2 text-xs text-gray-700 truncate w-full">{item.name}</span>
+                          </button>
+                        )
+                      }
+                      const isImage = item.mime_type?.startsWith('image/')
+                      const isPdf = item.mime_type === 'application/pdf'
+                      return (
+                        <a key={item.id}
+                          href={`https://kdrive.infomaniak.com/app/drive/${KDRIVE_DRIVE_ID}/preview/${item.id}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="group block rounded-xl border border-gray-100 hover:border-gray-300 overflow-hidden transition-colors">
+                          <div className="w-full h-28 bg-gray-50 flex items-center justify-center overflow-hidden">
+                            {item.has_thumbnail ? (
+                              <img
+                                src={`/api/kdrive/thumbnail?fileId=${item.id}`}
+                                alt={item.name}
+                                loading="lazy"
+                                className="w-full h-full object-cover"
+                                onError={e => { e.currentTarget.style.display = 'none' }}
+                              />
+                            ) : isPdf ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-3xl">📄</span>
+                                <span className="text-xs text-gray-400 font-medium">PDF</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-1">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                  <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="px-2 py-1.5">
+                            <p className="text-xs text-gray-700 truncate" title={item.name}>{item.name}</p>
+                            <p className="text-[10px] text-gray-400">{fmtSize(item.size)}</p>
+                          </div>
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
