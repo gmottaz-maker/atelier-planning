@@ -1,8 +1,11 @@
 // OCR d'une facture fournisseur via Claude Haiku
+import { requireAdmin } from '../../../lib/requireAdmin'
+
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  if (!requireAdmin(req, res)) return
 
   const { image, mimeType } = req.body
   if (!image) return res.status(400).json({ error: 'image (base64) requise' })

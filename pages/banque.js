@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import useIsAdmin from '../lib/useIsAdmin'
+import adminFetch from '../lib/adminFetch'
 
 const PINK = '#111827'
 
@@ -22,8 +25,12 @@ const TYPE_LABELS = {
 }
 
 export default function Banque() {
+  const router = useRouter()
   const { user } = useAuth()
   const currentUser = user?.name
+  const isAdmin = useIsAdmin()
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter]   = useState('unmatched') // unmatched | matched | all
@@ -33,7 +40,7 @@ export default function Banque() {
 
   async function load() {
     setLoading(true)
-    const r = await fetch(`/api/bank/transactions?status=${filter}&suggestions=1`)
+    const r = await adminFetch(`/api/bank/transactions?status=${filter}&suggestions=1`)
     const data = await r.json()
     setTransactions(Array.isArray(data) ? data : [])
     setLoading(false)
@@ -49,7 +56,7 @@ export default function Banque() {
       const text = await file.text()
       const isXml = text.trim().startsWith('<')
       const body = isXml ? { xml: text } : { csv: text }
-      const r = await fetch('/api/bank/import', {
+      const r = await adminFetch('/api/bank/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -66,7 +73,7 @@ export default function Banque() {
   }
 
   async function confirmMatch(tx, suggestion) {
-    await fetch('/api/bank/match', {
+    await adminFetch('/api/bank/match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -83,7 +90,7 @@ export default function Banque() {
 
   async function unmatch(tx) {
     if (!confirm('Annuler ce matching ?')) return
-    await fetch('/api/bank/match', {
+    await adminFetch('/api/bank/match', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transaction_id: tx.id, unmatch: true }),

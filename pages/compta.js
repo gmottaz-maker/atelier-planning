@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
+import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import useIsAdmin from '../lib/useIsAdmin'
+import adminFetch from '../lib/adminFetch'
 
 const PINK = '#111827'
 
@@ -9,6 +13,11 @@ function fmtCHF(n) {
 }
 
 export default function Compta() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const todayStr = new Date().toISOString().slice(0, 10)
   const yearStart = `${new Date().getFullYear()}-01-01`
   const [from, setFrom] = useState(yearStart)
@@ -21,9 +30,9 @@ export default function Compta() {
     setLoading(true)
     try {
       const [c, s, e] = await Promise.all([
-        fetch(`/api/customer-invoices?year=${from.slice(0, 4)}`).then(r => r.json()),
-        fetch(`/api/supplier-invoices?year=${from.slice(0, 4)}`).then(r => r.json()),
-        fetch(`/api/expenses?userName=Guillaume&year=${from.slice(0, 4)}`).then(r => r.json()),
+        adminFetch(`/api/customer-invoices?year=${from.slice(0, 4)}`).then(r => r.json()),
+        adminFetch(`/api/supplier-invoices?year=${from.slice(0, 4)}`).then(r => r.json()),
+        adminFetch(`/api/expenses?userName=Guillaume&year=${from.slice(0, 4)}`).then(r => r.json()),
       ])
       const filter = (rows, key) => (Array.isArray(rows) ? rows : []).filter(r => {
         const d = r[key]

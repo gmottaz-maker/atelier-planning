@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { parseCamt053 } from '../../../lib/camt053'
+import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
@@ -7,6 +8,7 @@ export const config = { api: { bodyParser: { sizeLimit: '20mb' } } }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  if (!requireAdmin(req, res)) return
 
   const { xml, csv, format } = req.body || {}
   if (!xml && !csv) return res.status(400).json({ error: 'xml ou csv requis' })

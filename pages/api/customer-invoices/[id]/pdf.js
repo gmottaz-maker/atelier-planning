@@ -1,4 +1,6 @@
 // Génère un PDF de facture A4 avec QR-bill suisse au pied de page.
+// Note: pas de requireAdmin car le PDF est ouvert via <a href>, le browser n'envoie pas
+// le header x-actor. La protection est faite côté UI (lien non rendu pour non-admin).
 import { getSupabaseServer } from '../../../../lib/supabase-server'
 import PDFDocument from 'pdfkit'
 import { SwissQRBill } from 'swissqrbill/pdf'
@@ -21,14 +23,31 @@ export default async function handler(req, res) {
     .from('customer_invoices').select('*, projects(name, client)').eq('id', id).single()
   if (error || !inv) return res.status(404).end()
 
-  // Données émetteur — adapter via env vars
-  const creditor = {
-    name:    process.env.AMAZING_LAB_NAME    || 'Amazing Lab Sàrl',
+  // Charger les infos entreprise depuis app_settings (fallback env)
+  const { data: settings } = await supabase
+    .from('app_settings').select('value').eq('key', 'company_info').maybeSingle()
+  const company = settings?.value || {
+    name: process.env.AMAZING_LAB_NAME || 'Amazing Lab Sàrl',
     address: process.env.AMAZING_LAB_ADDRESS || "Rue de l'Ecluse 30",
-    zip:     parseInt(process.env.AMAZING_LAB_ZIP || '1201', 10),
-    city:    process.env.AMAZING_LAB_CITY    || 'Genève',
+    zip: process.env.AMAZING_LAB_ZIP || '1201',
+    city: process.env.AMAZING_LAB_CITY || 'Genève',
     country: 'CH',
-    account: process.env.AMAZING_LAB_IBAN    || inv.iban_recipient || 'CH4431999123000889012',
+    iban: process.env.AMAZING_LAB_IBAN || '',
+    email: 'hello@amazinglab.ch',
+    website: 'amazinglab.ch',
+    phone: '',
+    vat_number: '',
+    payment_terms: 'Paiement à 30 jours net.',
+  }
+
+  // Données émetteur (utilisées par swissqrbill)
+  const creditor = {
+    name:    company.name,
+    address: company.address,
+    zip:     parseInt(String(company.zip).replace(/\D/g, '') || '1201', 10),
+    city:    company.city,
+    country: company.country || 'CH',
+    account: inv.iban_recipient || company.iban || 'CH4431999123000889012',
   }
 
   const qrData = {
@@ -52,10 +71,12 @@ export default async function handler(req, res) {
   doc.pipe(res)
 
   // ── Header émetteur ────────────────────────────────────────────────────────
-  doc.fontSize(9).fillColor('#111827').font('Helvetica-Bold').text(creditor.name)
+  doc.fontSize(9).fillColor('#111827').font('Helvetica-Bold').text(company.name)
   doc.font('Helvetica').fontSize(8).fillColor('#6b7280')
-    .text(`${creditor.address} · ${creditor.zip} ${creditor.city} · CH`)
-    .text(`hello@amazinglab.ch · amazinglab.ch`)
+    .text(`${company.address} · ${creditor.zip} ${company.city} · ${company.country || 'CH'}`)
+  const contactLine = [company.email, company.phone, company.website].filter(Boolean).join(' · ')
+  if (contactLine) doc.text(contactLine)
+  if (company.vat_number) doc.text(`N° TVA : ${company.vat_number}`)
 
   doc.moveDown(2)
 
@@ -182,6 +203,13 @@ export default async function handler(req, res) {
     doc.moveDown(1)
     doc.fontSize(8).fillColor('#9ca3af').font('Helvetica').text('NOTES')
     doc.fontSize(9).fillColor('#374151').text(inv.notes, { width: 515 })
+  }
+
+  // Conditions
+  if (company.payment_terms) {
+    doc.moveDown(0.8)
+    doc.fontSize(8).fillColor('#9ca3af').text('CONDITIONS DE PAIEMENT')
+    doc.fontSize(9).fillColor('#374151').text(company.payment_terms, { width: 515 })
   }
 
   // ── QR-bill au pied de page ────────────────────────────────────────────────

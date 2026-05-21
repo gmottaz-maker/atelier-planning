@@ -1,8 +1,10 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
+  if (!requireAdmin(req, res)) return
   const { id } = req.query
 
   if (req.method === 'GET') {
@@ -13,7 +15,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     const allowed = ['client_name', 'client_address', 'amount', 'currency', 'issue_date',
-                     'due_date', 'iban_recipient', 'notes', 'status']
+                     'due_date', 'iban_recipient', 'notes', 'status', 'quote_snapshot']
     const payload = { updated_at: new Date().toISOString() }
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
     if (payload.amount != null) payload.amount = parseFloat(payload.amount)

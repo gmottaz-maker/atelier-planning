@@ -3,6 +3,8 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import useIsAdmin from '../lib/useIsAdmin'
+import adminFetch from '../lib/adminFetch'
 
 const PINK = '#111827'
 const STATUS_LABELS = { pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
@@ -26,6 +28,10 @@ function effectiveStatus(inv) {
 
 export default function FacturesEmises() {
   const router = useRouter()
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const [invoices, setInvoices] = useState([])
   const [projects, setProjects] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -47,8 +53,8 @@ export default function FacturesEmises() {
   async function load() {
     setLoading(true)
     const [r1, r2] = await Promise.all([
-      fetch(`/api/customer-invoices?year=${year}`).then(r => r.json()),
-      fetch('/api/projects').then(r => r.json()),
+      adminFetch(`/api/customer-invoices?year=${year}`).then(r => r.json()),
+      adminFetch('/api/projects').then(r => r.json()),
     ])
     setInvoices(Array.isArray(r1) ? r1 : [])
     setProjects(Array.isArray(r2) ? r2.filter(p => p.status === 'active') : [])
@@ -187,8 +193,36 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     notes:          invoice?.notes || '',
     status:         invoice?.status || 'pending',
   })
+  const [lines, setLines]   = useState({
+    purchases: invoice?.quote_snapshot?.purchases || [],
+    labor:     invoice?.quote_snapshot?.labor || [],
+    logistics: invoice?.quote_snapshot?.logistics || [],
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
+
+  // Recompute total when lines change
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+  const recomputedTotal =
+    lines.purchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
+    lines.labor.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
+    lines.logistics.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
+
+  function genUid() { return `r_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` }
+  function addLine(t) {
+    const empty = t === 'purchases'
+      ? { _uid: genUid(), item:'', description:'', dimension:'', unit_price:'', quantity:'', margin:'' }
+      : t === 'logistics'
+        ? { _uid: genUid(), trajet:'', description:'', rate:'', quantity:'' }
+        : { _uid: genUid(), item:'', description:'', rate:'', quantity:'' }
+    setLines(L => ({ ...L, [t]: [...L[t], empty] }))
+  }
+  function updLine(t, i, k, v) {
+    setLines(L => ({ ...L, [t]: L[t].map((r, ix) => ix === i ? { ...r, [k]: v } : r) }))
+  }
+  function rmLine(t, i) {
+    setLines(L => ({ ...L, [t]: L[t].filter((_, ix) => ix !== i) }))
+  }
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -205,7 +239,6 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     const p = projects.find(x => x.id === pid)
     if (!p) { set('project_id', pid); return }
     const q = p.quote_data || {}
-    const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
     const total =
       (q.purchases || []).reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
       (q.labor     || []).reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
@@ -216,27 +249,37 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
       client_name: p.client || f.client_name,
       amount: total > 0 ? total.toFixed(2) : f.amount,
     }))
+    setLines({
+      purchases: (q.purchases || []).map(r => ({ ...r, _uid: r._uid || genUid() })),
+      labor:     (q.labor || []).map(r => ({ ...r, _uid: r._uid || genUid() })),
+      logistics: (q.logistics || []).map(r => ({ ...r, _uid: r._uid || genUid() })),
+    })
   }
 
   async function save() {
-    if (!form.client_name || !form.amount) { setError('Client et montant requis'); return }
+    if (!form.client_name) { setError('Client requis'); return }
     setSaving(true); setError('')
     try {
-      const p = projects.find(x => x.id === form.project_id)
-      const quote_snapshot = isEdit ? undefined : (p?.quote_data || null)
+      const hasLines = lines.purchases.length + lines.labor.length + lines.logistics.length > 0
+      const totalFromLines = hasLines ? recomputedTotal.toFixed(2) : form.amount
+      const snapshotToSave = hasLines ? lines : null
       if (isEdit) {
-        const r = await fetch(`/api/customer-invoices/${invoice.id}`, {
+        const body = { ...form, amount: totalFromLines, quote_snapshot: snapshotToSave }
+        const r = await adminFetch(`/api/customer-invoices/${invoice.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(body),
         })
         const d = await r.json()
         if (d.error) { setError(d.error); return }
       } else {
-        const r = await fetch('/api/customer-invoices', {
+        const p = projects.find(x => x.id === form.project_id)
+        const fallbackSnap = hasLines ? lines : (p?.quote_data || null)
+        const body = { ...form, amount: totalFromLines, quote_snapshot: fallbackSnap }
+        const r = await adminFetch('/api/customer-invoices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, quote_snapshot }),
+          body: JSON.stringify(body),
         })
         const d = await r.json()
         if (d.error) { setError(d.error); return }
@@ -247,7 +290,7 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
 
   async function del() {
     if (!confirm('Supprimer cette facture ?')) return
-    await fetch(`/api/customer-invoices/${invoice.id}`, { method: 'DELETE' })
+    await adminFetch(`/api/customer-invoices/${invoice.id}`, { method: 'DELETE' })
     onSaved()
   }
 
@@ -300,8 +343,14 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Montant *</label>
-                <input type="number" step="0.01" className={inputCls} value={form.amount} onChange={e => set('amount', e.target.value)} />
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                  Montant {(lines.purchases.length + lines.labor.length + lines.logistics.length) > 0 ? '(calculé)' : '*'}
+                </label>
+                <input type="number" step="0.01" className={inputCls}
+                  value={(lines.purchases.length + lines.labor.length + lines.logistics.length) > 0
+                    ? recomputedTotal.toFixed(2) : form.amount}
+                  readOnly={(lines.purchases.length + lines.labor.length + lines.logistics.length) > 0}
+                  onChange={e => set('amount', e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Devise</label>
@@ -338,6 +387,18 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
               </div>
             </div>
 
+            {/* ── Positions ── */}
+            <div className="border-t border-gray-100 pt-4">
+              <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: 14 }}>Positions</h3>
+              <LinesEditor lines={lines} addLine={addLine} updLine={updLine} rmLine={rmLine} />
+              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-baseline">
+                <span className="text-xs text-gray-500">Total recalculé</span>
+                <span className="font-semibold tabular-nums text-gray-900" style={{ fontSize: 16 }}>
+                  {recomputedTotal.toFixed(2)} {form.currency}
+                </span>
+              </div>
+            </div>
+
             {error && <p className="text-xs text-red-500">{error}</p>}
 
             {isEdit && (
@@ -366,3 +427,78 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     </>
   )
 }
+
+function LinesEditor({ lines, addLine, updLine, rmLine }) {
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+  const sec = 'mb-4'
+  const inputSm = 'w-full px-2 py-1 border border-gray-200 rounded text-xs bg-white focus:border-gray-400 focus:outline-none'
+
+  function Section({ title, type, columns, rows, computeRowTotal }) {
+    return (
+      <div className={sec}>
+        <div className='flex items-center justify-between mb-1.5'>
+          <span className='text-xs font-semibold text-gray-700 uppercase tracking-wider'>{title}</span>
+          <button type='button' onClick={() => addLine(type)}
+            className='text-xs font-medium text-gray-500 hover:text-gray-900'>+ Ligne</button>
+        </div>
+        {rows.length === 0 ? (
+          <p className='text-xs text-gray-400 italic py-1'>Aucune ligne</p>
+        ) : (
+          <div className='space-y-1.5'>
+            {rows.map((r, i) => (
+              <div key={r._uid || i} className='group grid gap-1' style={{ gridTemplateColumns: columns.map(c => c.w).join(' ') }}>
+                {columns.map(c => (
+                  <input key={c.k} type={c.type || 'text'} className={inputSm} placeholder={c.placeholder || c.label}
+                    value={r[c.k] || ''} onChange={e => updLine(type, i, c.k, e.target.value)}
+                    style={{ textAlign: c.align || 'left' }} />
+                ))}
+                <div className='text-xs text-right font-semibold text-gray-900 tabular-nums self-center pr-1'>
+                  {computeRowTotal(r).toFixed(2)}
+                </div>
+                <button type='button' onClick={() => rmLine(type, i)}
+                  className='text-gray-300 hover:text-red-500 text-sm opacity-0 group-hover:opacity-100 self-center'>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <Section title='Achats / matériel' type='purchases'
+        columns={[
+          { k: 'item',        w: '1.3fr', placeholder: 'Item' },
+          { k: 'description', w: '2fr',   placeholder: 'Description' },
+          { k: 'unit_price',  w: '0.8fr', type: 'number', align: 'right', placeholder: 'P.U.' },
+          { k: 'quantity',    w: '0.5fr', type: 'number', align: 'right', placeholder: 'Qté' },
+          { k: 'margin',      w: '0.6fr', type: 'number', align: 'right', placeholder: 'Marge %' },
+        ]}
+        rows={lines.purchases}
+        computeRowTotal={r => num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100)}
+      />
+      <Section title="Main d'œuvre" type='labor'
+        columns={[
+          { k: 'item',        w: '1.3fr', placeholder: 'Item' },
+          { k: 'description', w: '2fr',   placeholder: 'Description' },
+          { k: 'rate',        w: '0.8fr', type: 'number', align: 'right', placeholder: 'Tarif' },
+          { k: 'quantity',    w: '0.5fr', type: 'number', align: 'right', placeholder: 'Qté' },
+        ]}
+        rows={lines.labor}
+        computeRowTotal={r => num(r.rate) * num(r.quantity)}
+      />
+      <Section title='Logistique' type='logistics'
+        columns={[
+          { k: 'trajet',      w: '1.3fr', placeholder: 'Trajet' },
+          { k: 'description', w: '2fr',   placeholder: 'Description' },
+          { k: 'rate',        w: '0.8fr', type: 'number', align: 'right', placeholder: 'Tarif' },
+          { k: 'quantity',    w: '0.5fr', type: 'number', align: 'right', placeholder: 'Qté' },
+        ]}
+        rows={lines.logistics}
+        computeRowTotal={r => num(r.rate) * num(r.quantity)}
+      />
+    </div>
+  )
+}
+

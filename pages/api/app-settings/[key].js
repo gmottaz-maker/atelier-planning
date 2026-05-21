@@ -2,6 +2,19 @@ import { getSupabaseServer } from '../../../lib/supabase-server'
 
 const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
+  company_info: {
+    name:    process.env.AMAZING_LAB_NAME    || 'Amazing Lab Sàrl',
+    address: process.env.AMAZING_LAB_ADDRESS || "Rue de l'Ecluse 30",
+    zip:     process.env.AMAZING_LAB_ZIP    || '1201',
+    city:    process.env.AMAZING_LAB_CITY    || 'Genève',
+    country: process.env.AMAZING_LAB_COUNTRY || 'CH',
+    iban:    process.env.AMAZING_LAB_IBAN    || '',
+    email:   process.env.AMAZING_LAB_EMAIL   || 'hello@amazinglab.ch',
+    website: process.env.AMAZING_LAB_WEBSITE || 'amazinglab.ch',
+    phone:   process.env.AMAZING_LAB_PHONE   || '',
+    vat_number: process.env.AMAZING_LAB_VAT  || '',
+    payment_terms: 'Paiement à 30 jours net.',
+  },
 }
 
 export default async function handler(req, res) {

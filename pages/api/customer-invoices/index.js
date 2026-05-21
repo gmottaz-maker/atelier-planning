@@ -1,4 +1,5 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
@@ -32,6 +33,7 @@ function qrReference(invoiceNumber, projectId) {
 }
 
 export default async function handler(req, res) {
+  if (!requireAdmin(req, res)) return
   if (req.method === 'GET') {
     const { status, year } = req.query
     let q = supabase.from('customer_invoices').select('*, projects(name, client)').order('issue_date', { ascending: false })

@@ -1,6 +1,7 @@
 // Export CSV des écritures pour la fiduciaire.
 // Une ligne par : facture émise, facture fournisseur, frais.
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
@@ -17,6 +18,7 @@ function fmt(n) {
 }
 
 export default async function handler(req, res) {
+  if (!requireAdmin(req, res)) return
   const { from, to, mode } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from et to (YYYY-MM-DD) requis' })
 

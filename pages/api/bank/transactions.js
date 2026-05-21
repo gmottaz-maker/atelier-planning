@@ -1,10 +1,12 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { findMatches } from '../../../lib/bankMatching'
+import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end()
+  if (!requireAdmin(req, res)) return
 
   const { status, suggestions } = req.query  // status: 'all'|'matched'|'unmatched', suggestions: '1'
 

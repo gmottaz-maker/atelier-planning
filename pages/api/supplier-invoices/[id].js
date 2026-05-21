@@ -1,9 +1,11 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { del as kdriveDel } from '../../../lib/kdrive'
+import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
+  if (!requireAdmin(req, res)) return
   const { id } = req.query
 
   if (req.method === 'GET') {

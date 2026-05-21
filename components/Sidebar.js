@@ -1,16 +1,17 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useAuth } from '../pages/_app'
+import useIsAdmin from '../lib/useIsAdmin'
 
 const NAV_ITEMS = [
   { href: '/',                       label: 'Projets'    },
   { href: '/tasks',                  label: 'Tâches'     },
   { href: '/schedule',               label: 'Horaires'   },
   { href: '/meeting',                label: 'Meeting'    },
-  { href: '/factures-fournisseurs',  label: 'Fact. fournisseurs', section: 'Banque' },
-  { href: '/factures-emises',        label: 'Fact. émises', section: 'Banque' },
-  { href: '/banque',                 label: 'Banque',    section: 'Banque' },
-  { href: '/compta',                 label: 'Compta',    section: 'Banque' },
+  { href: '/factures-fournisseurs',  label: 'Fact. fournisseurs', section: 'Banque', adminOnly: true },
+  { href: '/factures-emises',        label: 'Fact. émises',       section: 'Banque', adminOnly: true },
+  { href: '/banque',                 label: 'Banque',             section: 'Banque', adminOnly: true },
+  { href: '/compta',                 label: 'Compta',             section: 'Banque', adminOnly: true },
   { href: '/activity',               label: 'Activité'   },
   { href: '/display',                label: 'Atelier',   newTab: true },
   { href: '/settings',               label: 'Réglages'   },
@@ -21,6 +22,8 @@ export const SIDEBAR_WIDTH = 260
 export default function Sidebar() {
   const router = useRouter()
   const { user, signOut } = useAuth() || {}
+  const isAdmin = useIsAdmin()
+  const visibleItems = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin)
 
   return (
     <aside
@@ -45,7 +48,7 @@ export default function Sidebar() {
       </div>
 
       <nav style={{ flex: 1, padding: '16px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {NAV_ITEMS.map(item => {
+        {visibleItems.map(item => {
           const isActive = router.pathname === item.href
           return (
             <Link

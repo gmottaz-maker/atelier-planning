@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import useIsAdmin from '../lib/useIsAdmin'
+import adminFetch from '../lib/adminFetch'
 
 const PINK = '#111827'
 const STATUS_LABELS = { pending: 'À payer', paid: 'Payée', overdue: 'En retard' }
@@ -25,8 +28,12 @@ function dueStatus(inv) {
 }
 
 export default function FacturesFournisseurs() {
+  const router = useRouter()
   const { user } = useAuth()
   const currentUser = user?.name
+  const isAdmin = useIsAdmin()
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading]   = useState(true)
   const [year, setYear]         = useState(new Date().getFullYear())
@@ -37,7 +44,7 @@ export default function FacturesFournisseurs() {
   async function load() {
     setLoading(true)
     const params = new URLSearchParams({ year: String(year) })
-    const r = await fetch(`/api/supplier-invoices?${params}`)
+    const r = await adminFetch(`/api/supplier-invoices?${params}`)
     const data = await r.json()
     setInvoices(Array.isArray(data) ? data : [])
     setLoading(false)
@@ -217,7 +224,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
     }
     setScanLoading(true); setScanError('')
     try {
-      const r = await fetch('/api/supplier-invoices/scan', {
+      const r = await adminFetch('/api/supplier-invoices/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: filePreview.base64, mimeType: filePreview.mime }),
@@ -247,7 +254,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
     setSaving(true); setSaveError('')
     try {
       if (isEdit) {
-        const r = await fetch(`/api/supplier-invoices/${invoice.id}`, {
+        const r = await adminFetch(`/api/supplier-invoices/${invoice.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
@@ -262,7 +269,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
           file_filename: filePreview?.name,
           file_mime_type: filePreview?.mime,
         }
-        const r = await fetch('/api/supplier-invoices', {
+        const r = await adminFetch('/api/supplier-invoices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -277,7 +284,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
 
   async function deleteInvoice() {
     if (!confirm('Supprimer cette facture ? Le PDF sur kDrive sera aussi supprimé.')) return
-    await fetch(`/api/supplier-invoices/${invoice.id}`, { method: 'DELETE' })
+    await adminFetch(`/api/supplier-invoices/${invoice.id}`, { method: 'DELETE' })
     onSaved()
   }
 

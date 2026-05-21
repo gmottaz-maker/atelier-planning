@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import { supabase } from '../lib/supabase'
@@ -59,6 +59,9 @@ export default function SettingsPage() {
 
         {/* Responsables (admin only) */}
         {isAdmin && <ResponsiblesSection />}
+
+        {/* Infos entreprise (admin only — pour les factures + QR-bill) */}
+        {isAdmin && <CompanyInfoSection />}
 
         {/* Sécurité */}
         <section>
@@ -220,6 +223,114 @@ function ResponsiblesSection() {
       <p className="mt-3 text-xs text-gray-400">
         Modifications visibles uniquement après avoir cliqué sur Enregistrer.
       </p>
+    </section>
+  )
+}
+
+// ─── Company info section ───────────────────────────────────────────────────
+
+function CompanyInfoSection() {
+  const EMPTY = {
+    name: '', address: '', zip: '', city: '', country: 'CH',
+    iban: '', email: '', phone: '', website: '', vat_number: '',
+    payment_terms: 'Paiement à 30 jours net.',
+  }
+  const [form, setForm] = useState(EMPTY)
+  const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  useEffect(() => {
+    fetch('/api/app-settings/company_info').then(r => r.json()).then(d => {
+      if (d?.value) setForm(f => ({ ...EMPTY, ...d.value }))
+      setLoaded(true)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function save() {
+    setSaving(true); setFeedback('')
+    try {
+      const r = await fetch('/api/app-settings/company_info', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: form }),
+      })
+      const d = await r.json()
+      if (d.error) { setFeedback('Erreur : ' + d.error); return }
+      setFeedback('Enregistré')
+      setTimeout(() => setFeedback(''), 2000)
+    } catch (e) { setFeedback('Erreur : ' + e.message) }
+    finally { setSaving(false) }
+  }
+
+  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none"
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-gray-900 mb-4">Informations entreprise (factures)</h2>
+      <p className="text-xs text-gray-500 mb-4">
+        Apparaissent en en-tête des factures PDF et dans la zone bénéficiaire du QR-bill suisse.
+      </p>
+      <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Raison sociale *</label>
+            <input className={inputCls} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Amazing Lab Sàrl" />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Adresse *</label>
+            <input className={inputCls} value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rue de l'Ecluse 30" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">NPA *</label>
+            <input className={inputCls} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="1201" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Ville *</label>
+            <input className={inputCls} value={form.city} onChange={e => set('city', e.target.value)} placeholder="Genève" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Pays</label>
+            <input className={inputCls} value={form.country} onChange={e => set('country', e.target.value)} placeholder="CH" maxLength={2} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">N° TVA</label>
+            <input className={inputCls} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} placeholder="CHE-123.456.789 TVA" />
+          </div>
+          <div className="col-span-2 pt-2 border-t border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 mb-1">IBAN (QR-IBAN recommandé pour QR-bill)</label>
+            <input className={inputCls} value={form.iban} onChange={e => set('iban', e.target.value)} placeholder="CH00 0000 0000 0000 0000 0" style={{ fontFamily: 'monospace' }} />
+            <p className="text-xs text-gray-400 mt-1">Un QR-IBAN commence par CH suivi de 30-31. Demande à ta banque s'il faut l'activer.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+            <input className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} placeholder="hello@amazinglab.ch" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Téléphone</label>
+            <input className={inputCls} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+41 22 ..." />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Site web</label>
+            <input className={inputCls} value={form.website} onChange={e => set('website', e.target.value)} placeholder="amazinglab.ch" />
+          </div>
+          <div className="col-span-2 pt-2 border-t border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Conditions de paiement (pied de facture)</label>
+            <textarea rows={2} className={inputCls} value={form.payment_terms} onChange={e => set('payment_terms', e.target.value)} />
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
+          <span className="text-xs text-gray-500">{feedback}</span>
+          <button onClick={save} disabled={saving}
+            className="px-4 py-2 rounded-md text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: '#111827' }}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
     </section>
   )
 }

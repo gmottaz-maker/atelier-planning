@@ -1,10 +1,12 @@
 // Confirme ou retire un match entre une transaction et une facture/dépense.
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  if (!requireAdmin(req, res)) return
 
   const { transaction_id, type, target_id, confidence, actor, unmatch } = req.body || {}
   if (!transaction_id) return res.status(400).json({ error: 'transaction_id requis' })
