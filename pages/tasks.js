@@ -31,6 +31,7 @@ const SECTIONS = [
   { key: 'thisWeek',       label: 'Cette semaine',            color: '#0ea5e9' },
   { key: 'nextWeek',       label: 'Semaine prochaine',        color: '#6366f1' },
   { key: 'later',          label: 'Plus tard',                color: '#6b7280' },
+  { key: 'noDate',         label: 'Sans date',                color: '#9ca3af' },
   { key: 'completedToday', label: "Terminées aujourd'hui",    color: '#22c55e' },
 ]
 
@@ -412,6 +413,7 @@ export default function Tasks() {
 
   function getTaskSection(task) {
     if (task.status === 'completed' && isCompletedToday(task)) return 'completedToday'
+    if (!task.execution_date) return 'noDate'
     if (task.status === 'active' && task.execution_date < todayStr) return 'overdue'
     const eff = toDateStr(effectiveDate(task))
     if (eff === todayStr) return 'today'
@@ -421,12 +423,12 @@ export default function Tasks() {
     return 'later'
   }
 
-  // Sections visibles selon la vue choisie
+  // Sections visibles selon la vue choisie — "noDate" toujours présent
   const sectionsForView = {
-    today:    ['overdue', 'today', 'completedToday'],
-    week:     ['overdue', 'today', 'tomorrow', 'thisWeek', 'completedToday'],
-    twoweeks: ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'completedToday'],
-    all:      ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'later', 'completedToday'],
+    today:    ['overdue', 'today', 'noDate', 'completedToday'],
+    week:     ['overdue', 'today', 'tomorrow', 'thisWeek', 'noDate', 'completedToday'],
+    twoweeks: ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'noDate', 'completedToday'],
+    all:      ['overdue', 'today', 'tomorrow', 'thisWeek', 'nextWeek', 'later', 'noDate', 'completedToday'],
   }[view] || []
 
   function taskVisible(task) {

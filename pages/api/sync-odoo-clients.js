@@ -59,6 +59,9 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
+  // Ping Supabase d'abord pour garder le projet actif même si Odoo échoue
+  try { await supabase.from('projects').select('id').limit(1) } catch (_) {}
+
   try {
     // ── 1. Authentification Odoo ─────────────────────────────────────────────
     const { uid, sessionId } = await authenticate()
