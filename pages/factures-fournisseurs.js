@@ -414,6 +414,13 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
             </div>
 
             {saveError && <p className="text-xs text-red-500">{saveError}</p>}
+
+            {isEdit && invoice?.kdrive_file_id && (
+              <a href={`/api/kdrive/download?fileId=${invoice.kdrive_file_id}`} target="_blank" rel="noopener"
+                className="block w-full text-center px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400">
+                📎 Ouvrir le fichier attaché
+              </a>
+            )}
           </div>
 
           <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
