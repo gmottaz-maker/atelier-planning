@@ -1279,7 +1279,7 @@ export default function ProjectPage() {
 
   function quoteAddRow(table) {
     const empty = table === 'purchases'
-      ? { _uid: genRowUid(), item: '', description: '', unit_price: '', quantity: '', margin: '' }
+      ? { _uid: genRowUid(), item: '', description: '', dimension: '', unit_price: '', quantity: '', margin: '' }
       : table === 'logistics'
         ? { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '' }
         : { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '' }
@@ -2305,6 +2305,15 @@ export default function ProjectPage() {
                         style={{ background: '#111827' }}>
                         {quoteSaving ? 'Enregistrement…' : 'Enregistrer'}
                       </button>
+                      <a href={`/projects/${id}/devis`} target="_blank" rel="noopener"
+                        className="px-4 py-1.5 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors inline-flex items-center gap-1.5"
+                        title={quoteDirty ? 'Enregistre d\'abord pour inclure les dernières modifs' : 'Ouvrir le devis PDF'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        Générer le devis
+                      </a>
                     </div>
                   )}
                 </div>
@@ -2324,6 +2333,7 @@ export default function ProjectPage() {
                             <tr>
                               <th className={th} style={{ width: '14%' }}>Item</th>
                               <th className={th}>Description</th>
+                              <th className={th} style={{ width: 130 }}>Dimension</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix d'achat</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Total</th>
@@ -2334,11 +2344,12 @@ export default function ProjectPage() {
                           </thead>
                           <tbody>
                             {quote.purchases.length === 0 ? (
-                              <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
+                              <tr><td colSpan={9} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
                             ) : quote.purchases.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => quoteUpdateRow('purchases', i, 'item', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => quoteUpdateRow('purchases', i, 'description', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} placeholder="ex: 200×120×40" value={r.dimension || ''} onChange={e => quoteUpdateRow('purchases', i, 'dimension', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => quoteUpdateRow('purchases', i, 'unit_price', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => quoteUpdateRow('purchases', i, 'quantity', e.target.value)} /></td>
                                 <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
@@ -2353,7 +2364,7 @@ export default function ProjectPage() {
                           {quote.purchases.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats facturés</td>
+                                <td colSpan={7} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats facturés</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(purchasesBilled)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
