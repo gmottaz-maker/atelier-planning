@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useAuth } from '../_app'
 import NavBar from '../../components/NavBar'
 import { useResponsibles } from '../../lib/useResponsibles'
+import { TASK_CATEGORIES } from '../../lib/taskCategories'
+import TaskFormDrawer from '../../components/TaskFormDrawer'
 import { useSuggestions } from '../../lib/useSuggestions'
 import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/AddressInput'
 
@@ -34,14 +36,6 @@ function genLogUid() {
 }
 // Types that have a date field
 const TYPES_WITH_DATE = ['demontage', 'recuperation', 'livraison', 'envoi_dhl', 'envoi_ete', 'montage']
-
-const TASK_CATEGORIES = [
-  { key: 'bureau',         label: 'Bureau',             icon: '🏢', color: '#6366f1' },
-  { key: 'commande',       label: 'Commande & Achats',  icon: '🛒', color: '#0ea5e9' },
-  { key: 'sous_traitance', label: 'Sous-traitance',     icon: '🔨', color: '#a855f7' },
-  { key: 'atelier',        label: 'Atelier',            icon: '🏭', color: '#f59e0b' },
-  { key: 'logistique',     label: 'Logistique',         icon: '🚚', color: '#10b981' },
-]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -325,70 +319,6 @@ function TaskItem({ task, onToggle, onEdit }) {
         </svg>
       )}
     </div>
-  )
-}
-
-// ─── AddTaskForm ──────────────────────────────────────────────────────────────
-function AddTaskForm({ projectId, category, currentUser, onAdd, onCancel }) {
-  const { responsibles } = useResponsibles()
-  const todayStr = toDateStr(today())
-  const [form, setForm] = useState({
-    title: '',
-    responsible: currentUser || DEFAULT_RESPONSIBLE,
-    execution_date: todayStr,
-  })
-  const [saving, setSaving] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!form.title.trim()) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
-        body: JSON.stringify({
-          title: form.title.trim(),
-          responsible: form.responsible,
-          execution_date: form.execution_date,
-          project_id: projectId,
-          category,
-        }),
-      })
-      const task = await res.json()
-      if (task.id) onAdd(task)
-    } catch (err) { console.error(err) }
-    setSaving(false)
-  }
-
-  const inp = "px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white w-full"
-  return (
-    <form onSubmit={handleSubmit} className="pt-2 pb-1 space-y-2">
-      <input autoFocus type="text" value={form.title}
-        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-        placeholder="Titre de la tâche..." className={inp} style={{ fontSize: 14 }} />
-      <div className="flex gap-2">
-        <select value={form.responsible}
-          onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))}
-          className={`${inp} flex-1`} style={{ fontSize: 14 }}>
-          {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-        <input type="date" value={form.execution_date}
-          onChange={e => setForm(f => ({ ...f, execution_date: e.target.value }))}
-          className={`${inp} flex-1`} style={{ fontSize: 14 }} />
-      </div>
-      <div className="flex gap-2">
-        <button type="submit" disabled={saving || !form.title.trim()}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
-          style={{ background: PINK }}>
-          {saving ? '...' : 'Ajouter'}
-        </button>
-        <button type="button" onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 border border-gray-200">
-          Annuler
-        </button>
-      </div>
-    </form>
   )
 }
 
@@ -976,7 +906,8 @@ export default function ProjectPage() {
   const [addingLogistics, setAddingLogistics] = useState(false)
 
   // Task state
-  const [addingCategory, setAddingCategory] = useState(null)
+  const [addingCategory, setAddingCategory] = useState(null) // 'commande' | 'sous_traitance' (inline)
+  const [drawerCategory, setDrawerCategory] = useState(null) // catégorie pour le drawer générique
   const [editingTask, setEditingTask]       = useState(null) // task object being edited
 
   // Files state
@@ -1736,11 +1667,14 @@ export default function ProjectPage() {
                 const isAdding = addingCategory === cat.key
                 const isEmpty = catTasks.length === 0 && !isAdding
 
+                const isSpecial = cat.key === 'commande' || cat.key === 'sous_traitance'
+                const openAdd = () => isSpecial ? setAddingCategory(cat.key) : setDrawerCategory(cat.key)
+
                 // Catégorie vide → ligne discrète repliée
                 if (isEmpty) {
                   return (
                     <button key={cat.key}
-                      onClick={() => setAddingCategory(cat.key)}
+                      onClick={openAdd}
                       className="w-full flex items-center gap-3 px-5 py-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors text-left group">
                       <div className="w-1 h-5 rounded-full" style={{ background: cat.color }} />
                       <span className="font-medium text-gray-600 group-hover:text-gray-900" style={{ fontSize: 14 }}>{cat.label}</span>
@@ -1763,7 +1697,7 @@ export default function ProjectPage() {
                         )}
                       </div>
                       <button
-                        onClick={() => setAddingCategory(isAdding ? null : cat.key)}
+                        onClick={() => isSpecial ? setAddingCategory(isAdding ? null : cat.key) : openAdd()}
                         className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
                         {isAdding ? 'Annuler' : '+ Ajouter'}
                       </button>
@@ -1781,30 +1715,21 @@ export default function ProjectPage() {
                         }
                         return <TaskItem key={t.id} task={t} onToggle={toggleTask} onEdit={t => setEditingTask(t)} />
                       })}
-                      {isAdding && (
-                        cat.key === 'commande' ? (
-                          <AddCommandeForm
-                            projectId={project.id}
-                            currentUser={currentUser}
-                            onAdd={handleTaskAdded}
-                            onCancel={() => setAddingCategory(null)}
-                          />
-                        ) : cat.key === 'sous_traitance' ? (
-                          <AddSousTraitanceForm
-                            projectId={project.id}
-                            currentUser={currentUser}
-                            onAdd={handleTaskAdded}
-                            onCancel={() => setAddingCategory(null)}
-                          />
-                        ) : (
-                          <AddTaskForm
-                            projectId={project.id}
-                            category={cat.key}
-                            currentUser={currentUser}
-                            onAdd={handleTaskAdded}
-                            onCancel={() => setAddingCategory(null)}
-                          />
-                        )
+                      {isAdding && cat.key === 'commande' && (
+                        <AddCommandeForm
+                          projectId={project.id}
+                          currentUser={currentUser}
+                          onAdd={handleTaskAdded}
+                          onCancel={() => setAddingCategory(null)}
+                        />
+                      )}
+                      {isAdding && cat.key === 'sous_traitance' && (
+                        <AddSousTraitanceForm
+                          projectId={project.id}
+                          currentUser={currentUser}
+                          onAdd={handleTaskAdded}
+                          onCancel={() => setAddingCategory(null)}
+                        />
                       )}
                     </div>
                   </div>
@@ -2719,6 +2644,27 @@ export default function ProjectPage() {
         onSave={handleTaskUpdated}
         onDelete={handleTaskDeleted}
         onClose={() => setEditingTask(null)}
+      />
+    )}
+
+    {/* ── Create task drawer (catégories génériques) ── */}
+    {drawerCategory && (
+      <TaskFormDrawer
+        currentUser={currentUser}
+        defaultProjectId={project.id}
+        defaultCategory={drawerCategory}
+        hideProjectSelector
+        onSave={async (body) => {
+          const res = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+            body: JSON.stringify(body),
+          })
+          const created = await res.json()
+          if (created.id) handleTaskAdded(created)
+          setDrawerCategory(null)
+        }}
+        onClose={() => setDrawerCategory(null)}
       />
     )}
     </>
