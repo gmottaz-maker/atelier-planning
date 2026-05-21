@@ -993,6 +993,13 @@ export default function ProjectPage() {
   const [updateError, setUpdateError] = useState('')
   const [updateDragging, setUpdateDragging] = useState(false)
 
+  // Quote state
+  const EMPTY_QUOTE = { purchases: [], labor: [], logistics: [] }
+  const [quote, setQuote] = useState(EMPTY_QUOTE)
+  const [quoteDirty, setQuoteDirty] = useState(false)
+  const [quoteSaving, setQuoteSaving] = useState(false)
+  const [quoteExpanded, setQuoteExpanded] = useState(false)
+
   // kDrive preview state
   const [kdriveItems, setKdriveItems] = useState([])
   const [kdrivePath, setKdrivePath]   = useState([])   // [{ id, name }]
@@ -1032,6 +1039,14 @@ export default function ProjectPage() {
           setVisitExpanded(true)
         }
         if (proj.site_visit_summary) setVisitSummary(proj.site_visit_summary)
+        if (proj.quote_data && (proj.quote_data.purchases?.length || proj.quote_data.labor?.length || proj.quote_data.logistics?.length)) {
+          setQuote({
+            purchases: proj.quote_data.purchases || [],
+            labor:     proj.quote_data.labor || [],
+            logistics: proj.quote_data.logistics || [],
+          })
+          setQuoteExpanded(true)
+        }
       }
       if (Array.isArray(allTasks)) {
         setTasks(allTasks.filter(t => String(t.project_id) === String(id)))
@@ -1251,6 +1266,49 @@ export default function ProjectPage() {
       }
     } catch (err) { console.error(err) }
     setSummaryLoading(false)
+  }
+
+  // ── Quote helpers ────────────────────────────────────────────────────────
+  function genRowUid() { return `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
+
+  function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+  function purchaseTotal(r)  { return num(r.unit_price) * num(r.quantity) }
+  function purchaseBilled(r) { return purchaseTotal(r) * (1 + num(r.margin) / 100) }
+  function serviceTotal(r)   { return num(r.rate) * num(r.quantity) }
+  function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
+
+  function quoteAddRow(table) {
+    const empty = table === 'purchases'
+      ? { _uid: genRowUid(), item: '', description: '', unit_price: '', quantity: '', margin: '' }
+      : table === 'logistics'
+        ? { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '' }
+        : { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '' }
+    setQuote(q => ({ ...q, [table]: [...q[table], empty] }))
+    setQuoteDirty(true)
+  }
+
+  function quoteUpdateRow(table, idx, field, value) {
+    setQuote(q => ({ ...q, [table]: q[table].map((r, i) => i === idx ? { ...r, [field]: value } : r) }))
+    setQuoteDirty(true)
+  }
+
+  function quoteRemoveRow(table, idx) {
+    setQuote(q => ({ ...q, [table]: q[table].filter((_, i) => i !== idx) }))
+    setQuoteDirty(true)
+  }
+
+  async function saveQuote() {
+    setQuoteSaving(true)
+    try {
+      const r = await fetch(`/api/projects/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify({ ...project, quote_data: quote }),
+      })
+      if (r.ok) setQuoteDirty(false)
+    } finally {
+      setQuoteSaving(false)
+    }
   }
 
   // ── kDrive preview helpers ───────────────────────────────────────────────
@@ -2212,6 +2270,207 @@ export default function ProjectPage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* ── Offre ── */}
+        <div className="mt-12 no-print">
+          {(() => {
+            const purchasesBilled = quote.purchases.reduce((s, r) => s + purchaseBilled(r), 0)
+            const laborTotal      = quote.labor.reduce((s, r) => s + serviceTotal(r), 0)
+            const logisticsTotal  = quote.logistics.reduce((s, r) => s + serviceTotal(r), 0)
+            const grandTotal      = purchasesBilled + laborTotal + logisticsTotal
+
+            const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
+            const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
+            const th = "px-3 py-2 text-left text-xs font-semibold text-gray-700 bg-gray-100"
+            const td = "border-t border-gray-100 align-middle"
+            const tdRO = "px-3 py-1.5 text-sm text-right text-gray-600 tabular-nums"
+
+            return (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <button onClick={() => setQuoteExpanded(v => !v)}
+                    className="flex items-center gap-2 group">
+                    <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Offre</h2>
+                    <span className="text-gray-400 group-hover:text-gray-700 text-sm">{quoteExpanded ? '▾' : '▸'}</span>
+                    {!quoteExpanded && grandTotal > 0 && (
+                      <span className="text-sm text-gray-500 ml-2">· Total {fmtCHF(grandTotal)} CHF</span>
+                    )}
+                  </button>
+                  {quoteExpanded && (
+                    <div className="flex items-center gap-3">
+                      {quoteDirty && <span className="text-xs text-amber-600">non enregistré</span>}
+                      <button onClick={saveQuote} disabled={!quoteDirty || quoteSaving}
+                        className="px-4 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-40"
+                        style={{ background: '#111827' }}>
+                        {quoteSaving ? 'Enregistrement…' : 'Enregistrer'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {quoteExpanded && (
+                  <div className="space-y-6">
+                    {/* ── Achats ── */}
+                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Achats</h3>
+                        <button onClick={() => quoteAddRow('purchases')}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full" style={{ minWidth: 800 }}>
+                          <thead>
+                            <tr>
+                              <th className={th} style={{ width: '14%' }}>Item</th>
+                              <th className={th}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix d'achat</th>
+                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                              <th className={th + ' text-right'} style={{ width: 110 }}>Total</th>
+                              <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
+                              <th className={th + ' text-right'} style={{ width: 130 }}>Total facturé</th>
+                              <th className={th} style={{ width: 32 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {quote.purchases.length === 0 ? (
+                              <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
+                            ) : quote.purchases.map((r, i) => (
+                              <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => quoteUpdateRow('purchases', i, 'item', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => quoteUpdateRow('purchases', i, 'description', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => quoteUpdateRow('purchases', i, 'unit_price', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => quoteUpdateRow('purchases', i, 'quantity', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
+                                <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} onChange={e => quoteUpdateRow('purchases', i, 'margin', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseBilled(r))}</td>
+                                <td className={td + ' text-center'}>
+                                  <button onClick={() => quoteRemoveRow('purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          {quote.purchases.length > 0 && (
+                            <tfoot>
+                              <tr>
+                                <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats facturés</td>
+                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(purchasesBilled)}</td>
+                                <td className="bg-gray-50"></td>
+                              </tr>
+                            </tfoot>
+                          )}
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* ── Main d'œuvre ── */}
+                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Main d'œuvre</h3>
+                        <button onClick={() => quoteAddRow('labor')}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full" style={{ minWidth: 700 }}>
+                          <thead>
+                            <tr>
+                              <th className={th} style={{ width: '16%' }}>Item</th>
+                              <th className={th}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: 110 }}>Tarif</th>
+                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                              <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
+                              <th className={th} style={{ width: 32 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {quote.labor.length === 0 ? (
+                              <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                            ) : quote.labor.map((r, i) => (
+                              <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => quoteUpdateRow('labor', i, 'item', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => quoteUpdateRow('labor', i, 'description', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => quoteUpdateRow('labor', i, 'rate', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => quoteUpdateRow('labor', i, 'quantity', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                <td className={td + ' text-center'}>
+                                  <button onClick={() => quoteRemoveRow('labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          {quote.labor.length > 0 && (
+                            <tfoot>
+                              <tr>
+                                <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
+                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(laborTotal)}</td>
+                                <td className="bg-gray-50"></td>
+                              </tr>
+                            </tfoot>
+                          )}
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* ── Logistique ── */}
+                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Logistique</h3>
+                        <button onClick={() => quoteAddRow('logistics')}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full" style={{ minWidth: 700 }}>
+                          <thead>
+                            <tr>
+                              <th className={th} style={{ width: '16%' }}>Trajet</th>
+                              <th className={th}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: 110 }}>Tarif</th>
+                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                              <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
+                              <th className={th} style={{ width: 32 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {quote.logistics.length === 0 ? (
+                              <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                            ) : quote.logistics.map((r, i) => (
+                              <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.trajet || ''} onChange={e => quoteUpdateRow('logistics', i, 'trajet', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => quoteUpdateRow('logistics', i, 'description', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => quoteUpdateRow('logistics', i, 'rate', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => quoteUpdateRow('logistics', i, 'quantity', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                <td className={td + ' text-center'}>
+                                  <button onClick={() => quoteRemoveRow('logistics', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          {quote.logistics.length > 0 && (
+                            <tfoot>
+                              <tr>
+                                <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
+                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(logisticsTotal)}</td>
+                                <td className="bg-gray-50"></td>
+                              </tr>
+                            </tfoot>
+                          )}
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* ── Total général ── */}
+                    <div className="rounded-2xl px-5 py-4 flex items-center justify-between" style={{ background: '#111827', color: 'white' }}>
+                      <span className="text-sm font-medium uppercase tracking-wider opacity-80">Total général</span>
+                      <span className="font-bold tabular-nums" style={{ fontSize: 24, letterSpacing: '-0.02em' }}>
+                        {fmtCHF(grandTotal)} <span className="text-sm opacity-70 ml-1">CHF</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
 
         {/* ── Aperçu dossier kDrive ── */}
