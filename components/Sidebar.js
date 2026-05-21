@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/schedule',               label: 'Horaires'   },
   { href: '/meeting',                label: 'Meeting'    },
   { href: '/factures-fournisseurs',  label: 'Fact. fournisseurs', section: 'Banque' },
+  { href: '/factures-emises',        label: 'Fact. émises', section: 'Banque' },
   { href: '/banque',                 label: 'Banque',    section: 'Banque' },
   { href: '/activity',               label: 'Activité'   },
   { href: '/display',                label: 'Atelier',   newTab: true },
