@@ -37,15 +37,15 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { title, project_id, responsible, execution_date, due_date, is_private, notes, category, category_data } = req.body
 
-    if (!title || !responsible || !execution_date) {
-      return res.status(400).json({ error: 'Champs obligatoires manquants' })
+    if (!title || !responsible) {
+      return res.status(400).json({ error: 'Titre et responsable requis' })
     }
 
     const { data, error } = await supabase.from('tasks').insert({
       title,
       project_id: project_id || null,
       responsible,
-      execution_date,
+      execution_date: execution_date || null,
       due_date: due_date || null,
       is_private: is_private || false,
       notes: notes || null,

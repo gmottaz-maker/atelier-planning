@@ -396,12 +396,11 @@ function AddTaskForm({ projectId, category, currentUser, onAdd, onCancel }) {
 function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
   const { responsibles } = useResponsibles()
   const vendorSuggestions = useSuggestions('vendor')
-  const todayStr = toDateStr(today())
   const [form, setForm] = useState({
     article: '',
     quantity: '',
     vendor: '',
-    order_date: todayStr,
+    order_date: '',
     expected_date: '',
     responsible: currentUser || DEFAULT_RESPONSIBLE,
   })
@@ -418,7 +417,7 @@ function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
         body: JSON.stringify({
           title: form.article.trim(),
           responsible: form.responsible,
-          execution_date: form.expected_date || form.order_date,
+          execution_date: form.expected_date || form.order_date || null,
           project_id: projectId,
           category: 'commande',
           category_data: {
@@ -683,11 +682,10 @@ function StorageLocationPicker({ onConfirm, onCancel, saving }) {
 function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
   const { responsibles } = useResponsibles()
   const subSuggestions = useSuggestions('subcontractor')
-  const todayStr = toDateStr(today())
   const [form, setForm] = useState({
     title: '',
     subcontractor: '',
-    drop_date: todayStr,
+    drop_date: '',
     expected_pickup_date: '',
     responsible: currentUser || DEFAULT_RESPONSIBLE,
   })
@@ -704,7 +702,7 @@ function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
         body: JSON.stringify({
           title: form.title.trim(),
           responsible: form.responsible,
-          execution_date: form.expected_pickup_date || form.drop_date,
+          execution_date: form.expected_pickup_date || form.drop_date || null,
           project_id: projectId,
           category: 'sous_traitance',
           category_data: {
