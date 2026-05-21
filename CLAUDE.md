@@ -147,7 +147,7 @@ Token GitHub : Personal Access Token, scope `repo`, à renouveler sur github.com
 Structure créée dans `ios/` mais setup CocoaPods non terminé.
 ```bash
 # Pour reprendre le setup iOS :
-cd ~/Downloads/atelier-planning/ios/App
+cd ~/Documents/atelier-planning/ios/App
 sudo gem install cocoapods
 pod install
 open App.xcworkspace
