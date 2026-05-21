@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/factures-fournisseurs',  label: 'Fact. fournisseurs', section: 'Banque' },
   { href: '/factures-emises',        label: 'Fact. émises', section: 'Banque' },
   { href: '/banque',                 label: 'Banque',    section: 'Banque' },
+  { href: '/compta',                 label: 'Compta',    section: 'Banque' },
   { href: '/activity',               label: 'Activité'   },
   { href: '/display',                label: 'Atelier',   newTab: true },
   { href: '/settings',               label: 'Réglages'   },

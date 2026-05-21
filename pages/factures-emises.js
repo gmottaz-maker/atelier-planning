@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
@@ -24,6 +25,7 @@ function effectiveStatus(inv) {
 }
 
 export default function FacturesEmises() {
+  const router = useRouter()
   const [invoices, setInvoices] = useState([])
   const [projects, setProjects] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -31,6 +33,16 @@ export default function FacturesEmises() {
   const [filter, setFilter]     = useState('all')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing]   = useState(null)
+  const [createForProject, setCreateForProject] = useState(null)
+
+  // Si on arrive avec ?from=projectId, ouvrir la création pré-remplie
+  useEffect(() => {
+    if (router.query.from && projects.length > 0 && !drawerOpen) {
+      setCreateForProject(String(router.query.from))
+      setEditing(null)
+      setDrawerOpen(true)
+    }
+  }, [router.query.from, projects.length])
 
   async function load() {
     setLoading(true)
@@ -152,18 +164,19 @@ export default function FacturesEmises() {
         <CustomerInvoiceDrawer
           invoice={editing}
           projects={projects}
-          onClose={() => { setDrawerOpen(false); setEditing(null) }}
-          onSaved={() => { setDrawerOpen(false); setEditing(null); load() }}
+          initialProjectId={createForProject}
+          onClose={() => { setDrawerOpen(false); setEditing(null); setCreateForProject(null) }}
+          onSaved={() => { setDrawerOpen(false); setEditing(null); setCreateForProject(null); load() }}
         />
       )}
     </div>
   )
 }
 
-function CustomerInvoiceDrawer({ invoice, projects, onClose, onSaved }) {
+function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, onSaved }) {
   const isEdit = !!invoice
   const [form, setForm] = useState({
-    project_id:     invoice?.project_id || '',
+    project_id:     invoice?.project_id || initialProjectId || '',
     client_name:    invoice?.client_name || '',
     client_address: invoice?.client_address || '',
     amount:         invoice?.amount ?? '',
@@ -178,6 +191,14 @@ function CustomerInvoiceDrawer({ invoice, projects, onClose, onSaved }) {
   const [error, setError]   = useState('')
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  // Auto-pré-remplir si on arrive depuis un projet
+  useEffect(() => {
+    if (!isEdit && initialProjectId && projects.length > 0) {
+      pickProject(initialProjectId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProjectId, projects.length])
 
   // Pré-remplir depuis le projet
   function pickProject(pid) {

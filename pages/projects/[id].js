@@ -2244,7 +2244,17 @@ export default function ProjectPage() {
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                           <polyline points="14 2 14 8 20 8" />
                         </svg>
-                        Générer le devis
+                        Devis PDF
+                      </a>
+                      <a href={`/factures-emises?from=${id}`}
+                        className="px-4 py-1.5 rounded-md text-sm font-medium text-white inline-flex items-center gap-1.5"
+                        style={{ background: '#111827' }}
+                        title={quoteDirty ? 'Enregistre d\'abord' : 'Convertir en facture officielle avec QR-bill'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="4" width="18" height="16" rx="2" />
+                          <path d="M3 10h18" />
+                        </svg>
+                        Convertir en facture
                       </a>
                     </div>
                   )}
