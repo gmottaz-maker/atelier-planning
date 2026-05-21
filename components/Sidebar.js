@@ -3,13 +3,15 @@ import { useRouter } from 'next/router'
 import { useAuth } from '../pages/_app'
 
 const NAV_ITEMS = [
-  { href: '/',         label: 'Projets'    },
-  { href: '/tasks',    label: 'Tâches'     },
-  { href: '/schedule', label: 'Horaires'   },
-  { href: '/meeting',  label: 'Meeting'    },
-  { href: '/activity', label: 'Activité'   },
-  { href: '/display',  label: 'Atelier',   newTab: true },
-  { href: '/settings', label: 'Réglages'   },
+  { href: '/',                       label: 'Projets'    },
+  { href: '/tasks',                  label: 'Tâches'     },
+  { href: '/schedule',               label: 'Horaires'   },
+  { href: '/meeting',                label: 'Meeting'    },
+  { href: '/factures-fournisseurs',  label: 'Fact. fournisseurs', section: 'Banque' },
+  { href: '/banque',                 label: 'Banque',    section: 'Banque' },
+  { href: '/activity',               label: 'Activité'   },
+  { href: '/display',                label: 'Atelier',   newTab: true },
+  { href: '/settings',               label: 'Réglages'   },
 ]
 
 export const SIDEBAR_WIDTH = 260
