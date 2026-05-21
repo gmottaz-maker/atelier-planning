@@ -7,6 +7,7 @@ import NavBar from '../../components/NavBar'
 import { useResponsibles } from '../../lib/useResponsibles'
 import { TASK_CATEGORIES } from '../../lib/taskCategories'
 import TaskFormDrawer from '../../components/TaskFormDrawer'
+import AutocompleteInput from '../../components/AutocompleteInput'
 import { useSuggestions } from '../../lib/useSuggestions'
 import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/AddressInput'
 
@@ -374,12 +375,16 @@ function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
         <input type="text" value={form.quantity}
           onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
           placeholder="Quantité" className={`${inp} w-24`} style={{ fontSize: 14 }} />
-        <input type="text" value={form.vendor} list="vendor-suggestions"
-          onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))}
-          placeholder="Vendeur" className={`${inp} flex-1`} style={{ fontSize: 14 }} />
-        <datalist id="vendor-suggestions">
-          {vendorSuggestions.map(v => <option key={v} value={v} />)}
-        </datalist>
+        <div className="flex-1">
+          <AutocompleteInput
+            value={form.vendor}
+            onChange={v => setForm(f => ({ ...f, vendor: v }))}
+            suggestions={vendorSuggestions}
+            placeholder="Vendeur"
+            className={inp}
+            style={{ fontSize: 14 }}
+          />
+        </div>
       </div>
       <div className="flex gap-2">
         <div className="flex-1">
@@ -654,12 +659,14 @@ function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
       <input autoFocus type="text" value={form.title}
         onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
         placeholder="Que sous-traiter ? (ex: Découpe panneaux)" className={inp} style={{ fontSize: 14 }} />
-      <input type="text" value={form.subcontractor} list="subcontractor-suggestions"
-        onChange={e => setForm(f => ({ ...f, subcontractor: e.target.value }))}
-        placeholder="Sous-traitant" className={inp} style={{ fontSize: 14 }} />
-      <datalist id="subcontractor-suggestions">
-        {subSuggestions.map(v => <option key={v} value={v} />)}
-      </datalist>
+      <AutocompleteInput
+        value={form.subcontractor}
+        onChange={v => setForm(f => ({ ...f, subcontractor: v }))}
+        suggestions={subSuggestions}
+        placeholder="Sous-traitant"
+        className={inp}
+        style={{ fontSize: 14 }}
+      />
       <div className="flex gap-2">
         <div className="flex-1">
           <label className="block text-[10px] text-gray-400 mb-0.5">Dépose</label>
