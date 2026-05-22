@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/meeting',                label: 'Meeting'    },
   { href: '/factures-fournisseurs',  label: 'Fact. fournisseurs', section: 'Banque', adminOnly: true },
   { href: '/factures-emises',        label: 'Fact. émises',       section: 'Banque', adminOnly: true },
+  { href: '/justificatifs',          label: 'Justificatifs',      section: 'Banque', adminOnly: true },
   { href: '/banque',                 label: 'Banque',             section: 'Banque', adminOnly: true },
   { href: '/compta',                 label: 'Compta',             section: 'Banque', adminOnly: true },
   { href: '/activity',               label: 'Activité'   },

@@ -71,9 +71,9 @@ export default async function handler(req, res) {
   for (const e of expenses || []) {
     rows.push({
       date:     e.date,
-      type:     'Frais',
+      type:     e.payment_method === 'company' ? 'Frais société' : 'Frais perso (à rembourser)',
       tiers:    e.merchant || e.user_name,
-      description: e.description || e.category || '',
+      description: `${e.user_name} — ${e.description || e.category || ''}`.trim(),
       reference: '',
       amount:   -Math.abs(e.amount || 0),
       currency: e.currency || 'CHF',

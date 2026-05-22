@@ -42,6 +42,7 @@ export default async function handler(req, res) {
     const {
       userName, date, amount, currency, category,
       merchant, description, receiptBase64, receiptMimeType,
+      payment_method,
     } = req.body
 
     if (!userName || !date) return res.status(400).json({ error: 'userName et date requis' })
@@ -73,6 +74,7 @@ export default async function handler(req, res) {
         merchant:    merchant || null,
         description: description || null,
         receipt_path,
+        payment_method: payment_method || 'personal',
       })
       .select()
       .single()

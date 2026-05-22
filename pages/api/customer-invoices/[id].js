@@ -14,11 +14,14 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
-    const allowed = ['client_name', 'client_address', 'amount', 'currency', 'issue_date',
+    const allowed = ['client_name', 'client_address', 'amount', 'amount_net', 'vat_rate', 'vat_amount',
+                     'currency', 'issue_date',
                      'due_date', 'iban_recipient', 'notes', 'status', 'quote_snapshot']
     const payload = { updated_at: new Date().toISOString() }
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
-    if (payload.amount != null) payload.amount = parseFloat(payload.amount)
+    for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount']) {
+      if (payload[k] != null) payload[k] = parseFloat(payload[k])
+    }
     const { data, error } = await supabase.from('customer_invoices').update(payload).eq('id', id).select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)

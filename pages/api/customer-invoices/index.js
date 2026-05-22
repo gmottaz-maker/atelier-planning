@@ -46,8 +46,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const {
-      project_id, client_name, client_address, amount, currency,
-      issue_date, due_date, iban_recipient, quote_snapshot, notes,
+      project_id, client_name, client_address, amount, amount_net, vat_rate, vat_amount,
+      currency, issue_date, due_date, iban_recipient, quote_snapshot, notes,
     } = req.body
 
     if (!client_name || amount == null) return res.status(400).json({ error: 'client_name et amount requis' })
@@ -62,6 +62,9 @@ export default async function handler(req, res) {
       client_name,
       client_address,
       amount: parseFloat(amount),
+      amount_net: amount_net != null && amount_net !== '' ? parseFloat(amount_net) : null,
+      vat_rate:   vat_rate   != null && vat_rate   !== '' ? parseFloat(vat_rate)   : null,
+      vat_amount: vat_amount != null && vat_amount !== '' ? parseFloat(vat_amount) : null,
       currency: currency || 'CHF',
       issue_date: issue_date || new Date().toISOString().slice(0, 10),
       due_date: due_date || null,

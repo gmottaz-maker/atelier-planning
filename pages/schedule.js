@@ -210,7 +210,7 @@ export default function SchedulePage() {
   const [expenses, setExpenses]           = useState([])
   const [expenseModal, setExpenseModal]   = useState(false)
   const [expEditId, setExpEditId]         = useState(null)
-  const EMPTY_EXP = { date: dateStr(new Date()), amount: '', currency: 'CHF', category: 'Autre', merchant: '', description: '' }
+  const EMPTY_EXP = { date: dateStr(new Date()), amount: '', currency: 'CHF', category: 'Autre', merchant: '', description: '', payment_method: 'personal' }
   const [expForm, setExpForm]             = useState(EMPTY_EXP)
   const [expReceiptB64, setExpReceiptB64] = useState(null)
   const [expReceiptMime, setExpReceiptMime] = useState(null)
@@ -393,7 +393,7 @@ export default function SchedulePage() {
 
   function openEditExpense(exp) {
     setExpEditId(exp.id)
-    setExpForm({ date: exp.date, amount: exp.amount ?? '', currency: exp.currency || 'CHF', category: exp.category || 'Autre', merchant: exp.merchant || '', description: exp.description || '' })
+    setExpForm({ date: exp.date, amount: exp.amount ?? '', currency: exp.currency || 'CHF', category: exp.category || 'Autre', merchant: exp.merchant || '', description: exp.description || '', payment_method: exp.payment_method || 'personal' })
     setExpReceiptB64(null); setExpReceiptMime(null)
     setExpReceiptPreview(exp.receipt_url || null)
     setExpScanError(''); setExpSaveError('')
@@ -457,6 +457,7 @@ export default function SchedulePage() {
           description:     expForm.description || null,
           receiptBase64:   expReceiptB64 || null,
           receiptMimeType: expReceiptMime || null,
+          payment_method:  expForm.payment_method || 'personal',
         }),
       })
       await loadExpenses()
@@ -1873,6 +1874,31 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
                     </button>
                   )
                 })}
+              </div>
+            </div>
+
+            {/* Mode de paiement */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-2">Mode de paiement</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, payment_method: 'personal' }))}
+                  className="py-2.5 rounded-md text-sm font-medium transition-colors border"
+                  style={form.payment_method === 'personal'
+                    ? { borderColor: '#f59e0b', background: '#fef3c7', color: '#92400e' }
+                    : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                  💳 Compte perso
+                  <span className="block text-[10px] opacity-75 font-normal">à rembourser</span>
+                </button>
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, payment_method: 'company' }))}
+                  className="py-2.5 rounded-md text-sm font-medium transition-colors border"
+                  style={form.payment_method === 'company'
+                    ? { borderColor: '#0ea5e9', background: '#e0f2fe', color: '#075985' }
+                    : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                  🏢 Carte société
+                  <span className="block text-[10px] opacity-75 font-normal">déjà payé</span>
+                </button>
               </div>
             </div>
 

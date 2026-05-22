@@ -188,6 +188,9 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
     supplier_name:     invoice?.supplier_name || '',
     invoice_number:    invoice?.invoice_number || '',
     amount:            invoice?.amount ?? '',
+    amount_net:        invoice?.amount_net ?? '',
+    vat_rate:          invoice?.vat_rate ?? '',
+    vat_amount:        invoice?.vat_amount ?? '',
     currency:          invoice?.currency || 'CHF',
     issue_date:        invoice?.issue_date || '',
     due_date:          invoice?.due_date || '',
@@ -205,6 +208,14 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
+  // Recalcul TVA automatique : si amount + rate → derive net et vat_amount
+  function recomputeFromGross(amount, rate) {
+    const a = parseFloat(amount), r = parseFloat(rate)
+    if (isNaN(a) || isNaN(r) || r < 0) return
+    const net = a / (1 + r / 100)
+    setForm(f => ({ ...f, amount_net: net.toFixed(2), vat_amount: (a - net).toFixed(2) }))
+  }
+
   async function onFile(file) {
     if (!file) return
     setScanError('')
@@ -214,11 +225,16 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
       r.onerror = reject
       r.readAsDataURL(file)
     })
-    setFilePreview({ name: file.name, mime: file.type, base64 })
+    const fp = { name: file.name, mime: file.type, base64 }
+    setFilePreview(fp)
+    // Auto-OCR si image
+    if (fp.mime.startsWith('image/')) {
+      await runScan(fp)
+    }
   }
 
-  async function scan() {
-    if (!filePreview || !filePreview.mime.startsWith('image/')) {
+  async function runScan(fp) {
+    if (!fp || !fp.mime.startsWith('image/')) {
       setScanError('Scan IA disponible uniquement pour les images (JPG/PNG)')
       return
     }
@@ -227,7 +243,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
       const r = await adminFetch('/api/supplier-invoices/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: filePreview.base64, mimeType: filePreview.mime }),
+        body: JSON.stringify({ image: fp.base64, mimeType: fp.mime }),
       })
       const d = await r.json()
       if (d.error) { setScanError(d.error); return }
@@ -236,15 +252,24 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
         supplier_name:     d.supplier_name || f.supplier_name,
         invoice_number:    d.invoice_number || f.invoice_number,
         amount:            d.amount != null ? String(d.amount) : f.amount,
+        amount_net:        d.amount_net != null ? String(d.amount_net) : f.amount_net,
+        vat_rate:          d.vat_rate != null ? String(d.vat_rate) : f.vat_rate,
+        vat_amount:        d.vat_amount != null ? String(d.vat_amount) : f.vat_amount,
         currency:          d.currency || f.currency,
         issue_date:        d.issue_date || f.issue_date,
         due_date:          d.due_date || f.due_date,
         payment_reference: d.payment_reference || f.payment_reference,
         iban:              d.iban || f.iban,
       }))
+      // Si OCR ne donne pas net/vat mais donne gross + rate, calculer
+      if (d.amount && d.vat_rate && d.amount_net == null) {
+        setTimeout(() => recomputeFromGross(d.amount, d.vat_rate), 0)
+      }
     } catch (e) { setScanError('Erreur IA') }
     finally { setScanLoading(false) }
   }
+
+  const scan = () => runScan(filePreview)
 
   async function save() {
     if (!form.supplier_name.trim() || !form.amount) {
@@ -378,14 +403,43 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
                 <input className={inputCls} value={form.category} onChange={e => set('category', e.target.value)} placeholder="Matériel, services..." />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Montant *</label>
-                <input type="number" step="0.01" className={inputCls} value={form.amount} onChange={e => set('amount', e.target.value)} />
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Total TTC *</label>
+                <input type="number" step="0.01" className={inputCls} value={form.amount}
+                  onChange={e => {
+                    set('amount', e.target.value)
+                    if (form.vat_rate) recomputeFromGross(e.target.value, form.vat_rate)
+                  }} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Devise</label>
                 <select className={inputCls} value={form.currency} onChange={e => set('currency', e.target.value)}>
                   <option>CHF</option><option>EUR</option><option>USD</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">TVA (%)</label>
+                <select className={inputCls} value={form.vat_rate}
+                  onChange={e => {
+                    set('vat_rate', e.target.value)
+                    if (form.amount) recomputeFromGross(form.amount, e.target.value)
+                  }}>
+                  <option value="">—</option>
+                  <option value="8.1">8.1% (normal)</option>
+                  <option value="2.6">2.6% (réduit)</option>
+                  <option value="3.8">3.8% (hébergement)</option>
+                  <option value="0">0% (exempt)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Montant HT</label>
+                <input type="number" step="0.01" className={inputCls} value={form.amount_net}
+                  onChange={e => set('amount_net', e.target.value)}
+                  placeholder="auto si TTC + taux" />
+              </div>
+              <div className="col-span-2 -mt-1">
+                <p className="text-xs text-gray-400">
+                  TVA : <span className="font-semibold text-gray-700 tabular-nums">{form.vat_amount ? `${form.vat_amount} ${form.currency}` : '—'}</span>
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Émise le</label>

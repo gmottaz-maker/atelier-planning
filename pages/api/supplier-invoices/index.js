@@ -24,7 +24,8 @@ export default async function handler(req, res) {
   // ── POST : créer ───────────────────────────────────────────────────────────
   if (req.method === 'POST') {
     const {
-      supplier_name, invoice_number, amount, currency, issue_date, due_date,
+      supplier_name, invoice_number, amount, amount_net, vat_rate, vat_amount,
+      currency, issue_date, due_date,
       payment_reference, iban, category, notes,
       file_base64, file_filename, file_mime_type,
       created_by,
@@ -52,6 +53,9 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase.from('supplier_invoices').insert({
       supplier_name, invoice_number, amount: parseFloat(amount),
+      amount_net:  amount_net  != null && amount_net  !== '' ? parseFloat(amount_net)  : null,
+      vat_rate:    vat_rate    != null && vat_rate    !== '' ? parseFloat(vat_rate)    : null,
+      vat_amount:  vat_amount  != null && vat_amount  !== '' ? parseFloat(vat_amount)  : null,
       currency: currency || 'CHF',
       issue_date: issue_date || null,
       due_date: due_date || null,

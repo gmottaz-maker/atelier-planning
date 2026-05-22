@@ -193,10 +193,18 @@ export default async function handler(req, res) {
     values: r => [r.trajet || '', r.description || '', fmtCHF(num(r.rate)), String(num(r.quantity) || ''), fmtCHF(num(r.rate)*num(r.quantity))],
   })
 
-  // ── Total ──────────────────────────────────────────────────────────────────
+  // ── Total avec décomposition TVA ───────────────────────────────────────────
   doc.moveDown(1.5)
-  doc.fontSize(11).fillColor('#111827').font('Helvetica-Bold')
-    .text(`TOTAL : ${fmtCHF(inv.amount)} ${inv.currency || 'CHF'}`, { align: 'right' })
+  const cur = inv.currency || 'CHF'
+  const hasVat = inv.amount_net != null && inv.vat_amount != null
+  if (hasVat) {
+    doc.fontSize(10).fillColor('#374151').font('Helvetica')
+      .text(`Sous-total HT : ${fmtCHF(inv.amount_net)} ${cur}`, { align: 'right' })
+      .text(`TVA ${inv.vat_rate != null ? inv.vat_rate + '%' : ''} : ${fmtCHF(inv.vat_amount)} ${cur}`, { align: 'right' })
+    doc.moveDown(0.4)
+  }
+  doc.fontSize(12).fillColor('#111827').font('Helvetica-Bold')
+    .text(`TOTAL TTC : ${fmtCHF(inv.amount)} ${cur}`, { align: 'right' })
 
   // Notes
   if (inv.notes) {

@@ -186,6 +186,7 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     client_name:    invoice?.client_name || '',
     client_address: invoice?.client_address || '',
     amount:         invoice?.amount ?? '',
+    vat_rate:       invoice?.vat_rate ?? '8.1',
     currency:       invoice?.currency || 'CHF',
     issue_date:     invoice?.issue_date || new Date().toISOString().slice(0, 10),
     due_date:       invoice?.due_date || '',
@@ -201,12 +202,16 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
-  // Recompute total when lines change
+  // Recompute total when lines change (les positions sont HT, on applique la TVA globale)
   const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
-  const recomputedTotal =
+  const linesNet =
     lines.purchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
     lines.labor.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
     lines.logistics.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
+  const vatRate     = num(form.vat_rate)
+  const linesVat    = linesNet * (vatRate / 100)
+  const linesGross  = linesNet + linesVat
+  const recomputedTotal = linesGross
 
   function genUid() { return `r_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` }
   function addLine(t) {
@@ -261,10 +266,19 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     setSaving(true); setError('')
     try {
       const hasLines = lines.purchases.length + lines.labor.length + lines.logistics.length > 0
-      const totalFromLines = hasLines ? recomputedTotal.toFixed(2) : form.amount
+      // Si on a des lignes: total HT vient des lignes; sinon: form.amount est déjà TTC saisi à la main
+      const gross = hasLines ? linesGross : num(form.amount)
+      const net   = hasLines ? linesNet   : (vatRate >= 0 ? gross / (1 + vatRate / 100) : gross)
+      const vat   = gross - net
       const snapshotToSave = hasLines ? lines : null
+      const baseBody = {
+        ...form,
+        amount: gross.toFixed(2),
+        amount_net: net.toFixed(2),
+        vat_amount: vat.toFixed(2),
+      }
       if (isEdit) {
-        const body = { ...form, amount: totalFromLines, quote_snapshot: snapshotToSave }
+        const body = { ...baseBody, quote_snapshot: snapshotToSave }
         const r = await adminFetch(`/api/customer-invoices/${invoice.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -275,7 +289,7 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
       } else {
         const p = projects.find(x => x.id === form.project_id)
         const fallbackSnap = hasLines ? lines : (p?.quote_data || null)
-        const body = { ...form, amount: totalFromLines, quote_snapshot: fallbackSnap }
+        const body = { ...baseBody, quote_snapshot: fallbackSnap }
         const r = await adminFetch('/api/customer-invoices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -344,11 +358,11 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                  Montant {(lines.purchases.length + lines.labor.length + lines.logistics.length) > 0 ? '(calculé)' : '*'}
+                  Total TTC {(lines.purchases.length + lines.labor.length + lines.logistics.length) > 0 ? '(calculé)' : '*'}
                 </label>
                 <input type="number" step="0.01" className={inputCls}
                   value={(lines.purchases.length + lines.labor.length + lines.logistics.length) > 0
-                    ? recomputedTotal.toFixed(2) : form.amount}
+                    ? linesGross.toFixed(2) : form.amount}
                   readOnly={(lines.purchases.length + lines.labor.length + lines.logistics.length) > 0}
                   onChange={e => set('amount', e.target.value)} />
               </div>
@@ -356,6 +370,15 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Devise</label>
                 <select className={inputCls} value={form.currency} onChange={e => set('currency', e.target.value)}>
                   <option>CHF</option><option>EUR</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">TVA</label>
+                <select className={inputCls} value={form.vat_rate} onChange={e => set('vat_rate', e.target.value)}>
+                  <option value="8.1">8.1% (normal)</option>
+                  <option value="2.6">2.6% (réduit)</option>
+                  <option value="3.8">3.8% (hébergement)</option>
+                  <option value="0">0% (exempt)</option>
                 </select>
               </div>
               <div>
@@ -389,13 +412,23 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
 
             {/* ── Positions ── */}
             <div className="border-t border-gray-100 pt-4">
-              <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: 14 }}>Positions</h3>
+              <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: 14 }}>Positions (HT)</h3>
               <LinesEditor lines={lines} addLine={addLine} updLine={updLine} rmLine={rmLine} />
-              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-baseline">
-                <span className="text-xs text-gray-500">Total recalculé</span>
-                <span className="font-semibold tabular-nums text-gray-900" style={{ fontSize: 16 }}>
-                  {recomputedTotal.toFixed(2)} {form.currency}
-                </span>
+              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+                <div className="flex justify-between items-baseline text-xs text-gray-600">
+                  <span>Sous-total HT</span>
+                  <span className="font-medium tabular-nums">{linesNet.toFixed(2)} {form.currency}</span>
+                </div>
+                <div className="flex justify-between items-baseline text-xs text-gray-600">
+                  <span>TVA {form.vat_rate}%</span>
+                  <span className="font-medium tabular-nums">{linesVat.toFixed(2)} {form.currency}</span>
+                </div>
+                <div className="flex justify-between items-baseline pt-1 border-t border-gray-100">
+                  <span className="text-xs text-gray-500 font-semibold">Total TTC</span>
+                  <span className="font-bold tabular-nums text-gray-900" style={{ fontSize: 16 }}>
+                    {linesGross.toFixed(2)} {form.currency}
+                  </span>
+                </div>
               </div>
             </div>
 
