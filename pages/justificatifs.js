@@ -33,6 +33,8 @@ export default function Justificatifs() {
   const [year, setYear]     = useState(new Date().getFullYear())
   const [filter, setFilter] = useState('all') // all | personal | company
   const [person, setPerson] = useState('all')
+  const [dragging, setDragging] = useState(false)
+  const [processing, setProcessing] = useState([])
 
   async function load() {
     setLoading(true)
@@ -45,6 +47,93 @@ export default function Justificatifs() {
   }
 
   useEffect(() => { load() }, [year, filter])
+
+  // ── Drop global sur la page ────────────────────────────────────────────────
+  useEffect(() => {
+    function onDragOver(e) {
+      if (e.dataTransfer?.types?.includes('Files')) {
+        e.preventDefault()
+        setDragging(true)
+      }
+    }
+    function onDragLeave(e) {
+      if (e.clientX === 0 && e.clientY === 0) setDragging(false)
+    }
+    function onDrop(e) {
+      e.preventDefault()
+      setDragging(false)
+      const files = Array.from(e.dataTransfer?.files || [])
+      files.forEach(processDroppedFile)
+    }
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('dragleave', onDragLeave)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('dragleave', onDragLeave)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [])
+
+  async function processDroppedFile(file) {
+    if (!file) return
+    const isImage = file.type.startsWith('image/')
+    const isPdf   = file.type === 'application/pdf'
+    if (!isImage && !isPdf) return
+    const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    setProcessing(p => [...p, { id, name: file.name, status: 'reading' }])
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const r = new FileReader()
+        r.onload = e => resolve(e.target.result.split(',')[1])
+        r.onerror = reject
+        r.readAsDataURL(file)
+      })
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'scanning' } : x))
+      const scanRes = await adminFetch('/api/expenses/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType: file.type }),
+      })
+      const scan = await scanRes.json()
+      const body = {
+        userName:        user?.name || 'Guillaume',
+        date:            scan.date || new Date().toISOString().slice(0, 10),
+        amount:          scan.amount ?? null,
+        currency:        scan.currency || 'CHF',
+        category:        scan.category || 'Autre',
+        merchant:        scan.merchant || null,
+        description:     scan.description || null,
+        receiptBase64:   base64,
+        receiptMimeType: file.type,
+        payment_method:  'personal',
+      }
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'uploading' } : x))
+      const r = await adminFetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done' } : x))
+      load()
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 3000)
+    } catch (e) {
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
+    }
+  }
+
+  async function togglePaymentMethod(row) {
+    const next = row.payment_method === 'company' ? 'personal' : 'company'
+    setRows(rs => rs.map(r => r.id === row.id ? { ...r, payment_method: next } : r))
+    await adminFetch(`/api/expenses?id=${row.id}&userName=${encodeURIComponent(row.user_name)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_method: next }),
+    })
+  }
 
   const visible = rows.filter(r => person === 'all' || r.user_name === person)
   const totals = visible.reduce((acc, r) => {
@@ -68,7 +157,52 @@ export default function Justificatifs() {
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
       <Head><title>Maze Project — Justificatifs</title></Head>
-      <NavBar title="Justificatifs de dépense" />
+      <NavBar title="Justificatifs de dépense">
+        <label className="px-4 py-2 text-sm font-medium rounded-md text-white cursor-pointer" style={{ background: PINK }}>
+          📁 Importer
+          <input type="file" multiple accept="image/*,application/pdf" className="hidden"
+            onChange={e => { Array.from(e.target.files || []).forEach(processDroppedFile); e.target.value = '' }} />
+        </label>
+      </NavBar>
+
+      {/* Overlay drop fullscreen */}
+      {dragging && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          style={{ background: 'rgba(17, 24, 39, 0.55)' }}>
+          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed" style={{ borderColor: '#111827' }}>
+            <div className="text-5xl mb-3">📥</div>
+            <p className="font-semibold text-gray-900" style={{ fontSize: 18 }}>Déposez votre justificatif ici</p>
+            <p className="text-sm text-gray-500 mt-1">JPG · PNG · PDF — l'IA va l'analyser</p>
+          </div>
+        </div>
+      )}
+
+      {/* Toast de progression */}
+      {processing.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-30 space-y-2 max-w-sm">
+          {processing.map(p => (
+            <div key={p.id} className="bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex items-center gap-3">
+              {p.status === 'done' ? (
+                <span className="text-green-600">✓</span>
+              ) : p.status === 'error' ? (
+                <span className="text-red-500">✕</span>
+              ) : (
+                <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                <p className="text-xs text-gray-500">
+                  {p.status === 'reading'   && 'Lecture…'}
+                  {p.status === 'scanning'  && 'Analyse IA…'}
+                  {p.status === 'uploading' && 'Sauvegarde…'}
+                  {p.status === 'done'      && 'Importé ✓'}
+                  {p.status === 'error'     && `Erreur : ${p.error}`}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
 
@@ -177,11 +311,13 @@ export default function Justificatifs() {
                     <td className="px-4 py-3 font-medium text-gray-900">{r.merchant || '—'}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{r.category}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
+                      <button onClick={() => togglePaymentMethod(r)}
+                        className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block hover:opacity-80 transition-opacity"
+                        title="Cliquer pour basculer perso ↔ société"
                         style={{ background: (PAYMENT_COLORS[r.payment_method || 'personal']) + '18',
                                  color: PAYMENT_COLORS[r.payment_method || 'personal'] }}>
                         {PAYMENT_LABELS[r.payment_method || 'personal']}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold tabular-nums text-gray-900">
                       {fmtCHF(r.amount)} <span className="text-xs font-normal text-gray-400">{r.currency || 'CHF'}</span>

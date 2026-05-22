@@ -32,14 +32,9 @@ export default async function handler(req, res) {
         messages: [{
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mimeType || 'image/jpeg',
-                data: image,
-              },
-            },
+            (mimeType || '').includes('pdf')
+              ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: image } }
+              : { type: 'image',    source: { type: 'base64', media_type: mimeType || 'image/jpeg', data: image } },
             {
               type: 'text',
               text: `Analyse ce reçu / ticket de caisse / facture et extrais les informations.
@@ -49,7 +44,8 @@ Réponds UNIQUEMENT avec un objet JSON valide (pas de markdown, pas de backticks
   "amount": nombre décimal ou null,
   "currency": "CHF" | "EUR" | "USD" (défaut CHF),
   "merchant": "nom du commerçant ou null",
-  "category": "Repas" | "Transport" | "Hébergement" | "Fournitures" | "Matériel" | "Autre"
+  "category": "Repas" | "Transport" | "Hébergement" | "Fournitures" | "Matériel" | "Autre",
+  "description": "court descriptif ou null"
 }`,
             },
           ],

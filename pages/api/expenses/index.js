@@ -90,6 +90,22 @@ export default async function handler(req, res) {
     })
   }
 
+  // ── PATCH – mise à jour partielle (admin: payment_method, etc.) ──────────
+  if (req.method === 'PATCH') {
+    const { id, userName } = req.query
+    if (!id) return res.status(400).json({ error: 'id requis' })
+    const allowed = ['payment_method', 'category', 'description', 'amount', 'merchant', 'date']
+    const payload = {}
+    for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
+    if (payload.amount != null) payload.amount = parseFloat(payload.amount)
+
+    let q = supabase.from('expenses').update(payload).eq('id', id)
+    if (userName) q = q.eq('user_name', userName)
+    const { data, error } = await q.select().single()
+    if (error) return res.status(500).json({ error: error.message })
+    return res.status(200).json(data)
+  }
+
   // ── DELETE – supprimer un frais ───────────────────────────────────────────
   if (req.method === 'DELETE') {
     const { id, userName } = req.query
