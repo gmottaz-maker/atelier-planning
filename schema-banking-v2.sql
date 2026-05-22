@@ -21,3 +21,7 @@ CREATE INDEX IF NOT EXISTS expenses_payment_method_idx ON expenses(payment_metho
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS amount_net  NUMERIC(12, 2);
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vat_rate    NUMERIC(5, 2);
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vat_amount  NUMERIC(12, 2);
+
+-- Détail TVA multi-taux (ex: [{ "rate": 8.1, "net": 50, "vat": 4.05 }, { "rate": 2.6, "net": 20, "vat": 0.52 }])
+ALTER TABLE expenses          ADD COLUMN IF NOT EXISTS vat_breakdown JSONB;
+ALTER TABLE supplier_invoices ADD COLUMN IF NOT EXISTS vat_breakdown JSONB;

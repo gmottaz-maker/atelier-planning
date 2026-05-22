@@ -105,6 +105,7 @@ export default function Justificatifs() {
         amount_net:      scan.amount_net ?? null,
         vat_rate:        scan.vat_rate ?? null,
         vat_amount:      scan.vat_amount ?? null,
+        vat_breakdown:   Array.isArray(scan.vat_breakdown) && scan.vat_breakdown.length > 0 ? scan.vat_breakdown : null,
         currency:        scan.currency || 'CHF',
         category:        scan.category || 'Autre',
         merchant:        scan.merchant || null,
@@ -113,6 +114,7 @@ export default function Justificatifs() {
         receiptMimeType: file.type,
         payment_method:  dropMode,
       }
+      const multiVat = Array.isArray(scan.vat_breakdown) && scan.vat_breakdown.length > 1
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'uploading' } : x))
       const r = await adminFetch('/api/expenses', {
         method: 'POST',
@@ -144,9 +146,9 @@ export default function Justificatifs() {
         return
       }
       if (d.error) throw new Error(d.error)
-      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done' } : x))
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done', multiVat, vatBreakdown: scan.vat_breakdown } : x))
       load()
-      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 3000)
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), multiVat ? 10000 : 3000)
     } catch (e) {
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
       setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
@@ -246,7 +248,12 @@ export default function Justificatifs() {
                   {p.status === 'reading'   && 'Lecture…'}
                   {p.status === 'scanning'  && 'Analyse IA…'}
                   {p.status === 'uploading' && 'Sauvegarde…'}
-                  {p.status === 'done'      && 'Importé ✓'}
+                  {p.status === 'done' && !p.multiVat && 'Importé ✓'}
+                  {p.status === 'done' && p.multiVat && (
+                    <span className="text-amber-700">
+                      Importé ✓ — ⚠ Plusieurs taux TVA détectés ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})
+                    </span>
+                  )}
                   {p.status === 'error'     && `Erreur : ${p.error}`}
                   {p.status === 'duplicate' && (
                     <>

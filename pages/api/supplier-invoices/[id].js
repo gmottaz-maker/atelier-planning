@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     const allowed = ['supplier_name', 'invoice_number', 'amount', 'amount_net', 'vat_rate', 'vat_amount',
-                     'currency', 'issue_date',
+                     'vat_breakdown', 'currency', 'issue_date',
                      'due_date', 'payment_reference', 'iban', 'category', 'notes', 'status']
     const payload = { updated_at: new Date().toISOString() }
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]

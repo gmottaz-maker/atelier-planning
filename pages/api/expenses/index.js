@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   // ── POST – créer un frais ─────────────────────────────────────────────────
   if (req.method === 'POST') {
     const {
-      userName, date, amount, amount_net, vat_rate, vat_amount,
+      userName, date, amount, amount_net, vat_rate, vat_amount, vat_breakdown,
       currency, category,
       merchant, description, receiptBase64, receiptMimeType,
       payment_method, force,
@@ -96,9 +96,10 @@ export default async function handler(req, res) {
         description: description || null,
         receipt_path,
         payment_method: payment_method || 'company',
-        amount_net:  amount_net  != null && amount_net  !== '' ? parseFloat(amount_net)  : null,
-        vat_rate:    vat_rate    != null && vat_rate    !== '' ? parseFloat(vat_rate)    : null,
-        vat_amount:  vat_amount  != null && vat_amount  !== '' ? parseFloat(vat_amount)  : null,
+        amount_net:    amount_net    != null && amount_net    !== '' ? parseFloat(amount_net)  : null,
+        vat_rate:      vat_rate      != null && vat_rate      !== '' ? parseFloat(vat_rate)    : null,
+        vat_amount:    vat_amount    != null && vat_amount    !== '' ? parseFloat(vat_amount)  : null,
+        vat_breakdown: Array.isArray(vat_breakdown) && vat_breakdown.length > 0 ? vat_breakdown : null,
       })
       .select()
       .single()
@@ -119,7 +120,7 @@ export default async function handler(req, res) {
     const { id, userName } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
     const allowed = ['payment_method', 'category', 'description', 'amount', 'amount_net',
-                     'vat_rate', 'vat_amount', 'merchant', 'date']
+                     'vat_rate', 'vat_amount', 'vat_breakdown', 'merchant', 'date']
     const payload = {}
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
     for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount']) {

@@ -44,14 +44,17 @@ Réponds UNIQUEMENT avec un JSON valide (pas de markdown) :
   "amount_net": montant HT (hors taxes) si visible, sinon null,
   "vat_rate": taux de TVA en % (ex: 8.1, 2.6, 0) ou null,
   "vat_amount": montant de TVA en CHF ou null,
+  "vat_breakdown": [{"rate": 8.1, "net": 100, "vat": 8.10}, ...] ou null (UNIQUEMENT si plusieurs taux différents),
   "currency": "CHF" | "EUR" | "USD" (défaut CHF),
   "issue_date": "YYYY-MM-DD" ou null,
   "due_date": "YYYY-MM-DD" ou null,
   "payment_reference": "référence QR/ESR/IBAN reference ou null (27 chiffres pour QR-bill suisse)",
   "iban": "IBAN du fournisseur ou null"
 }
-- Si seul le total TTC est visible mais pas la décomposition, mets amount, laisse amount_net/vat_rate/vat_amount à null.
-- Taux TVA suisses courants : 8.1% (normal depuis 2024), 2.6% (réduit), 3.8% (hébergement).
+- Si UN SEUL taux : vat_breakdown = null, remplis vat_rate/vat_amount.
+- Si PLUSIEURS taux : vat_breakdown = liste (1 entrée par taux). vat_rate/vat_amount peuvent rester null ou prendre le taux dominant.
+- Si seul le total TTC est visible, laisse amount_net/vat_rate/vat_amount à null.
+- Taux TVA suisses : 8.1% (normal depuis 2024), 2.6% (réduit), 3.8% (hébergement).
 - Si le QR-bill suisse est en bas de la facture, extrais la référence (27 chiffres) et l'IBAN du bénéficiaire.`,
             },
           ],
