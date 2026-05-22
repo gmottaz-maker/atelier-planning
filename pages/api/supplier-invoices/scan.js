@@ -14,6 +14,11 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY manquante' })
 
   try {
+    const isPdf = (mimeType || '').includes('pdf')
+    const contentBlock = isPdf
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: image } }
+      : { type: 'image',    source: { type: 'base64', media_type: mimeType || 'image/jpeg', data: image } }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -27,10 +32,7 @@ export default async function handler(req, res) {
         messages: [{
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mimeType || 'image/jpeg', data: image },
-            },
+            contentBlock,
             {
               type: 'text',
               text: `Analyse cette facture fournisseur et extrais ces infos.

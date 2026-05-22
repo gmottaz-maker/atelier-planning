@@ -40,6 +40,8 @@ export default function FacturesFournisseurs() {
   const [filter, setFilter]     = useState('all')   // all | pending | paid | overdue
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing]   = useState(null)
+  const [dragging, setDragging] = useState(false)
+  const [processing, setProcessing] = useState([])  // queue de fichiers en cours
 
   async function load() {
     setLoading(true)
@@ -51,6 +53,91 @@ export default function FacturesFournisseurs() {
   }
 
   useEffect(() => { load() }, [year])
+
+  // ── Drag global sur la page ──────────────────────────────────────────────
+  useEffect(() => {
+    function onDragOver(e) {
+      if (e.dataTransfer?.types?.includes('Files')) {
+        e.preventDefault()
+        setDragging(true)
+      }
+    }
+    function onDragLeave(e) {
+      if (e.clientX === 0 && e.clientY === 0) setDragging(false)
+    }
+    function onDrop(e) {
+      e.preventDefault()
+      setDragging(false)
+      const files = Array.from(e.dataTransfer?.files || [])
+      files.forEach(processDroppedFile)
+    }
+    window.addEventListener('dragover', onDragOver)
+    window.addEventListener('dragleave', onDragLeave)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragover', onDragOver)
+      window.removeEventListener('dragleave', onDragLeave)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [])
+
+  async function processDroppedFile(file) {
+    if (!file) return
+    const isImage = file.type.startsWith('image/')
+    const isPdf   = file.type === 'application/pdf'
+    if (!isImage && !isPdf) return
+    const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    setProcessing(p => [...p, { id, name: file.name, status: 'reading' }])
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const r = new FileReader()
+        r.onload = e => resolve(e.target.result.split(',')[1])
+        r.onerror = reject
+        r.readAsDataURL(file)
+      })
+      // Scan IA
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'scanning' } : x))
+      const scanRes = await adminFetch('/api/supplier-invoices/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType: file.type }),
+      })
+      const scan = await scanRes.json()
+
+      // Création facture avec données scannées (ou champs vides si OCR a échoué)
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'uploading' } : x))
+      const body = {
+        supplier_name:     scan.supplier_name || 'À compléter',
+        invoice_number:    scan.invoice_number || null,
+        amount:            scan.amount ?? 0,
+        amount_net:        scan.amount_net ?? null,
+        vat_rate:          scan.vat_rate ?? null,
+        vat_amount:        scan.vat_amount ?? null,
+        currency:          scan.currency || 'CHF',
+        issue_date:        scan.issue_date || null,
+        due_date:          scan.due_date || null,
+        payment_reference: scan.payment_reference || null,
+        iban:              scan.iban || null,
+        file_base64:       base64,
+        file_filename:     file.name,
+        file_mime_type:    file.type,
+        created_by:        currentUser,
+      }
+      const r = await adminFetch('/api/supplier-invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done' } : x))
+      load()
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 3000)
+    } catch (e) {
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
+    }
+  }
 
   const visible = invoices.filter(inv => filter === 'all' ? true : dueStatus(inv) === filter)
   const totals = invoices.reduce((acc, inv) => {
@@ -67,10 +154,55 @@ export default function FacturesFournisseurs() {
       <Head><title>Maze Project — Factures fournisseurs</title></Head>
 
       <NavBar title="Factures fournisseurs">
+        <label className="px-4 py-2 text-sm font-medium rounded-md text-white cursor-pointer" style={{ background: PINK }}>
+          📁 Importer
+          <input type="file" multiple accept="image/*,application/pdf" className="hidden"
+            onChange={e => { Array.from(e.target.files || []).forEach(processDroppedFile); e.target.value = '' }} />
+        </label>
         <button onClick={() => { setEditing(null); setDrawerOpen(true) }}
-          className="px-4 py-2 text-sm font-medium rounded-md text-white"
-          style={{ background: PINK }}>+ Nouvelle facture</button>
+          className="ml-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:border-gray-400">
+          + Manuel
+        </button>
       </NavBar>
+
+      {/* Overlay drop fullscreen */}
+      {dragging && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          style={{ background: 'rgba(17, 24, 39, 0.55)' }}>
+          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed" style={{ borderColor: '#111827' }}>
+            <div className="text-5xl mb-3">📥</div>
+            <p className="font-semibold text-gray-900" style={{ fontSize: 18 }}>Déposez votre facture ici</p>
+            <p className="text-sm text-gray-500 mt-1">JPG · PNG · PDF — l'IA va l'analyser</p>
+          </div>
+        </div>
+      )}
+
+      {/* Toast de progression */}
+      {processing.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-30 space-y-2 max-w-sm">
+          {processing.map(p => (
+            <div key={p.id} className="bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex items-center gap-3">
+              {p.status === 'done' ? (
+                <span className="text-green-600">✓</span>
+              ) : p.status === 'error' ? (
+                <span className="text-red-500">✕</span>
+              ) : (
+                <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                <p className="text-xs text-gray-500">
+                  {p.status === 'reading'   && 'Lecture…'}
+                  {p.status === 'scanning'  && 'Analyse IA…'}
+                  {p.status === 'uploading' && 'Sauvegarde sur kDrive…'}
+                  {p.status === 'done'      && 'Importée ✓'}
+                  {p.status === 'error'     && `Erreur : ${p.error}`}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
 
