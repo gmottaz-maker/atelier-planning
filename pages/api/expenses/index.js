@@ -40,7 +40,8 @@ export default async function handler(req, res) {
   // ── POST – créer un frais ─────────────────────────────────────────────────
   if (req.method === 'POST') {
     const {
-      userName, date, amount, currency, category,
+      userName, date, amount, amount_net, vat_rate, vat_amount,
+      currency, category,
       merchant, description, receiptBase64, receiptMimeType,
       payment_method,
     } = req.body
@@ -75,6 +76,9 @@ export default async function handler(req, res) {
         description: description || null,
         receipt_path,
         payment_method: payment_method || 'personal',
+        amount_net:  amount_net  != null && amount_net  !== '' ? parseFloat(amount_net)  : null,
+        vat_rate:    vat_rate    != null && vat_rate    !== '' ? parseFloat(vat_rate)    : null,
+        vat_amount:  vat_amount  != null && vat_amount  !== '' ? parseFloat(vat_amount)  : null,
       })
       .select()
       .single()
@@ -94,10 +98,13 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     const { id, userName } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
-    const allowed = ['payment_method', 'category', 'description', 'amount', 'merchant', 'date']
+    const allowed = ['payment_method', 'category', 'description', 'amount', 'amount_net',
+                     'vat_rate', 'vat_amount', 'merchant', 'date']
     const payload = {}
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
-    if (payload.amount != null) payload.amount = parseFloat(payload.amount)
+    for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount']) {
+      if (payload[k] != null) payload[k] = parseFloat(payload[k])
+    }
 
     let q = supabase.from('expenses').update(payload).eq('id', id)
     if (userName) q = q.eq('user_name', userName)

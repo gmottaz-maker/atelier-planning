@@ -102,6 +102,9 @@ export default function Justificatifs() {
         userName:        user?.name || 'Guillaume',
         date:            scan.date || new Date().toISOString().slice(0, 10),
         amount:          scan.amount ?? null,
+        amount_net:      scan.amount_net ?? null,
+        vat_rate:        scan.vat_rate ?? null,
+        vat_amount:      scan.vat_amount ?? null,
         currency:        scan.currency || 'CHF',
         category:        scan.category || 'Autre',
         merchant:        scan.merchant || null,
@@ -381,6 +384,9 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
   const [form, setForm] = useState({
     date:           row.date,
     amount:         row.amount ?? '',
+    amount_net:     row.amount_net ?? '',
+    vat_rate:       row.vat_rate ?? '',
+    vat_amount:     row.vat_amount ?? '',
     currency:       row.currency || 'CHF',
     category:       row.category || 'Autre',
     merchant:       row.merchant || '',
@@ -392,6 +398,14 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
   const [error, setError]   = useState('')
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  // Auto-calcul HT + TVA quand on change TTC ou taux
+  function recomputeFromGross(gross, rate) {
+    const g = parseFloat(gross), r = parseFloat(rate)
+    if (isNaN(g) || isNaN(r) || r < 0) return
+    const net = g / (1 + r / 100)
+    setForm(f => ({ ...f, amount_net: net.toFixed(2), vat_amount: (g - net).toFixed(2) }))
+  }
 
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose() }
@@ -408,7 +422,10 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: form.date,
-          amount: form.amount === '' ? null : parseFloat(form.amount),
+          amount:     form.amount     === '' ? null : parseFloat(form.amount),
+          amount_net: form.amount_net === '' ? null : parseFloat(form.amount_net),
+          vat_rate:   form.vat_rate   === '' ? null : parseFloat(form.vat_rate),
+          vat_amount: form.vat_amount === '' ? null : parseFloat(form.vat_amount),
           category: form.category,
           merchant: form.merchant,
           description: form.description,
@@ -467,8 +484,37 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
                 <input type="date" className={inputCls} value={form.date} onChange={e => set('date', e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Montant</label>
-                <input type="number" step="0.01" className={inputCls} value={form.amount} onChange={e => set('amount', e.target.value)} />
+                <label className="block text-xs font-medium text-gray-500 mb-1">Total TTC</label>
+                <input type="number" step="0.01" className={inputCls} value={form.amount}
+                  onChange={e => {
+                    set('amount', e.target.value)
+                    if (form.vat_rate) recomputeFromGross(e.target.value, form.vat_rate)
+                  }} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">TVA</label>
+                <select className={inputCls} value={form.vat_rate}
+                  onChange={e => {
+                    set('vat_rate', e.target.value)
+                    if (form.amount) recomputeFromGross(form.amount, e.target.value)
+                  }}>
+                  <option value="">—</option>
+                  <option value="8.1">8.1% (normal)</option>
+                  <option value="2.6">2.6% (réduit)</option>
+                  <option value="3.8">3.8% (hébergement)</option>
+                  <option value="0">0% (exempt)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Montant HT</label>
+                <input type="number" step="0.01" className={inputCls} value={form.amount_net}
+                  onChange={e => set('amount_net', e.target.value)}
+                  placeholder="auto si TTC + taux" />
+              </div>
+              <div className="col-span-2 -mt-1">
+                <p className="text-xs text-gray-400">
+                  TVA : <span className="font-semibold text-gray-700 tabular-nums">{form.vat_amount ? `${form.vat_amount} ${form.currency}` : '—'}</span>
+                </p>
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">Commerçant</label>

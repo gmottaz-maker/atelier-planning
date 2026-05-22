@@ -41,12 +41,17 @@ export default async function handler(req, res) {
 Réponds UNIQUEMENT avec un objet JSON valide (pas de markdown, pas de backticks) avec ces champs:
 {
   "date": "YYYY-MM-DD ou null",
-  "amount": nombre décimal ou null,
+  "amount": nombre décimal TTC ou null,
+  "amount_net": montant HT (hors taxes) si visible, sinon null,
+  "vat_rate": taux de TVA en % (ex: 8.1, 2.6, 0) ou null,
+  "vat_amount": montant de TVA en CHF ou null,
   "currency": "CHF" | "EUR" | "USD" (défaut CHF),
   "merchant": "nom du commerçant ou null",
   "category": "Repas" | "Transport" | "Hébergement" | "Fournitures" | "Matériel" | "Autre",
   "description": "court descriptif ou null"
-}`,
+}
+- Taux TVA suisses : 8.1% (normal depuis 2024), 2.6% (réduit alimentaire/livres), 3.8% (hébergement).
+- Si seul le total TTC est visible, laisse amount_net/vat_rate/vat_amount à null.`,
             },
           ],
         }],

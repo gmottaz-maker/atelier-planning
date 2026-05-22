@@ -16,3 +16,8 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'perso
 -- valeurs: 'personal' (carte/compte perso, à rembourser) | 'company' (carte société)
 
 CREATE INDEX IF NOT EXISTS expenses_payment_method_idx ON expenses(payment_method, date DESC);
+
+-- TVA sur les frais / justificatifs
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS amount_net  NUMERIC(12, 2);
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vat_rate    NUMERIC(5, 2);
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vat_amount  NUMERIC(12, 2);
