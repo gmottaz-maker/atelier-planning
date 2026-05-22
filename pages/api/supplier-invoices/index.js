@@ -28,11 +28,46 @@ export default async function handler(req, res) {
       currency, issue_date, due_date,
       payment_reference, iban, category, notes,
       file_base64, file_filename, file_mime_type,
-      created_by,
+      created_by, force,
     } = req.body
 
     if (!supplier_name || amount == null) {
       return res.status(400).json({ error: 'supplier_name et amount requis' })
+    }
+
+    // ── Détection de doublon ─────────────────────────────────────────────────
+    // Critère 1: même n° de facture chez le même fournisseur (très fiable)
+    // Critère 2: même montant + même fournisseur sur ±3 jours (heuristique)
+    if (!force) {
+      if (invoice_number && supplier_name) {
+        const { data: byNumber } = await supabase
+          .from('supplier_invoices')
+          .select('id, supplier_name, invoice_number, amount, issue_date')
+          .ilike('supplier_name', supplier_name)
+          .eq('invoice_number', invoice_number)
+          .limit(1)
+        if (byNumber && byNumber.length > 0) {
+          return res.status(409).json({ error: 'duplicate', duplicate_of: byNumber[0], match_on: 'invoice_number' })
+        }
+      }
+      if (issue_date && supplier_name) {
+        const amt = parseFloat(amount)
+        const d = new Date(issue_date)
+        const start = new Date(d); start.setDate(d.getDate() - 3)
+        const end   = new Date(d); end.setDate(d.getDate() + 3)
+        const dStr = (x) => x.toISOString().slice(0, 10)
+        const { data: byAmount } = await supabase
+          .from('supplier_invoices')
+          .select('id, supplier_name, invoice_number, amount, issue_date')
+          .ilike('supplier_name', supplier_name)
+          .eq('amount', amt)
+          .gte('issue_date', dStr(start))
+          .lte('issue_date', dStr(end))
+          .limit(1)
+        if (byAmount && byAmount.length > 0) {
+          return res.status(409).json({ error: 'duplicate', duplicate_of: byAmount[0], match_on: 'amount_date' })
+        }
+      }
     }
 
     let kdrive_file_id = null

@@ -36,7 +36,7 @@ export default function Justificatifs() {
   const [dragging, setDragging] = useState(false)
   const [processing, setProcessing] = useState([])
   const [editing, setEditing] = useState(null)
-  const [dropMode, setDropMode] = useState('personal') // mode appliqué aux prochains imports
+  const [dropMode, setDropMode] = useState('company') // mode appliqué aux prochains imports
 
   async function load() {
     setLoading(true)
@@ -120,6 +120,29 @@ export default function Justificatifs() {
         body: JSON.stringify(body),
       })
       const d = await r.json()
+      if (r.status === 409) {
+        const dup = d.duplicate_of
+        setProcessing(p => p.map(x => x.id === id ? {
+          ...x, status: 'duplicate',
+          duplicate: dup,
+          retry: async () => {
+            setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'uploading' } : xx))
+            const r2 = await adminFetch('/api/expenses', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...body, force: true }),
+            })
+            const d2 = await r2.json()
+            if (d2.error) {
+              setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'error', error: d2.error } : xx))
+            } else {
+              setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'done' } : xx))
+              load()
+              setTimeout(() => setProcessing(pp => pp.filter(xx => xx.id !== id)), 3000)
+            }
+          },
+        } : x))
+        return
+      }
       if (d.error) throw new Error(d.error)
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done' } : x))
       load()
@@ -212,6 +235,8 @@ export default function Justificatifs() {
                 <span className="text-green-600">✓</span>
               ) : p.status === 'error' ? (
                 <span className="text-red-500">✕</span>
+              ) : p.status === 'duplicate' ? (
+                <span className="text-amber-600">⚠</span>
               ) : (
                 <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />
               )}
@@ -223,6 +248,15 @@ export default function Justificatifs() {
                   {p.status === 'uploading' && 'Sauvegarde…'}
                   {p.status === 'done'      && 'Importé ✓'}
                   {p.status === 'error'     && `Erreur : ${p.error}`}
+                  {p.status === 'duplicate' && (
+                    <>
+                      Doublon détecté ({p.duplicate?.amount} CHF, {p.duplicate?.date}){' '}
+                      <button onClick={p.retry} className="ml-1 underline text-amber-700 hover:text-amber-900">Importer quand même</button>
+                      {' · '}
+                      <button onClick={() => setProcessing(pp => pp.filter(xx => xx.id !== p.id))}
+                        className="underline text-gray-500 hover:text-gray-700">Ignorer</button>
+                    </>
+                  )}
                 </p>
               </div>
             </div>

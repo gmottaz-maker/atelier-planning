@@ -210,7 +210,7 @@ export default function SchedulePage() {
   const [expenses, setExpenses]           = useState([])
   const [expenseModal, setExpenseModal]   = useState(false)
   const [expEditId, setExpEditId]         = useState(null)
-  const EMPTY_EXP = { date: dateStr(new Date()), amount: '', currency: 'CHF', category: 'Autre', merchant: '', description: '', payment_method: 'personal' }
+  const EMPTY_EXP = { date: dateStr(new Date()), amount: '', currency: 'CHF', category: 'Autre', merchant: '', description: '', payment_method: 'company' }
   const [expForm, setExpForm]             = useState(EMPTY_EXP)
   const [expReceiptB64, setExpReceiptB64] = useState(null)
   const [expReceiptMime, setExpReceiptMime] = useState(null)
@@ -1882,7 +1882,7 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
               <label className="block text-xs font-medium text-gray-500 mb-2">Mode de paiement</label>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button"
-                  onClick={() => setForm(f => ({ ...f, payment_method: 'personal' }))}
+                  onClick={() => setForm(f => ({ ...f, payment_method: 'company' }))}
                   className="py-2.5 rounded-md text-sm font-medium transition-colors border"
                   style={form.payment_method === 'personal'
                     ? { borderColor: '#f59e0b', background: '#fef3c7', color: '#92400e' }

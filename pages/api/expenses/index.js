@@ -43,10 +43,30 @@ export default async function handler(req, res) {
       userName, date, amount, amount_net, vat_rate, vat_amount,
       currency, category,
       merchant, description, receiptBase64, receiptMimeType,
-      payment_method,
+      payment_method, force,
     } = req.body
 
     if (!userName || !date) return res.status(400).json({ error: 'userName et date requis' })
+
+    // ── Détection de doublon (même date + montant + utilisateur, ±1 jour) ───
+    if (!force && amount != null) {
+      const amt = parseFloat(amount)
+      const d   = new Date(date)
+      const dayBefore = new Date(d); dayBefore.setDate(d.getDate() - 1)
+      const dayAfter  = new Date(d); dayAfter.setDate(d.getDate() + 1)
+      const dStr = (x) => x.toISOString().slice(0, 10)
+      const { data: existing } = await supabase
+        .from('expenses')
+        .select('id, date, amount, merchant, category, payment_method')
+        .eq('user_name', userName)
+        .eq('amount', amt)
+        .gte('date', dStr(dayBefore))
+        .lte('date', dStr(dayAfter))
+        .limit(1)
+      if (existing && existing.length > 0) {
+        return res.status(409).json({ error: 'duplicate', duplicate_of: existing[0] })
+      }
+    }
 
     let receipt_path = null
 
@@ -75,7 +95,7 @@ export default async function handler(req, res) {
         merchant:    merchant || null,
         description: description || null,
         receipt_path,
-        payment_method: payment_method || 'personal',
+        payment_method: payment_method || 'company',
         amount_net:  amount_net  != null && amount_net  !== '' ? parseFloat(amount_net)  : null,
         vat_rate:    vat_rate    != null && vat_rate    !== '' ? parseFloat(vat_rate)    : null,
         vat_amount:  vat_amount  != null && vat_amount  !== '' ? parseFloat(vat_amount)  : null,
