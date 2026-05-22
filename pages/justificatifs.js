@@ -35,6 +35,8 @@ export default function Justificatifs() {
   const [person, setPerson] = useState('all')
   const [dragging, setDragging] = useState(false)
   const [processing, setProcessing] = useState([])
+  const [editing, setEditing] = useState(null)
+  const [dropMode, setDropMode] = useState('personal') // mode appliqué aux prochains imports
 
   async function load() {
     setLoading(true)
@@ -106,7 +108,7 @@ export default function Justificatifs() {
         description:     scan.description || null,
         receiptBase64:   base64,
         receiptMimeType: file.type,
-        payment_method:  'personal',
+        payment_method:  dropMode,
       }
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'uploading' } : x))
       const r = await adminFetch('/api/expenses', {
@@ -158,6 +160,22 @@ export default function Justificatifs() {
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
       <Head><title>Maze Project — Justificatifs</title></Head>
       <NavBar title="Justificatifs de dépense">
+        <div className="flex items-center gap-1.5 bg-gray-100 rounded-md p-0.5 mr-2">
+          <button onClick={() => setDropMode('personal')}
+            className="px-2.5 py-1 rounded text-xs font-semibold transition-colors"
+            style={dropMode === 'personal'
+              ? { background: 'white', color: '#92400e', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+              : { background: 'transparent', color: '#6b7280' }}>
+            💳 Perso
+          </button>
+          <button onClick={() => setDropMode('company')}
+            className="px-2.5 py-1 rounded text-xs font-semibold transition-colors"
+            style={dropMode === 'company'
+              ? { background: 'white', color: '#075985', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+              : { background: 'transparent', color: '#6b7280' }}>
+            🏢 Société
+          </button>
+        </div>
         <label className="px-4 py-2 text-sm font-medium rounded-md text-white cursor-pointer" style={{ background: PINK }}>
           📁 Importer
           <input type="file" multiple accept="image/*,application/pdf" className="hidden"
@@ -171,8 +189,13 @@ export default function Justificatifs() {
           style={{ background: 'rgba(17, 24, 39, 0.55)' }}>
           <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed" style={{ borderColor: '#111827' }}>
             <div className="text-5xl mb-3">📥</div>
-            <p className="font-semibold text-gray-900" style={{ fontSize: 18 }}>Déposez votre justificatif ici</p>
-            <p className="text-sm text-gray-500 mt-1">JPG · PNG · PDF — l'IA va l'analyser</p>
+            <p className="font-semibold text-gray-900" style={{ fontSize: 18 }}>
+              Déposez votre justificatif ici
+            </p>
+            <p className="text-sm mt-1" style={{ color: dropMode === 'personal' ? '#92400e' : '#075985' }}>
+              Mode : {dropMode === 'personal' ? '💳 Perso (à rembourser)' : '🏢 Société (carte)'}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">JPG · PNG · PDF — l'IA va l'analyser</p>
           </div>
         </div>
       )}
@@ -297,7 +320,8 @@ export default function Justificatifs() {
               </thead>
               <tbody>
                 {visible.map(r => (
-                  <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50">
+                  <tr key={r.id} onClick={() => setEditing(r)}
+                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer">
                     <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(r.date)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -311,7 +335,7 @@ export default function Justificatifs() {
                     <td className="px-4 py-3 font-medium text-gray-900">{r.merchant || '—'}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{r.category}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => togglePaymentMethod(r)}
+                      <button onClick={e => { e.stopPropagation(); togglePaymentMethod(r) }}
                         className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block hover:opacity-80 transition-opacity"
                         title="Cliquer pour basculer perso ↔ société"
                         style={{ background: (PAYMENT_COLORS[r.payment_method || 'personal']) + '18',
@@ -325,6 +349,7 @@ export default function Justificatifs() {
                     <td className="px-4 py-3 text-center">
                       {r.receipt_url ? (
                         <a href={r.receipt_url} target="_blank" rel="noopener"
+                          onClick={e => e.stopPropagation()}
                           className="text-xs text-gray-500 hover:text-gray-900 underline">voir</a>
                       ) : <span className="text-xs text-gray-300">—</span>}
                     </td>
@@ -335,6 +360,171 @@ export default function Justificatifs() {
           </div>
         )}
       </main>
+
+      {editing && (
+        <JustificatifDrawer
+          row={editing}
+          people={allPeople.length ? allPeople : ['Arnaud', 'Gabin', 'Guillaume']}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load() }}
+        />
+      )}
     </div>
+  )
+}
+
+// ─── Drawer édition justificatif ───────────────────────────────────────────
+
+const CATEGORIES = ['Repas', 'Transport', 'Hébergement', 'Fournitures', 'Matériel', 'Autre']
+
+function JustificatifDrawer({ row, people, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    date:           row.date,
+    amount:         row.amount ?? '',
+    currency:       row.currency || 'CHF',
+    category:       row.category || 'Autre',
+    merchant:       row.merchant || '',
+    description:    row.description || '',
+    payment_method: row.payment_method || 'personal',
+    user_name:      row.user_name,
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  async function save() {
+    setSaving(true); setError('')
+    try {
+      const params = new URLSearchParams({ id: String(row.id), userName: row.user_name })
+      const r = await adminFetch(`/api/expenses?${params}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: form.date,
+          amount: form.amount === '' ? null : parseFloat(form.amount),
+          category: form.category,
+          merchant: form.merchant,
+          description: form.description,
+          payment_method: form.payment_method,
+        }),
+      })
+      const d = await r.json()
+      if (d.error) { setError(d.error); return }
+      onSaved()
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  async function del() {
+    if (!confirm('Supprimer ce justificatif et son reçu ?')) return
+    const params = new URLSearchParams({ id: String(row.id), userName: row.user_name })
+    await adminFetch(`/api/expenses?${params}`, { method: 'DELETE' })
+    onSaved()
+  }
+
+  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none"
+
+  return (
+    <>
+      <style>{`@keyframes drawerSlide { from { transform: translateX(100%);} to { transform: translateX(0);} }`}</style>
+      <div className="fixed inset-0 z-50" style={{ background: 'rgba(15,23,42,0.35)' }}
+        onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="fixed top-0 right-0 bottom-0 bg-white flex flex-col shadow-2xl"
+          style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s ease both', fontFamily: 'Inter, sans-serif' }}>
+
+          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Justificatif · {form.user_name}</p>
+              <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>{form.merchant || 'Sans commerçant'}</h2>
+            </div>
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100" style={{ fontSize: 22 }}>×</button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
+            {row.receipt_url && (
+              <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                <a href={row.receipt_url} target="_blank" rel="noopener" className="block">
+                  <img src={row.receipt_url} alt="reçu" style={{ maxHeight: 280, width: '100%', objectFit: 'contain' }}
+                    onError={e => { e.currentTarget.style.display = 'none' }} />
+                </a>
+                <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Reçu attaché</span>
+                  <a href={row.receipt_url} target="_blank" rel="noopener" className="text-xs text-gray-700 underline">Ouvrir en grand</a>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                <input type="date" className={inputCls} value={form.date} onChange={e => set('date', e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Montant</label>
+                <input type="number" step="0.01" className={inputCls} value={form.amount} onChange={e => set('amount', e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Commerçant</label>
+                <input className={inputCls} value={form.merchant} onChange={e => set('merchant', e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
+                <select className={inputCls} value={form.category} onChange={e => set('category', e.target.value)}>
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                <textarea rows={2} className={inputCls} value={form.description} onChange={e => set('description', e.target.value)} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-2">Mode de paiement</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button"
+                    onClick={() => set('payment_method', 'personal')}
+                    className="py-2.5 rounded-md text-sm font-medium border"
+                    style={form.payment_method === 'personal'
+                      ? { borderColor: '#f59e0b', background: '#fef3c7', color: '#92400e' }
+                      : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                    💳 Compte perso
+                    <span className="block text-[10px] opacity-75 font-normal">à rembourser</span>
+                  </button>
+                  <button type="button"
+                    onClick={() => set('payment_method', 'company')}
+                    className="py-2.5 rounded-md text-sm font-medium border"
+                    style={form.payment_method === 'company'
+                      ? { borderColor: '#0ea5e9', background: '#e0f2fe', color: '#075985' }
+                      : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                    🏢 Carte société
+                    <span className="block text-[10px] opacity-75 font-normal">déjà payé</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {error && <p className="text-xs text-red-500">{error}</p>}
+          </div>
+
+          <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+            <button onClick={del} className="text-sm font-medium text-red-500 hover:text-red-700">Supprimer</button>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Annuler</button>
+              <button onClick={save} disabled={saving}
+                className="px-5 py-2 rounded-md text-white font-medium text-sm disabled:opacity-50"
+                style={{ background: '#111827' }}>
+                {saving ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   )
 }
