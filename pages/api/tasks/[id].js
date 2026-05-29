@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { notifyTeam } from '../../../lib/push-server'
+import * as todoist from '../../../lib/todoist'
 
 function getSupabase() {
   return createClient(
@@ -74,9 +75,9 @@ export default async function handler(req, res) {
       updates.completed_at = null
     }
 
-    // Récupère la version précédente pour détecter les transitions de catégorie
+    // Récupère la version précédente pour détecter les transitions de catégorie + sync Todoist
     const { data: prevTask } = await supabase
-      .from('tasks').select('category, category_data, project_id, projects(name)').eq('id', id).maybeSingle()
+      .from('tasks').select('category, category_data, project_id, responsible, todoist_id, projects(name)').eq('id', id).maybeSingle()
 
     const { data, error } = await supabase
       .from('tasks')
@@ -101,14 +102,43 @@ export default async function handler(req, res) {
     // Push notifications sur transitions de catégorie
     await maybeNotifyTransition(prevTask, data, actor)
 
+    // ── Sync Todoist (Maze → Todoist) ────────────────────────────────────────
+    if (todoist.todoistEnabled()) {
+      const SYNC  = todoist.TODOIST_SYNC_USER
+      const isMine = data.responsible === SYNC
+      const tid   = data.todoist_id || prevTask?.todoist_id || null
+
+      if (isMine && !tid) {
+        // Devenue mienne (réassignée à Guillaume) → créer dans Todoist
+        const newTid = await todoist.createTask(data)
+        if (newTid) {
+          await supabase.from('tasks').update({ todoist_id: newTid }).eq('id', id)
+          data.todoist_id = newTid
+          if (data.status === 'completed') await todoist.closeTask(newTid)
+        }
+      } else if (isMine && tid) {
+        // Mise à jour titre/date + propagation de la complétion
+        await todoist.updateTask(tid, data)
+        if (data.status === 'completed') await todoist.closeTask(tid)
+        else if (data.status === 'active') await todoist.reopenTask(tid)
+      } else if (!isMine && tid) {
+        // Réassignée à quelqu'un d'autre → retirer de mon inbox Todoist
+        await todoist.deleteTask(tid)
+        await supabase.from('tasks').update({ todoist_id: null }).eq('id', id)
+        data.todoist_id = null
+      }
+    }
+
     return res.status(200).json(data)
   }
 
   if (req.method === 'DELETE') {
     const { data: taskData } = await supabase
-      .from('tasks').select('id, title, responsible').eq('id', id).single()
+      .from('tasks').select('id, title, responsible, todoist_id').eq('id', id).single()
     const { error } = await supabase.from('tasks').delete().eq('id', id)
     if (error) return res.status(500).json({ error: error.message })
+    // Sync Todoist : supprimer la tâche liée
+    if (taskData?.todoist_id) await todoist.deleteTask(taskData.todoist_id)
     await logActivity(supabase, actor, 'task_deleted', taskData)
     return res.status(200).json({ ok: true })
   }

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import * as todoist from '../../../lib/todoist'
 
 function getSupabase() {
   return createClient(
@@ -57,6 +58,15 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message })
 
     await logActivity(supabase, actor, 'task_created', data)
+
+    // Sync Todoist : tâches de Guillaume → inbox Todoist
+    if (data.responsible === todoist.TODOIST_SYNC_USER && todoist.todoistEnabled()) {
+      const tid = await todoist.createTask(data)
+      if (tid) {
+        await supabase.from('tasks').update({ todoist_id: tid }).eq('id', data.id)
+        data.todoist_id = tid
+      }
+    }
 
     return res.status(201).json(data)
   }
