@@ -367,21 +367,29 @@ function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
   }
 
   const inp = "px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white w-full"
+  const lbl = "block text-[10px] text-gray-400 mb-0.5"
   return (
     <form onSubmit={handleSubmit} className="pt-2 pb-1 space-y-2">
-      <input autoFocus type="text" value={form.article}
-        onChange={e => setForm(f => ({ ...f, article: e.target.value }))}
-        placeholder="Article (ex: Vis M6 inox)" className={inp} style={{ fontSize: 14 }} />
+      <div>
+        <label className={lbl}>Article *</label>
+        <input autoFocus type="text" value={form.article}
+          onChange={e => setForm(f => ({ ...f, article: e.target.value }))}
+          placeholder="ex: Vis M6 inox" className={inp} style={{ fontSize: 14 }} />
+      </div>
       <div className="flex gap-2">
-        <input type="text" value={form.quantity}
-          onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-          placeholder="Quantité" className={`${inp} w-24`} style={{ fontSize: 14 }} />
+        <div className="w-24">
+          <label className={lbl}>Quantité</label>
+          <input type="text" value={form.quantity}
+            onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+            placeholder="ex: 10" className={inp} style={{ fontSize: 14 }} />
+        </div>
         <div className="flex-1">
+          <label className={lbl}>Vendeur</label>
           <AutocompleteInput
             value={form.vendor}
             onChange={v => setForm(f => ({ ...f, vendor: v }))}
             suggestions={vendorSuggestions}
-            placeholder="Vendeur"
+            placeholder="Nom du vendeur (autocomplete)"
             className={inp}
             style={{ fontSize: 14 }}
           />
@@ -389,23 +397,26 @@ function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
       </div>
       <div className="flex gap-2">
         <div className="flex-1">
-          <label className="block text-[10px] text-gray-400 mb-0.5">Commandé le</label>
+          <label className={lbl}>Commandé le</label>
           <input type="date" value={form.order_date}
             onChange={e => setForm(f => ({ ...f, order_date: e.target.value }))}
             className={inp} style={{ fontSize: 14 }} />
         </div>
         <div className="flex-1">
-          <label className="block text-[10px] text-gray-400 mb-0.5">Réception prévue</label>
+          <label className={lbl}>Réception prévue</label>
           <input type="date" value={form.expected_date}
             onChange={e => setForm(f => ({ ...f, expected_date: e.target.value }))}
             className={inp} style={{ fontSize: 14 }} />
         </div>
       </div>
-      <select value={form.responsible}
-        onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))}
-        className={inp} style={{ fontSize: 14 }}>
-        {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
-      </select>
+      <div>
+        <label className={lbl}>Responsable</label>
+        <select value={form.responsible}
+          onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))}
+          className={inp} style={{ fontSize: 14 }}>
+          {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </div>
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !form.article.trim()}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
