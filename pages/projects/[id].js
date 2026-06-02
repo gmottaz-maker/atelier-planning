@@ -2581,10 +2581,10 @@ export default function ProjectPage() {
                                     <th className={th + ' text-right'} style={{ width: '13%' }}>Prix d'achat</th>
                                     <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
                                     <th className={th} style={{ width: '10%' }}>Unité</th>
-                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Total</th>
+                                    <th className={th + ' text-right'} style={{ width: '6%' }}>Total</th>
                                     <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
                                     <th className={th + ' text-right'} style={{ width: '8%' }}>Total facturé</th>
-                                    <th className={th} style={{ width: '2%' }}></th>
+                                    <th className={th} style={{ width: '4%' }}></th>
                                   </tr>
                                 </thead>
                                 <tbody>
