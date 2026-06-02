@@ -265,6 +265,14 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
           flatLabor.push({ ...r, item: itemName, _uid: r._uid || genUid() })
         }
       }
+      // Sous-traitance → ligne labor "Sous-traitance · <description>"
+      for (const r of (q.subcontracting || [])) {
+        flatLabor.push({
+          ...r,
+          item: r.item ? `Sous-traitance · ${r.item}` : 'Sous-traitance',
+          _uid: r._uid || genUid(),
+        })
+      }
     } else {
       // Ancien format
       flatPurchases = (q.purchases || []).map(r => ({ ...r, _uid: r._uid || genUid() }))

@@ -944,8 +944,8 @@ export default function ProjectPage() {
   const [updateError, setUpdateError] = useState('')
   const [updateDragging, setUpdateDragging] = useState(false)
 
-  // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], logistics:[] }
-  const EMPTY_QUOTE = { management: [], items: [], logistics: [] }
+  // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], subcontracting:[], logistics:[] }
+  const EMPTY_QUOTE = { management: [], items: [], subcontracting: [], logistics: [] }
   const [quote, setQuote] = useState(EMPTY_QUOTE)
   const [quoteDirty, setQuoteDirty] = useState(false)
   const [quoteSaving, setQuoteSaving] = useState(false)
@@ -992,13 +992,16 @@ export default function ProjectPage() {
         if (proj.site_visit_summary) setVisitSummary(proj.site_visit_summary)
         if (proj.quote_data) {
           const q = proj.quote_data
-          // Nouveau format : { management, items, logistics }
+          // Nouveau format : { management, items, subcontracting, logistics }
           if (Array.isArray(q.items) || Array.isArray(q.management)) {
-            if ((q.management?.length || 0) + (q.items?.length || 0) + (q.logistics?.length || 0) > 0) {
+            const totalLines = (q.management?.length || 0) + (q.items?.length || 0)
+              + (q.subcontracting?.length || 0) + (q.logistics?.length || 0)
+            if (totalLines > 0) {
               setQuote({
-                management: q.management || [],
-                items:      q.items || [],
-                logistics:  q.logistics || [],
+                management:     q.management || [],
+                items:          q.items || [],
+                subcontracting: q.subcontracting || [],
+                logistics:      q.logistics || [],
               })
               setQuoteExpanded(true)
             }
@@ -1014,6 +1017,7 @@ export default function ProjectPage() {
                     labor:     q.labor || [],
                   }]
                 : [],
+              subcontracting: [],
               logistics: q.logistics || [],
             }
             setQuote(migrated)
@@ -1256,6 +1260,7 @@ export default function ProjectPage() {
   function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '' } }
   function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '', quantity: '', unit: '' } }
   function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '' } }
+  function emptySubcontractingRow(){ return { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '', unit: '' } }
 
   // ── Gestion (lignes de main d'œuvre globales) ──
   function addManagementRow() {
@@ -1282,6 +1287,20 @@ export default function ProjectPage() {
   }
   function removeLogisticsRow(idx) {
     setQuote(q => ({ ...q, logistics: q.logistics.filter((_, i) => i !== idx) }))
+    setQuoteDirty(true)
+  }
+
+  // ── Sous-traitance ──
+  function addSubcontractingRow() {
+    setQuote(q => ({ ...q, subcontracting: [...(q.subcontracting || []), emptySubcontractingRow()] }))
+    setQuoteDirty(true)
+  }
+  function updateSubcontractingRow(idx, field, value) {
+    setQuote(q => ({ ...q, subcontracting: (q.subcontracting || []).map((r, i) => i === idx ? { ...r, [field]: value } : r) }))
+    setQuoteDirty(true)
+  }
+  function removeSubcontractingRow(idx) {
+    setQuote(q => ({ ...q, subcontracting: (q.subcontracting || []).filter((_, i) => i !== idx) }))
     setQuoteDirty(true)
   }
 
@@ -2305,10 +2324,11 @@ export default function ProjectPage() {
         {/* ── Offre ── */}
         <div className="mt-12 no-print">
           {(() => {
-            const managementTotal = quote.management.reduce((s, r) => s + serviceTotal(r), 0)
-            const itemsTotal      = quote.items.reduce((s, it) => s + itemTotal(it), 0)
-            const logisticsTotal  = quote.logistics.reduce((s, r) => s + serviceTotal(r), 0)
-            const grandTotal      = managementTotal + itemsTotal + logisticsTotal
+            const managementTotal     = quote.management.reduce((s, r) => s + serviceTotal(r), 0)
+            const itemsTotal          = quote.items.reduce((s, it) => s + itemTotal(it), 0)
+            const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceTotal(r), 0)
+            const logisticsTotal      = quote.logistics.reduce((s, r) => s + serviceTotal(r), 0)
+            const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
             const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
             const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
@@ -2541,6 +2561,56 @@ export default function ProjectPage() {
                       className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-gray-900 hover:text-gray-900 transition-colors">
                       + Ajouter un item
                     </button>
+
+                    {/* ── Sous-traitance ── */}
+                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Sous-traitance</h3>
+                        <button onClick={addSubcontractingRow}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full" style={{ minWidth: 800 }}>
+                          <thead>
+                            <tr>
+                              <th className={th} style={{ width: '16%' }}>Item</th>
+                              <th className={th}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                              <th className={th} style={{ width: 100 }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
+                              <th className={th} style={{ width: 32 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(quote.subcontracting || []).length === 0 ? (
+                              <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                            ) : quote.subcontracting.map((r, i) => (
+                              <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateSubcontractingRow(i, 'item', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateSubcontractingRow(i, 'description', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateSubcontractingRow(i, 'rate', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateSubcontractingRow(i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateSubcontractingRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                <td className={td + ' text-center'}>
+                                  <button onClick={() => removeSubcontractingRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          {(quote.subcontracting || []).length > 0 && (
+                            <tfoot>
+                              <tr>
+                                <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total sous-traitance</td>
+                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(subcontractingTotal)}</td>
+                                <td className="bg-gray-50"></td>
+                              </tr>
+                            </tfoot>
+                          )}
+                        </table>
+                      </div>
+                    </div>
 
                     {/* ── Logistique ── */}
                     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">

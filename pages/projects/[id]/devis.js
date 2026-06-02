@@ -29,25 +29,32 @@ export default function DevisPage() {
   if (loading) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Chargement…</div>
   if (!project) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Projet introuvable</div>
 
-  // Normalisation : migre l'ancien format { purchases, labor, logistics } vers { management, items, logistics }
+  // Normalisation : migre l'ancien format { purchases, labor, logistics } vers { management, items, subcontracting, logistics }
   const rawQ = project.quote_data || {}
   const q = (Array.isArray(rawQ.items) || Array.isArray(rawQ.management))
-    ? { management: rawQ.management || [], items: rawQ.items || [], logistics: rawQ.logistics || [] }
+    ? {
+        management:     rawQ.management || [],
+        items:          rawQ.items || [],
+        subcontracting: rawQ.subcontracting || [],
+        logistics:      rawQ.logistics || [],
+      }
     : {
         management: [],
         items: (rawQ.purchases?.length || rawQ.labor?.length)
           ? [{ name: 'Général', purchases: rawQ.purchases || [], labor: rawQ.labor || [] }]
           : [],
+        subcontracting: [],
         logistics: rawQ.logistics || [],
       }
-  const managementTotal = (q.management || []).reduce((s, r) => s + serviceTotal(r), 0)
-  const itemsTotal      = (q.items || []).reduce((s, it) => {
+  const managementTotal     = (q.management || []).reduce((s, r) => s + serviceTotal(r), 0)
+  const itemsTotal          = (q.items || []).reduce((s, it) => {
     const p = (it.purchases || []).reduce((a, r) => a + purchaseBilled(r), 0)
     const l = (it.labor     || []).reduce((a, r) => a + serviceTotal(r), 0)
     return s + p + l
   }, 0)
-  const logisticsTotal  = (q.logistics || []).reduce((s, r) => s + serviceTotal(r), 0)
-  const grandTotal      = managementTotal + itemsTotal + logisticsTotal
+  const subcontractingTotal = (q.subcontracting || []).reduce((s, r) => s + serviceTotal(r), 0)
+  const logisticsTotal      = (q.logistics || []).reduce((s, r) => s + serviceTotal(r), 0)
+  const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
   const today = new Date()
   const ref   = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(project.id).slice(-4).toUpperCase()}`
@@ -205,6 +212,27 @@ export default function DevisPage() {
         })}
 
         {/* ── Logistique ── */}
+        {/* ── Sous-traitance ── */}
+        {(q.subcontracting || []).length > 0 && (
+          <DevisTable
+            title="Sous-traitance"
+            columns={[
+              { label: 'Item',        width: '14%', align: 'left'  },
+              { label: 'Description', width: 'auto',align: 'left'  },
+              { label: 'Prix',        width: '10%', align: 'right' },
+              { label: 'Qté',         width: '7%',  align: 'right' },
+              { label: 'Unité',       width: '10%', align: 'left'  },
+              { label: 'Total',       width: '13%', align: 'right' },
+            ]}
+            rows={q.subcontracting.map(r => [
+              r.item, r.description,
+              fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
+            ])}
+            subtotalLabel="Sous-total sous-traitance"
+            subtotal={subcontractingTotal}
+          />
+        )}
+
         {(q.logistics || []).length > 0 && (
           <DevisTable
             title="Logistique"
