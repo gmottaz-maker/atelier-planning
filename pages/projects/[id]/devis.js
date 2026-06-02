@@ -29,11 +29,25 @@ export default function DevisPage() {
   if (loading) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Chargement…</div>
   if (!project) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Projet introuvable</div>
 
-  const q = project.quote_data || { purchases: [], labor: [], logistics: [] }
-  const purchasesBilled = (q.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
-  const laborTotal      = (q.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+  // Normalisation : migre l'ancien format { purchases, labor, logistics } vers { management, items, logistics }
+  const rawQ = project.quote_data || {}
+  const q = (Array.isArray(rawQ.items) || Array.isArray(rawQ.management))
+    ? { management: rawQ.management || [], items: rawQ.items || [], logistics: rawQ.logistics || [] }
+    : {
+        management: [],
+        items: (rawQ.purchases?.length || rawQ.labor?.length)
+          ? [{ name: 'Général', purchases: rawQ.purchases || [], labor: rawQ.labor || [] }]
+          : [],
+        logistics: rawQ.logistics || [],
+      }
+  const managementTotal = (q.management || []).reduce((s, r) => s + serviceTotal(r), 0)
+  const itemsTotal      = (q.items || []).reduce((s, it) => {
+    const p = (it.purchases || []).reduce((a, r) => a + purchaseBilled(r), 0)
+    const l = (it.labor     || []).reduce((a, r) => a + serviceTotal(r), 0)
+    return s + p + l
+  }, 0)
   const logisticsTotal  = (q.logistics || []).reduce((s, r) => s + serviceTotal(r), 0)
-  const grandTotal      = purchasesBilled + laborTotal + logisticsTotal
+  const grandTotal      = managementTotal + itemsTotal + logisticsTotal
 
   const today = new Date()
   const ref   = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(project.id).slice(-4).toUpperCase()}`
@@ -109,46 +123,82 @@ export default function DevisPage() {
           </div>
         </section>
 
-        {/* ── Achats ── */}
-        {(q.purchases || []).length > 0 && (
+        {/* ── Gestion de projet / visuel ── */}
+        {(q.management || []).length > 0 && (
           <DevisTable
-            title="Achats / matériel"
+            title="Gestion de projet / visuel"
             columns={[
-              { label: 'Item',        width: '14%', align: 'left'  },
-              { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Dimension',   width: '12%',align: 'left'  },
-              { label: 'P.U.',        width: '9%', align: 'right' },
-              { label: 'Qté',         width: '6%', align: 'right' },
-              { label: 'Total',       width: '11%',align: 'right' },
-            ]}
-            rows={q.purchases.map(r => [
-              r.item, r.description, r.dimension,
-              fmtCHF(num(r.unit_price)), num(r.quantity), fmtCHF(purchaseBilled(r)),
-            ])}
-            subtotalLabel="Sous-total achats"
-            subtotal={purchasesBilled}
-          />
-        )}
-
-        {/* ── Main d'œuvre ── */}
-        {(q.labor || []).length > 0 && (
-          <DevisTable
-            title="Main d'œuvre"
-            columns={[
-              { label: 'Item',        width: '16%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
               { label: 'Tarif',       width: '11%', align: 'right' },
               { label: 'Qté',         width: '7%',  align: 'right' },
               { label: 'Total',       width: '13%', align: 'right' },
             ]}
-            rows={q.labor.map(r => [
-              r.item, r.description,
+            rows={q.management.map(r => [
+              r.description,
               fmtCHF(num(r.rate)), num(r.quantity), fmtCHF(serviceTotal(r)),
             ])}
-            subtotalLabel="Sous-total main d'œuvre"
-            subtotal={laborTotal}
+            subtotalLabel="Sous-total gestion"
+            subtotal={managementTotal}
           />
         )}
+
+        {/* ── Items (Bar, Backbar, etc.) ── */}
+        {(q.items || []).map((it, idx) => {
+          const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
+          const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+          const subTotal = purchSub + laborSub
+          if (subTotal === 0 && (it.purchases || []).length === 0 && (it.labor || []).length === 0) return null
+          return (
+            <section key={idx} style={{ marginBottom: 26 }}>
+              <h2 style={{
+                fontSize: 13, fontWeight: 700, color: '#111827',
+                marginBottom: 10, paddingBottom: 6,
+                borderBottom: '1.5px solid #111827',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              }}>
+                <span>{it.name || `Item ${idx + 1}`}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtCHF(subTotal)} CHF
+                </span>
+              </h2>
+              {(it.purchases || []).length > 0 && (
+                <DevisTable
+                  title="Achats / matériel"
+                  columns={[
+                    { label: 'Description', width: 'auto',align: 'left'  },
+                    { label: 'Dimension',   width: '14%', align: 'left'  },
+                    { label: 'P.U.',        width: '10%', align: 'right' },
+                    { label: 'Qté',         width: '7%',  align: 'right' },
+                    { label: 'Total',       width: '13%', align: 'right' },
+                  ]}
+                  rows={it.purchases.map(r => [
+                    r.description, r.dimension,
+                    fmtCHF(num(r.unit_price)), num(r.quantity), fmtCHF(purchaseBilled(r)),
+                  ])}
+                  subtotalLabel="Sous-total achats"
+                  subtotal={purchSub}
+                />
+              )}
+              {(it.labor || []).length > 0 && (
+                <DevisTable
+                  title="Main d'œuvre"
+                  columns={[
+                    { label: 'Description', width: 'auto',align: 'left'  },
+                    { label: 'Tarif',       width: '11%', align: 'right' },
+                    { label: 'Qté',         width: '7%',  align: 'right' },
+                    { label: 'Total',       width: '13%', align: 'right' },
+                  ]}
+                  rows={it.labor.map(r => [
+                    r.description,
+                    fmtCHF(num(r.rate)), num(r.quantity), fmtCHF(serviceTotal(r)),
+                  ])}
+                  subtotalLabel="Sous-total main d'œuvre"
+                  subtotal={laborSub}
+                />
+              )}
+            </section>
+          )
+        })}
 
         {/* ── Logistique ── */}
         {(q.logistics || []).length > 0 && (

@@ -239,26 +239,50 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProjectId, projects.length])
 
-  // Pré-remplir depuis le projet
+  // Pré-remplir depuis le projet — on aplatit la structure { management, items, logistics }
+  // (ou l'ancien { purchases, labor, logistics }) en lignes plates pour la facture
   function pickProject(pid) {
     const p = projects.find(x => x.id === pid)
     if (!p) { set('project_id', pid); return }
     const q = p.quote_data || {}
+
+    // Nouveau format : { management, items, logistics }
+    let flatPurchases = []
+    let flatLabor     = []
+    if (Array.isArray(q.items) || Array.isArray(q.management)) {
+      // Gestion → ligne labor "Gestion de projet / visuel — <description>"
+      flatLabor = (q.management || []).map(r => ({
+        ...r,
+        item: 'Gestion de projet / visuel',
+        _uid: r._uid || genUid(),
+      }))
+      for (const it of (q.items || [])) {
+        const itemName = it.name || 'Item'
+        for (const r of (it.purchases || [])) {
+          flatPurchases.push({ ...r, item: itemName, _uid: r._uid || genUid() })
+        }
+        for (const r of (it.labor || [])) {
+          flatLabor.push({ ...r, item: itemName, _uid: r._uid || genUid() })
+        }
+      }
+    } else {
+      // Ancien format
+      flatPurchases = (q.purchases || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
+      flatLabor     = (q.labor     || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
+    }
+    const flatLogistics = (q.logistics || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
+
     const total =
-      (q.purchases || []).reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
-      (q.labor     || []).reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
-      (q.logistics || []).reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
+      flatPurchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
+      flatLabor    .reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
+      flatLogistics.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
     setForm(f => ({
       ...f,
       project_id: pid,
       client_name: p.client || f.client_name,
       amount: total > 0 ? total.toFixed(2) : f.amount,
     }))
-    setLines({
-      purchases: (q.purchases || []).map(r => ({ ...r, _uid: r._uid || genUid() })),
-      labor:     (q.labor || []).map(r => ({ ...r, _uid: r._uid || genUid() })),
-      logistics: (q.logistics || []).map(r => ({ ...r, _uid: r._uid || genUid() })),
-    })
+    setLines({ purchases: flatPurchases, labor: flatLabor, logistics: flatLogistics })
   }
 
   async function save() {

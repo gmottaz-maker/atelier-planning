@@ -944,8 +944,8 @@ export default function ProjectPage() {
   const [updateError, setUpdateError] = useState('')
   const [updateDragging, setUpdateDragging] = useState(false)
 
-  // Quote state
-  const EMPTY_QUOTE = { purchases: [], labor: [], logistics: [] }
+  // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], logistics:[] }
+  const EMPTY_QUOTE = { management: [], items: [], logistics: [] }
   const [quote, setQuote] = useState(EMPTY_QUOTE)
   const [quoteDirty, setQuoteDirty] = useState(false)
   const [quoteSaving, setQuoteSaving] = useState(false)
@@ -990,13 +990,36 @@ export default function ProjectPage() {
           setVisitExpanded(true)
         }
         if (proj.site_visit_summary) setVisitSummary(proj.site_visit_summary)
-        if (proj.quote_data && (proj.quote_data.purchases?.length || proj.quote_data.labor?.length || proj.quote_data.logistics?.length)) {
-          setQuote({
-            purchases: proj.quote_data.purchases || [],
-            labor:     proj.quote_data.labor || [],
-            logistics: proj.quote_data.logistics || [],
-          })
-          setQuoteExpanded(true)
+        if (proj.quote_data) {
+          const q = proj.quote_data
+          // Nouveau format : { management, items, logistics }
+          if (Array.isArray(q.items) || Array.isArray(q.management)) {
+            if ((q.management?.length || 0) + (q.items?.length || 0) + (q.logistics?.length || 0) > 0) {
+              setQuote({
+                management: q.management || [],
+                items:      q.items || [],
+                logistics:  q.logistics || [],
+              })
+              setQuoteExpanded(true)
+            }
+          // Migration silencieuse depuis l'ancien format { purchases, labor, logistics }
+          } else if (q.purchases?.length || q.labor?.length || q.logistics?.length) {
+            const migrated = {
+              management: [],
+              items: (q.purchases?.length || q.labor?.length)
+                ? [{
+                    _uid: `i_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+                    name: 'Général',
+                    purchases: q.purchases || [],
+                    labor:     q.labor || [],
+                  }]
+                : [],
+              logistics: q.logistics || [],
+            }
+            setQuote(migrated)
+            setQuoteDirty(true)  // forcer un re-save dans le nouveau format
+            setQuoteExpanded(true)
+          }
         }
       }
       if (Array.isArray(allTasks)) {
@@ -1228,24 +1251,85 @@ export default function ProjectPage() {
   function serviceTotal(r)   { return num(r.rate) * num(r.quantity) }
   function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
-  function quoteAddRow(table) {
-    const empty = table === 'purchases'
-      ? { _uid: genRowUid(), item: '', description: '', dimension: '', unit_price: '', quantity: '', margin: '' }
-      : table === 'logistics'
-        ? { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '' }
-        : { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '' }
-    setQuote(q => ({ ...q, [table]: [...q[table], empty] }))
+  function genItemUid() { return `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
+  function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', margin: '' } }
+  function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '', quantity: '' } }
+  function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '' } }
+
+  // ── Gestion (lignes de main d'œuvre globales) ──
+  function addManagementRow() {
+    setQuote(q => ({ ...q, management: [...q.management, emptyLaborRow()] }))
+    setQuoteDirty(true)
+  }
+  function updateManagementRow(idx, field, value) {
+    setQuote(q => ({ ...q, management: q.management.map((r, i) => i === idx ? { ...r, [field]: value } : r) }))
+    setQuoteDirty(true)
+  }
+  function removeManagementRow(idx) {
+    setQuote(q => ({ ...q, management: q.management.filter((_, i) => i !== idx) }))
     setQuoteDirty(true)
   }
 
-  function quoteUpdateRow(table, idx, field, value) {
-    setQuote(q => ({ ...q, [table]: q[table].map((r, i) => i === idx ? { ...r, [field]: value } : r) }))
+  // ── Logistique ──
+  function addLogisticsRow() {
+    setQuote(q => ({ ...q, logistics: [...q.logistics, emptyLogisticsRow()] }))
+    setQuoteDirty(true)
+  }
+  function updateLogisticsRow(idx, field, value) {
+    setQuote(q => ({ ...q, logistics: q.logistics.map((r, i) => i === idx ? { ...r, [field]: value } : r) }))
+    setQuoteDirty(true)
+  }
+  function removeLogisticsRow(idx) {
+    setQuote(q => ({ ...q, logistics: q.logistics.filter((_, i) => i !== idx) }))
     setQuoteDirty(true)
   }
 
-  function quoteRemoveRow(table, idx) {
-    setQuote(q => ({ ...q, [table]: q[table].filter((_, i) => i !== idx) }))
+  // ── Items (Bar, Backbar, etc.) ──
+  function addItem() {
+    setQuote(q => ({
+      ...q,
+      items: [...q.items, { _uid: genItemUid(), name: '', purchases: [], labor: [] }],
+    }))
     setQuoteDirty(true)
+  }
+  function updateItemName(idx, name) {
+    setQuote(q => ({ ...q, items: q.items.map((it, i) => i === idx ? { ...it, name } : it) }))
+    setQuoteDirty(true)
+  }
+  function removeItem(idx) {
+    setQuote(q => ({ ...q, items: q.items.filter((_, i) => i !== idx) }))
+    setQuoteDirty(true)
+  }
+  function addItemRow(itemIdx, kind) {
+    const empty = kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()
+    setQuote(q => ({
+      ...q,
+      items: q.items.map((it, i) => i === itemIdx ? { ...it, [kind]: [...(it[kind] || []), empty] } : it),
+    }))
+    setQuoteDirty(true)
+  }
+  function updateItemRow(itemIdx, kind, rowIdx, field, value) {
+    setQuote(q => ({
+      ...q,
+      items: q.items.map((it, i) => i === itemIdx
+        ? { ...it, [kind]: it[kind].map((r, j) => j === rowIdx ? { ...r, [field]: value } : r) }
+        : it),
+    }))
+    setQuoteDirty(true)
+  }
+  function removeItemRow(itemIdx, kind, rowIdx) {
+    setQuote(q => ({
+      ...q,
+      items: q.items.map((it, i) => i === itemIdx
+        ? { ...it, [kind]: it[kind].filter((_, j) => j !== rowIdx) }
+        : it),
+    }))
+    setQuoteDirty(true)
+  }
+  function itemTotal(it) {
+    const p = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
+    const l = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+    return p + l
   }
 
   async function saveQuote() {
@@ -2220,10 +2304,10 @@ export default function ProjectPage() {
         {/* ── Offre ── */}
         <div className="mt-12 no-print">
           {(() => {
-            const purchasesBilled = quote.purchases.reduce((s, r) => s + purchaseBilled(r), 0)
-            const laborTotal      = quote.labor.reduce((s, r) => s + serviceTotal(r), 0)
+            const managementTotal = quote.management.reduce((s, r) => s + serviceTotal(r), 0)
+            const itemsTotal      = quote.items.reduce((s, it) => s + itemTotal(it), 0)
             const logisticsTotal  = quote.logistics.reduce((s, r) => s + serviceTotal(r), 0)
-            const grandTotal      = purchasesBilled + laborTotal + logisticsTotal
+            const grandTotal      = managementTotal + itemsTotal + logisticsTotal
 
             const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
             const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
@@ -2277,72 +2361,17 @@ export default function ProjectPage() {
 
                 {quoteExpanded && (
                   <div className="space-y-6">
-                    {/* ── Achats ── */}
+                    {/* ── Gestion de projet / visuel ── */}
                     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Achats</h3>
-                        <button onClick={() => quoteAddRow('purchases')}
-                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 800 }}>
-                          <thead>
-                            <tr>
-                              <th className={th} style={{ width: '14%' }}>Item</th>
-                              <th className={th}>Description</th>
-                              <th className={th} style={{ width: 130 }}>Dimension</th>
-                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix d'achat</th>
-                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
-                              <th className={th + ' text-right'} style={{ width: 110 }}>Total</th>
-                              <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: 130 }}>Total facturé</th>
-                              <th className={th} style={{ width: 32 }}></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {quote.purchases.length === 0 ? (
-                              <tr><td colSpan={9} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
-                            ) : quote.purchases.map((r, i) => (
-                              <tr key={r._uid || i} className="group hover:bg-gray-50">
-                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => quoteUpdateRow('purchases', i, 'item', e.target.value)} /></td>
-                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => quoteUpdateRow('purchases', i, 'description', e.target.value)} /></td>
-                                <td className={td}><input className={txtCell} placeholder="ex: 200×120×40" value={r.dimension || ''} onChange={e => quoteUpdateRow('purchases', i, 'dimension', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => quoteUpdateRow('purchases', i, 'unit_price', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => quoteUpdateRow('purchases', i, 'quantity', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
-                                <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} onChange={e => quoteUpdateRow('purchases', i, 'margin', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseBilled(r))}</td>
-                                <td className={td + ' text-center'}>
-                                  <button onClick={() => quoteRemoveRow('purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          {quote.purchases.length > 0 && (
-                            <tfoot>
-                              <tr>
-                                <td colSpan={7} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats facturés</td>
-                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(purchasesBilled)}</td>
-                                <td className="bg-gray-50"></td>
-                              </tr>
-                            </tfoot>
-                          )}
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* ── Main d'œuvre ── */}
-                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Main d'œuvre</h3>
-                        <button onClick={() => quoteAddRow('labor')}
+                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Gestion de projet / visuel</h3>
+                        <button onClick={addManagementRow}
                           className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full" style={{ minWidth: 700 }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '16%' }}>Item</th>
                               <th className={th}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Tarif</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
@@ -2351,26 +2380,25 @@ export default function ProjectPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {quote.labor.length === 0 ? (
-                              <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
-                            ) : quote.labor.map((r, i) => (
+                            {quote.management.length === 0 ? (
+                              <tr><td colSpan={5} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
+                            ) : quote.management.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
-                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => quoteUpdateRow('labor', i, 'item', e.target.value)} /></td>
-                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => quoteUpdateRow('labor', i, 'description', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => quoteUpdateRow('labor', i, 'rate', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => quoteUpdateRow('labor', i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateManagementRow(i, 'description', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateManagementRow(i, 'rate', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateManagementRow(i, 'quantity', e.target.value)} /></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
                                 <td className={td + ' text-center'}>
-                                  <button onClick={() => quoteRemoveRow('labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  <button onClick={() => removeManagementRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>
                               </tr>
                             ))}
                           </tbody>
-                          {quote.labor.length > 0 && (
+                          {quote.management.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
-                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(laborTotal)}</td>
+                                <td colSpan={3} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
+                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(managementTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
                             </tfoot>
@@ -2379,11 +2407,137 @@ export default function ProjectPage() {
                       </div>
                     </div>
 
+                    {/* ── Items (Bar, Backbar, etc.) ── */}
+                    {quote.items.map((it, itemIdx) => {
+                      const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
+                      const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+                      const subTotal = purchSub + laborSub
+                      return (
+                        <div key={it._uid || itemIdx} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3" style={{ background: '#fafafa' }}>
+                            <input
+                              className="flex-1 px-2 py-1 text-base font-semibold text-gray-900 bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
+                              placeholder="Nom de l'item (ex: Bar, Backbar…)"
+                              value={it.name || ''}
+                              onChange={e => updateItemName(itemIdx, e.target.value)}
+                            />
+                            <span className="text-sm font-semibold text-gray-700 tabular-nums whitespace-nowrap">{fmtCHF(subTotal)} CHF</span>
+                            <button onClick={() => { if (confirm(`Supprimer l'item "${it.name || 'sans nom'}" ?`)) removeItem(itemIdx) }}
+                              className="text-gray-400 hover:text-red-500 text-sm" title="Supprimer cet item">✕</button>
+                          </div>
+
+                          {/* Achats de l'item */}
+                          <div className="border-b border-gray-100">
+                            <div className="px-5 py-2 flex items-center justify-between bg-white">
+                              <h4 className="font-medium text-gray-700 text-sm">Achats (matériaux)</h4>
+                              <button onClick={() => addItemRow(itemIdx, 'purchases')}
+                                className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full" style={{ minWidth: 800 }}>
+                                <thead>
+                                  <tr>
+                                    <th className={th}>Description</th>
+                                    <th className={th} style={{ width: 130 }}>Dimension</th>
+                                    <th className={th + ' text-right'} style={{ width: 110 }}>Prix d'achat</th>
+                                    <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                                    <th className={th + ' text-right'} style={{ width: 110 }}>Total</th>
+                                    <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
+                                    <th className={th + ' text-right'} style={{ width: 130 }}>Total facturé</th>
+                                    <th className={th} style={{ width: 32 }}></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(it.purchases || []).length === 0 ? (
+                                    <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-4">Aucun achat.</td></tr>
+                                  ) : it.purchases.map((r, i) => (
+                                    <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                      <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'description', e.target.value)} /></td>
+                                      <td className={td}><input className={txtCell} placeholder="ex: 200×120×40" value={r.dimension || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'dimension', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit_price', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'quantity', e.target.value)} /></td>
+                                      <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
+                                      <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'margin', e.target.value)} /></td>
+                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseBilled(r))}</td>
+                                      <td className={td + ' text-center'}>
+                                        <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                {(it.purchases || []).length > 0 && (
+                                  <tfoot>
+                                    <tr>
+                                      <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats</td>
+                                      <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(purchSub)}</td>
+                                      <td className="bg-gray-50"></td>
+                                    </tr>
+                                  </tfoot>
+                                )}
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Main d'œuvre de l'item */}
+                          <div>
+                            <div className="px-5 py-2 flex items-center justify-between bg-white">
+                              <h4 className="font-medium text-gray-700 text-sm">Main d'œuvre (découpe, peinture…)</h4>
+                              <button onClick={() => addItemRow(itemIdx, 'labor')}
+                                className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full" style={{ minWidth: 700 }}>
+                                <thead>
+                                  <tr>
+                                    <th className={th}>Description</th>
+                                    <th className={th + ' text-right'} style={{ width: 110 }}>Tarif</th>
+                                    <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                                    <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
+                                    <th className={th} style={{ width: 32 }}></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(it.labor || []).length === 0 ? (
+                                    <tr><td colSpan={5} className="text-center text-sm text-gray-400 py-4">Aucune main d'œuvre.</td></tr>
+                                  ) : it.labor.map((r, i) => (
+                                    <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                      <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'rate', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'quantity', e.target.value)} /></td>
+                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                      <td className={td + ' text-center'}>
+                                        <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                {(it.labor || []).length > 0 && (
+                                  <tfoot>
+                                    <tr>
+                                      <td colSpan={3} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
+                                      <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(laborSub)}</td>
+                                      <td className="bg-gray-50"></td>
+                                    </tr>
+                                  </tfoot>
+                                )}
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {/* Bouton ajouter un item */}
+                    <button onClick={addItem}
+                      className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-gray-900 hover:text-gray-900 transition-colors">
+                      + Ajouter un item
+                    </button>
+
                     {/* ── Logistique ── */}
                     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
                         <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Logistique</h3>
-                        <button onClick={() => quoteAddRow('logistics')}
+                        <button onClick={addLogisticsRow}
                           className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
@@ -2403,13 +2557,13 @@ export default function ProjectPage() {
                               <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
                             ) : quote.logistics.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
-                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.trajet || ''} onChange={e => quoteUpdateRow('logistics', i, 'trajet', e.target.value)} /></td>
-                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => quoteUpdateRow('logistics', i, 'description', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => quoteUpdateRow('logistics', i, 'rate', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => quoteUpdateRow('logistics', i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
+                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateLogisticsRow(i, 'description', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateLogisticsRow(i, 'quantity', e.target.value)} /></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
                                 <td className={td + ' text-center'}>
-                                  <button onClick={() => quoteRemoveRow('logistics', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>
                               </tr>
                             ))}
