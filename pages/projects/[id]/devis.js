@@ -115,34 +115,34 @@ export default function DevisPage() {
       <div className="devis-page" style={{
         maxWidth: 800, margin: '24px auto', background: 'white',
         padding: '40px 48px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
-        fontSize: 11, lineHeight: 1.5,
+        fontSize: 10, lineHeight: 1.5,
       }}>
 
         {/* ── Header ── */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: 16, marginBottom: 28 }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: 18, marginBottom: 28 }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#111827', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>Amazing Lab</div>
-            <div style={{ fontSize: 9, color: '#6b7280' }}>Rue de l'Ecluse 30 · 1201 Genève · CH</div>
-            <div style={{ fontSize: 9, color: '#6b7280' }}>hello@amazinglab.ch · amazinglab.ch</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#111827', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>Amazing Lab</div>
+            <div style={{ fontSize: 9.5, color: '#6b7280' }}>Rue de l'Ecluse 30 · 1201 Genève · CH</div>
+            <div style={{ fontSize: 9.5, color: '#6b7280' }}>hello@amazinglab.ch · amazinglab.ch</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#111827', letterSpacing: '-0.02em' }}>DEVIS</div>
-            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>Réf. {ref}</div>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{fmtDateLong(today)}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#111827', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Devis</div>
+            <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Réf. {ref}</div>
+            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{fmtDateLong(today)}</div>
           </div>
         </header>
 
         {/* ── Info client / projet ── */}
-        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 28 }}>
+        <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 32 }}>
           <div>
-            <div style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Pour</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{project.client || '—'}</div>
+            <div style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Pour</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{project.client || '—'}</div>
           </div>
           <div>
-            <div style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Objet</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{project.name}</div>
+            <div style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Objet</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{project.name}</div>
             {project.short_description && (
-              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{project.short_description}</div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 3 }}>{project.short_description}</div>
             )}
             {project.deadline && (
               <div style={{ fontSize: 10, color: '#6b7280', marginTop: 6 }}>Livraison prévue : {fmtDateLong(new Date(project.deadline))}</div>
@@ -182,15 +182,15 @@ export default function DevisPage() {
               const subTotal = purchSub + laborSub
               if (subTotal === 0 && (it.purchases || []).length === 0 && (it.labor || []).length === 0) return null
               return (
-                <section key={idx} style={{ marginBottom: level === 'detail' ? 22 : 8, marginLeft: 16 }}>
+                <section key={idx} style={{ marginBottom: level === 'detail' ? 22 : 6, marginLeft: 14 }}>
                   <h3 style={{
-                    fontSize: 12, fontWeight: 600, color: '#065f46',
+                    fontSize: 11, fontWeight: 600, color: '#111827',
                     marginBottom: level === 'detail' ? 8 : 0, paddingBottom: 4,
-                    borderBottom: level === 'detail' ? '1px solid #d1fae5' : 'none',
+                    borderBottom: level === 'detail' ? '1px solid #e5e7eb' : 'none',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                   }}>
-                    <span>● {it.name || `Item ${idx + 1}`}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#065f46', fontVariantNumeric: 'tabular-nums' }}>
+                    <span>{it.name || `Item ${idx + 1}`}</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums' }}>
                       {fmtCHF(subTotal)} CHF
                     </span>
                   </h3>
@@ -281,22 +281,22 @@ export default function DevisPage() {
 
         {/* ── Total général ── */}
         <div style={{
-          marginTop: 24, padding: '14px 18px',
+          marginTop: 28, padding: '16px 20px',
           background: '#111827', color: 'white',
           borderRadius: 8,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
         }}>
-          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.85 }}>Total HT</span>
-          <span style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-            {fmtCHF(grandTotal)} <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.7 }}>CHF</span>
+          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.8 }}>Total HT</span>
+          <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
+            {fmtCHF(grandTotal)} <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.7, marginLeft: 4 }}>CHF</span>
           </span>
         </div>
 
         {/* ── Conditions ── */}
-        <footer style={{ marginTop: 36, fontSize: 9, color: '#6b7280', lineHeight: 1.6, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
-          <p style={{ marginBottom: 4 }}><strong style={{ color: '#374151' }}>Validité :</strong> 30 jours à compter de la date d'émission.</p>
-          <p style={{ marginBottom: 4 }}><strong style={{ color: '#374151' }}>Conditions de paiement :</strong> 30% à la commande, solde à la livraison.</p>
-          <p style={{ marginBottom: 4 }}><strong style={{ color: '#374151' }}>TVA :</strong> Prix indiqués hors taxes.</p>
+        <footer style={{ marginTop: 32, fontSize: 9, color: '#6b7280', lineHeight: 1.7, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
+          <p style={{ marginBottom: 3 }}><strong style={{ color: '#374151', fontWeight: 600 }}>Validité :</strong> 30 jours à compter de la date d'émission.</p>
+          <p style={{ marginBottom: 3 }}><strong style={{ color: '#374151', fontWeight: 600 }}>Conditions de paiement :</strong> 30 % à la commande, solde à la livraison.</p>
+          <p style={{ marginBottom: 3 }}><strong style={{ color: '#374151', fontWeight: 600 }}>TVA :</strong> prix indiqués hors taxes.</p>
           <p style={{ marginTop: 10, color: '#9ca3af' }}>Devis généré le {fmtDateLong(today)} · Amazing Lab Sàrl</p>
         </footer>
 
@@ -308,13 +308,13 @@ export default function DevisPage() {
 function SectionHeader({ title, total }) {
   return (
     <h2 style={{
-      fontSize: 14, fontWeight: 700, color: '#111827',
-      marginTop: 18, marginBottom: 10, paddingBottom: 6,
+      fontSize: 13, fontWeight: 700, color: '#111827',
+      marginTop: 22, marginBottom: 10, paddingBottom: 6,
       borderBottom: '2px solid #111827',
       display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
     }}>
-      <span>● {title}</span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
+      <span>{title}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums' }}>
         Sous-total : {fmtCHF(total)} CHF
       </span>
     </h2>
@@ -324,18 +324,18 @@ function SectionHeader({ title, total }) {
 function DevisTable({ title, columns, rows, subtotalLabel, subtotal }) {
   if (rows.length === 0) return null
   return (
-    <section style={{ marginBottom: 22 }}>
+    <section style={{ marginBottom: 18 }}>
       {title && (
-        <h3 style={{ fontSize: 11, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{title}</h3>
+        <h4 style={{ fontSize: 8.5, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{title}</h4>
       )}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
         <thead>
-          <tr style={{ borderBottom: '1.5px solid #111827' }}>
+          <tr style={{ borderBottom: '1px solid #d1d5db' }}>
             {columns.map((c, i) => (
               <th key={i} style={{
-                padding: '6px 6px',
+                padding: '6px 4px',
                 textAlign: c.align,
-                fontSize: 9.5, fontWeight: 600, color: '#374151',
+                fontSize: 9, fontWeight: 600, color: '#6b7280',
                 letterSpacing: '0.02em',
                 width: c.width,
               }}>{c.label}</th>
@@ -347,7 +347,7 @@ function DevisTable({ title, columns, rows, subtotalLabel, subtotal }) {
             <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
               {row.map((cell, j) => (
                 <td key={j} style={{
-                  padding: '7px 6px',
+                  padding: '6px 4px',
                   verticalAlign: 'top',
                   textAlign: columns[j].align,
                   color: j === 0 ? '#111827' : '#374151',
@@ -359,8 +359,8 @@ function DevisTable({ title, columns, rows, subtotalLabel, subtotal }) {
           ))}
           {subtotalLabel && (
             <tr>
-              <td colSpan={columns.length - 1} style={{ padding: '8px 6px', textAlign: 'right', fontSize: 10, color: '#6b7280', fontWeight: 500 }}>{subtotalLabel}</td>
-              <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{fmtCHF(subtotal)}</td>
+              <td colSpan={columns.length - 1} style={{ padding: '6px 4px', textAlign: 'right', fontSize: 9.5, color: '#6b7280', fontWeight: 500 }}>{subtotalLabel}</td>
+              <td style={{ padding: '6px 4px', textAlign: 'right', fontSize: 10.5, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{fmtCHF(subtotal)}</td>
             </tr>
           )}
         </tbody>

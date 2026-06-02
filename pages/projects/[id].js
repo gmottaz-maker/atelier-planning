@@ -2465,10 +2465,10 @@ export default function ProjectPage() {
                     {/* ── Gestion projet ── */}
                     <div className="bg-white rounded-2xl border border-indigo-200 overflow-hidden">
                       <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#eef2ff', borderBottom: collapsedSections.management ? 'none' : '1px solid #e0e7ff' }}>
-                        <button onClick={() => toggleCollapsedSection('management')}
+                        <button type="button" onClick={() => toggleCollapsedSection('management')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={{ color: '#3730a3', fontSize: 12 }}>{collapsedSections.management ? '▸' : '▾'}</span>
-                          <h3 className="font-semibold" style={{ fontSize: 17, color: '#3730a3' }}>● Gestion projet</h3>
+                          <span className="font-semibold" style={{ fontSize: 17, color: '#3730a3' }}>● Gestion projet</span>
                         </button>
                         <div className="flex items-center gap-4">
                           <span className="text-sm font-semibold tabular-nums" style={{ color: '#3730a3' }}>{fmtCHF(managementTotal)} CHF</span>
@@ -2480,11 +2480,11 @@ export default function ProjectPage() {
                       </div>
                       {!collapsedSections.management && (
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 900 }}>
+                        <table style={{ width: 902, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
                               <th className={th} style={{ width: 160 }}>Item</th>
-                              <th className={th}>Description</th>
+                              <th className={th} style={{ width: 290 }}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th} style={{ width: 100 }}>Unité</th>
@@ -2526,10 +2526,10 @@ export default function ProjectPage() {
                     {/* ── Fabrication (groupe d'items: Bar, Pergola, etc.) ── */}
                     <div className="bg-white rounded-2xl border border-emerald-300 overflow-hidden">
                       <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#d1fae5', borderBottom: collapsedSections.fabrication ? 'none' : '1px solid #a7f3d0' }}>
-                        <button onClick={() => toggleCollapsedSection('fabrication')}
+                        <button type="button" onClick={() => toggleCollapsedSection('fabrication')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={{ color: '#065f46', fontSize: 12 }}>{collapsedSections.fabrication ? '▸' : '▾'}</span>
-                          <h3 className="font-bold" style={{ fontSize: 17, color: '#065f46' }}>● Fabrication</h3>
+                          <span className="font-bold" style={{ fontSize: 17, color: '#065f46' }}>● Fabrication</span>
                         </button>
                         <span className="text-sm font-semibold tabular-nums" style={{ color: '#065f46' }}>{fmtCHF(itemsTotal)} CHF</span>
                       </div>
@@ -2546,7 +2546,7 @@ export default function ProjectPage() {
                           return (
                             <div key={it._uid || itemIdx} className="bg-white rounded-xl border border-emerald-200 overflow-hidden shadow-sm">
                               <div className="px-4 py-2.5 flex items-center justify-between gap-3" style={{ background: '#ecfdf5', borderBottom: collapsedItems[it._uid] ? 'none' : '1px solid #d1fae5' }}>
-                                <button onClick={() => toggleCollapsedItem(it._uid)}
+                                <button type="button" onClick={() => toggleCollapsedItem(it._uid)}
                                   className="hover:opacity-70" title={collapsedItems[it._uid] ? 'Déplier' : 'Replier'}>
                                   <span className="text-emerald-700" style={{ fontSize: 12 }}>{collapsedItems[it._uid] ? '▸' : '▾'}</span>
                                 </button>
@@ -2573,10 +2573,10 @@ export default function ProjectPage() {
                                     className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Ligne</button>
                                 </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full" style={{ minWidth: 1090 }}>
+                              <table style={{ width: 1092, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th}>Description</th>
+                                    <th className={th} style={{ width: 320 }}>Description</th>
                                     <th className={th} style={{ width: 130 }}>Dimension</th>
                                     <th className={th + ' text-right'} style={{ width: 110 }}>Prix d'achat</th>
                                     <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
@@ -2627,10 +2627,10 @@ export default function ProjectPage() {
                                 className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Ligne</button>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full" style={{ minWidth: 900 }}>
+                              <table style={{ width: 902, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th}>Description</th>
+                                    <th className={th} style={{ width: 450 }}>Description</th>
                                     <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                                     <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                                     <th className={th} style={{ width: 100 }}>Unité</th>
@@ -2684,10 +2684,10 @@ export default function ProjectPage() {
                     {/* ── Sous-traitance ── */}
                     <div className="bg-white rounded-2xl border border-orange-200 overflow-hidden">
                       <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#fff7ed', borderBottom: collapsedSections.subcontracting ? 'none' : '1px solid #fed7aa' }}>
-                        <button onClick={() => toggleCollapsedSection('subcontracting')}
+                        <button type="button" onClick={() => toggleCollapsedSection('subcontracting')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={{ color: '#9a3412', fontSize: 12 }}>{collapsedSections.subcontracting ? '▸' : '▾'}</span>
-                          <h3 className="font-bold" style={{ fontSize: 17, color: '#9a3412' }}>● Sous-traitance</h3>
+                          <span className="font-bold" style={{ fontSize: 17, color: '#9a3412' }}>● Sous-traitance</span>
                         </button>
                         <div className="flex items-center gap-4">
                           <span className="text-sm font-semibold tabular-nums" style={{ color: '#9a3412' }}>{fmtCHF(subcontractingTotal)} CHF</span>
@@ -2699,11 +2699,11 @@ export default function ProjectPage() {
                       </div>
                       {!collapsedSections.subcontracting && (
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 980 }}>
+                        <table style={{ width: 982, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
                               <th className={th} style={{ width: 160 }}>Item</th>
-                              <th className={th}>Description</th>
+                              <th className={th} style={{ width: 290 }}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th} style={{ width: 100 }}>Unité</th>
@@ -2747,10 +2747,10 @@ export default function ProjectPage() {
                     {/* ── Logistique ── */}
                     <div className="bg-white rounded-2xl border border-cyan-200 overflow-hidden">
                       <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#ecfeff', borderBottom: collapsedSections.logistics ? 'none' : '1px solid #cffafe' }}>
-                        <button onClick={() => toggleCollapsedSection('logistics')}
+                        <button type="button" onClick={() => toggleCollapsedSection('logistics')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={{ color: '#155e75', fontSize: 12 }}>{collapsedSections.logistics ? '▸' : '▾'}</span>
-                          <h3 className="font-bold" style={{ fontSize: 17, color: '#155e75' }}>● Logistique</h3>
+                          <span className="font-bold" style={{ fontSize: 17, color: '#155e75' }}>● Logistique</span>
                         </button>
                         <div className="flex items-center gap-4">
                           <span className="text-sm font-semibold tabular-nums" style={{ color: '#155e75' }}>{fmtCHF(logisticsTotal)} CHF</span>
@@ -2762,11 +2762,11 @@ export default function ProjectPage() {
                       </div>
                       {!collapsedSections.logistics && (
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 980 }}>
+                        <table style={{ width: 982, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
                               <th className={th} style={{ width: 160 }}>Item</th>
-                              <th className={th}>Description</th>
+                              <th className={th} style={{ width: 290 }}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th} style={{ width: 100 }}>Unité</th>
