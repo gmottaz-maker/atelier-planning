@@ -128,15 +128,16 @@ export default function DevisPage() {
           <DevisTable
             title="Gestion de projet / visuel"
             columns={[
-              { label: 'Item',        width: '18%', align: 'left'  },
+              { label: 'Item',        width: '16%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Prix',        width: '11%', align: 'right' },
+              { label: 'Prix',        width: '10%', align: 'right' },
               { label: 'Qté',         width: '7%',  align: 'right' },
+              { label: 'Unité',       width: '10%', align: 'left'  },
               { label: 'Total',       width: '13%', align: 'right' },
             ]}
             rows={q.management.map(r => [
               r.item, r.description,
-              fmtCHF(num(r.rate)), num(r.quantity), fmtCHF(serviceTotal(r)),
+              fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
             ])}
             subtotalLabel="Sous-total gestion"
             subtotal={managementTotal}
@@ -167,14 +168,15 @@ export default function DevisPage() {
                   title="Achats / matériel"
                   columns={[
                     { label: 'Description', width: 'auto',align: 'left'  },
-                    { label: 'Dimension',   width: '14%', align: 'left'  },
-                    { label: 'P.U.',        width: '10%', align: 'right' },
-                    { label: 'Qté',         width: '7%',  align: 'right' },
-                    { label: 'Total',       width: '13%', align: 'right' },
+                    { label: 'Dimension',   width: '13%', align: 'left'  },
+                    { label: 'P.U.',        width: '9%',  align: 'right' },
+                    { label: 'Qté',         width: '6%',  align: 'right' },
+                    { label: 'Unité',       width: '9%',  align: 'left'  },
+                    { label: 'Total',       width: '12%', align: 'right' },
                   ]}
                   rows={it.purchases.map(r => [
                     r.description, r.dimension,
-                    fmtCHF(num(r.unit_price)), num(r.quantity), fmtCHF(purchaseBilled(r)),
+                    fmtCHF(num(r.unit_price)), num(r.quantity), r.unit || '', fmtCHF(purchaseBilled(r)),
                   ])}
                   subtotalLabel="Sous-total achats"
                   subtotal={purchSub}
@@ -185,13 +187,14 @@ export default function DevisPage() {
                   title="Main d'œuvre"
                   columns={[
                     { label: 'Description', width: 'auto',align: 'left'  },
-                    { label: 'Prix',        width: '11%', align: 'right' },
+                    { label: 'Prix',        width: '10%', align: 'right' },
                     { label: 'Qté',         width: '7%',  align: 'right' },
+                    { label: 'Unité',       width: '10%', align: 'left'  },
                     { label: 'Total',       width: '13%', align: 'right' },
                   ]}
                   rows={it.labor.map(r => [
                     r.description,
-                    fmtCHF(num(r.rate)), num(r.quantity), fmtCHF(serviceTotal(r)),
+                    fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
                   ])}
                   subtotalLabel="Sous-total main d'œuvre"
                   subtotal={laborSub}
@@ -206,15 +209,16 @@ export default function DevisPage() {
           <DevisTable
             title="Logistique"
             columns={[
-              { label: 'Item',        width: '16%', align: 'left'  },
+              { label: 'Item',        width: '14%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Prix',        width: '11%', align: 'right' },
+              { label: 'Prix',        width: '10%', align: 'right' },
               { label: 'Qté',         width: '7%',  align: 'right' },
+              { label: 'Unité',       width: '10%', align: 'left'  },
               { label: 'Total',       width: '13%', align: 'right' },
             ]}
             rows={q.logistics.map(r => [
               r.trajet, r.description,
-              fmtCHF(num(r.rate)), num(r.quantity), fmtCHF(serviceTotal(r)),
+              fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
             ])}
             subtotalLabel="Sous-total logistique"
             subtotal={logisticsTotal}

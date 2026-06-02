@@ -1252,9 +1252,10 @@ export default function ProjectPage() {
   function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
   function genItemUid() { return `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
-  function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', margin: '' } }
-  function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '', quantity: '' } }
-  function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '' } }
+  const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km']
+  function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '' } }
+  function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '', quantity: '', unit: '' } }
+  function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '' } }
 
   // ── Gestion (lignes de main d'œuvre globales) ──
   function addManagementRow() {
@@ -2369,26 +2370,28 @@ export default function ProjectPage() {
                           className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 800 }}>
+                        <table className="w-full" style={{ minWidth: 900 }}>
                           <thead>
                             <tr>
                               <th className={th} style={{ width: '18%' }}>Item</th>
                               <th className={th}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                              <th className={th} style={{ width: 100 }}>Unité</th>
                               <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                               <th className={th} style={{ width: 32 }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {quote.management.length === 0 ? (
-                              <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
+                              <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
                             ) : quote.management.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateManagementRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateManagementRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateManagementRow(i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateManagementRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeManagementRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
@@ -2399,7 +2402,7 @@ export default function ProjectPage() {
                           {quote.management.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
+                                <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(managementTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
@@ -2436,13 +2439,14 @@ export default function ProjectPage() {
                                 className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full" style={{ minWidth: 800 }}>
+                              <table className="w-full" style={{ minWidth: 900 }}>
                                 <thead>
                                   <tr>
                                     <th className={th}>Description</th>
                                     <th className={th} style={{ width: 130 }}>Dimension</th>
                                     <th className={th + ' text-right'} style={{ width: 110 }}>Prix d'achat</th>
                                     <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                                    <th className={th} style={{ width: 100 }}>Unité</th>
                                     <th className={th + ' text-right'} style={{ width: 110 }}>Total</th>
                                     <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
                                     <th className={th + ' text-right'} style={{ width: 130 }}>Total facturé</th>
@@ -2451,13 +2455,14 @@ export default function ProjectPage() {
                                 </thead>
                                 <tbody>
                                   {(it.purchases || []).length === 0 ? (
-                                    <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-4">Aucun achat.</td></tr>
+                                    <tr><td colSpan={9} className="text-center text-sm text-gray-400 py-4">Aucun achat.</td></tr>
                                   ) : it.purchases.map((r, i) => (
                                     <tr key={r._uid || i} className="group hover:bg-gray-50">
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'description', e.target.value)} /></td>
                                       <td className={td}><input className={txtCell} placeholder="ex: 200×120×40" value={r.dimension || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'dimension', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit_price', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'quantity', e.target.value)} /></td>
+                                      <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                       <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
                                       <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'margin', e.target.value)} /></td>
                                       <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseBilled(r))}</td>
@@ -2470,7 +2475,7 @@ export default function ProjectPage() {
                                 {(it.purchases || []).length > 0 && (
                                   <tfoot>
                                     <tr>
-                                      <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats</td>
+                                      <td colSpan={7} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats</td>
                                       <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(purchSub)}</td>
                                       <td className="bg-gray-50"></td>
                                     </tr>
@@ -2488,24 +2493,26 @@ export default function ProjectPage() {
                                 className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full" style={{ minWidth: 700 }}>
+                              <table className="w-full" style={{ minWidth: 800 }}>
                                 <thead>
                                   <tr>
                                     <th className={th}>Description</th>
                                     <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                                     <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                                    <th className={th} style={{ width: 100 }}>Unité</th>
                                     <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                                     <th className={th} style={{ width: 32 }}></th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {(it.labor || []).length === 0 ? (
-                                    <tr><td colSpan={5} className="text-center text-sm text-gray-400 py-4">Aucune main d'œuvre.</td></tr>
+                                    <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-4">Aucune main d'œuvre.</td></tr>
                                   ) : it.labor.map((r, i) => (
                                     <tr key={r._uid || i} className="group hover:bg-gray-50">
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'rate', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'quantity', e.target.value)} /></td>
+                                      <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                       <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
                                       <td className={td + ' text-center'}>
                                         <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
@@ -2516,7 +2523,7 @@ export default function ProjectPage() {
                                 {(it.labor || []).length > 0 && (
                                   <tfoot>
                                     <tr>
-                                      <td colSpan={3} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
+                                      <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
                                       <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(laborSub)}</td>
                                       <td className="bg-gray-50"></td>
                                     </tr>
@@ -2543,26 +2550,28 @@ export default function ProjectPage() {
                           className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 700 }}>
+                        <table className="w-full" style={{ minWidth: 800 }}>
                           <thead>
                             <tr>
                               <th className={th} style={{ width: '16%' }}>Item</th>
                               <th className={th}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
+                              <th className={th} style={{ width: 100 }}>Unité</th>
                               <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                               <th className={th} style={{ width: 32 }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {quote.logistics.length === 0 ? (
-                              <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
                             ) : quote.logistics.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateLogisticsRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateLogisticsRow(i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
@@ -2573,7 +2582,7 @@ export default function ProjectPage() {
                           {quote.logistics.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
+                                <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(logisticsTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
