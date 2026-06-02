@@ -182,11 +182,11 @@ export default function DevisPage() {
               const subTotal = purchSub + laborSub
               if (subTotal === 0 && (it.purchases || []).length === 0 && (it.labor || []).length === 0) return null
               return (
-                <section key={idx} style={{ marginBottom: level === 'detail' ? 22 : 6, marginLeft: 14 }}>
+                <section key={idx} style={{ marginBottom: level === 'detail' ? 22 : 6, marginLeft: 14, marginTop: level === 'detail' ? 14 : 0 }}>
                   <h3 style={{
-                    fontSize: 11, fontWeight: 600, color: '#111827',
-                    marginBottom: level === 'detail' ? 8 : 0, paddingBottom: 4,
-                    borderBottom: level === 'detail' ? '1px solid #e5e7eb' : 'none',
+                    fontSize: 12, fontWeight: 700, color: '#111827',
+                    marginBottom: level === 'detail' ? 10 : 0, paddingBottom: 5,
+                    borderBottom: level === 'detail' ? '1px solid #d1d5db' : 'none',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                   }}>
                     <span>{it.name || `Item ${idx + 1}`}</span>
@@ -326,7 +326,7 @@ function DevisTable({ title, columns, rows, subtotalLabel, subtotal }) {
   return (
     <section style={{ marginBottom: 18 }}>
       {title && (
-        <h4 style={{ fontSize: 8.5, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>{title}</h4>
+        <h4 style={{ fontSize: 8, fontWeight: 500, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>{title}</h4>
       )}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
         <thead>
