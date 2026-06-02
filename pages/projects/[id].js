@@ -1286,7 +1286,7 @@ export default function ProjectPage() {
   function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
   function genItemUid() { return `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
-  const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN']
+  const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
   function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '' } }
   function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '100', quantity: '', unit: '' } }
   function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '', margin: '' } }
