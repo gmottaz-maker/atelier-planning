@@ -2480,16 +2480,16 @@ export default function ProjectPage() {
                       </div>
                       {!collapsedSections.management && (
                       <div className="overflow-x-auto">
-                        <table style={{ width: 902, tableLayout: 'fixed' }}>
+                        <table className="w-full" style={{ minWidth: 800, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: 160 }}>Item</th>
-                              <th className={th} style={{ width: 290 }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
-                              <th className={th} style={{ width: 100 }}>Unité</th>
-                              <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
-                              <th className={th} style={{ width: 32 }}></th>
+                              <th className={th} style={{ width: '15%' }}>Item</th>
+                              <th className={th} style={{ width: '30%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
+                              <th className={th} style={{ width: '10%' }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: '20%' }}>Total</th>
+                              <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2573,18 +2573,18 @@ export default function ProjectPage() {
                                     className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Ligne</button>
                                 </div>
                             <div className="overflow-x-auto">
-                              <table style={{ width: 1092, tableLayout: 'fixed' }}>
+                              <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th} style={{ width: 320 }}>Description</th>
-                                    <th className={th} style={{ width: 130 }}>Dimension</th>
-                                    <th className={th + ' text-right'} style={{ width: 110 }}>Prix d'achat</th>
-                                    <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
-                                    <th className={th} style={{ width: 100 }}>Unité</th>
-                                    <th className={th + ' text-right'} style={{ width: 110 }}>Total</th>
-                                    <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
-                                    <th className={th + ' text-right'} style={{ width: 130 }}>Total facturé</th>
-                                    <th className={th} style={{ width: 32 }}></th>
+                                    <th className={th} style={{ width: '30%' }}>Description</th>
+                                    <th className={th} style={{ width: '15%' }}>Dimension</th>
+                                    <th className={th + ' text-right'} style={{ width: '13%' }}>Prix d'achat</th>
+                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
+                                    <th className={th} style={{ width: '10%' }}>Unité</th>
+                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Total</th>
+                                    <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
+                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Total facturé</th>
+                                    <th className={th} style={{ width: '2%' }}></th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -2627,15 +2627,15 @@ export default function ProjectPage() {
                                 className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Ligne</button>
                             </div>
                             <div className="overflow-x-auto">
-                              <table style={{ width: 902, tableLayout: 'fixed' }}>
+                              <table className="w-full" style={{ minWidth: 800, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th} style={{ width: 450 }}>Description</th>
-                                    <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
-                                    <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
-                                    <th className={th} style={{ width: 100 }}>Unité</th>
-                                    <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
-                                    <th className={th} style={{ width: 32 }}></th>
+                                    <th className={th} style={{ width: '45%' }}>Description</th>
+                                    <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
+                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
+                                    <th className={th} style={{ width: '10%' }}>Unité</th>
+                                    <th className={th + ' text-right'} style={{ width: '20%' }}>Total</th>
+                                    <th className={th} style={{ width: '4%' }}></th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -2699,17 +2699,17 @@ export default function ProjectPage() {
                       </div>
                       {!collapsedSections.subcontracting && (
                       <div className="overflow-x-auto">
-                        <table style={{ width: 982, tableLayout: 'fixed' }}>
+                        <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: 160 }}>Item</th>
-                              <th className={th} style={{ width: 290 }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
-                              <th className={th} style={{ width: 100 }}>Unité</th>
-                              <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
-                              <th className={th} style={{ width: 32 }}></th>
+                              <th className={th} style={{ width: '15%' }}>Item</th>
+                              <th className={th} style={{ width: '30%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
+                              <th className={th} style={{ width: '10%' }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
+                              <th className={th + ' text-right'} style={{ width: '14%' }}>Total</th>
+                              <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -2762,17 +2762,17 @@ export default function ProjectPage() {
                       </div>
                       {!collapsedSections.logistics && (
                       <div className="overflow-x-auto">
-                        <table style={{ width: 982, tableLayout: 'fixed' }}>
+                        <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: 160 }}>Item</th>
-                              <th className={th} style={{ width: 290 }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
-                              <th className={th} style={{ width: 100 }}>Unité</th>
-                              <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
-                              <th className={th} style={{ width: 32 }}></th>
+                              <th className={th} style={{ width: '15%' }}>Item</th>
+                              <th className={th} style={{ width: '30%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
+                              <th className={th} style={{ width: '10%' }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
+                              <th className={th + ' text-right'} style={{ width: '14%' }}>Total</th>
+                              <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
                           <tbody>
