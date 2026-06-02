@@ -128,13 +128,14 @@ export default function DevisPage() {
           <DevisTable
             title="Gestion de projet / visuel"
             columns={[
+              { label: 'Item',        width: '18%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Tarif',       width: '11%', align: 'right' },
+              { label: 'Prix',        width: '11%', align: 'right' },
               { label: 'Qté',         width: '7%',  align: 'right' },
               { label: 'Total',       width: '13%', align: 'right' },
             ]}
             rows={q.management.map(r => [
-              r.description,
+              r.item, r.description,
               fmtCHF(num(r.rate)), num(r.quantity), fmtCHF(serviceTotal(r)),
             ])}
             subtotalLabel="Sous-total gestion"
@@ -184,7 +185,7 @@ export default function DevisPage() {
                   title="Main d'œuvre"
                   columns={[
                     { label: 'Description', width: 'auto',align: 'left'  },
-                    { label: 'Tarif',       width: '11%', align: 'right' },
+                    { label: 'Prix',        width: '11%', align: 'right' },
                     { label: 'Qté',         width: '7%',  align: 'right' },
                     { label: 'Total',       width: '13%', align: 'right' },
                   ]}
@@ -205,9 +206,9 @@ export default function DevisPage() {
           <DevisTable
             title="Logistique"
             columns={[
-              { label: 'Trajet',      width: '16%', align: 'left'  },
+              { label: 'Item',        width: '16%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Tarif',       width: '11%', align: 'right' },
+              { label: 'Prix',        width: '11%', align: 'right' },
               { label: 'Qté',         width: '7%',  align: 'right' },
               { label: 'Total',       width: '13%', align: 'right' },
             ]}

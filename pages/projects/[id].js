@@ -2369,11 +2369,12 @@ export default function ProjectPage() {
                           className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 700 }}>
+                        <table className="w-full" style={{ minWidth: 800 }}>
                           <thead>
                             <tr>
+                              <th className={th} style={{ width: '18%' }}>Item</th>
                               <th className={th}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: 110 }}>Tarif</th>
+                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                               <th className={th} style={{ width: 32 }}></th>
@@ -2381,9 +2382,10 @@ export default function ProjectPage() {
                           </thead>
                           <tbody>
                             {quote.management.length === 0 ? (
-                              <tr><td colSpan={5} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
+                              <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
                             ) : quote.management.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateManagementRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateManagementRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateManagementRow(i, 'quantity', e.target.value)} /></td>
@@ -2397,7 +2399,7 @@ export default function ProjectPage() {
                           {quote.management.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={3} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
+                                <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(managementTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
@@ -2490,7 +2492,7 @@ export default function ProjectPage() {
                                 <thead>
                                   <tr>
                                     <th className={th}>Description</th>
-                                    <th className={th + ' text-right'} style={{ width: 110 }}>Tarif</th>
+                                    <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                                     <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                                     <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                                     <th className={th} style={{ width: 32 }}></th>
@@ -2544,9 +2546,9 @@ export default function ProjectPage() {
                         <table className="w-full" style={{ minWidth: 700 }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '16%' }}>Trajet</th>
+                              <th className={th} style={{ width: '16%' }}>Item</th>
                               <th className={th}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: 110 }}>Tarif</th>
+                              <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                               <th className={th} style={{ width: 32 }}></th>
