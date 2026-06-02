@@ -246,39 +246,60 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     if (!p) { set('project_id', pid); return }
     const q = p.quote_data || {}
 
-    // Nouveau format : { management, items, logistics }
+    // Marge effective pour une ligne: spécifique sinon marge générale du devis
+    const gm = q.general_margin ?? ''
+    const effMargin = r => {
+      if (r?.margin !== '' && r?.margin != null) return num(r.margin)
+      return num(gm)
+    }
+
+    // Nouveau format : { management, items, subcontracting, logistics, general_margin }
     let flatPurchases = []
     let flatLabor     = []
+    let flatLogistics = []
     if (Array.isArray(q.items) || Array.isArray(q.management)) {
-      // Gestion → ligne labor "Gestion de projet / visuel — <description>"
+      // Gestion → labor (pas de marge, c'est de la main d'œuvre)
       flatLabor = (q.management || []).map(r => ({
         ...r,
-        item: 'Gestion de projet / visuel',
+        item: r.item || 'Gestion de projet / visuel',
         _uid: r._uid || genUid(),
       }))
       for (const it of (q.items || [])) {
         const itemName = it.name || 'Item'
+        // Achats : la marge effective est résolue en row.margin pour que la facture la calcule comme avant
         for (const r of (it.purchases || [])) {
-          flatPurchases.push({ ...r, item: itemName, _uid: r._uid || genUid() })
+          flatPurchases.push({
+            ...r,
+            item: itemName,
+            margin: r.margin !== '' && r.margin != null ? r.margin : gm,
+            _uid: r._uid || genUid(),
+          })
         }
         for (const r of (it.labor || [])) {
           flatLabor.push({ ...r, item: itemName, _uid: r._uid || genUid() })
         }
       }
-      // Sous-traitance → ligne labor "Sous-traitance · <description>"
+      // Sous-traitance → labor avec marge intégrée dans le tarif (la facture n'applique pas de marge sur le labor)
       for (const r of (q.subcontracting || [])) {
+        const billedRate = num(r.rate) * (1 + effMargin(r) / 100)
         flatLabor.push({
           ...r,
           item: r.item ? `Sous-traitance · ${r.item}` : 'Sous-traitance',
+          rate: billedRate.toFixed(2),
           _uid: r._uid || genUid(),
         })
       }
+      // Logistique → idem (marge intégrée dans le tarif)
+      flatLogistics = (q.logistics || []).map(r => {
+        const billedRate = num(r.rate) * (1 + effMargin(r) / 100)
+        return { ...r, rate: billedRate.toFixed(2), _uid: r._uid || genUid() }
+      })
     } else {
       // Ancien format
       flatPurchases = (q.purchases || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
       flatLabor     = (q.labor     || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
+      flatLogistics = (q.logistics || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
     }
-    const flatLogistics = (q.logistics || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
 
     const total =
       flatPurchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +

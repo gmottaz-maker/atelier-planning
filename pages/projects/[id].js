@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
@@ -13,6 +13,27 @@ import { useSuggestions } from '../../lib/useSuggestions'
 import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/AddressInput'
 
 const PINK = '#111827'
+
+// Champ quantité : step natif 0.5, mais le passage vide/0 → 0.5 (premier clic up) saute directement à 1
+function QtyInput({ value, onChange, className }) {
+  return (
+    <input
+      type="number"
+      step="0.5"
+      min="0"
+      className={className}
+      value={value ?? ''}
+      onChange={e => {
+        const raw = e.target.value
+        const oldNum = parseFloat(value)
+        const newNum = parseFloat(raw)
+        const wasEmpty = value === '' || value == null || oldNum === 0
+        if (wasEmpty && newNum === 0.5) { onChange('1'); return }
+        onChange(raw)
+      }}
+    />
+  )
+}
 const PERSON_COLORS = {
   Arnaud: '#3b82f6',
   Gabin: '#8b5cf6',
@@ -944,8 +965,9 @@ export default function ProjectPage() {
   const [updateError, setUpdateError] = useState('')
   const [updateDragging, setUpdateDragging] = useState(false)
 
-  // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], subcontracting:[], logistics:[] }
-  const EMPTY_QUOTE = { management: [], items: [], subcontracting: [], logistics: [] }
+  // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], subcontracting:[], logistics:[], general_margin:'' }
+  // general_margin (%) s'applique aux achats / sous-traitance / logistique sauf si une marge spécifique est définie sur la ligne
+  const EMPTY_QUOTE = { management: [], items: [], subcontracting: [], logistics: [], general_margin: '' }
   const [quote, setQuote] = useState(EMPTY_QUOTE)
   const [quoteDirty, setQuoteDirty] = useState(false)
   const [quoteSaving, setQuoteSaving] = useState(false)
@@ -1002,6 +1024,7 @@ export default function ProjectPage() {
                 items:          q.items || [],
                 subcontracting: q.subcontracting || [],
                 logistics:      q.logistics || [],
+                general_margin: q.general_margin ?? '',
               })
               setQuoteExpanded(true)
             }
@@ -1019,6 +1042,7 @@ export default function ProjectPage() {
                 : [],
               subcontracting: [],
               logistics: q.logistics || [],
+              general_margin: '',
             }
             setQuote(migrated)
             setQuoteDirty(true)  // forcer un re-save dans le nouveau format
@@ -1250,17 +1274,23 @@ export default function ProjectPage() {
   function genRowUid() { return `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
 
   function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+  // Marge effective : marge spécifique de la ligne si définie, sinon marge générale du devis
+  function effectiveMargin(r) {
+    if (r?.margin !== '' && r?.margin != null) return num(r.margin)
+    return num(quote.general_margin)
+  }
   function purchaseTotal(r)  { return num(r.unit_price) * num(r.quantity) }
-  function purchaseBilled(r) { return purchaseTotal(r) * (1 + num(r.margin) / 100) }
+  function purchaseBilled(r) { return purchaseTotal(r) * (1 + effectiveMargin(r) / 100) }
   function serviceTotal(r)   { return num(r.rate) * num(r.quantity) }
+  function serviceBilled(r)  { return serviceTotal(r) * (1 + effectiveMargin(r) / 100) }
   function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
   function genItemUid() { return `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
-  const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km']
+  const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN']
   function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '' } }
-  function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '', quantity: '', unit: '' } }
-  function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '' } }
-  function emptySubcontractingRow(){ return { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '', unit: '' } }
+  function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '100', quantity: '', unit: '' } }
+  function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '', margin: '' } }
+  function emptySubcontractingRow(){ return { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '', unit: '', margin: '' } }
 
   // ── Gestion (lignes de main d'œuvre globales) ──
   function addManagementRow() {
@@ -1365,6 +1395,26 @@ export default function ProjectPage() {
       setQuoteSaving(false)
     }
   }
+
+  // Auto-save: 5 min après une modification, on enregistre silencieusement
+  const latestQuote   = useRef(quote)
+  const latestProject = useRef(project)
+  useEffect(() => { latestQuote.current   = quote   }, [quote])
+  useEffect(() => { latestProject.current = project }, [project])
+  useEffect(() => {
+    if (!quoteDirty || !project) return
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/projects/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+          body: JSON.stringify({ ...latestProject.current, quote_data: latestQuote.current }),
+        })
+        if (r.ok) setQuoteDirty(false)
+      } catch (e) { console.warn('Auto-save quote failed:', e?.message) }
+    }, 5 * 60 * 1000)
+    return () => clearTimeout(t)
+  }, [quoteDirty, project, id, currentUser])
 
   // ── kDrive preview helpers ───────────────────────────────────────────────
   const KDRIVE_DRIVE_ID = 1936508 // pour bâtir les liens externes (drive Infomaniak)
@@ -2326,8 +2376,8 @@ export default function ProjectPage() {
           {(() => {
             const managementTotal     = quote.management.reduce((s, r) => s + serviceTotal(r), 0)
             const itemsTotal          = quote.items.reduce((s, it) => s + itemTotal(it), 0)
-            const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceTotal(r), 0)
-            const logisticsTotal      = quote.logistics.reduce((s, r) => s + serviceTotal(r), 0)
+            const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceBilled(r), 0)
+            const logisticsTotal      = quote.logistics.reduce((s, r) => s + serviceBilled(r), 0)
             const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
             const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
@@ -2382,18 +2432,33 @@ export default function ProjectPage() {
 
                 {quoteExpanded && (
                   <div className="space-y-6">
+                    {/* ── Marge générale ── */}
+                    <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <span className="text-sm font-medium text-amber-900">Marge générale</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="px-3 py-1.5 border border-amber-300 rounded-md text-sm w-24 text-right bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        placeholder="0"
+                        value={quote.general_margin ?? ''}
+                        onChange={e => { setQuote(q => ({ ...q, general_margin: e.target.value })); setQuoteDirty(true) }}
+                      />
+                      <span className="text-sm text-amber-900">%</span>
+                      <span className="text-xs text-amber-800/80 ml-2">S'applique aux achats, sous-traitance et logistique. Une marge spécifique sur une ligne prend le dessus.</span>
+                    </div>
+
                     {/* ── Gestion de projet / visuel ── */}
                     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Gestion de projet / visuel</h3>
+                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between" style={{ background: '#eef2ff' }}>
+                        <h3 className="font-semibold" style={{ fontSize: 15, color: '#3730a3' }}>Gestion de projet / visuel</h3>
                         <button onClick={addManagementRow}
-                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                          className="text-xs font-medium text-indigo-700 hover:text-indigo-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full" style={{ minWidth: 900 }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '18%' }}>Item</th>
+                              <th className={th} style={{ width: 160 }}>Item</th>
                               <th className={th}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
@@ -2410,7 +2475,7 @@ export default function ProjectPage() {
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateManagementRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateManagementRow(i, 'rate', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateManagementRow(i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateManagementRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateManagementRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
                                 <td className={td + ' text-center'}>
@@ -2438,17 +2503,18 @@ export default function ProjectPage() {
                       const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
                       const subTotal = purchSub + laborSub
                       return (
-                        <div key={it._uid || itemIdx} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3" style={{ background: '#fafafa' }}>
+                        <div key={it._uid || itemIdx} className="bg-white rounded-2xl border border-emerald-200 overflow-hidden">
+                          <div className="px-5 py-3 border-b border-emerald-100 flex items-center justify-between gap-3" style={{ background: '#ecfdf5' }}>
                             <input
-                              className="flex-1 px-2 py-1 text-base font-semibold text-gray-900 bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
+                              className="flex-1 px-2 py-1 text-base font-semibold bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded"
+                              style={{ color: '#065f46' }}
                               placeholder="Nom de l'item (ex: Bar, Backbar…)"
                               value={it.name || ''}
                               onChange={e => updateItemName(itemIdx, e.target.value)}
                             />
-                            <span className="text-sm font-semibold text-gray-700 tabular-nums whitespace-nowrap">{fmtCHF(subTotal)} CHF</span>
+                            <span className="text-sm font-semibold tabular-nums whitespace-nowrap" style={{ color: '#065f46' }}>{fmtCHF(subTotal)} CHF</span>
                             <button onClick={() => { if (confirm(`Supprimer l'item "${it.name || 'sans nom'}" ?`)) removeItem(itemIdx) }}
-                              className="text-gray-400 hover:text-red-500 text-sm" title="Supprimer cet item">✕</button>
+                              className="text-emerald-600 hover:text-red-500 text-sm" title="Supprimer cet item">✕</button>
                           </div>
 
                           {/* Achats de l'item */}
@@ -2459,7 +2525,7 @@ export default function ProjectPage() {
                                 className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full" style={{ minWidth: 900 }}>
+                              <table className="w-full" style={{ minWidth: 1090 }}>
                                 <thead>
                                   <tr>
                                     <th className={th}>Description</th>
@@ -2481,10 +2547,10 @@ export default function ProjectPage() {
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'description', e.target.value)} /></td>
                                       <td className={td}><input className={txtCell} placeholder="ex: 200×120×40" value={r.dimension || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'dimension', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit_price', e.target.value)} /></td>
-                                      <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'quantity', e.target.value)} /></td>
+                                      <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateItemRow(itemIdx, 'purchases', i, 'quantity', v)} /></td>
                                       <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                       <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
-                                      <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'margin', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'margin', e.target.value)} /></td>
                                       <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseBilled(r))}</td>
                                       <td className={td + ' text-center'}>
                                         <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
@@ -2513,7 +2579,7 @@ export default function ProjectPage() {
                                 className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full" style={{ minWidth: 800 }}>
+                              <table className="w-full" style={{ minWidth: 900 }}>
                                 <thead>
                                   <tr>
                                     <th className={th}>Description</th>
@@ -2531,7 +2597,7 @@ export default function ProjectPage() {
                                     <tr key={r._uid || i} className="group hover:bg-gray-50">
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'rate', e.target.value)} /></td>
-                                      <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'quantity', e.target.value)} /></td>
+                                      <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateItemRow(itemIdx, 'labor', i, 'quantity', v)} /></td>
                                       <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                       <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
                                       <td className={td + ' text-center'}>
@@ -2563,36 +2629,38 @@ export default function ProjectPage() {
                     </button>
 
                     {/* ── Sous-traitance ── */}
-                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Sous-traitance</h3>
+                    <div className="bg-white rounded-2xl border border-orange-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-orange-100 flex items-center justify-between" style={{ background: '#fff7ed' }}>
+                        <h3 className="font-semibold" style={{ fontSize: 15, color: '#9a3412' }}>Sous-traitance</h3>
                         <button onClick={addSubcontractingRow}
-                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                          className="text-xs font-medium text-orange-700 hover:text-orange-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 800 }}>
+                        <table className="w-full" style={{ minWidth: 980 }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '16%' }}>Item</th>
+                              <th className={th} style={{ width: 160 }}>Item</th>
                               <th className={th}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th} style={{ width: 100 }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
                               <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                               <th className={th} style={{ width: 32 }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {(quote.subcontracting || []).length === 0 ? (
-                              <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
                             ) : quote.subcontracting.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateSubcontractingRow(i, 'item', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateSubcontractingRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateSubcontractingRow(i, 'rate', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateSubcontractingRow(i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateSubcontractingRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateSubcontractingRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateSubcontractingRow(i, 'margin', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceBilled(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeSubcontractingRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>
@@ -2602,7 +2670,7 @@ export default function ProjectPage() {
                           {(quote.subcontracting || []).length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total sous-traitance</td>
+                                <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total sous-traitance</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(subcontractingTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
@@ -2613,36 +2681,38 @@ export default function ProjectPage() {
                     </div>
 
                     {/* ── Logistique ── */}
-                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Logistique</h3>
+                    <div className="bg-white rounded-2xl border border-cyan-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-cyan-100 flex items-center justify-between" style={{ background: '#ecfeff' }}>
+                        <h3 className="font-semibold" style={{ fontSize: 15, color: '#155e75' }}>Logistique</h3>
                         <button onClick={addLogisticsRow}
-                          className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                          className="text-xs font-medium text-cyan-700 hover:text-cyan-900">+ Ligne</button>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 800 }}>
+                        <table className="w-full" style={{ minWidth: 980 }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '16%' }}>Item</th>
+                              <th className={th} style={{ width: 160 }}>Item</th>
                               <th className={th}>Description</th>
                               <th className={th + ' text-right'} style={{ width: 110 }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: 80 }}>Qté</th>
                               <th className={th} style={{ width: 100 }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: 80 }}>Marge %</th>
                               <th className={th + ' text-right'} style={{ width: 130 }}>Total</th>
                               <th className={th} style={{ width: 32 }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {quote.logistics.length === 0 ? (
-                              <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
                             ) : quote.logistics.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateLogisticsRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.quantity || ''} onChange={e => updateLogisticsRow(i, 'quantity', e.target.value)} /></td>
+                                <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateLogisticsRow(i, 'margin', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceBilled(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>
@@ -2652,7 +2722,7 @@ export default function ProjectPage() {
                           {quote.logistics.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
+                                <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(logisticsTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
