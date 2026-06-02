@@ -972,6 +972,11 @@ export default function ProjectPage() {
   const [quoteDirty, setQuoteDirty] = useState(false)
   const [quoteSaving, setQuoteSaving] = useState(false)
   const [quoteExpanded, setQuoteExpanded] = useState(false)
+  // Collapse state — uid → true si replié (par défaut: tout est déplié)
+  const [collapsedItems, setCollapsedItems] = useState({})
+  const [collapsedSections, setCollapsedSections] = useState({}) // 'management' | 'fabrication' | 'subcontracting' | 'logistics'
+  function toggleCollapsedItem(uid) { setCollapsedItems(s => ({ ...s, [uid]: !s[uid] })) }
+  function toggleCollapsedSection(name) { setCollapsedSections(s => ({ ...s, [name]: !s[name] })) }
 
   // kDrive preview state
   const [kdriveItems, setKdriveItems] = useState([])
@@ -2407,12 +2412,22 @@ export default function ProjectPage() {
                       </button>
                       <a href={`/projects/${id}/devis`} target="_blank" rel="noopener"
                         className="px-4 py-1.5 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors inline-flex items-center gap-1.5"
-                        title={quoteDirty ? 'Enregistre d\'abord pour inclure les dernières modifs' : 'Ouvrir le devis PDF'}>
+                        title={quoteDirty ? 'Enregistre d\'abord pour inclure les dernières modifs' : 'Devis PDF détaillé'}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                           <polyline points="14 2 14 8 20 8" />
                         </svg>
-                        Devis PDF
+                        PDF détaillé
+                      </a>
+                      <a href={`/projects/${id}/devis?summary=1`} target="_blank" rel="noopener"
+                        className="px-4 py-1.5 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors inline-flex items-center gap-1.5"
+                        title={quoteDirty ? 'Enregistre d\'abord' : 'Devis PDF résumé (sections + sous-totaux seulement)'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="4" y1="6" x2="20" y2="6" />
+                          <line x1="4" y1="12" x2="20" y2="12" />
+                          <line x1="4" y1="18" x2="14" y2="18" />
+                        </svg>
+                        PDF résumé
                       </a>
                       {isAdmin && (
                         <a href={`/factures-emises?from=${id}`}
@@ -2447,13 +2462,23 @@ export default function ProjectPage() {
                       <span className="text-xs text-amber-800/80 ml-2">S'applique aux achats, sous-traitance et logistique. Une marge spécifique sur une ligne prend le dessus.</span>
                     </div>
 
-                    {/* ── Gestion de projet / visuel ── */}
-                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between" style={{ background: '#eef2ff' }}>
-                        <h3 className="font-semibold" style={{ fontSize: 15, color: '#3730a3' }}>Gestion de projet / visuel</h3>
-                        <button onClick={addManagementRow}
-                          className="text-xs font-medium text-indigo-700 hover:text-indigo-900">+ Ligne</button>
+                    {/* ── Gestion projet ── */}
+                    <div className="bg-white rounded-2xl border border-indigo-200 overflow-hidden">
+                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#eef2ff', borderBottom: collapsedSections.management ? 'none' : '1px solid #e0e7ff' }}>
+                        <button onClick={() => toggleCollapsedSection('management')}
+                          className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
+                          <span style={{ color: '#3730a3', fontSize: 12 }}>{collapsedSections.management ? '▸' : '▾'}</span>
+                          <h3 className="font-semibold" style={{ fontSize: 17, color: '#3730a3' }}>● Gestion projet</h3>
+                        </button>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-semibold tabular-nums" style={{ color: '#3730a3' }}>{fmtCHF(managementTotal)} CHF</span>
+                          {!collapsedSections.management && (
+                            <button onClick={addManagementRow}
+                              className="text-xs font-medium text-indigo-700 hover:text-indigo-900">+ Ligne</button>
+                          )}
+                        </div>
                       </div>
+                      {!collapsedSections.management && (
                       <div className="overflow-x-auto">
                         <table className="w-full" style={{ minWidth: 900 }}>
                           <thead>
@@ -2495,35 +2520,58 @@ export default function ProjectPage() {
                           )}
                         </table>
                       </div>
+                      )}
                     </div>
 
-                    {/* ── Items (Bar, Backbar, etc.) ── */}
-                    {quote.items.map((it, itemIdx) => {
-                      const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
-                      const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
-                      const subTotal = purchSub + laborSub
-                      return (
-                        <div key={it._uid || itemIdx} className="bg-white rounded-2xl border border-emerald-200 overflow-hidden">
-                          <div className="px-5 py-3 border-b border-emerald-100 flex items-center justify-between gap-3" style={{ background: '#ecfdf5' }}>
-                            <input
-                              className="flex-1 px-2 py-1 text-base font-semibold bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded"
-                              style={{ color: '#065f46' }}
-                              placeholder="Nom de l'item (ex: Bar, Backbar…)"
-                              value={it.name || ''}
-                              onChange={e => updateItemName(itemIdx, e.target.value)}
-                            />
-                            <span className="text-sm font-semibold tabular-nums whitespace-nowrap" style={{ color: '#065f46' }}>{fmtCHF(subTotal)} CHF</span>
-                            <button onClick={() => { if (confirm(`Supprimer l'item "${it.name || 'sans nom'}" ?`)) removeItem(itemIdx) }}
-                              className="text-emerald-600 hover:text-red-500 text-sm" title="Supprimer cet item">✕</button>
-                          </div>
+                    {/* ── Fabrication (groupe d'items: Bar, Pergola, etc.) ── */}
+                    <div className="bg-white rounded-2xl border border-emerald-300 overflow-hidden">
+                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#d1fae5', borderBottom: collapsedSections.fabrication ? 'none' : '1px solid #a7f3d0' }}>
+                        <button onClick={() => toggleCollapsedSection('fabrication')}
+                          className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
+                          <span style={{ color: '#065f46', fontSize: 12 }}>{collapsedSections.fabrication ? '▸' : '▾'}</span>
+                          <h3 className="font-bold" style={{ fontSize: 17, color: '#065f46' }}>● Fabrication</h3>
+                        </button>
+                        <span className="text-sm font-semibold tabular-nums" style={{ color: '#065f46' }}>{fmtCHF(itemsTotal)} CHF</span>
+                      </div>
 
-                          {/* Achats de l'item */}
-                          <div className="border-b border-gray-100">
-                            <div className="px-5 py-2 flex items-center justify-between bg-white">
-                              <h4 className="font-medium text-gray-700 text-sm">Achats (matériaux)</h4>
-                              <button onClick={() => addItemRow(itemIdx, 'purchases')}
-                                className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
-                            </div>
+                      {!collapsedSections.fabrication && (
+                      <div className="p-4 space-y-3" style={{ background: '#f0fdf4' }}>
+                        {quote.items.length === 0 && (
+                          <div className="text-center text-sm text-emerald-700/70 py-6">Aucun item pour l'instant. Ajoute Bar, Pergola, etc.</div>
+                        )}
+                        {quote.items.map((it, itemIdx) => {
+                          const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
+                          const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+                          const subTotal = purchSub + laborSub
+                          return (
+                            <div key={it._uid || itemIdx} className="bg-white rounded-xl border border-emerald-200 overflow-hidden shadow-sm">
+                              <div className="px-4 py-2.5 flex items-center justify-between gap-3" style={{ background: '#ecfdf5', borderBottom: collapsedItems[it._uid] ? 'none' : '1px solid #d1fae5' }}>
+                                <button onClick={() => toggleCollapsedItem(it._uid)}
+                                  className="hover:opacity-70" title={collapsedItems[it._uid] ? 'Déplier' : 'Replier'}>
+                                  <span className="text-emerald-700" style={{ fontSize: 12 }}>{collapsedItems[it._uid] ? '▸' : '▾'}</span>
+                                </button>
+                                <span className="text-emerald-700">●</span>
+                                <input
+                                  className="flex-1 px-2 py-1 text-base font-semibold bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded"
+                                  style={{ color: '#065f46' }}
+                                  placeholder="Nom de l'item (ex: Bar, Backbar…)"
+                                  value={it.name || ''}
+                                  onChange={e => updateItemName(itemIdx, e.target.value)}
+                                />
+                                <span className="text-sm font-semibold tabular-nums whitespace-nowrap" style={{ color: '#065f46' }}>{fmtCHF(subTotal)} CHF</span>
+                                <button onClick={() => { if (confirm(`Supprimer l'item "${it.name || 'sans nom'}" ?`)) removeItem(itemIdx) }}
+                                  className="text-emerald-600 hover:text-red-500 text-sm" title="Supprimer cet item">✕</button>
+                              </div>
+
+                              {!collapsedItems[it._uid] && (
+                              <>
+                              {/* Achats de l'item */}
+                              <div className="border-b border-gray-100">
+                                <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#fffbeb' }}>
+                                  <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#92400e' }}>● Achats (matériaux)</h4>
+                                  <button onClick={() => addItemRow(itemIdx, 'purchases')}
+                                    className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Ligne</button>
+                                </div>
                             <div className="overflow-x-auto">
                               <table className="w-full" style={{ minWidth: 1090 }}>
                                 <thead>
@@ -2573,10 +2621,10 @@ export default function ProjectPage() {
 
                           {/* Main d'œuvre de l'item */}
                           <div>
-                            <div className="px-5 py-2 flex items-center justify-between bg-white">
-                              <h4 className="font-medium text-gray-700 text-sm">Main d'œuvre (découpe, peinture…)</h4>
+                            <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#faf5ff' }}>
+                              <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#6b21a8' }}>● Main d'œuvre (découpe, peinture…)</h4>
                               <button onClick={() => addItemRow(itemIdx, 'labor')}
-                                className="text-xs font-medium text-gray-500 hover:text-gray-900">+ Ligne</button>
+                                className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Ligne</button>
                             </div>
                             <div className="overflow-x-auto">
                               <table className="w-full" style={{ minWidth: 900 }}>
@@ -2618,23 +2666,38 @@ export default function ProjectPage() {
                               </table>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                          </>
+                          )}
+                            </div>
+                          )
+                        })}
 
-                    {/* Bouton ajouter un item */}
-                    <button onClick={addItem}
-                      className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-gray-900 hover:text-gray-900 transition-colors">
-                      + Ajouter un item
-                    </button>
+                        {/* Bouton ajouter un item (à l'intérieur de Fabrication) */}
+                        <button onClick={addItem}
+                          className="w-full py-2.5 rounded-xl border-2 border-dashed border-emerald-300 text-sm font-medium text-emerald-700 hover:border-emerald-600 hover:bg-white transition-colors">
+                          + Ajouter un item
+                        </button>
+                      </div>
+                      )}
+                    </div>
 
                     {/* ── Sous-traitance ── */}
                     <div className="bg-white rounded-2xl border border-orange-200 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-orange-100 flex items-center justify-between" style={{ background: '#fff7ed' }}>
-                        <h3 className="font-semibold" style={{ fontSize: 15, color: '#9a3412' }}>Sous-traitance</h3>
-                        <button onClick={addSubcontractingRow}
-                          className="text-xs font-medium text-orange-700 hover:text-orange-900">+ Ligne</button>
+                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#fff7ed', borderBottom: collapsedSections.subcontracting ? 'none' : '1px solid #fed7aa' }}>
+                        <button onClick={() => toggleCollapsedSection('subcontracting')}
+                          className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
+                          <span style={{ color: '#9a3412', fontSize: 12 }}>{collapsedSections.subcontracting ? '▸' : '▾'}</span>
+                          <h3 className="font-bold" style={{ fontSize: 17, color: '#9a3412' }}>● Sous-traitance</h3>
+                        </button>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-semibold tabular-nums" style={{ color: '#9a3412' }}>{fmtCHF(subcontractingTotal)} CHF</span>
+                          {!collapsedSections.subcontracting && (
+                            <button onClick={addSubcontractingRow}
+                              className="text-xs font-medium text-orange-700 hover:text-orange-900">+ Ligne</button>
+                          )}
+                        </div>
                       </div>
+                      {!collapsedSections.subcontracting && (
                       <div className="overflow-x-auto">
                         <table className="w-full" style={{ minWidth: 980 }}>
                           <thead>
@@ -2678,15 +2741,26 @@ export default function ProjectPage() {
                           )}
                         </table>
                       </div>
+                      )}
                     </div>
 
                     {/* ── Logistique ── */}
                     <div className="bg-white rounded-2xl border border-cyan-200 overflow-hidden">
-                      <div className="px-5 py-3 border-b border-cyan-100 flex items-center justify-between" style={{ background: '#ecfeff' }}>
-                        <h3 className="font-semibold" style={{ fontSize: 15, color: '#155e75' }}>Logistique</h3>
-                        <button onClick={addLogisticsRow}
-                          className="text-xs font-medium text-cyan-700 hover:text-cyan-900">+ Ligne</button>
+                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#ecfeff', borderBottom: collapsedSections.logistics ? 'none' : '1px solid #cffafe' }}>
+                        <button onClick={() => toggleCollapsedSection('logistics')}
+                          className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
+                          <span style={{ color: '#155e75', fontSize: 12 }}>{collapsedSections.logistics ? '▸' : '▾'}</span>
+                          <h3 className="font-bold" style={{ fontSize: 17, color: '#155e75' }}>● Logistique</h3>
+                        </button>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-semibold tabular-nums" style={{ color: '#155e75' }}>{fmtCHF(logisticsTotal)} CHF</span>
+                          {!collapsedSections.logistics && (
+                            <button onClick={addLogisticsRow}
+                              className="text-xs font-medium text-cyan-700 hover:text-cyan-900">+ Ligne</button>
+                          )}
+                        </div>
                       </div>
+                      {!collapsedSections.logistics && (
                       <div className="overflow-x-auto">
                         <table className="w-full" style={{ minWidth: 980 }}>
                           <thead>
@@ -2730,6 +2804,7 @@ export default function ProjectPage() {
                           )}
                         </table>
                       </div>
+                      )}
                     </div>
 
                     {/* ── Total général ── */}

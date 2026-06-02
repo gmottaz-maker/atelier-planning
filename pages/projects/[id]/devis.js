@@ -19,7 +19,9 @@ function fmtDateLong(d) {
 
 export default function DevisPage() {
   const router = useRouter()
-  const { id } = router.query
+  const { id, summary } = router.query
+  // level: 'detail' (toutes les lignes) | 'summary' (uniquement les sections avec sous-totaux)
+  const level = summary === '1' ? 'summary' : 'detail'
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -84,13 +86,25 @@ export default function DevisPage() {
         }
       `}</style>
 
-      {/* Bouton imprimer (visible à l'écran) */}
-      <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 10, display: 'flex', gap: 8 }}>
+      {/* Boutons de contrôle (visibles à l'écran) */}
+      <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
         <button
           onClick={() => router.back()}
           style={{ padding: '8px 14px', borderRadius: 8, background: 'white', border: '1px solid #e5e7eb', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
           ← Retour
         </button>
+        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', background: 'white' }}>
+          <button
+            onClick={() => router.replace({ pathname: router.pathname, query: { id } })}
+            style={{ padding: '8px 14px', background: level === 'detail' ? '#111827' : 'white', color: level === 'detail' ? 'white' : '#374151', border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            Détaillé
+          </button>
+          <button
+            onClick={() => router.replace({ pathname: router.pathname, query: { id, summary: '1' } })}
+            style={{ padding: '8px 14px', background: level === 'summary' ? '#111827' : 'white', color: level === 'summary' ? 'white' : '#374151', border: 'none', borderLeft: '1px solid #e5e7eb', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            Résumé
+          </button>
+        </div>
         <button
           onClick={() => window.print()}
           style={{ padding: '8px 16px', borderRadius: 8, background: '#111827', color: 'white', border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
@@ -136,10 +150,12 @@ export default function DevisPage() {
           </div>
         </section>
 
-        {/* ── Gestion de projet / visuel ── */}
+        {/* ── Gestion projet ── */}
         {(q.management || []).length > 0 && (
+          <SectionHeader title="Gestion projet" total={managementTotal} />
+        )}
+        {level === 'detail' && (q.management || []).length > 0 && (
           <DevisTable
-            title="Gestion de projet / visuel"
             columns={[
               { label: 'Item',        width: '16%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
@@ -152,76 +168,81 @@ export default function DevisPage() {
               r.item, r.description,
               fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
             ])}
-            subtotalLabel="Sous-total gestion"
-            subtotal={managementTotal}
           />
         )}
 
-        {/* ── Items (Bar, Backbar, etc.) ── */}
-        {(q.items || []).map((it, idx) => {
-          const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r, gm), 0)
-          const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
-          const subTotal = purchSub + laborSub
-          if (subTotal === 0 && (it.purchases || []).length === 0 && (it.labor || []).length === 0) return null
-          return (
-            <section key={idx} style={{ marginBottom: 26 }}>
-              <h2 style={{
-                fontSize: 13, fontWeight: 700, color: '#111827',
-                marginBottom: 10, paddingBottom: 6,
-                borderBottom: '1.5px solid #111827',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-              }}>
-                <span>{it.name || `Item ${idx + 1}`}</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtCHF(subTotal)} CHF
-                </span>
-              </h2>
-              {(it.purchases || []).length > 0 && (
-                <DevisTable
-                  title="Achats / matériel"
-                  columns={[
-                    { label: 'Description', width: 'auto',align: 'left'  },
-                    { label: 'Dimension',   width: '13%', align: 'left'  },
-                    { label: 'P.U.',        width: '9%',  align: 'right' },
-                    { label: 'Qté',         width: '6%',  align: 'right' },
-                    { label: 'Unité',       width: '9%',  align: 'left'  },
-                    { label: 'Total',       width: '12%', align: 'right' },
-                  ]}
-                  rows={it.purchases.map(r => [
-                    r.description, r.dimension,
-                    fmtCHF(num(r.unit_price)), num(r.quantity), r.unit || '', fmtCHF(purchaseBilled(r, gm)),
-                  ])}
-                  subtotalLabel="Sous-total achats"
-                  subtotal={purchSub}
-                />
-              )}
-              {(it.labor || []).length > 0 && (
-                <DevisTable
-                  title="Main d'œuvre"
-                  columns={[
-                    { label: 'Description', width: 'auto',align: 'left'  },
-                    { label: 'Prix',        width: '10%', align: 'right' },
-                    { label: 'Qté',         width: '7%',  align: 'right' },
-                    { label: 'Unité',       width: '10%', align: 'left'  },
-                    { label: 'Total',       width: '13%', align: 'right' },
-                  ]}
-                  rows={it.labor.map(r => [
-                    r.description,
-                    fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
-                  ])}
-                  subtotalLabel="Sous-total main d'œuvre"
-                  subtotal={laborSub}
-                />
-              )}
-            </section>
-          )
-        })}
+        {/* ── Fabrication (groupe d'items) ── */}
+        {(q.items || []).length > 0 && (
+          <>
+            <SectionHeader title="Fabrication" total={itemsTotal} />
 
-        {/* ── Logistique ── */}
+            {(q.items || []).map((it, idx) => {
+              const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r, gm), 0)
+              const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+              const subTotal = purchSub + laborSub
+              if (subTotal === 0 && (it.purchases || []).length === 0 && (it.labor || []).length === 0) return null
+              return (
+                <section key={idx} style={{ marginBottom: level === 'detail' ? 22 : 8, marginLeft: 16 }}>
+                  <h3 style={{
+                    fontSize: 12, fontWeight: 600, color: '#065f46',
+                    marginBottom: level === 'detail' ? 8 : 0, paddingBottom: 4,
+                    borderBottom: level === 'detail' ? '1px solid #d1fae5' : 'none',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                  }}>
+                    <span>● {it.name || `Item ${idx + 1}`}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#065f46', fontVariantNumeric: 'tabular-nums' }}>
+                      {fmtCHF(subTotal)} CHF
+                    </span>
+                  </h3>
+                  {level === 'detail' && (it.purchases || []).length > 0 && (
+                    <DevisTable
+                      title="Achats / matériel"
+                      columns={[
+                        { label: 'Description', width: 'auto',align: 'left'  },
+                        { label: 'Dimension',   width: '13%', align: 'left'  },
+                        { label: 'P.U.',        width: '9%',  align: 'right' },
+                        { label: 'Qté',         width: '6%',  align: 'right' },
+                        { label: 'Unité',       width: '9%',  align: 'left'  },
+                        { label: 'Total',       width: '12%', align: 'right' },
+                      ]}
+                      rows={it.purchases.map(r => [
+                        r.description, r.dimension,
+                        fmtCHF(num(r.unit_price)), num(r.quantity), r.unit || '', fmtCHF(purchaseBilled(r, gm)),
+                      ])}
+                      subtotalLabel="Sous-total achats"
+                      subtotal={purchSub}
+                    />
+                  )}
+                  {level === 'detail' && (it.labor || []).length > 0 && (
+                    <DevisTable
+                      title="Main d'œuvre"
+                      columns={[
+                        { label: 'Description', width: 'auto',align: 'left'  },
+                        { label: 'Prix',        width: '10%', align: 'right' },
+                        { label: 'Qté',         width: '7%',  align: 'right' },
+                        { label: 'Unité',       width: '10%', align: 'left'  },
+                        { label: 'Total',       width: '13%', align: 'right' },
+                      ]}
+                      rows={it.labor.map(r => [
+                        r.description,
+                        fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
+                      ])}
+                      subtotalLabel="Sous-total main d'œuvre"
+                      subtotal={laborSub}
+                    />
+                  )}
+                </section>
+              )
+            })}
+          </>
+        )}
+
         {/* ── Sous-traitance ── */}
         {(q.subcontracting || []).length > 0 && (
+          <SectionHeader title="Sous-traitance" total={subcontractingTotal} />
+        )}
+        {level === 'detail' && (q.subcontracting || []).length > 0 && (
           <DevisTable
-            title="Sous-traitance"
             columns={[
               { label: 'Item',        width: '14%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
@@ -234,14 +255,15 @@ export default function DevisPage() {
               r.item, r.description,
               fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
             ])}
-            subtotalLabel="Sous-total sous-traitance"
-            subtotal={subcontractingTotal}
           />
         )}
 
+        {/* ── Logistique ── */}
         {(q.logistics || []).length > 0 && (
+          <SectionHeader title="Logistique" total={logisticsTotal} />
+        )}
+        {level === 'detail' && (q.logistics || []).length > 0 && (
           <DevisTable
-            title="Logistique"
             columns={[
               { label: 'Item',        width: '14%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
@@ -254,8 +276,6 @@ export default function DevisPage() {
               r.trajet, r.description,
               fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
             ])}
-            subtotalLabel="Sous-total logistique"
-            subtotal={logisticsTotal}
           />
         )}
 
@@ -285,11 +305,29 @@ export default function DevisPage() {
   )
 }
 
+function SectionHeader({ title, total }) {
+  return (
+    <h2 style={{
+      fontSize: 14, fontWeight: 700, color: '#111827',
+      marginTop: 18, marginBottom: 10, paddingBottom: 6,
+      borderBottom: '2px solid #111827',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+    }}>
+      <span>● {title}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
+        Sous-total : {fmtCHF(total)} CHF
+      </span>
+    </h2>
+  )
+}
+
 function DevisTable({ title, columns, rows, subtotalLabel, subtotal }) {
   if (rows.length === 0) return null
   return (
     <section style={{ marginBottom: 22 }}>
-      <h3 style={{ fontSize: 11, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{title}</h3>
+      {title && (
+        <h3 style={{ fontSize: 11, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{title}</h3>
+      )}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>
         <thead>
           <tr style={{ borderBottom: '1.5px solid #111827' }}>
@@ -319,10 +357,12 @@ function DevisTable({ title, columns, rows, subtotalLabel, subtotal }) {
               ))}
             </tr>
           ))}
-          <tr>
-            <td colSpan={columns.length - 1} style={{ padding: '8px 6px', textAlign: 'right', fontSize: 10, color: '#6b7280', fontWeight: 500 }}>{subtotalLabel}</td>
-            <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{fmtCHF(subtotal)}</td>
-          </tr>
+          {subtotalLabel && (
+            <tr>
+              <td colSpan={columns.length - 1} style={{ padding: '8px 6px', textAlign: 'right', fontSize: 10, color: '#6b7280', fontWeight: 500 }}>{subtotalLabel}</td>
+              <td style={{ padding: '8px 6px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>{fmtCHF(subtotal)}</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </section>
