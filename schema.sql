@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS projects (
   name          TEXT NOT NULL,
   client        TEXT NOT NULL,
   description   TEXT,
-  deadline      DATE NOT NULL,
+  deadline      DATE,           -- optionnelle (projets sans date définie)
   delivery_type TEXT DEFAULT 'Livraison',
   responsible   TEXT DEFAULT 'Arnaud',
   color_override TEXT,          -- null = auto, sinon ex: '#3b82f6'
