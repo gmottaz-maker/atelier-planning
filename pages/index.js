@@ -62,6 +62,22 @@ function formatDateShort(s) {
   return `${d}.${m}`
 }
 
+// ─── Kanban par échéance ─────────────────────────────────────────────────────
+const KANBAN_COLUMNS = [
+  { key: 'overdue', label: 'En retard',     accent: '#dc2626' },
+  { key: 'week',    label: 'Cette semaine', accent: '#ea580c' },
+  { key: 'month',   label: 'Ce mois',       accent: '#ca8a04' },
+  { key: 'later',   label: 'Plus tard',     accent: '#16a34a' },
+]
+function deadlineBucket(deadline) {
+  const d = getDaysRemaining(deadline)
+  if (d === null) return 'later'   // projets sans date → "Plus tard"
+  if (d < 0)  return 'overdue'
+  if (d < 7)  return 'week'
+  if (d < 30) return 'month'
+  return 'later'
+}
+
 // ─── DaysChip ────────────────────────────────────────────────────────────────
 
 function DaysChip({ deadline }) {
@@ -475,8 +491,19 @@ export default function Admin() {
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [logisticsProject, setLogisticsProject]   = useState(null)
   const [pickerOpen, setPickerOpen]               = useState(false)
+  const [viewMode, setViewMode]                   = useState('list')
 
   useEffect(() => { fetchProjects(); fetchTasks() }, [])
+
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' && localStorage.getItem('projectsViewMode')
+    if (saved === 'kanban' || saved === 'list') setViewMode(saved)
+  }, [])
+
+  function changeViewMode(mode) {
+    setViewMode(mode)
+    if (typeof window !== 'undefined') localStorage.setItem('projectsViewMode', mode)
+  }
 
   function actorHeaders() {
     return { 'Content-Type': 'application/json', 'x-actor': user?.name || '' }
@@ -602,6 +629,125 @@ export default function Admin() {
   })
   const archivedProjects = projects.filter(p => p.status !== 'active')
   const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 transition-colors bg-white"
+
+  function renderProjectCard(project) {
+    const color       = getProjectColor(project)
+    const fromTodoist = isFromTodoist(project)
+    const incomplete  = needsCompletion(project)
+    const allTasks    = tasks.filter(t => t.project_id === project.id)
+    const doneCount   = allTasks.filter(t => t.status === 'completed').length
+    const totalCount  = allTasks.length
+    const progress    = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
+    const respColor   = colorForName(project.responsible)
+    const nextTask    = allTasks
+      .filter(t => t.status === 'active')
+      .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
+
+    return (
+      <div key={project.id}
+        className="group bg-white rounded-xl border hover:border-gray-300 hover:shadow-sm transition-all overflow-hidden flex flex-col"
+        style={{ borderColor: incomplete ? '#fed7aa' : '#e5e7eb' }}>
+
+        {/* Urgency stripe */}
+        <div className="h-1.5 w-full" style={{ background: color }} />
+
+        <Link href={`/projects/${project.id}`} className="block px-7 py-6 flex-1 hover:bg-gray-50/50 transition-colors">
+          {/* Header: title + responsable avatar */}
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 18 }}>
+                {project.name}
+              </h3>
+              <p className={`mt-1 ${incomplete ? 'font-medium' : 'text-gray-500'}`}
+                style={{ fontSize: 14, ...(incomplete ? { color: '#ea580c' } : {}) }}>
+                {project.client}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+              style={{ background: respColor, fontSize: 13, letterSpacing: '-0.02em' }}
+              title={project.responsible}>
+              {initials(project.responsible)}
+            </div>
+          </div>
+
+          {project.description && (
+            <p className="text-gray-500 leading-relaxed line-clamp-2 mb-4" style={{ fontSize: 13 }}>{project.description}</p>
+          )}
+
+          {/* Deadline — proeminent */}
+          <div className="mb-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-semibold text-gray-900" style={{ fontSize: 15 }}>{formatDate(project.deadline)}</span>
+              {!incomplete && <DaysChip deadline={project.deadline} />}
+              {incomplete && (
+                <span className="text-xs font-medium" style={{ color: '#ea580c' }}>À compléter</span>
+              )}
+            </div>
+          </div>
+
+          {/* Meta line */}
+          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-5" style={{ fontSize: 12 }}>
+            <span className="font-semibold" style={{ color: respColor }}>{project.responsible || 'non défini'}</span>
+            <span className="text-gray-300">·</span>
+            <span className="text-gray-500">{project.delivery_type}</span>
+            {fromTodoist && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span style={{ color: '#16a34a' }}>Todoist</span>
+              </>
+            )}
+          </div>
+
+          {/* Progress bar — bigger */}
+          <div>
+            <div className="flex items-center justify-between mb-2" style={{ fontSize: 12 }}>
+              <span className="text-gray-500">
+                {totalCount === 0
+                  ? 'Aucune tâche'
+                  : `${doneCount} / ${totalCount} tâche${totalCount > 1 ? 's' : ''}`}
+              </span>
+              <span className="font-semibold tabular-nums" style={{ color: totalCount === 0 ? '#9ca3af' : '#111827', fontSize: 13 }}>
+                {totalCount === 0 ? '—' : `${progress}%`}
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
+              <div className="h-full rounded-full transition-all"
+                style={{
+                  width: `${progress}%`,
+                  background: totalCount === 0 ? '#e5e7eb' : progress === 100 ? '#22c55e' : '#111827',
+                }} />
+            </div>
+          </div>
+
+          {/* Next task */}
+          {nextTask && (
+            <div className="mt-5 pt-4 border-t flex items-center gap-2" style={{ borderColor: '#f3f4f6' }}>
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: colorForName(nextTask.responsible) }} />
+              <span className="text-gray-600 flex-1 truncate" style={{ fontSize: 12 }}>{nextTask.title}</span>
+              <span className="text-gray-400 flex-shrink-0" style={{ fontSize: 11 }}>
+                {nextTask.responsible}{nextTask.execution_date ? ` · ${formatDateShort(nextTask.execution_date)}` : ''}
+              </span>
+            </div>
+          )}
+        </Link>
+
+        {/* Actions — toujours visibles mais discrètes */}
+        <div className="px-7 py-3 flex items-center gap-3 border-t" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
+          <button onClick={() => setLogisticsProject(project)}
+            className="text-gray-500 hover:text-gray-900 transition-colors">
+            Logistique{project.logistics_address && ' ✓'}
+          </button>
+          <span className="text-gray-200">·</span>
+          <button onClick={() => handleEdit(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Modifier</button>
+          <span className="ml-auto text-gray-200">·</span>
+          <button onClick={() => handleArchive(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Archiver</button>
+          <span className="text-gray-200">·</span>
+          <button onClick={() => handleDelete(project)} className="text-gray-500 hover:text-red-600 transition-colors">Supprimer</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
@@ -760,6 +906,20 @@ export default function Admin() {
           <div className="flex items-baseline gap-3 mb-8">
             <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>Projets en cours</h2>
             <span className="text-base text-gray-400">{activeProjects.length}</span>
+            <div className="ml-auto self-center inline-flex items-center gap-0.5 p-1 rounded-lg bg-gray-100">
+              {[
+                { key: 'list',   label: 'Liste' },
+                { key: 'kanban', label: 'Kanban' },
+              ].map(v => (
+                <button key={v.key} onClick={() => changeViewMode(v.key)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+                  style={viewMode === v.key
+                    ? { background: '#fff', color: '#111827', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+                    : { background: 'transparent', color: '#6b7280' }}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Bannière Todoist */}
@@ -778,126 +938,31 @@ export default function Admin() {
             <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
               <p className="text-gray-400 text-sm">Aucun projet actif.</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-              {activeProjects.map(project => {
-                const color       = getProjectColor(project)
-                const fromTodoist = isFromTodoist(project)
-                const incomplete  = needsCompletion(project)
-                const allTasks    = tasks.filter(t => t.project_id === project.id)
-                const doneCount   = allTasks.filter(t => t.status === 'completed').length
-                const totalCount  = allTasks.length
-                const progress    = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
-                const respColor   = colorForName(project.responsible)
-                const nextTask    = allTasks
-                  .filter(t => t.status === 'active')
-                  .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
-
+          ) : viewMode === 'kanban' ? (
+            <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:-mx-10 md:px-10">
+              {KANBAN_COLUMNS.map(col => {
+                const colProjects = activeProjects.filter(p => deadlineBucket(p.deadline) === col.key)
                 return (
-                  <div key={project.id}
-                    className="group bg-white rounded-xl border hover:border-gray-300 hover:shadow-sm transition-all overflow-hidden flex flex-col"
-                    style={{ borderColor: incomplete ? '#fed7aa' : '#e5e7eb' }}>
-
-                    {/* Urgency stripe */}
-                    <div className="h-1.5 w-full" style={{ background: color }} />
-
-                    <Link href={`/projects/${project.id}`} className="block px-7 py-6 flex-1 hover:bg-gray-50/50 transition-colors">
-                      {/* Header: title + responsable avatar */}
-                      <div className="flex items-start justify-between gap-4 mb-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 18 }}>
-                            {project.name}
-                          </h3>
-                          <p className={`mt-1 ${incomplete ? 'font-medium' : 'text-gray-500'}`}
-                            style={{ fontSize: 14, ...(incomplete ? { color: '#ea580c' } : {}) }}>
-                            {project.client}
-                          </p>
+                  <div key={col.key} className="flex-shrink-0 w-80">
+                    <div className="flex items-center gap-2 mb-4 px-1">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col.accent }} />
+                      <h3 className="font-semibold text-gray-700 text-sm">{col.label}</h3>
+                      <span className="text-xs text-gray-400 tabular-nums">{colProjects.length}</span>
+                    </div>
+                    <div className="space-y-4">
+                      {colProjects.length === 0 ? (
+                        <div className="text-center py-10 rounded-xl border border-dashed border-gray-200 text-gray-300 text-xs">
+                          Aucun projet
                         </div>
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
-                          style={{ background: respColor, fontSize: 13, letterSpacing: '-0.02em' }}
-                          title={project.responsible}>
-                          {initials(project.responsible)}
-                        </div>
-                      </div>
-
-                      {project.description && (
-                        <p className="text-gray-500 leading-relaxed line-clamp-2 mb-4" style={{ fontSize: 13 }}>{project.description}</p>
-                      )}
-
-                      {/* Deadline — proeminent */}
-                      <div className="mb-2">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="font-semibold text-gray-900" style={{ fontSize: 15 }}>{formatDate(project.deadline)}</span>
-                          {!incomplete && <DaysChip deadline={project.deadline} />}
-                          {incomplete && (
-                            <span className="text-xs font-medium" style={{ color: '#ea580c' }}>À compléter</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Meta line */}
-                      <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-5" style={{ fontSize: 12 }}>
-                        <span className="font-semibold" style={{ color: respColor }}>{project.responsible || 'non défini'}</span>
-                        <span className="text-gray-300">·</span>
-                        <span className="text-gray-500">{project.delivery_type}</span>
-                        {fromTodoist && (
-                          <>
-                            <span className="text-gray-300">·</span>
-                            <span style={{ color: '#16a34a' }}>Todoist</span>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Progress bar — bigger */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2" style={{ fontSize: 12 }}>
-                          <span className="text-gray-500">
-                            {totalCount === 0
-                              ? 'Aucune tâche'
-                              : `${doneCount} / ${totalCount} tâche${totalCount > 1 ? 's' : ''}`}
-                          </span>
-                          <span className="font-semibold tabular-nums" style={{ color: totalCount === 0 ? '#9ca3af' : '#111827', fontSize: 13 }}>
-                            {totalCount === 0 ? '—' : `${progress}%`}
-                          </span>
-                        </div>
-                        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
-                          <div className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${progress}%`,
-                              background: totalCount === 0 ? '#e5e7eb' : progress === 100 ? '#22c55e' : '#111827',
-                            }} />
-                        </div>
-                      </div>
-
-                      {/* Next task */}
-                      {nextTask && (
-                        <div className="mt-5 pt-4 border-t flex items-center gap-2" style={{ borderColor: '#f3f4f6' }}>
-                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{ background: colorForName(nextTask.responsible) }} />
-                          <span className="text-gray-600 flex-1 truncate" style={{ fontSize: 12 }}>{nextTask.title}</span>
-                          <span className="text-gray-400 flex-shrink-0" style={{ fontSize: 11 }}>
-                            {nextTask.responsible}{nextTask.execution_date ? ` · ${formatDateShort(nextTask.execution_date)}` : ''}
-                          </span>
-                        </div>
-                      )}
-                    </Link>
-
-                    {/* Actions — toujours visibles mais discrètes */}
-                    <div className="px-7 py-3 flex items-center gap-3 border-t" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
-                      <button onClick={() => setLogisticsProject(project)}
-                        className="text-gray-500 hover:text-gray-900 transition-colors">
-                        Logistique{project.logistics_address && ' ✓'}
-                      </button>
-                      <span className="text-gray-200">·</span>
-                      <button onClick={() => handleEdit(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Modifier</button>
-                      <span className="ml-auto text-gray-200">·</span>
-                      <button onClick={() => handleArchive(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Archiver</button>
-                      <span className="text-gray-200">·</span>
-                      <button onClick={() => handleDelete(project)} className="text-gray-500 hover:text-red-600 transition-colors">Supprimer</button>
+                      ) : colProjects.map(renderProjectCard)}
                     </div>
                   </div>
                 )
               })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+              {activeProjects.map(renderProjectCard)}
             </div>
           )}
         </div>
