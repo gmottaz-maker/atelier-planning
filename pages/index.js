@@ -749,6 +749,74 @@ export default function Admin() {
     )
   }
 
+  function renderProjectRow(project) {
+    const color       = getProjectColor(project)
+    const fromTodoist = isFromTodoist(project)
+    const incomplete  = needsCompletion(project)
+    const allTasks    = tasks.filter(t => t.project_id === project.id)
+    const doneCount   = allTasks.filter(t => t.status === 'completed').length
+    const totalCount  = allTasks.length
+    const progress    = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
+    const respColor   = colorForName(project.responsible)
+
+    return (
+      <div key={project.id} className="group flex items-center gap-4 px-4 py-3 hover:bg-gray-50/70 transition-colors">
+        {/* Accent d'urgence */}
+        <span className="w-1.5 h-9 rounded-full flex-shrink-0" style={{ background: color }} />
+
+        {/* Projet (nom + client) */}
+        <Link href={`/projects/${project.id}`} className="flex-1 min-w-0">
+          <div className="font-semibold text-gray-900 truncate" style={{ fontSize: 15 }}>{project.name}</div>
+          <div className={`truncate ${incomplete ? 'font-medium' : 'text-gray-500'}`}
+            style={{ fontSize: 13, ...(incomplete ? { color: '#ea580c' } : {}) }}>
+            {project.client}
+            {fromTodoist && <span style={{ color: '#16a34a' }}> · Todoist</span>}
+          </div>
+        </Link>
+
+        {/* Responsable */}
+        <div className="w-32 hidden md:flex items-center gap-2">
+          <span className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+            style={{ background: respColor, fontSize: 11, letterSpacing: '-0.02em' }} title={project.responsible}>
+            {initials(project.responsible)}
+          </span>
+          <span className="text-gray-600 truncate" style={{ fontSize: 13 }}>{project.responsible || 'non défini'}</span>
+        </div>
+
+        {/* Échéance */}
+        <div className="w-48 hidden lg:flex items-center gap-2">
+          <span className="text-gray-900 tabular-nums" style={{ fontSize: 13 }}>{formatDate(project.deadline) || '—'}</span>
+          {!incomplete && <DaysChip deadline={project.deadline} />}
+        </div>
+
+        {/* Avancement */}
+        <div className="w-40 hidden lg:block">
+          <div className="flex items-center justify-between mb-1" style={{ fontSize: 11 }}>
+            <span className="text-gray-400">{totalCount === 0 ? 'Aucune tâche' : `${doneCount}/${totalCount}`}</span>
+            <span className="font-semibold tabular-nums text-gray-700">{totalCount === 0 ? '—' : `${progress}%`}</span>
+          </div>
+          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${progress}%`, background: totalCount === 0 ? '#e5e7eb' : progress === 100 ? '#22c55e' : '#111827' }} />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="w-52 hidden md:flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: 12 }}>
+          <button onClick={() => setLogisticsProject(project)} className="text-gray-400 hover:text-gray-900 transition-colors">
+            Logist.{project.logistics_address && ' ✓'}
+          </button>
+          <span className="text-gray-200">·</span>
+          <button onClick={() => handleEdit(project)} className="text-gray-400 hover:text-gray-900 transition-colors">Modifier</button>
+          <span className="text-gray-200">·</span>
+          <button onClick={() => handleArchive(project)} className="text-gray-400 hover:text-gray-900 transition-colors">Archiver</button>
+          <span className="text-gray-200">·</span>
+          <button onClick={() => handleDelete(project)} className="text-gray-400 hover:text-red-600 transition-colors">Suppr.</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
       <Head>
@@ -961,8 +1029,20 @@ export default function Admin() {
               })}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-              {activeProjects.map(renderProjectCard)}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {/* En-tête de colonnes */}
+              <div className="hidden md:flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 text-gray-400 uppercase tracking-wide"
+                style={{ fontSize: 11, fontWeight: 600 }}>
+                <span className="w-1.5 flex-shrink-0" />
+                <span className="flex-1">Projet</span>
+                <span className="w-32">Responsable</span>
+                <span className="w-48 hidden lg:block">Échéance</span>
+                <span className="w-40 hidden lg:block">Avancement</span>
+                <span className="w-52 text-right">Actions</span>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {activeProjects.map(renderProjectRow)}
+              </div>
             </div>
           )}
         </div>
