@@ -78,6 +78,26 @@ function deadlineBucket(deadline) {
   return 'later'
 }
 
+// ─── Regroupement par mois ───────────────────────────────────────────────────
+const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+function monthKey(deadline)   { return deadline ? deadline.slice(0, 7) : 'none' }   // 'YYYY-MM' | 'none'
+function monthLabel(deadline) {
+  if (!deadline) return 'Sans date'
+  const [y, m] = deadline.split('-')
+  const name = MONTHS_FR[parseInt(m, 10) - 1] || ''
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${y}`
+}
+function groupByMonth(projects) {
+  const groups = []
+  let cur = null
+  projects.forEach(p => {
+    const key = monthKey(p.deadline)
+    if (!cur || cur.key !== key) { cur = { key, label: monthLabel(p.deadline), items: [] }; groups.push(cur) }
+    cur.items.push(p)
+  })
+  return groups
+}
+
 // ─── DaysChip ────────────────────────────────────────────────────────────────
 
 function DaysChip({ deadline }) {
@@ -1041,7 +1061,15 @@ export default function Admin() {
                 <span className="w-52 text-right">Actions</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {activeProjects.map(renderProjectRow)}
+                {groupByMonth(activeProjects).flatMap(g => [
+                  <div key={`m-${g.key}`}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-50/80 text-gray-500 uppercase tracking-wide"
+                    style={{ fontSize: 11, fontWeight: 700 }}>
+                    {g.label}
+                    <span className="text-gray-400 tabular-nums" style={{ fontWeight: 500 }}>{g.items.length}</span>
+                  </div>,
+                  ...g.items.map(renderProjectRow),
+                ])}
               </div>
             </div>
           )}
