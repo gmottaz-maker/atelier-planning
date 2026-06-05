@@ -229,11 +229,37 @@ function ResponsiblesSection() {
 
 // ─── Company info section ───────────────────────────────────────────────────
 
+// Lit un fichier image et le renvoie en data URL, redimensionné (sauf SVG).
+function fileToLogoDataUrl(file, maxDim = 600) {
+  return new Promise((resolve, reject) => {
+    if (file.size > 3 * 1024 * 1024) return reject(new Error('fichier trop lourd (> 3 Mo)'))
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('lecture impossible'))
+    reader.onload = () => {
+      const src = reader.result
+      if (file.type === 'image/svg+xml') return resolve(src) // vectoriel, déjà léger
+      const img = new Image()
+      img.onerror = () => reject(new Error('image invalide'))
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/png')) // PNG → préserve la transparence
+      }
+      img.src = src
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 function CompanyInfoSection() {
   const EMPTY = {
     name: '', address: '', zip: '', city: '', country: 'CH',
     iban: '', email: '', phone: '', website: '', vat_number: '',
-    payment_terms: 'Paiement à 30 jours net.',
+    payment_terms: 'Paiement à 30 jours net.', logo: '',
   }
   const [form, setForm] = useState(EMPTY)
   const [loaded, setLoaded] = useState(false)
@@ -249,6 +275,18 @@ function CompanyInfoSection() {
   }, [])
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function onLogoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      set('logo', await fileToLogoDataUrl(file))
+    } catch (err) {
+      setFeedback('Logo : ' + err.message)
+    } finally {
+      e.target.value = ''
+    }
+  }
 
   async function save() {
     setSaving(true); setFeedback('')
@@ -270,12 +308,30 @@ function CompanyInfoSection() {
 
   return (
     <section>
-      <h2 className="text-sm font-semibold text-gray-900 mb-4">Informations entreprise (factures)</h2>
+      <h2 className="text-sm font-semibold text-gray-900 mb-4">Informations entreprise (devis & factures)</h2>
       <p className="text-xs text-gray-500 mb-4">
-        Apparaissent en en-tête des factures PDF et dans la zone bénéficiaire du QR-bill suisse.
+        Apparaissent en en-tête des devis et factures PDF, et dans la zone bénéficiaire du QR-bill suisse.
       </p>
       <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-3">
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Logo (en-tête des devis & factures)</label>
+            <div className="flex items-center gap-3">
+              {form.logo ? (
+                <img src={form.logo} alt="logo" className="h-12 w-auto max-w-[160px] object-contain border border-gray-200 rounded-md bg-white p-1" />
+              ) : (
+                <div className="h-12 w-24 flex items-center justify-center border border-dashed border-gray-200 rounded-md text-gray-300 text-xs">Aucun</div>
+              )}
+              <label className="px-3 py-2 text-sm rounded-md border border-gray-200 hover:border-gray-400 cursor-pointer transition-colors">
+                {form.logo ? 'Changer' : 'Téléverser'}
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={onLogoChange} />
+              </label>
+              {form.logo && (
+                <button type="button" onClick={() => set('logo', '')} className="text-xs text-gray-400 hover:text-red-500">retirer</button>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">PNG ou SVG conseillé. Redimensionné automatiquement.</p>
+          </div>
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-500 mb-1">Raison sociale *</label>
             <input className={inputCls} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Amazing Lab Sàrl" />

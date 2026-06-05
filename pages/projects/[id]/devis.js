@@ -23,6 +23,7 @@ export default function DevisPage() {
   // level: 'detail' (toutes les lignes) | 'summary' (uniquement les sections avec sous-totaux)
   const level = summary === '1' ? 'summary' : 'detail'
   const [project, setProject] = useState(null)
+  const [company, setCompany] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,6 +33,13 @@ export default function DevisPage() {
       .then(p => { if (p && !p.error) setProject(p) })
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    fetch('/api/app-settings/company_info')
+      .then(r => r.json())
+      .then(d => { if (d?.value) setCompany(d.value) })
+      .catch(() => {})
+  }, [])
 
   if (loading) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Chargement…</div>
   if (!project) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Projet introuvable</div>
@@ -66,6 +74,13 @@ export default function DevisPage() {
 
   const today = new Date()
   const ref   = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(project.id).slice(-4).toUpperCase()}`
+
+  // Infos entreprise (réglages) — fallback Amazing Lab si pas encore chargées
+  const ci = company || {}
+  const ciName    = ci.name || 'Amazing Lab'
+  const ciAddr    = [ci.address, [ci.zip, ci.city].filter(Boolean).join(' '), ci.country]
+                      .filter(Boolean).join(' · ') || "Rue de l'Ecluse 30 · 1201 Genève · CH"
+  const ciContact = [ci.email, ci.website, ci.phone].filter(Boolean).join(' · ')
 
   return (
     <>
@@ -121,9 +136,13 @@ export default function DevisPage() {
         {/* ── Header ── */}
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: 18, marginBottom: 28 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#111827', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>Amazing Lab</div>
-            <div style={{ fontSize: 9.5, color: '#6b7280' }}>Rue de l'Ecluse 30 · 1201 Genève · CH</div>
-            <div style={{ fontSize: 9.5, color: '#6b7280' }}>hello@amazinglab.ch · amazinglab.ch</div>
+            {ci.logo && (
+              <img src={ci.logo} alt="" style={{ maxHeight: 46, maxWidth: 200, objectFit: 'contain', display: 'block', marginBottom: 8 }} />
+            )}
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#111827', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>{ciName}</div>
+            <div style={{ fontSize: 9.5, color: '#6b7280' }}>{ciAddr}</div>
+            {ciContact && <div style={{ fontSize: 9.5, color: '#6b7280' }}>{ciContact}</div>}
+            {ci.vat_number && <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 2 }}>{ci.vat_number}</div>}
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 26, fontWeight: 700, color: '#111827', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Devis</div>
@@ -297,7 +316,7 @@ export default function DevisPage() {
           <p style={{ marginBottom: 3 }}><strong style={{ color: '#374151', fontWeight: 600 }}>Validité :</strong> 30 jours à compter de la date d'émission.</p>
           <p style={{ marginBottom: 3 }}><strong style={{ color: '#374151', fontWeight: 600 }}>Conditions de paiement :</strong> 30 % à la commande, solde à la livraison.</p>
           <p style={{ marginBottom: 3 }}><strong style={{ color: '#374151', fontWeight: 600 }}>TVA :</strong> prix indiqués hors taxes.</p>
-          <p style={{ marginTop: 10, color: '#9ca3af' }}>Devis généré le {fmtDateLong(today)} · Amazing Lab Sàrl</p>
+          <p style={{ marginTop: 10, color: '#9ca3af' }}>Devis généré le {fmtDateLong(today)} · {ciName}</p>
         </footer>
 
       </div>
