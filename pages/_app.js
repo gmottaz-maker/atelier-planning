@@ -13,7 +13,7 @@ export const AuthContext = createContext(null)
 export function useAuth() { return useContext(AuthContext) }
 
 const PUBLIC_ROUTES = ['/login', '/display']
-const NO_CHROME_ROUTES = ['/login', '/display']
+const NO_CHROME_ROUTES = ['/login', '/display', '/projects/[id]/devis']
 const PINK = '#111827'
 
 async function fetchProfile(userId) {
