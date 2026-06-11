@@ -148,6 +148,34 @@ function ProjectsSkeleton({ rows = 6 }) {
   )
 }
 
+// ─── Menu d'actions compact (⋯) ─────────────────────────────────────────────
+
+function ProjectActionsMenu({ project, onLogistics, onEdit, onArchive, onDelete }) {
+  const [open, setOpen] = useState(false)
+  const item = "w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors"
+  return (
+    <div className="absolute top-3 right-2 z-10">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
+        aria-label="Actions"
+        className={`w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition ${open ? 'opacity-100 bg-gray-200' : 'md:opacity-0 md:group-hover:opacity-100'}`}
+        style={{ fontSize: 20, lineHeight: 1 }}>⋯</button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-44 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-20" style={{ fontSize: 13 }}>
+            <button onClick={() => { setOpen(false); onLogistics() }} className={`${item} text-gray-700`}>Logistique{project.logistics_address && ' ✓'}</button>
+            <button onClick={() => { setOpen(false); onEdit() }} className={`${item} text-gray-700`}>Modifier</button>
+            <button onClick={() => { setOpen(false); onArchive() }} className={`${item} text-gray-700`}>Archiver</button>
+            <div className="my-1 border-t border-gray-100" />
+            <button onClick={() => { setOpen(false); onDelete() }} className={`${item} text-red-600 hover:bg-red-50`}>Supprimer</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── AddressInput — Google Maps (nouvelle API) ou Nominatim en fallback ──────
 
 function AddressInput({ value, onChange, placeholder, className, style }) {
@@ -793,59 +821,61 @@ export default function Admin() {
     const respColor   = colorForName(project.responsible)
 
     return (
-      <div key={project.id} className="group flex items-center gap-4 px-4 py-3 hover:bg-gray-50/70 transition-colors">
-        {/* Accent d'urgence */}
-        <span className="w-1.5 h-9 rounded-full flex-shrink-0" style={{ background: color }} />
+      <div key={project.id} className="group relative flex gap-3 px-4 py-3.5 hover:bg-gray-50/70 transition-colors">
+        {/* Accent d'urgence (toute la hauteur) */}
+        <span className="w-1.5 rounded-full flex-shrink-0 self-stretch" style={{ background: color }} />
 
-        {/* Projet (nom + client) */}
-        <Link href={`/projects/${project.id}`} className="flex-1 min-w-0">
-          <div className="font-semibold text-gray-900 truncate" style={{ fontSize: 15 }}>{project.name}</div>
-          <div className={`truncate ${incomplete ? 'font-medium' : 'text-gray-500'}`}
-            style={{ fontSize: 13, ...(incomplete ? { color: '#ea580c' } : {}) }}>
-            {project.client}
-            {fromTodoist && <span style={{ color: '#16a34a' }}> · Todoist</span>}
+        <div className="flex-1 min-w-0">
+          {/* Ligne 1 — nom · client */}
+          <Link href={`/projects/${project.id}`} className="block min-w-0 pr-8 truncate">
+            <span className="font-semibold text-gray-900" style={{ fontSize: 15 }}>{project.name}</span>
+            <span className={incomplete ? 'font-medium' : 'text-gray-400'}
+              style={{ fontSize: 14, ...(incomplete ? { color: '#ea580c' } : {}) }}>
+              {'  ·  '}{project.client}
+            </span>
+            {fromTodoist && <span style={{ color: '#16a34a', fontSize: 12 }}> · Todoist</span>}
+          </Link>
+
+          {/* Ligne 2 — méta : responsable · échéance · avancement */}
+          <div className="flex items-center flex-wrap gap-x-5 gap-y-1.5 mt-2" style={{ fontSize: 13 }}>
+            {/* Responsable */}
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+                style={{ background: respColor, fontSize: 10, letterSpacing: '-0.02em' }}>
+                {initials(project.responsible)}
+              </span>
+              <span className="text-gray-600">{project.responsible || 'non défini'}</span>
+            </span>
+
+            {/* Échéance */}
+            <span className="inline-flex items-center gap-2">
+              <span className="text-gray-500 tabular-nums">{formatDate(project.deadline) || 'Sans date'}</span>
+              {!incomplete && <DaysChip deadline={project.deadline} />}
+            </span>
+
+            {/* Avancement */}
+            {totalCount === 0 ? (
+              <span className="text-gray-400">Aucune tâche</span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block w-24 h-1.5 rounded-full overflow-hidden align-middle" style={{ background: '#f3f4f6' }}>
+                  <span className="block h-full rounded-full" style={{ width: `${progress}%`, background: progress === 100 ? '#22c55e' : '#111827' }} />
+                </span>
+                <span className="font-semibold tabular-nums text-gray-700">{progress}%</span>
+                <span className="text-gray-400 tabular-nums">{doneCount}/{totalCount}</span>
+              </span>
+            )}
           </div>
-        </Link>
-
-        {/* Responsable */}
-        <div className="w-32 hidden md:flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
-            style={{ background: respColor, fontSize: 11, letterSpacing: '-0.02em' }} title={project.responsible}>
-            {initials(project.responsible)}
-          </span>
-          <span className="text-gray-600 truncate" style={{ fontSize: 13 }}>{project.responsible || 'non défini'}</span>
         </div>
 
-        {/* Échéance */}
-        <div className="w-48 hidden lg:flex items-center gap-2">
-          <span className="text-gray-900 tabular-nums" style={{ fontSize: 13 }}>{formatDate(project.deadline) || '—'}</span>
-          {!incomplete && <DaysChip deadline={project.deadline} />}
-        </div>
-
-        {/* Avancement */}
-        <div className="w-40 hidden lg:block">
-          <div className="flex items-center justify-between mb-1" style={{ fontSize: 11 }}>
-            <span className="text-gray-400">{totalCount === 0 ? 'Aucune tâche' : `${doneCount}/${totalCount}`}</span>
-            <span className="font-semibold tabular-nums text-gray-700">{totalCount === 0 ? '—' : `${progress}%`}</span>
-          </div>
-          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
-            <div className="h-full rounded-full transition-all"
-              style={{ width: `${progress}%`, background: totalCount === 0 ? '#e5e7eb' : progress === 100 ? '#22c55e' : '#111827' }} />
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="w-52 hidden md:flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: 12 }}>
-          <button onClick={() => setLogisticsProject(project)} className="text-gray-400 hover:text-gray-900 transition-colors">
-            Logist.{project.logistics_address && ' ✓'}
-          </button>
-          <span className="text-gray-200">·</span>
-          <button onClick={() => handleEdit(project)} className="text-gray-400 hover:text-gray-900 transition-colors">Modifier</button>
-          <span className="text-gray-200">·</span>
-          <button onClick={() => handleArchive(project)} className="text-gray-400 hover:text-gray-900 transition-colors">Archiver</button>
-          <span className="text-gray-200">·</span>
-          <button onClick={() => handleDelete(project)} className="text-gray-400 hover:text-red-600 transition-colors">Suppr.</button>
-        </div>
+        {/* Menu actions compact */}
+        <ProjectActionsMenu
+          project={project}
+          onLogistics={() => setLogisticsProject(project)}
+          onEdit={() => handleEdit(project)}
+          onArchive={() => handleArchive(project)}
+          onDelete={() => handleDelete(project)}
+        />
       </div>
     )
   }
@@ -1003,8 +1033,8 @@ export default function Admin() {
         )}
 
         {/* Projets actifs */}
-        <div>
-          <div className="flex items-baseline gap-3 mb-8">
+        <div className="mx-auto w-full" style={{ maxWidth: viewMode === 'list' ? 1180 : undefined }}>
+          <div className="flex items-baseline gap-3 mb-6">
             <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>Projets en cours</h2>
             <span className="text-base text-gray-400">{activeProjects.length}</span>
             <div className="ml-auto self-center inline-flex items-center gap-0.5 p-1 rounded-lg bg-gray-100">
@@ -1022,6 +1052,23 @@ export default function Admin() {
               ))}
             </div>
           </div>
+
+          {/* Résumé d'urgence */}
+          {activeProjects.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              {KANBAN_COLUMNS.map(col => {
+                const n = activeProjects.filter(p => deadlineBucket(p.deadline) === col.key).length
+                if (!n) return null
+                return (
+                  <span key={col.key} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                    style={{ background: `${col.accent}14`, color: col.accent, fontSize: 12, fontWeight: 600 }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: col.accent }} />
+                    {n} {col.label.toLowerCase()}
+                  </span>
+                )
+              })}
+            </div>
+          )}
 
           {/* Bannière Todoist */}
           {activeProjects.some(needsCompletion) && (
@@ -1063,23 +1110,14 @@ export default function Admin() {
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              {/* En-tête de colonnes */}
-              <div className="hidden md:flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 text-gray-400 uppercase tracking-wide"
-                style={{ fontSize: 11, fontWeight: 600 }}>
-                <span className="w-1.5 flex-shrink-0" />
-                <span className="flex-1">Projet</span>
-                <span className="w-32">Responsable</span>
-                <span className="w-48 hidden lg:block">Échéance</span>
-                <span className="w-40 hidden lg:block">Avancement</span>
-                <span className="w-52 text-right">Actions</span>
-              </div>
               <div className="divide-y divide-gray-100">
                 {groupByMonth(activeProjects).flatMap(g => [
                   <div key={`m-${g.key}`}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-50/80 text-gray-500 uppercase tracking-wide"
-                    style={{ fontSize: 11, fontWeight: 700 }}>
-                    {g.label}
-                    <span className="text-gray-400 tabular-nums" style={{ fontWeight: 500 }}>{g.items.length}</span>
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gray-50/80 border-b border-gray-100"
+                    style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.06em' }}>
+                    <span className="text-gray-700 uppercase">{g.label}</span>
+                    <span className="inline-flex items-center justify-center h-4 px-1.5 rounded-full bg-gray-200 text-gray-600 tabular-nums"
+                      style={{ fontSize: 10.5, fontWeight: 600 }}>{g.items.length}</span>
                   </div>,
                   ...g.items.map(renderProjectRow),
                 ])}
