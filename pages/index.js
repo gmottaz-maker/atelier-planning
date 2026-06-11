@@ -79,6 +79,27 @@ function deadlineBucket(deadline) {
   return 'later'
 }
 
+// Colonnes Kanban : En retard · mois courant · +1 · +2 · Plus tard (mois nommés)
+function buildKanbanColumns() {
+  const now = new Date()
+  const monthAccents = ['#ea580c', '#ca8a04', '#16a34a']
+  const cols = [{ key: 'overdue', label: 'En retard', accent: '#dc2626' }]
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const name = MONTHS_FR[d.getMonth()]
+    cols.push({ key: ym, label: `${name.charAt(0).toUpperCase()}${name.slice(1)}`, accent: monthAccents[i] })
+  }
+  cols.push({ key: 'later', label: 'Plus tard', accent: '#64748b' })
+  return cols
+}
+function kanbanColumnKey(deadline, columns) {
+  if (!deadline) return 'later'
+  if (getDaysRemaining(deadline) < 0) return 'overdue'
+  const ym = deadline.slice(0, 7)
+  return columns.some(c => c.key === ym) ? ym : 'later'
+}
+
 // ─── Regroupement par mois ───────────────────────────────────────────────────
 const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
 function monthKey(deadline)   { return deadline ? deadline.slice(0, 7) : 'none' }   // 'YYYY-MM' | 'none'
@@ -1203,25 +1224,28 @@ export default function Admin() {
             <GanttView projects={activeProjects} />
           ) : viewMode === 'kanban' ? (
             <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:-mx-10 md:px-10">
-              {KANBAN_COLUMNS.map(col => {
-                const colProjects = activeProjects.filter(p => deadlineBucket(p.deadline) === col.key)
-                return (
-                  <div key={col.key} className="flex-shrink-0 w-80">
-                    <div className="flex items-center gap-2 mb-4 px-1">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col.accent }} />
-                      <h3 className="font-semibold text-gray-700 text-sm">{col.label}</h3>
-                      <span className="text-xs text-gray-400 tabular-nums">{colProjects.length}</span>
+              {(() => {
+                const kanbanCols = buildKanbanColumns()
+                return kanbanCols.map(col => {
+                  const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols) === col.key)
+                  return (
+                    <div key={col.key} className="flex-shrink-0 w-80">
+                      <div className="flex items-center gap-2 mb-4 px-1">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col.accent }} />
+                        <h3 className="font-semibold text-gray-700 text-sm">{col.label}</h3>
+                        <span className="text-xs text-gray-400 tabular-nums">{colProjects.length}</span>
+                      </div>
+                      <div className="space-y-4">
+                        {colProjects.length === 0 ? (
+                          <div className="text-center py-10 rounded-xl border border-dashed border-gray-200 text-gray-300 text-xs">
+                            Aucun projet
+                          </div>
+                        ) : colProjects.map(renderProjectCard)}
+                      </div>
                     </div>
-                    <div className="space-y-4">
-                      {colProjects.length === 0 ? (
-                        <div className="text-center py-10 rounded-xl border border-dashed border-gray-200 text-gray-300 text-xs">
-                          Aucun projet
-                        </div>
-                      ) : colProjects.map(renderProjectCard)}
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
