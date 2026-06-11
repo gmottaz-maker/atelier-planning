@@ -176,16 +176,15 @@ export default function DevisPage() {
         {level === 'detail' && (q.management || []).length > 0 && (
           <DevisTable
             columns={[
-              { label: 'Item',        width: '16%', align: 'left'  },
+              { label: 'Item',        width: '18%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Prix',        width: '10%', align: 'right' },
-              { label: 'Qté',         width: '7%',  align: 'right' },
-              { label: 'Unité',       width: '10%', align: 'left'  },
-              { label: 'Total',       width: '13%', align: 'right' },
+              { label: 'Qté',         width: '8%',  align: 'right' },
+              { label: 'Unité',       width: '11%', align: 'left'  },
+              { label: 'Total',       width: '14%', align: 'right' },
             ]}
             rows={q.management.map(r => [
               r.item, r.description,
-              fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
+              num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
             ])}
           />
         )}
@@ -218,15 +217,14 @@ export default function DevisPage() {
                       title="Achats / matériel"
                       columns={[
                         { label: 'Description', width: 'auto',align: 'left'  },
-                        { label: 'Dimension',   width: '13%', align: 'left'  },
-                        { label: 'P.U.',        width: '9%',  align: 'right' },
-                        { label: 'Qté',         width: '6%',  align: 'right' },
-                        { label: 'Unité',       width: '9%',  align: 'left'  },
-                        { label: 'Total',       width: '12%', align: 'right' },
+                        { label: 'Dimension',   width: '15%', align: 'left'  },
+                        { label: 'Qté',         width: '7%',  align: 'right' },
+                        { label: 'Unité',       width: '10%', align: 'left'  },
+                        { label: 'Total',       width: '13%', align: 'right' },
                       ]}
                       rows={it.purchases.map(r => [
                         r.description, r.dimension,
-                        fmtCHF(num(r.unit_price)), num(r.quantity), r.unit || '', fmtCHF(purchaseBilled(r, gm)),
+                        num(r.quantity), r.unit || '', fmtCHF(purchaseBilled(r, gm)),
                       ])}
                       subtotalLabel="Sous-total achats"
                       subtotal={purchSub}
@@ -237,14 +235,13 @@ export default function DevisPage() {
                       title="Main d'œuvre"
                       columns={[
                         { label: 'Description', width: 'auto',align: 'left'  },
-                        { label: 'Prix',        width: '10%', align: 'right' },
-                        { label: 'Qté',         width: '7%',  align: 'right' },
-                        { label: 'Unité',       width: '10%', align: 'left'  },
-                        { label: 'Total',       width: '13%', align: 'right' },
+                        { label: 'Qté',         width: '8%',  align: 'right' },
+                        { label: 'Unité',       width: '11%', align: 'left'  },
+                        { label: 'Total',       width: '14%', align: 'right' },
                       ]}
                       rows={it.labor.map(r => [
                         r.description,
-                        fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
+                        num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
                       ])}
                       subtotalLabel="Sous-total main d'œuvre"
                       subtotal={laborSub}
@@ -263,16 +260,15 @@ export default function DevisPage() {
         {level === 'detail' && (q.subcontracting || []).length > 0 && (
           <DevisTable
             columns={[
-              { label: 'Item',        width: '14%', align: 'left'  },
+              { label: 'Item',        width: '16%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Prix',        width: '10%', align: 'right' },
-              { label: 'Qté',         width: '7%',  align: 'right' },
-              { label: 'Unité',       width: '10%', align: 'left'  },
-              { label: 'Total',       width: '13%', align: 'right' },
+              { label: 'Qté',         width: '8%',  align: 'right' },
+              { label: 'Unité',       width: '11%', align: 'left'  },
+              { label: 'Total',       width: '14%', align: 'right' },
             ]}
             rows={q.subcontracting.map(r => [
               r.item, r.description,
-              fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
+              num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
             ])}
           />
         )}
@@ -284,16 +280,15 @@ export default function DevisPage() {
         {level === 'detail' && (q.logistics || []).length > 0 && (
           <DevisTable
             columns={[
-              { label: 'Item',        width: '14%', align: 'left'  },
+              { label: 'Trajet',      width: '16%', align: 'left'  },
               { label: 'Description', width: 'auto',align: 'left'  },
-              { label: 'Prix',        width: '10%', align: 'right' },
-              { label: 'Qté',         width: '7%',  align: 'right' },
-              { label: 'Unité',       width: '10%', align: 'left'  },
-              { label: 'Total',       width: '13%', align: 'right' },
+              { label: 'Qté',         width: '8%',  align: 'right' },
+              { label: 'Unité',       width: '11%', align: 'left'  },
+              { label: 'Total',       width: '14%', align: 'right' },
             ]}
             rows={q.logistics.map(r => [
               r.trajet, r.description,
-              fmtCHF(num(r.rate)), num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
+              num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
             ])}
           />
         )}
