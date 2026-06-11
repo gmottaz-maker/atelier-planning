@@ -847,12 +847,12 @@ export default function Admin() {
     return (
       <div key={project.id}
         className="group bg-white rounded-xl border hover:border-gray-300 hover:shadow-sm transition-all overflow-hidden flex flex-col"
-        style={{ borderColor: incomplete ? '#fed7aa' : '#e5e7eb' }}>
+        style={{ borderColor: incomplete ? '#fed7aa' : '#e5e7eb', height: 340 }}>
 
         {/* Urgency stripe */}
-        <div className="h-1.5 w-full" style={{ background: color }} />
+        <div className="h-1.5 w-full flex-shrink-0" style={{ background: color }} />
 
-        <Link href={`/projects/${project.id}`} className="block px-6 py-5 flex-1 hover:bg-gray-50/50 transition-colors">
+        <Link href={`/projects/${project.id}`} className="block px-6 py-5 flex-1 min-h-0 overflow-hidden hover:bg-gray-50/50 transition-colors">
           {/* Header: title + responsable avatar */}
           <div className="flex items-start justify-between gap-4 mb-3">
             <div className="flex-1 min-w-0">
@@ -934,7 +934,7 @@ export default function Admin() {
         </Link>
 
         {/* Actions — toujours visibles mais discrètes */}
-        <div className="px-6 py-3 flex items-center gap-3 border-t" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
+        <div className="px-6 py-3 flex items-center gap-3 border-t flex-shrink-0" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
           <button onClick={() => handleEdit(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Modifier</button>
           <span className="ml-auto text-gray-200">·</span>
           <button onClick={() => handleArchive(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Archiver</button>
