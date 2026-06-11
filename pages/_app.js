@@ -31,48 +31,71 @@ export default function App({ Component, pageProps }) {
 
   // ─── Service worker ────────────────────────────────────────────────────
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
-        console.warn('SW registration failed:', err)
-      })
-    }
+    if (!('serviceWorker' in navigator)) return
+    // Différé après le chargement pour ne pas concurrencer le premier affichage
+    const register = () => navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.warn('SW registration failed:', err)
+    })
+    if (document.readyState === 'complete') register()
+    else window.addEventListener('load', register, { once: true })
   }, [])
 
   // ─── Auth state ─────────────────────────────────────────────────────────
   useEffect(() => {
+    let cancelled = false
+
+    // Applique une session SANS attendre un appel réseau : on affiche tout de
+    // suite l'app avec le nom issu des métadonnées de session (déjà en local),
+    // puis on rafraîchit le nom depuis `profiles` en arrière-plan.
+    function applySession(session) {
+      if (!session) { setUser(null); return }
+      const fallbackName = session.user.user_metadata?.name || session.user.email
+      setUser(prev =>
+        prev?.id === session.user.id
+          ? prev
+          : { id: session.user.id, email: session.user.email, name: fallbackName }
+      )
+      fetchProfile(session.user.id)
+        .then(profile => {
+          if (cancelled || !profile?.name) return
+          setUser(u => (u && u.id === session.user.id ? { ...u, name: profile.name } : u))
+        })
+        .catch(() => {})
+    }
+
+    // Filet de sécurité : ne jamais laisser le splash bloqué si getSession rame
+    // (token expiré la nuit, infra froide, conflit de lock multi-onglets/PWA).
+    const timer = setTimeout(() => { if (!cancelled) setAuthReady(true) }, 2500)
+
     // Init session — vérifier si la session est éphémère (sessionOnly sans sessionAlive)
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return
       if (session) {
         const sessionOnly = localStorage.getItem('sessionOnly') === 'true'
         const sessionAlive = sessionStorage.getItem('sessionAlive')
         if (sessionOnly && !sessionAlive) {
           // Navigateur rouvert sans "rester connecté" → déconnecter
           localStorage.removeItem('sessionOnly')
-          await supabase.auth.signOut()
-          setAuthReady(true)
-          return
+          supabase.auth.signOut()
+        } else {
+          applySession(session)
         }
-        const profile = await fetchProfile(session.user.id)
-        setUser({ id: session.user.id, email: session.user.email, name: profile?.name || session.user.email })
       }
       setAuthReady(true)
     }).catch((err) => {
       // Supabase Web Lock conflict (multiple tabs) — don't crash, just continue
       console.warn('Auth init error (multi-tab lock?):', err?.message)
       setAuthReady(true)
+    }).finally(() => clearTimeout(timer))
+
+    // Watch changes (login, logout, refresh token)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return
+      if (session) applySession(session)
+      else setUser(null)
     })
 
-    // Watch changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        const profile = await fetchProfile(session.user.id)
-        setUser({ id: session.user.id, email: session.user.email, name: profile?.name || session.user.email })
-      } else {
-        setUser(null)
-      }
-    })
-
-    return () => subscription.unsubscribe()
+    return () => { cancelled = true; clearTimeout(timer); subscription.unsubscribe() }
   }, [])
 
   // ─── Redirect logic ─────────────────────────────────────────────────────
