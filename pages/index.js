@@ -150,11 +150,11 @@ function ProjectsSkeleton({ rows = 6 }) {
 
 // ─── Menu d'actions compact (⋯) ─────────────────────────────────────────────
 
-function ProjectActionsMenu({ project, onLogistics, onEdit, onArchive, onDelete }) {
+function ProjectActionsMenu({ onEdit, onArchive, onDelete }) {
   const [open, setOpen] = useState(false)
   const item = "w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors"
   return (
-    <div className="absolute top-3 right-2 z-10">
+    <div className="absolute top-3.5 right-2.5 z-10">
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
         aria-label="Actions"
@@ -164,7 +164,6 @@ function ProjectActionsMenu({ project, onLogistics, onEdit, onArchive, onDelete 
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute right-0 mt-1 w-44 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-20" style={{ fontSize: 13 }}>
-            <button onClick={() => { setOpen(false); onLogistics() }} className={`${item} text-gray-700`}>Logistique{project.logistics_address && ' ✓'}</button>
             <button onClick={() => { setOpen(false); onEdit() }} className={`${item} text-gray-700`}>Modifier</button>
             <button onClick={() => { setOpen(false); onArchive() }} className={`${item} text-gray-700`}>Archiver</button>
             <div className="my-1 border-t border-gray-100" />
@@ -821,9 +820,9 @@ export default function Admin() {
     const respColor   = colorForName(project.responsible)
 
     return (
-      <div key={project.id} className="group relative flex gap-3 px-4 py-3.5 hover:bg-gray-50/70 transition-colors">
+      <div key={project.id} className="group relative flex gap-3.5 px-5 py-5 hover:bg-gray-50/70 transition-colors">
         {/* Accent d'urgence (toute la hauteur) */}
-        <span className="w-1.5 rounded-full flex-shrink-0 self-stretch" style={{ background: color }} />
+        <span className="w-1 rounded-full flex-shrink-0 self-stretch" style={{ background: color }} />
 
         <div className="flex-1 min-w-0">
           {/* Ligne 1 — nom · client */}
@@ -837,7 +836,7 @@ export default function Admin() {
           </Link>
 
           {/* Ligne 2 — méta : responsable · échéance · avancement */}
-          <div className="flex items-center flex-wrap gap-x-5 gap-y-1.5 mt-2" style={{ fontSize: 13 }}>
+          <div className="flex items-center flex-wrap gap-x-6 gap-y-2 mt-3" style={{ fontSize: 13 }}>
             {/* Responsable */}
             <span className="inline-flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
@@ -870,8 +869,6 @@ export default function Admin() {
 
         {/* Menu actions compact */}
         <ProjectActionsMenu
-          project={project}
-          onLogistics={() => setLogisticsProject(project)}
           onEdit={() => handleEdit(project)}
           onArchive={() => handleArchive(project)}
           onDelete={() => handleDelete(project)}
@@ -1113,7 +1110,7 @@ export default function Admin() {
               <div className="divide-y divide-gray-100">
                 {groupByMonth(activeProjects).flatMap(g => [
                   <div key={`m-${g.key}`}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-gray-50/80 border-b border-gray-100"
+                    className="flex items-center gap-2 px-5 py-3 bg-gray-50/80 border-b border-gray-100"
                     style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.06em' }}>
                     <span className="text-gray-700 uppercase">{g.label}</span>
                     <span className="inline-flex items-center justify-center h-4 px-1.5 rounded-full bg-gray-200 text-gray-600 tabular-nums"
