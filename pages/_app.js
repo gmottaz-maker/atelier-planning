@@ -112,15 +112,43 @@ export default function App({ Component, pageProps }) {
   // ─── Loading splash ──────────────────────────────────────────────────────
   if (!authReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#fafafa' }}>
-        <svg width="32" height="32" viewBox="0 0 40 40" fill="none"
-          style={{ animation: 'spin 2s linear infinite' }}>
-          <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
-          <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
-          <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(60 20 20)" />
-          <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
-          <circle cx="20" cy="20" r="3" fill={PINK} />
-        </svg>
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 24,
+        background: 'radial-gradient(circle at 50% 38%, #ffffff 0%, #f3f4f6 100%)',
+      }}>
+        <style>{`
+          @keyframes maze-spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+          @keyframes maze-glow { 0%,100% { opacity: .25 } 50% { opacity: .7 } }
+          @keyframes maze-fade { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+          @keyframes maze-bar  { 0% { transform: translateX(-120%) } 100% { transform: translateX(330%) } }
+        `}</style>
+        <div style={{ position: 'relative', width: 72, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            position: 'absolute', width: 72, height: 72, borderRadius: '50%',
+            background: PINK, filter: 'blur(18px)', opacity: 0.18,
+            animation: 'maze-glow 2s ease-in-out infinite',
+          }} />
+          <svg width="64" height="64" viewBox="0 0 40 40" fill="none"
+            style={{ position: 'relative', animation: 'maze-spin 5s linear infinite' }}>
+            <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="1.5" fill="none" opacity="0.9" />
+            <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="1.5" fill="none" transform="rotate(60 20 20)" opacity="0.9" />
+            <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="1.5" fill="none" transform="rotate(120 20 20)" opacity="0.9" />
+            <circle cx="38" cy="20" r="2.2" fill={PINK} />
+            <circle cx="20" cy="20" r="3.2" fill={PINK} />
+          </svg>
+        </div>
+        <div style={{
+          fontSize: 12, fontWeight: 700, letterSpacing: '0.3em', color: PINK,
+          textTransform: 'uppercase', fontFamily: 'Inter, system-ui, sans-serif',
+          animation: 'maze-fade .7s ease both',
+        }}>Maze Project</div>
+        <div style={{
+          width: 132, height: 3, borderRadius: 99, background: '#e5e7eb',
+          overflow: 'hidden', animation: 'maze-fade .7s ease both',
+        }}>
+          <div style={{ width: '40%', height: '100%', borderRadius: 99, background: PINK, animation: 'maze-bar 1.2s ease-in-out infinite' }} />
+        </div>
       </div>
     )
   }
