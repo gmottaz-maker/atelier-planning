@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import useSWR from 'swr'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useAuth } from './_app'
@@ -121,6 +122,29 @@ function AtomLogo({ size = 24 }) {
       <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
       <circle cx="20" cy="20" r="3" fill={PINK} />
     </svg>
+  )
+}
+
+// ─── Skeleton de chargement (liste de projets) ──────────────────────────────
+
+function ProjectsSkeleton({ rows = 6 }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <style>{`@keyframes maze-shimmer { 0% { opacity:.55 } 50% { opacity:1 } 100% { opacity:.55 } }`}</style>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-4 py-3.5 border-b border-gray-100 last:border-0"
+          style={{ animation: 'maze-shimmer 1.3s ease-in-out infinite', animationDelay: `${i * 0.08}s` }}>
+          <div className="w-1 h-9 rounded-full bg-gray-200 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="h-3.5 bg-gray-200 rounded w-1/3 mb-2" />
+            <div className="h-2.5 bg-gray-100 rounded w-1/5" />
+          </div>
+          <div className="w-7 h-7 rounded-full bg-gray-200 flex-shrink-0" />
+          <div className="h-5 bg-gray-100 rounded-full w-20 flex-shrink-0" />
+          <div className="h-2 bg-gray-100 rounded w-24 flex-shrink-0 hidden md:block" />
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -499,9 +523,14 @@ export default function Admin() {
   const { user, signOut } = useAuth()
   const { responsibles } = useResponsibles()
 
-  const [projects, setProjects]         = useState([])
-  const [tasks, setTasks]               = useState([])
-  const [loading, setLoading]           = useState(true)
+  // Données via SWR : affichage instantané depuis le cache + revalidation auto
+  const { data: projects = [], isLoading: projectsLoading, mutate: mutateProjects } = useSWR('/api/projects')
+  const { data: tasks = [], mutate: mutateTasks } = useSWR('/api/tasks')
+  const fetchProjects = () => mutateProjects()
+  const fetchTasks    = () => mutateTasks()
+  // On ne montre le skeleton qu'au tout premier chargement (cache vide)
+  const loading = projectsLoading && projects.length === 0
+
   const [showForm, setShowForm]         = useState(false)
   const [editingProject, setEditingProject] = useState(null)
   const [form, setForm]                 = useState(emptyForm)
@@ -512,8 +541,6 @@ export default function Admin() {
   const [logisticsProject, setLogisticsProject]   = useState(null)
   const [pickerOpen, setPickerOpen]               = useState(false)
   const [viewMode, setViewMode]                   = useState('list')
-
-  useEffect(() => { fetchProjects(); fetchTasks() }, [])
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' && localStorage.getItem('projectsViewMode')
@@ -527,20 +554,6 @@ export default function Admin() {
 
   function actorHeaders() {
     return { 'Content-Type': 'application/json', 'x-actor': user?.name || '' }
-  }
-
-  async function fetchProjects() {
-    setLoading(true)
-    const res  = await fetch('/api/projects')
-    const data = await res.json()
-    setProjects(Array.isArray(data) ? data : [])
-    setLoading(false)
-  }
-
-  async function fetchTasks() {
-    const res  = await fetch('/api/tasks')
-    const data = await res.json()
-    setTasks(Array.isArray(data) ? data : [])
   }
 
   async function handleSaveLogistics(projectId, logisticsData) {
@@ -1021,7 +1034,7 @@ export default function Admin() {
           )}
 
           {loading ? (
-            <div className="text-center py-20 text-gray-400 text-sm">Chargement…</div>
+            <ProjectsSkeleton />
           ) : activeProjects.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
               <p className="text-gray-400 text-sm">Aucun projet actif.</p>

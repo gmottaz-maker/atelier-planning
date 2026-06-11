@@ -3,9 +3,11 @@ import Head from 'next/head'
 import { useState, useEffect, createContext, useContext } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
+import { SWRConfig } from 'swr'
 import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar'
 import BottomNav, { BOTTOM_NAV_HEIGHT } from '../components/BottomNav'
 import useIsMobile from '../lib/useIsMobile'
+import { swrConfig } from '../lib/swr'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -160,6 +162,7 @@ export default function App({ Component, pageProps }) {
 
   return (
     <AuthContext.Provider value={{ user, signOut: () => supabase.auth.signOut() }}>
+      <SWRConfig value={swrConfig}>
       <Head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -187,6 +190,7 @@ export default function App({ Component, pageProps }) {
       ) : (
         <Component {...pageProps} />
       )}
+      </SWRConfig>
     </AuthContext.Provider>
   )
 }
