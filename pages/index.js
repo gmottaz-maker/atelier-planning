@@ -175,6 +175,126 @@ function ProjectActionsMenu({ onEdit, onArchive, onDelete }) {
   )
 }
 
+// ─── Vue Gantt (frise temporelle par échéance) ──────────────────────────────
+
+function GanttView({ projects }) {
+  const DAY = 86400000
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+
+  const dated   = projects.filter(p => p.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline))
+  const undated = projects.filter(p => !p.deadline)
+
+  if (dated.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400 text-sm">
+        Aucun projet daté à afficher sur la frise.
+      </div>
+    )
+  }
+
+  // Début d'un projet = sa date de création (sinon aujourd'hui), borné à aujourd'hui
+  const startOf = (p) => {
+    const s = p.created_at ? new Date(p.created_at) : new Date(today)
+    s.setHours(0, 0, 0, 0)
+    return Math.min(s.getTime(), today.getTime())
+  }
+  const endOf = (p) => { const d = new Date(p.deadline); d.setHours(0, 0, 0, 0); return d.getTime() }
+
+  const minStart = Math.min(today.getTime(), ...dated.map(startOf))
+  const maxEnd   = Math.max(today.getTime(), ...dated.map(endOf))
+  const rangeStart = new Date(new Date(minStart).getFullYear(), new Date(minStart).getMonth(), 1)
+  const rangeEndM  = new Date(maxEnd)
+  const rangeEnd   = new Date(rangeEndM.getFullYear(), rangeEndM.getMonth() + 1, 0) // dernier jour du mois
+
+  // Colonnes de mois avec décalage cumulé (en jours)
+  const months = []
+  let offset = 0
+  let c = new Date(rangeStart)
+  while (c <= rangeEnd) {
+    const next = new Date(c.getFullYear(), c.getMonth() + 1, 1)
+    const stop = next > rangeEnd ? new Date(rangeEnd.getTime() + DAY) : next
+    const days = Math.round((stop - c) / DAY)
+    months.push({ key: `${c.getFullYear()}-${c.getMonth()}`, label: `${MONTHS_FR[c.getMonth()].slice(0, 3)} ${String(c.getFullYear()).slice(2)}`, days, offset })
+    offset += days
+    c = next
+  }
+
+  const PX_PER_DAY = 5
+  const LABEL_W    = 200
+  const trackWidth = offset * PX_PER_DAY
+  const x = (ms) => Math.max(0, Math.min(trackWidth, ((ms - rangeStart.getTime()) / DAY) * PX_PER_DAY))
+  const todayX = x(today.getTime())
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: LABEL_W + trackWidth, position: 'relative' }}>
+
+          {/* Séparateurs de mois (verticaux, sur toute la hauteur) */}
+          {months.map(m => (
+            <div key={`sep-${m.key}`} style={{ position: 'absolute', top: 0, bottom: 0, left: LABEL_W + m.offset * PX_PER_DAY, width: 1, background: '#f3f4f6', zIndex: 0 }} />
+          ))}
+          {/* Ligne "aujourd'hui" */}
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: LABEL_W + todayX, width: 1.5, background: '#f87171', zIndex: 5 }} />
+
+          {/* En-tête des mois */}
+          <div className="flex border-b border-gray-100" style={{ position: 'relative', zIndex: 1 }}>
+            <div className="flex-shrink-0" style={{ width: LABEL_W }} />
+            {months.map(m => (
+              <div key={m.key} className="text-gray-500 uppercase tracking-wide"
+                style={{ width: m.days * PX_PER_DAY, fontSize: 10.5, fontWeight: 600, padding: '8px 6px', flexShrink: 0 }}>
+                {m.label}
+              </div>
+            ))}
+          </div>
+
+          {/* Lignes projets */}
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            {dated.map(p => {
+              const color = getProjectColor(p)
+              const left  = x(startOf(p))
+              const right = x(endOf(p))
+              const width = Math.max(8, right - left)
+              const d = getDaysRemaining(p.deadline)
+              return (
+                <div key={p.id} className="flex items-center border-b border-gray-50 hover:bg-gray-50/50 transition-colors" style={{ height: 46 }}>
+                  <Link href={`/projects/${p.id}`} className="flex-shrink-0 px-4 min-w-0" style={{ width: LABEL_W }}>
+                    <div className="font-medium text-gray-900 truncate" style={{ fontSize: 13 }}>{p.name}</div>
+                    <div className="text-gray-400 truncate" style={{ fontSize: 11 }}>{p.client}</div>
+                  </Link>
+                  <div style={{ position: 'relative', width: trackWidth, height: '100%', flexShrink: 0 }}>
+                    <div title={`${p.name} — échéance ${formatDate(p.deadline)}`}
+                      style={{
+                        position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                        left, width, height: 18, borderRadius: 9, background: color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                        paddingRight: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                      }}>
+                    </div>
+                    <span style={{
+                      position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+                      left: left + width + 8, fontSize: 11, fontWeight: 600,
+                      color: d < 0 ? '#dc2626' : '#6b7280', whiteSpace: 'nowrap',
+                    }}>
+                      {formatDateShort(p.deadline)}{d < 0 ? ` · ${Math.abs(d)}j retard` : d === 0 ? " · auj." : ''}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {undated.length > 0 && (
+        <div className="px-4 py-3 border-t border-gray-100 text-gray-400" style={{ fontSize: 12 }}>
+          {undated.length} projet{undated.length > 1 ? 's' : ''} sans date — non affiché{undated.length > 1 ? 's' : ''} sur la frise.
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── AddressInput — Google Maps (nouvelle API) ou Nominatim en fallback ──────
 
 function AddressInput({ value, onChange, placeholder, className, style }) {
@@ -571,7 +691,7 @@ export default function Admin() {
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' && localStorage.getItem('projectsViewMode')
-    if (saved === 'kanban' || saved === 'list') setViewMode(saved)
+    if (saved === 'kanban' || saved === 'list' || saved === 'gantt') setViewMode(saved)
   }, [])
 
   function changeViewMode(mode) {
@@ -711,9 +831,9 @@ export default function Admin() {
         {/* Urgency stripe */}
         <div className="h-1.5 w-full" style={{ background: color }} />
 
-        <Link href={`/projects/${project.id}`} className="block px-7 py-6 flex-1 hover:bg-gray-50/50 transition-colors">
+        <Link href={`/projects/${project.id}`} className="block px-6 py-5 flex-1 hover:bg-gray-50/50 transition-colors">
           {/* Header: title + responsable avatar */}
-          <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex items-start justify-between gap-4 mb-3">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 18 }}>
                 {project.name}
@@ -746,7 +866,7 @@ export default function Admin() {
           </div>
 
           {/* Meta line */}
-          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-5" style={{ fontSize: 12 }}>
+          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-4" style={{ fontSize: 12 }}>
             <span className="font-semibold" style={{ color: respColor }}>{project.responsible || 'non défini'}</span>
             <span className="text-gray-300">·</span>
             <span className="text-gray-500">{project.delivery_type}</span>
@@ -793,12 +913,7 @@ export default function Admin() {
         </Link>
 
         {/* Actions — toujours visibles mais discrètes */}
-        <div className="px-7 py-3 flex items-center gap-3 border-t" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
-          <button onClick={() => setLogisticsProject(project)}
-            className="text-gray-500 hover:text-gray-900 transition-colors">
-            Logistique{project.logistics_address && ' ✓'}
-          </button>
-          <span className="text-gray-200">·</span>
+        <div className="px-6 py-3 flex items-center gap-3 border-t" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
           <button onClick={() => handleEdit(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Modifier</button>
           <span className="ml-auto text-gray-200">·</span>
           <button onClick={() => handleArchive(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Archiver</button>
@@ -1038,6 +1153,7 @@ export default function Admin() {
               {[
                 { key: 'list',   label: 'Liste' },
                 { key: 'kanban', label: 'Kanban' },
+                { key: 'gantt',  label: 'Gantt' },
               ].map(v => (
                 <button key={v.key} onClick={() => changeViewMode(v.key)}
                   className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
@@ -1083,6 +1199,8 @@ export default function Admin() {
             <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
               <p className="text-gray-400 text-sm">Aucun projet actif.</p>
             </div>
+          ) : viewMode === 'gantt' ? (
+            <GanttView projects={activeProjects} />
           ) : viewMode === 'kanban' ? (
             <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:-mx-10 md:px-10">
               {KANBAN_COLUMNS.map(col => {
