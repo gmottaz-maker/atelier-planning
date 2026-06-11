@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import useSWR from 'swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
@@ -190,11 +191,14 @@ export default function SchedulePage() {
   const effectiveUser = selectedUser || user?.name || ''
   const year = currentDate.getFullYear()
 
-  // Data
-  const [entries, setEntries]     = useState([])
+  // Data — entrées via SWR (cache instantané + revalidation au focus)
+  const entriesKey = effectiveUser
+    ? `/api/work-entries?userName=${encodeURIComponent(effectiveUser)}&from=${year}-01-01&to=${year}-12-31`
+    : null
+  const { data: entries = [], isLoading: entriesLoading, mutate: mutateEntries } = useSWR(entriesKey)
+  const loading = entriesLoading && entries.length === 0
   const [settings, setSettings]   = useState({ vacation_days: 20, weekly_hours: 42.0, off_days: [] })
   const [allSettings, setAllSettings] = useState([]) // admin overview
-  const [loading, setLoading]     = useState(false)
 
   // Modal – day entry
   const [modal, setModal]             = useState(null) // { date, entry }
@@ -206,8 +210,11 @@ export default function SchedulePage() {
   const [saving, setSaving]           = useState(false)
   const [saveError, setSaveError]     = useState('')
 
-  // ── Expenses state ───────────────────────────────────────────────────────
-  const [expenses, setExpenses]           = useState([])
+  // ── Expenses state (via SWR) ─────────────────────────────────────────────
+  const expensesKey = effectiveUser
+    ? `/api/expenses?userName=${encodeURIComponent(effectiveUser)}&year=${year}`
+    : null
+  const { data: expenses = [], mutate: mutateExpenses } = useSWR(expensesKey)
   const [expenseModal, setExpenseModal]   = useState(false)
   const [expEditId, setExpEditId]         = useState(null)
   const EMPTY_EXP = { date: dateStr(new Date()), amount: '', currency: 'CHF', category: 'Autre', merchant: '', description: '', payment_method: 'company' }
@@ -235,20 +242,7 @@ export default function SchedulePage() {
   const [settingsError, setSettingsError] = useState('')
 
   // ── Load entries for full year ────────────────────────────────────────────
-  const loadEntries = useCallback(async () => {
-    if (!effectiveUser) return
-    setLoading(true)
-    try {
-      const data = await apiFetch(
-        `/api/work-entries?userName=${encodeURIComponent(effectiveUser)}&from=${year}-01-01&to=${year}-12-31`
-      )
-      setEntries(data)
-    } catch (e) {
-      console.error('loadEntries', e)
-    } finally {
-      setLoading(false)
-    }
-  }, [effectiveUser, year])
+  const loadEntries = useCallback(() => { mutateEntries() }, [mutateEntries])
 
   const loadSettings = useCallback(async () => {
     if (!effectiveUser) return
@@ -275,7 +269,6 @@ export default function SchedulePage() {
     }
   }, [isAdmin, year])
 
-  useEffect(() => { loadEntries() }, [loadEntries])
   useEffect(() => { loadSettings() }, [loadSettings])
   useEffect(() => { loadAllSettings() }, [loadAllSettings])
 
@@ -373,15 +366,7 @@ export default function SchedulePage() {
   }
 
   // ── Expenses ─────────────────────────────────────────────────────────────
-  const loadExpenses = useCallback(async () => {
-    if (!effectiveUser) return
-    try {
-      const data = await apiFetch(`/api/expenses?userName=${encodeURIComponent(effectiveUser)}&year=${year}`)
-      setExpenses(data)
-    } catch (e) { console.error('loadExpenses', e) }
-  }, [effectiveUser, year])
-
-  useEffect(() => { loadExpenses() }, [loadExpenses])
+  const loadExpenses = useCallback(() => { mutateExpenses() }, [mutateExpenses])
 
   function openAddExpense() {
     setExpEditId(null)

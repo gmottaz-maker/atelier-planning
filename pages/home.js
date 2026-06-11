@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import useSWR from 'swr'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useAuth } from './_app'
@@ -179,8 +180,9 @@ export default function HomePage() {
   const currentUser = user?.name || ''
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID
 
-  const [tasks, setTasks] = useState([])
-  const [tasksLoading, setTasksLoading] = useState(true)
+  // Tâches via SWR : cache instantané + revalidation au focus
+  const { data: tasks = [], isLoading, mutate: mutateTasks } = useSWR('/api/tasks')
+  const tasksLoading = isLoading && tasks.length === 0
   const [taskView, setTaskView] = useState('list') // 'list' | 'week'
   const [calEvents, setCalEvents] = useState([])
   const [calStatus, setCalStatus] = useState('idle')
@@ -188,25 +190,16 @@ export default function HomePage() {
   const tokenClientRef = useRef(null)
   const gapiReadyRef = useRef(false)
 
-  // ─── Load tasks ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!currentUser) return
-    fetch('/api/tasks', { headers: { 'x-actor': currentUser } })
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d)) setTasks(d) })
-      .catch(console.error)
-      .finally(() => setTasksLoading(false))
-  }, [currentUser])
-
   // ─── Toggle task completion ───────────────────────────────────────────────
   async function toggleTask(task) {
     const newStatus = task.status === 'completed' ? 'active' : 'completed'
     const now = new Date().toISOString()
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === task.id
+    const optimistic = tasks.map(t => t.id === task.id
       ? { ...t, status: newStatus, completed_at: newStatus === 'completed' ? now : null }
       : t
-    ))
+    )
+    // Mise à jour optimiste (sans revalider tout de suite)
+    mutateTasks(optimistic, false)
     try {
       const { projects: _p, ...taskData } = task
       await fetch(`/api/tasks/${task.id}`, {
@@ -214,9 +207,9 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
         body: JSON.stringify({ ...taskData, status: newStatus, completed_at: newStatus === 'completed' ? now : null }),
       })
+      mutateTasks() // resynchronise avec le serveur
     } catch (err) {
-      // Revert on error
-      setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+      mutateTasks() // revert : on recharge la vérité serveur
       console.error(err)
     }
   }

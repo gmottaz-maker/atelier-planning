@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import useSWR from 'swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
@@ -269,9 +270,11 @@ export default function Tasks() {
   const { responsibles } = useResponsibles()
   const currentUser = user?.name || null
 
-  const [tasks, setTasks] = useState([])
-  const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Données via SWR : cache instantané + revalidation au focus
+  const { data: tasks = [], isLoading: tasksLoading, mutate: mutateTasks } = useSWR('/api/tasks')
+  const { data: allProjects = [], mutate: mutateProjects } = useSWR('/api/projects')
+  const projects = allProjects.filter(p => p.status === 'active')
+  const loading = tasksLoading && tasks.length === 0
   const [view, setView] = useState('week')       // 'today' | 'week' | 'twoweeks' | 'all'
   const [personFilter, setPersonFilter] = useState(null) // null = not initialized yet
   const [projectFilter, setProjectFilter] = useState('all') // 'all' | project_id
@@ -328,18 +331,10 @@ export default function Tasks() {
     return { 'Content-Type': 'application/json', 'x-actor': currentUser || '' }
   }
 
-  const fetchAll = useCallback(async () => {
-    const [tRes, pRes] = await Promise.all([
-      fetch('/api/tasks'),
-      fetch('/api/projects'),
-    ])
-    const [tData, pData] = await Promise.all([tRes.json(), pRes.json()])
-    setTasks(Array.isArray(tData) ? tData : [])
-    setProjects((Array.isArray(pData) ? pData : []).filter(p => p.status === 'active'))
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { if (currentUser) fetchAll() }, [currentUser, fetchAll])
+  const fetchAll = useCallback(() => {
+    mutateTasks()
+    mutateProjects()
+  }, [mutateTasks, mutateProjects])
 
   // Init personFilter when currentUser becomes available
   useEffect(() => {

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
@@ -54,16 +55,9 @@ function formatDay(dateStr) {
 
 export default function Activity() {
   const { user, signOut } = useAuth()
-  const [entries, setEntries] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { data: entries = [], isLoading } = useSWR('/api/activity')
+  const loading = isLoading && entries.length === 0
   const [filter, setFilter] = useState('all') // 'all' | person name
-
-  useEffect(() => {
-    fetch('/api/activity')
-      .then(r => r.json())
-      .then(d => { setEntries(Array.isArray(d) ? d : []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
 
   const filtered = filter === 'all' ? entries : entries.filter(e => e.actor === filter)
   const grouped  = groupByDay(filtered)
