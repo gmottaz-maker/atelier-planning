@@ -966,9 +966,9 @@ export default function ProjectPage() {
   const [updateDragging, setUpdateDragging] = useState(false)
 
   // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], subcontracting:[], logistics:[], general_margin:'' }
-  // general_margin (%) s'applique aux achats / sous-traitance / logistique sauf si une marge spécifique est définie sur la ligne
-  const EMPTY_QUOTE = { management: [], items: [], subcontracting: [], logistics: [], general_margin: '' }
-  const [quote, setQuote] = useState(EMPTY_QUOTE)
+  // general_margin (%) s'applique aux achats / sous-traitance sauf si une marge spécifique est définie sur la ligne (PAS la logistique)
+  // Nouveau devis → pré-rempli avec un modèle par défaut (gestion + logistique)
+  const [quote, setQuote] = useState(() => defaultQuote())
   const [quoteDirty, setQuoteDirty] = useState(false)
   const [quoteSaving, setQuoteSaving] = useState(false)
   const [quoteExpanded, setQuoteExpanded] = useState(false)
@@ -1288,14 +1288,36 @@ export default function ProjectPage() {
   function purchaseBilled(r) { return purchaseTotal(r) * (1 + effectiveMargin(r) / 100) }
   function serviceTotal(r)   { return num(r.rate) * num(r.quantity) }
   function serviceBilled(r)  { return serviceTotal(r) * (1 + effectiveMargin(r) / 100) }
+  // La logistique n'hérite PAS de la marge générale : 0 % sauf marge spécifique sur la ligne
+  function effectiveMarginLogistics(r) { return (r?.margin !== '' && r?.margin != null) ? num(r.margin) : 0 }
+  function serviceBilledLogistics(r)   { return serviceTotal(r) * (1 + effectiveMarginLogistics(r) / 100) }
   function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
   function genItemUid() { return `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
   const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
   function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '' } }
-  function emptyLaborRow()    { return { _uid: genRowUid(), description: '', rate: '100', quantity: '', unit: '' } }
+  function emptyLaborRow()    { return { _uid: genRowUid(), item: '', description: '', rate: '100', quantity: '', unit: '' } }
   function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '', margin: '' } }
   function emptySubcontractingRow(){ return { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '', unit: '', margin: '' } }
+
+  // Modèle par défaut d'un nouveau devis (gestion projet + logistique pré-remplies)
+  function defaultQuote() {
+    return {
+      management: [
+        { _uid: genRowUid(), item: 'Projet',                  description: 'Gestion de projet générale, correspondances, commandes', rate: '120', quantity: '', unit: 'heure(s)' },
+        { _uid: genRowUid(), item: 'Visuels & développement', description: 'Création de visuels, plans et développement tests',       rate: '140', quantity: '', unit: 'heure(s)' },
+        { _uid: genRowUid(), item: 'Visite sur place',        description: 'Visite sur place',                                          rate: '100', quantity: '', unit: 'heure(s)' },
+      ],
+      items: [],
+      subcontracting: [],
+      logistics: [
+        { _uid: genRowUid(), trajet: 'Trajet',    description: '', rate: '3',   quantity: '', unit: 'km',       margin: '' },
+        { _uid: genRowUid(), trajet: 'Montage',   description: '', rate: '100', quantity: '', unit: 'heure(s)', margin: '' },
+        { _uid: genRowUid(), trajet: 'Démontage', description: '', rate: '100', quantity: '', unit: 'heure(s)', margin: '' },
+      ],
+      general_margin: '20',
+    }
+  }
 
   // ── Gestion (lignes de main d'œuvre globales) ──
   function addManagementRow() {
@@ -2382,7 +2404,7 @@ export default function ProjectPage() {
             const managementTotal     = quote.management.reduce((s, r) => s + serviceTotal(r), 0)
             const itemsTotal          = quote.items.reduce((s, it) => s + itemTotal(it), 0)
             const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceBilled(r), 0)
-            const logisticsTotal      = quote.logistics.reduce((s, r) => s + serviceBilled(r), 0)
+            const logisticsTotal      = quote.logistics.reduce((s, r) => s + serviceBilledLogistics(r), 0)
             const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
             const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
@@ -2459,7 +2481,7 @@ export default function ProjectPage() {
                         onChange={e => { setQuote(q => ({ ...q, general_margin: e.target.value })); setQuoteDirty(true) }}
                       />
                       <span className="text-sm text-amber-900">%</span>
-                      <span className="text-xs text-amber-800/80 ml-2">S'applique aux achats, sous-traitance et logistique. Une marge spécifique sur une ligne prend le dessus.</span>
+                      <span className="text-xs text-amber-800/80 ml-2">S'applique aux achats et à la sous-traitance. Une marge spécifique sur une ligne prend le dessus.</span>
                     </div>
 
                     {/* ── Gestion projet ── */}
@@ -2785,8 +2807,8 @@ export default function ProjectPage() {
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
-                                <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateLogisticsRow(i, 'margin', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceBilled(r))}</td>
+                                <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder="0" onChange={e => updateLogisticsRow(i, 'margin', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceBilledLogistics(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>

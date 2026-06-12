@@ -11,6 +11,9 @@ function purchaseTotal(r)  { return num(r.unit_price) * num(r.quantity) }
 function purchaseBilled(r, gm) { return purchaseTotal(r) * (1 + effectiveMargin(r, gm) / 100) }
 function serviceTotal(r)   { return num(r.rate) * num(r.quantity) }
 function serviceBilled(r, gm) { return serviceTotal(r) * (1 + effectiveMargin(r, gm) / 100) }
+// La logistique n'hérite pas de la marge générale : 0 % sauf marge spécifique sur la ligne
+function marginLogistics(r) { return (r?.margin !== '' && r?.margin != null) ? num(r.margin) : 0 }
+function serviceBilledLogistics(r) { return serviceTotal(r) * (1 + marginLogistics(r) / 100) }
 function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
 function fmtDateLong(d) {
@@ -69,7 +72,7 @@ export default function DevisPage() {
     return s + p + l
   }, 0)
   const subcontractingTotal = (q.subcontracting || []).reduce((s, r) => s + serviceBilled(r, gm), 0)
-  const logisticsTotal      = (q.logistics || []).reduce((s, r) => s + serviceBilled(r, gm), 0)
+  const logisticsTotal      = (q.logistics || []).reduce((s, r) => s + serviceBilledLogistics(r), 0)
   const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
   const today = new Date()
@@ -288,7 +291,7 @@ export default function DevisPage() {
             ]}
             rows={q.logistics.map(r => [
               r.trajet, r.description,
-              num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
+              num(r.quantity), r.unit || '', fmtCHF(serviceBilledLogistics(r)),
             ])}
           />
         )}
