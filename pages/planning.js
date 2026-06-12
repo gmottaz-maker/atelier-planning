@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
 import Link from 'next/link'
 import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
+import { useGoogleCalendar } from '../lib/googleCalendar'
 
 const PERSON_COLORS = { Arnaud: '#3b82f6', Gabin: '#8b5cf6', Guillaume: '#111827', 'Sous-traitant': '#64748b', 'non défini': '#9ca3af' }
 function colorForName(name) {
@@ -71,6 +72,44 @@ export default function Planning() {
     if (n >= 5) return '#fef2f2'   // rouge clair — surcharge
     if (n >= 3) return '#fffbeb'   // ambre clair — charge
     return 'transparent'
+  }
+
+  // ── Google Agenda (lecture + écriture d'événements) ──────────────────────
+  const gcal = useGoogleCalendar()
+  const { connected: gcalConnected, listEvents } = gcal
+  const [events, setEvents]   = useState([])
+  const [evtModal, setEvtModal] = useState(null) // { mode, event?, dateKey?, calendarId? }
+
+  // Auto-reconnexion silencieuse si déjà connecté précédemment
+  useEffect(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('gcalConnected') === '1') {
+      gcal.connect({ silent: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadEvents = useCallback(async () => {
+    if (!gcalConnected) return
+    const tMin = new Date(weekStart); tMin.setHours(0, 0, 0, 0)
+    const tMax = addDays(weekStart, 7)
+    try { setEvents(await listEvents(tMin.toISOString(), tMax.toISOString())) }
+    catch (_) { /* ignore */ }
+  }, [gcalConnected, weekStart, listEvents])
+  useEffect(() => { loadEvents() }, [loadEvents])
+
+  function eventDateKey(ev) {
+    return ev.start?.date || (ev.start?.dateTime ? ev.start.dateTime.slice(0, 10) : null)
+  }
+  function eventsForDay(dayKey) {
+    return events.filter(ev => eventDateKey(ev) === dayKey).sort((a, b) => {
+      const ta = a.start?.dateTime || ''; const tb = b.start?.dateTime || ''
+      return ta < tb ? -1 : ta > tb ? 1 : 0
+    })
+  }
+  function eventTimeLabel(ev) {
+    if (ev.start?.date) return ''
+    if (!ev.start?.dateTime) return ''
+    const d = new Date(ev.start.dateTime)
+    return d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })
   }
 
   return (
@@ -164,7 +203,186 @@ export default function Planning() {
         <p className="text-xs text-gray-400 mt-4">
           Charge basée sur les tâches datées (date d'exécution). <span style={{ color: '#b45309' }}>■</span> 3+ tâches · <span style={{ color: '#dc2626' }}>■</span> 5+ tâches dans la journée.
         </p>
+
+        {/* ── Agenda Google ── */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900" style={{ fontSize: 18 }}>Agenda Google</h3>
+              {gcal.connected && <span className="text-xs text-gray-400">{gcal.calendars.length} agenda(s)</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              {gcal.error && <span className="text-xs text-red-600 max-w-xs truncate" title={gcal.error}>{gcal.error}</span>}
+              {gcal.connected ? (
+                <button onClick={loadEvents} className="px-3 py-1.5 rounded-md border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Rafraîchir</button>
+              ) : (
+                <button onClick={() => gcal.connect()} disabled={gcal.connecting}
+                  className="px-3 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-50" style={{ background: '#111827' }}>
+                  {gcal.connecting ? 'Connexion…' : 'Connecter Google Agenda'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!gcal.connected ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+              Connecte ton compte Google pour voir et gérer tes événements ici. Tout reste synchronisé avec ton agenda (Mac, téléphone…).
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <div style={{ minWidth: 150 + 7 * 150 }}>
+                <div style={GRID} className="border-b border-gray-100">
+                  <div className="px-3 py-2.5 text-xs font-semibold text-gray-400 flex items-center">Événements</div>
+                  {days.map((d, i) => {
+                    const isToday = isSameDay(d, today)
+                    return (
+                      <div key={i} className="px-3 py-2.5 text-center border-l border-gray-100" style={{ background: isToday ? '#eff6ff' : 'transparent' }}>
+                        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: isToday ? '#1d4ed8' : '#9ca3af' }}>{DAYS_FR[i]}</div>
+                        <div className="text-sm font-semibold tabular-nums" style={{ color: isToday ? '#1d4ed8' : '#374151' }}>{d.getDate()}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={GRID}>
+                  <div className="px-3 py-2 border-r border-gray-100 text-xs text-gray-400 flex items-center">Tous agendas</div>
+                  {days.map((d, i) => {
+                    const dayKey = weekKeys[i]
+                    const evs = eventsForDay(dayKey)
+                    return (
+                      <div key={i} className="group px-1.5 py-1.5 border-l border-gray-100 space-y-1"
+                        style={{ background: isSameDay(d, today) ? '#f8faff' : 'transparent', minHeight: 70 }}>
+                        {evs.map(ev => (
+                          <button key={ev.id + ev._calendarId}
+                            onClick={() => ev._writable && setEvtModal({ mode: 'edit', event: ev })}
+                            className="w-full text-left flex items-start gap-1.5 px-1.5 py-1 rounded-md hover:bg-gray-100 transition-colors"
+                            style={{ background: '#f9fafb', cursor: ev._writable ? 'pointer' : 'default' }}
+                            title={`${ev.summary || '(sans titre)'}${ev._calName ? ' · ' + ev._calName : ''}`}>
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ background: ev._color || '#9ca3af' }} />
+                            <span className="min-w-0 truncate">
+                              {eventTimeLabel(ev) && <span className="text-gray-400 mr-1" style={{ fontSize: 10.5 }}>{eventTimeLabel(ev)}</span>}
+                              <span className="text-gray-700" style={{ fontSize: 11.5 }}>{ev.summary || '(sans titre)'}</span>
+                            </span>
+                          </button>
+                        ))}
+                        <button onClick={() => setEvtModal({ mode: 'create', dateKey })}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity w-full text-center text-xs text-gray-400 hover:text-gray-700 py-0.5 rounded border border-dashed border-gray-200">
+                          + Événement
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
+
+      {evtModal && (
+        <EventModal data={evtModal} calendars={gcal.calendars} gcal={gcal}
+          onClose={() => setEvtModal(null)} onSaved={loadEvents} />
+      )}
+    </div>
+  )
+}
+
+function pad(n) { return String(n).padStart(2, '0') }
+
+function EventModal({ data, calendars, gcal, onClose, onSaved }) {
+  const writable = calendars.filter(c => c.writable)
+  const isEdit = data.mode === 'edit'
+  const ev = data.event
+
+  const initAllDay = isEdit ? !!ev.start?.date : true
+  const initDate   = isEdit ? (ev.start?.date || ev.start?.dateTime?.slice(0, 10)) : data.dateKey
+  const initStart  = isEdit && ev.start?.dateTime ? new Date(ev.start.dateTime) : null
+  const initEnd    = isEdit && ev.end?.dateTime ? new Date(ev.end.dateTime) : null
+
+  const [title, setTitle]   = useState(isEdit ? (ev.summary || '') : '')
+  const [allDay, setAllDay] = useState(initAllDay)
+  const [date, setDate]     = useState(initDate || ymd(new Date()))
+  const [startTime, setStartTime] = useState(initStart ? `${pad(initStart.getHours())}:${pad(initStart.getMinutes())}` : '09:00')
+  const [endTime, setEndTime]     = useState(initEnd ? `${pad(initEnd.getHours())}:${pad(initEnd.getMinutes())}` : '10:00')
+  const [calendarId, setCalendarId] = useState(isEdit ? ev._calendarId : (writable.find(c => c.primary)?.id || writable[0]?.id || 'primary'))
+  const [saving, setSaving] = useState(false)
+  const [err, setErr]       = useState('')
+
+  function buildResource() {
+    if (allDay) {
+      const end = new Date(date + 'T00:00:00'); end.setDate(end.getDate() + 1)
+      return { summary: title || '(sans titre)', start: { date }, end: { date: ymd(end) } }
+    }
+    const s = new Date(`${date}T${startTime}:00`)
+    const e = new Date(`${date}T${endTime}:00`)
+    return { summary: title || '(sans titre)', start: { dateTime: s.toISOString() }, end: { dateTime: e.toISOString() } }
+  }
+
+  async function save() {
+    if (saving) return
+    setSaving(true); setErr('')
+    try {
+      const res = buildResource()
+      if (isEdit) await gcal.updateEvent(ev._calendarId, ev.id, res)
+      else        await gcal.createEvent(calendarId, res)
+      await onSaved(); onClose()
+    } catch (e) { setErr(e?.result?.error?.message || e?.message || 'Erreur'); setSaving(false) }
+  }
+  async function remove() {
+    if (!isEdit || saving) return
+    if (!confirm('Supprimer cet événement de Google Agenda ?')) return
+    setSaving(true); setErr('')
+    try { await gcal.deleteEvent(ev._calendarId, ev.id); await onSaved(); onClose() }
+    catch (e) { setErr(e?.result?.error?.message || e?.message || 'Erreur'); setSaving(false) }
+  }
+
+  const inp = "w-full px-3 py-2 rounded-md border border-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClose}>
+      <div className="bg-white rounded-xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+        <h3 className="font-semibold text-gray-900 mb-4" style={{ fontSize: 16 }}>{isEdit ? 'Modifier l’événement' : 'Nouvel événement'}</h3>
+        <div className="space-y-3">
+          <input className={inp} placeholder="Titre" value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)} /> Journée entière
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className={allDay ? 'col-span-2' : ''}>
+              <label className="block text-xs text-gray-500 mb-1">Date</label>
+              <input type="date" className={inp} value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+            {!allDay && (
+              <>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Début</label>
+                  <input type="time" className={inp} value={startTime} onChange={e => setStartTime(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Fin</label>
+                  <input type="time" className={inp} value={endTime} onChange={e => setEndTime(e.target.value)} />
+                </div>
+              </>
+            )}
+          </div>
+          {!isEdit ? (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Agenda</label>
+              <select className={inp} value={calendarId} onChange={e => setCalendarId(e.target.value)}>
+                {writable.map(c => <option key={c.id} value={c.id}>{c.summary}{c.primary ? ' (principal)' : ''}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">Agenda : {ev._calName}</div>
+          )}
+          {err && <div className="text-xs text-red-600">{err}</div>}
+        </div>
+        <div className="flex items-center gap-2 mt-5">
+          <button onClick={save} disabled={saving} className="px-4 py-2 rounded-md text-sm font-medium text-white disabled:opacity-50" style={{ background: '#111827' }}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+          <button onClick={onClose} className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800">Annuler</button>
+          {isEdit && <button onClick={remove} disabled={saving} className="ml-auto px-3 py-2 text-sm text-red-600 hover:text-red-700">Supprimer</button>}
+        </div>
+      </div>
     </div>
   )
 }
