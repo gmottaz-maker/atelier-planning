@@ -7,6 +7,7 @@ import NavBar from '../../components/NavBar'
 import { useResponsibles } from '../../lib/useResponsibles'
 import useIsAdmin from '../../lib/useIsAdmin'
 import { TASK_CATEGORIES } from '../../lib/taskCategories'
+import { QUOTE_STATUSES, quoteStatusMeta } from '../../lib/quoteStatus'
 import TaskFormDrawer from '../../components/TaskFormDrawer'
 import AutocompleteInput from '../../components/AutocompleteInput'
 import { useSuggestions } from '../../lib/useSuggestions'
@@ -1030,6 +1031,8 @@ export default function ProjectPage() {
                 subcontracting: q.subcontracting || [],
                 logistics:      q.logistics || [],
                 general_margin: q.general_margin ?? '',
+                status:         q.status || 'brouillon',
+                number:         q.number || '',
               })
               setQuoteExpanded(true)
             }
@@ -1048,6 +1051,8 @@ export default function ProjectPage() {
               subcontracting: [],
               logistics: q.logistics || [],
               general_margin: '',
+              status: q.status || 'brouillon',
+              number: q.number || '',
             }
             setQuote(migrated)
             setQuoteDirty(true)  // forcer un re-save dans le nouveau format
@@ -1316,6 +1321,8 @@ export default function ProjectPage() {
         { _uid: genRowUid(), trajet: 'Démontage', description: '', rate: '100', quantity: '', unit: 'heure(s)', margin: '' },
       ],
       general_margin: '20',
+      status: 'brouillon',
+      number: '',
     }
   }
 
@@ -2406,6 +2413,8 @@ export default function ProjectPage() {
             const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceBilled(r), 0)
             const logisticsTotal      = quote.logistics.reduce((s, r) => s + serviceBilledLogistics(r), 0)
             const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
+            const autoRef             = `${new Date().getFullYear()}-${String(project?.id || '').slice(-4).toUpperCase()}`
+            const statusMeta          = quoteStatusMeta(quote.status)
 
             const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
             const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
@@ -2416,14 +2425,40 @@ export default function ProjectPage() {
             return (
               <>
                 <div className="flex items-center justify-between mb-3">
-                  <button onClick={() => setQuoteExpanded(v => !v)}
-                    className="flex items-center gap-2 group">
-                    <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Offre</h2>
-                    <span className="text-gray-400 group-hover:text-gray-700 text-sm">{quoteExpanded ? '▾' : '▸'}</span>
-                    {!quoteExpanded && grandTotal > 0 && (
-                      <span className="text-sm text-gray-500 ml-2">· Total {fmtCHF(grandTotal)} CHF</span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button onClick={() => setQuoteExpanded(v => !v)}
+                      className="flex items-center gap-2 group">
+                      <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Offre</h2>
+                      <span className="text-gray-400 group-hover:text-gray-700 text-sm">{quoteExpanded ? '▾' : '▸'}</span>
+                      {!quoteExpanded && grandTotal > 0 && (
+                        <span className="text-sm text-gray-500 ml-2">· Total {fmtCHF(grandTotal)} CHF</span>
+                      )}
+                    </button>
+                    {quoteExpanded ? (
+                      <>
+                        <select
+                          value={quote.status || 'brouillon'}
+                          onChange={e => { setQuote(q => ({ ...q, status: e.target.value })); setQuoteDirty(true) }}
+                          className="text-xs font-semibold rounded-full pl-2.5 pr-1 py-1 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-300"
+                          style={{ background: statusMeta.bg, color: statusMeta.color }}>
+                          {QUOTE_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                        </select>
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <span>N°</span>
+                          <input
+                            value={quote.number || ''}
+                            placeholder={autoRef}
+                            onChange={e => { setQuote(q => ({ ...q, number: e.target.value })); setQuoteDirty(true) }}
+                            className="w-28 px-2 py-1 rounded border border-gray-200 text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-300" />
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold rounded-full px-2.5 py-1"
+                        style={{ background: statusMeta.bg, color: statusMeta.color }}>
+                        {statusMeta.label}
+                      </span>
                     )}
-                  </button>
+                  </div>
                   {quoteExpanded && (
                     <div className="flex items-center gap-3">
                       {quoteDirty && <span className="text-xs text-amber-600">non enregistré</span>}

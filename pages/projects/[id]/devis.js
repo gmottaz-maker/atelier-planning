@@ -76,7 +76,7 @@ export default function DevisPage() {
   const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
   const today = new Date()
-  const ref   = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(project.id).slice(-4).toUpperCase()}`
+  const ref   = project.quote_data?.number || `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(project.id).slice(-4).toUpperCase()}`
 
   // Infos entreprise (réglages) — fallback Amazing Lab si pas encore chargées
   const ci = company || {}

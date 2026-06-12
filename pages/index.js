@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
+import { quoteStatusMeta } from '../lib/quoteStatus'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
@@ -897,6 +898,15 @@ export default function Admin() {
                 <span style={{ color: '#16a34a' }}>Todoist</span>
               </>
             )}
+            {project.quote_data?.status && (() => {
+              const m = quoteStatusMeta(project.quote_data.status)
+              return (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 font-semibold"
+                  style={{ background: m.bg, color: m.color, fontSize: 11 }}>
+                  Devis · {m.label}
+                </span>
+              )
+            })()}
           </div>
 
           {/* Progress bar — bigger */}
@@ -1000,6 +1010,17 @@ export default function Admin() {
                 <span className="text-gray-400 tabular-nums">{doneCount}/{totalCount}</span>
               </span>
             )}
+
+            {/* Statut devis */}
+            {project.quote_data?.status && (() => {
+              const m = quoteStatusMeta(project.quote_data.status)
+              return (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 font-semibold"
+                  style={{ background: m.bg, color: m.color, fontSize: 11 }}>
+                  Devis · {m.label}
+                </span>
+              )
+            })()}
           </div>
         </div>
 
