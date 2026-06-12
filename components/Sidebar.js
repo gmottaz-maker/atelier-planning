@@ -6,6 +6,7 @@ import useIsAdmin from '../lib/useIsAdmin'
 const NAV_ITEMS = [
   { href: '/',                       label: 'Projets'    },
   { href: '/tasks',                  label: 'Tâches'     },
+  { href: '/planning',               label: 'Planning'   },
   { href: '/schedule',               label: 'Horaires'   },
   { href: '/meeting',                label: 'Meeting'    },
   { href: '/factures-fournisseurs',  label: 'Fact. fournisseurs', section: 'Banque', adminOnly: true },

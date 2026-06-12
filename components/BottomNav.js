@@ -26,6 +26,17 @@ const ITEMS = [
     ),
   },
   {
+    href: '/planning',
+    label: 'Planning',
+    match: (p) => p === '/planning',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M3 9h18M8 2v4M16 2v4" />
+      </svg>
+    ),
+  },
+  {
     href: '/schedule',
     label: 'Horaires',
     match: (p) => p === '/schedule',
