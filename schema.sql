@@ -20,15 +20,12 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE INDEX IF NOT EXISTS idx_projects_deadline ON projects (deadline);
 CREATE INDEX IF NOT EXISTS idx_projects_status   ON projects (status);
 
--- Activer la sécurité par ligne (Row Level Security)
--- Pour un usage interne simple, on autorise tout en public (pas de auth)
+-- Row Level Security : activée, AUCUNE policy permissive.
+-- L'accès aux données passe exclusivement par les routes API (client
+-- service-role, qui vérifient le JWT via lib/requireAdmin.js). Voir
+-- schema-security-lockdown.sql. Ne PAS ajouter de policy USING(true) :
+-- la clé anon est publique dans le bundle client.
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Accès public lecture" ON projects
-  FOR SELECT USING (true);
-
-CREATE POLICY "Accès public écriture" ON projects
-  FOR ALL USING (true);
 
 -- Données de test (optionnel — à supprimer en prod)
 INSERT INTO projects (name, client, description, deadline, delivery_type, responsible, status)

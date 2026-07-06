@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- RLS activée sans policy permissive : accès via routes API service-role.
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Acces public app_settings" ON app_settings FOR ALL USING (true);
 
 -- Valeur par défaut pour la liste des responsables de projet
 INSERT INTO app_settings (key, value)

@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- RLS activée sans policy permissive : accès via routes API service-role.
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Acces push subscriptions" ON push_subscriptions FOR ALL USING (true);

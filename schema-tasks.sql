@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- RLS activée sans policy permissive : accès via routes API service-role
+-- uniquement (voir schema-security-lockdown.sql).
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Acces public lecture tasks" ON tasks FOR SELECT USING (true);
-CREATE POLICY "Acces public ecriture tasks" ON tasks FOR ALL USING (true);

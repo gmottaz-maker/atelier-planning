@@ -7,8 +7,11 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Seule table lue côté client (par _app.js pour récupérer le nom) : on
+-- autorise la lecture aux utilisateurs connectés, rien d'autre.
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Profiles accessibles" ON profiles FOR ALL USING (true);
+CREATE POLICY "profiles_select_authenticated" ON profiles
+  FOR SELECT TO authenticated USING (true);
 
 -- ─── Journal d'activité ──────────────────────────────────────────────────────
 
@@ -23,5 +26,5 @@ CREATE TABLE IF NOT EXISTS activity_log (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- RLS activée sans policy permissive : accès via routes API service-role.
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Activite accessible" ON activity_log FOR ALL USING (true);

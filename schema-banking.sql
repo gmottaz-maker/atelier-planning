@@ -84,3 +84,22 @@ CREATE TABLE IF NOT EXISTS bank_transactions (
 CREATE INDEX IF NOT EXISTS bank_transactions_date_idx ON bank_transactions(booking_date DESC);
 CREATE INDEX IF NOT EXISTS bank_transactions_matched_idx ON bank_transactions(matched_to_type, matched_to_id);
 CREATE INDEX IF NOT EXISTS bank_transactions_unmatched_idx ON bank_transactions(booking_date DESC) WHERE matched_to_type IS NULL;
+
+-- ── Intégrité : lier paid_transaction_id → bank_transactions ──────────────────
+-- Sans cette FK, supprimer une transaction laissait des factures avec un
+-- paid_transaction_id fantôme (et parfois status='paid' sans transaction).
+-- ON DELETE SET NULL : la suppression d'une transaction remet la facture à zéro
+-- côté paiement (le status doit alors être régularisé via l'app). Idempotent.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'supplier_invoices_paid_tx_fk') THEN
+    ALTER TABLE supplier_invoices
+      ADD CONSTRAINT supplier_invoices_paid_tx_fk
+      FOREIGN KEY (paid_transaction_id) REFERENCES bank_transactions(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'customer_invoices_paid_tx_fk') THEN
+    ALTER TABLE customer_invoices
+      ADD CONSTRAINT customer_invoices_paid_tx_fk
+      FOREIGN KEY (paid_transaction_id) REFERENCES bank_transactions(id) ON DELETE SET NULL;
+  END IF;
+END $$;

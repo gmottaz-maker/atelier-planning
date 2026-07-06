@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser, ADMIN_USER } from '../../../lib/requireAdmin'
+import { withSignedReceipts, withSignedReceipt } from '../../../lib/receipts'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -36,15 +37,8 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error: error.message })
 
-    // Ajouter l'URL publique du reçu
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const rows = (data || []).map(e => ({
-      ...e,
-      receipt_url: e.receipt_path
-        ? `${url}/storage/v1/object/public/${BUCKET}/${e.receipt_path}`
-        : null,
-    }))
-
+    // URLs signées (bucket privé) au lieu d'URLs publiques devinables
+    const rows = await withSignedReceipts(supabase, data)
     return res.status(200).json(rows)
   }
 
@@ -121,13 +115,8 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error: error.message })
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    return res.status(200).json({
-      ...data,
-      receipt_url: receipt_path
-        ? `${url}/storage/v1/object/public/${BUCKET}/${receipt_path}`
-        : null,
-    })
+    const withUrl = await withSignedReceipt(supabase, data)
+    return res.status(200).json(withUrl)
   }
 
   // ── PATCH – mise à jour partielle (admin: payment_method, etc.) ──────────
