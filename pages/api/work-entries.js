@@ -1,12 +1,19 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { requireUser, ADMIN_USER } from '../../lib/requireAdmin'
 
 export default async function handler(req, res) {
+  const authUser = await requireUser(req, res)
+  if (!authUser) return
+  const isAdmin = authUser.name === ADMIN_USER
+  // Un non-admin ne peut lire/écrire que ses propres heures, quel que soit
+  // le userName envoyé par le client.
+  const ownName = (requested) => (isAdmin ? (requested || authUser.name) : authUser.name)
   const supabase = getSupabaseServer()
 
   // ── GET – list entries ────────────────────────────────────────────────────
   if (req.method === 'GET') {
-    const { userName, from, to } = req.query
-    if (!userName) return res.status(400).json({ error: 'userName requis' })
+    const { from, to } = req.query
+    const userName = ownName(req.query.userName)
 
     let query = supabase
       .from('work_entries')
@@ -24,10 +31,19 @@ export default async function handler(req, res) {
 
   // ── POST – create / update entry (upsert by user_name+date+type) ──────────
   if (req.method === 'POST') {
-    const { userName, date, type, hours, pause_hours, note, arrival_time, departure_time } = req.body
+    const { date, type, hours, pause_hours, note, arrival_time, departure_time } = req.body
+    const userName = ownName(req.body.userName)
 
     if (!userName || !date || !type) {
       return res.status(400).json({ error: 'userName, date et type requis' })
+    }
+    const h = type === 'WORK' ? parseFloat(hours) : null
+    const p = type === 'WORK' ? parseFloat(pause_hours ?? 1.0) : null
+    if (type === 'WORK' && hours != null && hours !== '' && !Number.isFinite(h)) {
+      return res.status(400).json({ error: 'hours invalide' })
+    }
+    if (type === 'WORK' && !Number.isFinite(p)) {
+      return res.status(400).json({ error: 'pause_hours invalide' })
     }
 
     const { data, error } = await supabase
@@ -37,8 +53,8 @@ export default async function handler(req, res) {
           user_name:      userName,
           date,
           type,
-          hours:          type === 'WORK' ? parseFloat(hours) || null : null,
-          pause_hours:    type === 'WORK' ? parseFloat(pause_hours ?? 1.0) : null,
+          hours:          Number.isFinite(h) ? h : null,
+          pause_hours:    p,
           arrival_time:   type === 'WORK' ? (arrival_time || null) : null,
           departure_time: type === 'WORK' ? (departure_time || null) : null,
           note:           note || null,
@@ -55,7 +71,8 @@ export default async function handler(req, res) {
 
   // ── DELETE – remove an entry by id ────────────────────────────────────────
   if (req.method === 'DELETE') {
-    const { id, userName } = req.query
+    const { id } = req.query
+    const userName = ownName(req.query.userName)
     if (!id || !userName) return res.status(400).json({ error: 'id et userName requis' })
 
     const { error } = await supabase

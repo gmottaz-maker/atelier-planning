@@ -2,8 +2,10 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 
 const supabase = getSupabaseServer()
 import { downloadStream } from '../../lib/kdrive'
+import { requireUser } from '../../lib/requireAdmin'
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   const { fileId } = req.query
   if (!fileId) return res.status(400).json({ error: 'fileId required' })
 

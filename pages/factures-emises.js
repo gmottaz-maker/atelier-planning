@@ -488,10 +488,23 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
             {error && <p className="text-xs text-red-500">{error}</p>}
 
             {isEdit && (
-              <a href={`/api/customer-invoices/${invoice.id}/pdf`} target="_blank" rel="noopener"
+              <button type="button" onClick={async () => {
+                // Fetch authentifié (JWT injecté dans _app.js) puis ouverture en blob :
+                // un <a href> direct n'enverrait pas le token et prendrait un 401.
+                try {
+                  const r = await fetch(`/api/customer-invoices/${invoice.id}/pdf`)
+                  if (!r.ok) throw new Error(`Erreur ${r.status}`)
+                  const blob = await r.blob()
+                  const url = URL.createObjectURL(blob)
+                  window.open(url, '_blank', 'noopener')
+                  setTimeout(() => URL.revokeObjectURL(url), 60000)
+                } catch (e) {
+                  alert('Téléchargement du PDF impossible : ' + e.message)
+                }
+              }}
                 className="block w-full text-center px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400">
                 📄 Télécharger le PDF avec QR-bill
-              </a>
+              </button>
             )}
           </div>
 

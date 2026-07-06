@@ -1,3 +1,4 @@
+import { requireUser } from '../../../lib/requireAdmin'
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
 /**
@@ -6,6 +7,7 @@ export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
  * Returns: { date, amount, currency, merchant, category }
  */
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { image, mimeType } = req.body

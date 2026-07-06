@@ -3,18 +3,21 @@ import { requireAdmin } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
-// Génère un n° de facture séquentiel par année (ex: 2026-001)
+// Génère un n° de facture séquentiel par année (ex: 2026-001).
+// Max calculé numériquement (un tri texte classerait "999" après "1000") ;
+// la course entre deux POST simultanés est rattrapée par la contrainte
+// UNIQUE + retry dans le handler.
 async function nextInvoiceNumber(year) {
   const { data } = await supabase
     .from('customer_invoices')
     .select('invoice_number')
     .like('invoice_number', `${year}-%`)
-    .order('invoice_number', { ascending: false })
-    .limit(1)
-  if (!data || data.length === 0) return `${year}-001`
-  const last = data[0].invoice_number
-  const seq  = parseInt(last.split('-')[1] || '0', 10) + 1
-  return `${year}-${String(seq).padStart(3, '0')}`
+  let maxSeq = 0
+  for (const row of data || []) {
+    const n = parseInt(row.invoice_number.split('-')[1] || '0', 10)
+    if (Number.isFinite(n) && n > maxSeq) maxSeq = n
+  }
+  return `${year}-${String(maxSeq + 1).padStart(3, '0')}`
 }
 
 // Génère une référence QR-bill (26 chiffres + 1 chiffre checksum = 27 chiffres)
@@ -33,7 +36,7 @@ function qrReference(invoiceNumber, projectId) {
 }
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
   if (req.method === 'GET') {
     const { status, year } = req.query
     let q = supabase.from('customer_invoices').select('*, projects(name, client)').order('issue_date', { ascending: false })
@@ -51,28 +54,41 @@ export default async function handler(req, res) {
     } = req.body
 
     if (!client_name || amount == null) return res.status(400).json({ error: 'client_name et amount requis' })
+    const amountNum = parseFloat(amount)
+    if (!Number.isFinite(amountNum) || amountNum < 0) {
+      return res.status(400).json({ error: 'Montant invalide' })
+    }
 
     const year = (issue_date || new Date().toISOString().slice(0, 10)).slice(0, 4)
-    const invoice_number = await nextInvoiceNumber(year)
-    const qr_reference = qrReference(invoice_number, project_id)
 
-    const { data, error } = await supabase.from('customer_invoices').insert({
-      project_id: project_id || null,
-      invoice_number,
-      client_name,
-      client_address,
-      amount: parseFloat(amount),
-      amount_net: amount_net != null && amount_net !== '' ? parseFloat(amount_net) : null,
-      vat_rate:   vat_rate   != null && vat_rate   !== '' ? parseFloat(vat_rate)   : null,
-      vat_amount: vat_amount != null && vat_amount !== '' ? parseFloat(vat_amount) : null,
-      currency: currency || 'CHF',
-      issue_date: issue_date || new Date().toISOString().slice(0, 10),
-      due_date: due_date || null,
-      iban_recipient: iban_recipient || process.env.AMAZING_LAB_IBAN || null,
-      qr_reference,
-      quote_snapshot: quote_snapshot || null,
-      notes,
-    }).select().single()
+    // Deux tentatives : si un POST concurrent a pris le même numéro
+    // (violation UNIQUE 23505), on recalcule et on réessaie une fois.
+    let data = null
+    let error = null
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const invoice_number = await nextInvoiceNumber(year)
+      const qr_reference = qrReference(invoice_number, project_id)
+
+      ;({ data, error } = await supabase.from('customer_invoices').insert({
+        project_id: project_id || null,
+        invoice_number,
+        client_name,
+        client_address,
+        amount: amountNum,
+        amount_net: amount_net != null && amount_net !== '' ? parseFloat(amount_net) : null,
+        vat_rate:   vat_rate   != null && vat_rate   !== '' ? parseFloat(vat_rate)   : null,
+        vat_amount: vat_amount != null && vat_amount !== '' ? parseFloat(vat_amount) : null,
+        currency: currency || 'CHF',
+        issue_date: issue_date || new Date().toISOString().slice(0, 10),
+        due_date: due_date || null,
+        iban_recipient: iban_recipient || process.env.AMAZING_LAB_IBAN || null,
+        qr_reference,
+        quote_snapshot: quote_snapshot || null,
+        notes,
+      }).select().single())
+
+      if (!error || error.code !== '23505') break
+    }
 
     if (error) return res.status(500).json({ error: error.message })
     return res.status(201).json(data)

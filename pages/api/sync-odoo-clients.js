@@ -1,4 +1,6 @@
-import { supabase } from '../../lib/supabase'
+import { getSupabaseServer } from '../../lib/supabase-server'
+const supabase = getSupabaseServer()
+import { getVerifiedUser } from '../../lib/requireAdmin'
 
 const ODOO_URL = process.env.ODOO_URL          // ex: https://amazing-lab.odoo.com
 const ODOO_DB  = process.env.ODOO_DB           // ex: amazing-lab
@@ -53,9 +55,10 @@ async function authenticate() {
 }
 
 export default async function handler(req, res) {
-  // Vérifier le secret (appelé depuis Vercel Cron ou manuellement)
+  // Vérifier le secret (Vercel Cron) ou un utilisateur connecté (déclenchement manuel)
   const auth = req.headers.authorization
-  if (CRON_SECRET && auth !== `Bearer ${CRON_SECRET}`) {
+  const isCron = !!CRON_SECRET && auth === `Bearer ${CRON_SECRET}`
+  if (!isCron && !(await getVerifiedUser(req))) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 

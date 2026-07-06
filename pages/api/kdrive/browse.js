@@ -1,9 +1,11 @@
 import { listDir } from '../../../lib/kdrive'
+import { requireUser } from '../../../lib/requireAdmin'
 
 // id du dossier "02. Projets" — racine par défaut
 const PROJECTS_ROOT_ID = 11480
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   const parentId = req.query.parentId ? Number(req.query.parentId) : PROJECTS_ROOT_ID
   try {
     const items = await listDir(parentId, 1, 200)

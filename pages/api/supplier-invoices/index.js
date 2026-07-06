@@ -7,7 +7,7 @@ const supabase = getSupabaseServer()
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
   // ── GET : liste ────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
     const { status, year } = req.query

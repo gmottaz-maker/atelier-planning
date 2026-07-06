@@ -2,10 +2,12 @@
 // Pour la sécurité minimum, on vérifie que le fichier id est référencé quelque part en DB.
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { downloadStream } from '../../../lib/kdrive'
+import { requireUser } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   const { fileId } = req.query
   if (!fileId) return res.status(400).end()
   const id = Number(fileId)

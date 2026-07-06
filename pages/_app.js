@@ -18,6 +18,40 @@ const PUBLIC_ROUTES = ['/login', '/display']
 const NO_CHROME_ROUTES = ['/login', '/display', '/projects/[id]/devis']
 const PINK = '#111827'
 
+// ─── Auth des appels API ─────────────────────────────────────────────────────
+// Toutes les routes /api/* vérifient désormais le JWT Supabase côté serveur.
+// On injecte le token une seule fois ici (couvre fetch direct, SWR, adminFetch)
+// plutôt que de modifier chaque call-site.
+// Le cookie sert aux requêtes qui ne passent pas par fetch (<img src>, <a href>
+// vers /api/kdrive/thumbnail, /api/update-image, PDF…) : SameSite=Lax bloque
+// les POST cross-site, et le token est déjà accessible au JS via localStorage
+// donc le cookie n'élargit pas la surface XSS.
+function syncAuthCookie(session) {
+  const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+  if (session?.access_token) {
+    document.cookie = `sb-access-token=${session.access_token}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax${secure}`
+  } else {
+    document.cookie = 'sb-access-token=; Path=/; Max-Age=0'
+  }
+}
+if (typeof window !== 'undefined' && !window.__mazeAuthFetchInstalled) {
+  window.__mazeAuthFetchInstalled = true
+  const origFetch = window.fetch.bind(window)
+  window.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : (input?.url || '')
+    if (url.startsWith('/api/')) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          init = { ...(init || {}) }
+          init.headers = { ...(init.headers || {}), Authorization: `Bearer ${session.access_token}` }
+        }
+      } catch (_) { /* pas de session → la route répondra 401 */ }
+    }
+    return origFetch(input, init)
+  }
+}
+
 async function fetchProfile(userId) {
   const { data } = await supabase.from('profiles').select('name').eq('id', userId).single()
   return data
@@ -50,6 +84,7 @@ export default function App({ Component, pageProps }) {
     // suite l'app avec le nom issu des métadonnées de session (déjà en local),
     // puis on rafraîchit le nom depuis `profiles` en arrière-plan.
     function applySession(session) {
+      syncAuthCookie(session)
       if (!session) { setUser(null); return }
       const fallbackName = session.user.user_metadata?.name || session.user.email
       setUser(prev =>
@@ -94,7 +129,7 @@ export default function App({ Component, pageProps }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return
       if (session) applySession(session)
-      else setUser(null)
+      else { syncAuthCookie(null); setUser(null) }
     })
 
     return () => { cancelled = true; clearTimeout(timer); subscription.unsubscribe() }

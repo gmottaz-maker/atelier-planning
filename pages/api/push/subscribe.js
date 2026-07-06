@@ -1,6 +1,9 @@
-import { supabase } from '../../../lib/supabase'
+import { getSupabaseServer } from '../../../lib/supabase-server'
+const supabase = getSupabaseServer()
+import { requireUser } from '../../../lib/requireAdmin'
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   if (req.method !== 'POST') return res.status(405).end()
 
   const { subscription, user } = req.body

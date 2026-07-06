@@ -1,14 +1,19 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { requireUser, ADMIN_USER } from '../../lib/requireAdmin'
 
 export default async function handler(req, res) {
+  const authUser = await requireUser(req, res)
+  if (!authUser) return
+  const isAdmin = authUser.name === ADMIN_USER
+  const ownName = (requested) => (isAdmin ? (requested || authUser.name) : authUser.name)
   const supabase = getSupabaseServer()
   const year = parseInt(req.query.year) || new Date().getFullYear()
 
   // GET – settings for one user (or all users for admin)
   if (req.method === 'GET') {
-    const { userName } = req.query
+    const userName = ownName(req.query.userName)
 
-    if (!userName) {
+    if (!userName || (isAdmin && !req.query.userName)) {
       // Admin: return all users' settings for the year
       const { data, error } = await supabase
         .from('work_settings')
@@ -42,7 +47,8 @@ export default async function handler(req, res) {
 
   // POST – upsert settings
   if (req.method === 'POST') {
-    const { userName, vacation_days, weekly_hours, off_days } = req.body
+    const { vacation_days, weekly_hours, off_days } = req.body
+    const userName = ownName(req.body.userName)
 
     if (!userName) return res.status(400).json({ error: 'userName requis' })
 

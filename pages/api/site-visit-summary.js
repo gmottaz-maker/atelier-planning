@@ -1,4 +1,6 @@
+import { requireUser } from '../../lib/requireAdmin'
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   if (req.method !== 'POST') return res.status(405).end()
 
   const { visitData, projectName } = req.body

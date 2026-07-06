@@ -6,7 +6,7 @@ const supabase = getSupabaseServer()
 const BUCKET = 'receipts'
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
   if (req.method !== 'GET') return res.status(405).end()
 
   const { year, payment_method } = req.query

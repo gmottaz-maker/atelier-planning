@@ -1,5 +1,7 @@
-import { supabase } from '../../../lib/supabase'
+import { getSupabaseServer } from '../../../lib/supabase-server'
+const supabase = getSupabaseServer()
 import webpush from 'web-push'
+import { getVerifiedUser } from '../../../lib/requireAdmin'
 
 webpush.setVapidDetails(
   'mailto:hello@amazinglab.ch',
@@ -8,11 +10,12 @@ webpush.setVapidDetails(
 )
 
 export default async function handler(req, res) {
-  // Sécurité : uniquement depuis Vercel Cron ou avec le secret
+  // Sécurité : Vercel Cron (secret) ou utilisateur connecté (test manuel).
+  // L'ancien GET sans auth permettait à n'importe qui de spammer l'équipe.
   const authHeader = req.headers.authorization
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && req.method !== 'GET') {
-    // Allow GET without auth for manual testing (dev only) — in prod the cron sends POST with secret
-    if (req.method !== 'GET') return res.status(401).json({ error: 'Unauthorized' })
+  const isCron = !!process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`
+  if (!isCron && !(await getVerifiedUser(req))) {
+    return res.status(401).json({ error: 'Unauthorized' })
   }
 
   const today = new Date().toISOString().split('T')[0]

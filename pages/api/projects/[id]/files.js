@@ -2,12 +2,14 @@ import { getSupabaseServer } from '../../../../lib/supabase-server'
 
 const supabase = getSupabaseServer()
 import { ensureProjectFolder, upload, del } from '../../../../lib/kdrive'
+import { requireUser } from '../../../../lib/requireAdmin'
 
 const MAX_SIZE_MB = 20
 
 export const config = { api: { bodyParser: { sizeLimit: '27mb' } } }
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   const { id } = req.query
 
   // ── GET: liste des fichiers du projet ──────────────────────────────────────

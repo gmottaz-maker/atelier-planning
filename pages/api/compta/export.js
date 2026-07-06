@@ -18,7 +18,7 @@ function fmt(n) {
 }
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
   const { from, to, mode } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from et to (YYYY-MM-DD) requis' })
 

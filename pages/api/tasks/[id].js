@@ -1,13 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireUser } from '../../../lib/requireAdmin'
 import { notifyTeam } from '../../../lib/push-server'
 import * as todoist from '../../../lib/todoist'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-}
 
 async function maybeNotifyTransition(prev, next, actor) {
   if (!next?.category) return
@@ -57,9 +51,11 @@ async function logActivity(supabase, actor, action, task) {
 }
 
 export default async function handler(req, res) {
-  const supabase = getSupabase()
+  const user = await requireUser(req, res)
+  if (!user) return
+  const supabase = getSupabaseServer()
   const { id } = req.query
-  const actor = req.headers['x-actor'] || null
+  const actor = user.name
 
   if (req.method === 'PUT') {
     // Strip any nested join data (e.g. projects) sent from the client

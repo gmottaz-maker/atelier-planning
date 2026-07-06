@@ -1,9 +1,11 @@
 import { getSupabaseServer } from '../../../../lib/supabase-server'
 import { listDir } from '../../../../lib/kdrive'
+import { requireUser } from '../../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   const { id, folderId } = req.query
 
   let targetFolder

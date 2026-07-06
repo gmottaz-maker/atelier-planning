@@ -1,4 +1,5 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireUser } from '../../../lib/requireAdmin'
 
 const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
@@ -18,6 +19,7 @@ const DEFAULTS = {
 }
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   const { key } = req.query
   if (!key) return res.status(400).json({ error: 'key requis' })
 

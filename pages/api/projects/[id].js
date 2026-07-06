@@ -1,4 +1,5 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireUser } from '../../../lib/requireAdmin'
 
 async function logActivity(actor, action, project) {
   if (!actor) return
@@ -16,9 +17,11 @@ async function logActivity(actor, action, project) {
 }
 
 export default async function handler(req, res) {
+  const user = await requireUser(req, res)
+  if (!user) return
   const supabase = getSupabaseServer()
   const { id } = req.query
-  const actor = req.headers['x-actor'] || null
+  const actor = user.name
 
   if (req.method === 'GET') {
     const { data, error } = await supabase

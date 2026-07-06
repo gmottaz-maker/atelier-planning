@@ -1,6 +1,8 @@
 import { thumbnailStream } from '../../../lib/kdrive'
+import { requireUser } from '../../../lib/requireAdmin'
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   const { fileId } = req.query
   if (!fileId) return res.status(400).end()
   try {

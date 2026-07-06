@@ -1,11 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+// Webhook Todoist : authentifié par secret d'URL (TODOIST_WEBHOOK_SECRET),
+// pas par JWT utilisateur. Client service-role pour ne pas dépendre de RLS.
+import { getSupabaseServer } from '../../lib/supabase-server'
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
-}
+const getSupabase = getSupabaseServer
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

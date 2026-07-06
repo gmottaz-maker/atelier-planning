@@ -1,6 +1,9 @@
-import { supabase } from '../../../lib/supabase'
+import { getSupabaseServer } from '../../../lib/supabase-server'
+const supabase = getSupabaseServer()
+import { requireUser } from '../../../lib/requireAdmin'
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('activity_log')

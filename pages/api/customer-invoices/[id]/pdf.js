@@ -1,7 +1,8 @@
 // Génère un PDF de facture A4 avec QR-bill suisse au pied de page.
-// Note: pas de requireAdmin car le PDF est ouvert via <a href>, le browser n'envoie pas
-// le header x-actor. La protection est faite côté UI (lien non rendu pour non-admin).
+// Auth requise : le client télécharge le PDF via fetch (le JWT est injecté
+// globalement dans _app.js) puis l'ouvre en blob — plus de lien direct ouvert.
 import { getSupabaseServer } from '../../../../lib/supabase-server'
+import { requireAdmin } from '../../../../lib/requireAdmin'
 import PDFDocument from 'pdfkit'
 import { SwissQRBill } from 'swissqrbill/pdf'
 
@@ -17,6 +18,7 @@ function fmtDate(s) {
 }
 
 export default async function handler(req, res) {
+  if (!(await requireAdmin(req, res))) return
   const { id } = req.query
 
   const { data: inv, error } = await supabase

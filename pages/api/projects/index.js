@@ -1,4 +1,5 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireUser } from '../../../lib/requireAdmin'
 
 async function logActivity(actor, action, project) {
   if (!actor) return
@@ -17,8 +18,9 @@ async function logActivity(actor, action, project) {
 
 export default async function handler(req, res) {
   const supabase = getSupabaseServer()
-  const actor = req.headers['x-actor'] || null
 
+  // GET laissé sans auth : l'écran mural /display (page publique, TV atelier)
+  // liste les projets sans session. Toutes les mutations exigent un JWT.
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('projects')
@@ -27,6 +29,10 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)
   }
+
+  const user = await requireUser(req, res)
+  if (!user) return
+  const actor = user.name
 
   if (req.method === 'POST') {
     const {

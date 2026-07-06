@@ -4,7 +4,7 @@ import { requireAdmin } from '../../../lib/requireAdmin'
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
   const { id } = req.query
 
   if (req.method === 'GET') {

@@ -1,4 +1,5 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireUser } from '../../../lib/requireAdmin'
 
 const FIELDS = {
   vendor:        { category: 'commande',       jsonKey: 'vendor' },
@@ -7,6 +8,7 @@ const FIELDS = {
 }
 
 export default async function handler(req, res) {
+  if (!(await requireUser(req, res))) return
   if (req.method !== 'GET') return res.status(405).end()
 
   const field = String(req.query.field || '')

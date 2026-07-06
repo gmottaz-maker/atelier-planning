@@ -6,7 +6,7 @@ const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end()
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
 
   const { status, suggestions } = req.query  // status: 'all'|'matched'|'unmatched', suggestions: '1'
 

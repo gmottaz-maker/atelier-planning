@@ -1,15 +1,26 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
+import { requireUser, ADMIN_USER } from '../../../lib/requireAdmin'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
 const BUCKET = 'receipts'
 
 export default async function handler(req, res) {
+  const authUser = await requireUser(req, res)
+  if (!authUser) return
+  const isAdmin = authUser.name === ADMIN_USER
+  // Un non-admin ne peut agir que sur ses propres frais, quel que soit le
+  // userName envoyé par le client.
+  const ownName = (requested) => {
+    if (isAdmin) return requested || authUser.name
+    return authUser.name
+  }
   const supabase = getSupabaseServer()
 
   // ── GET – liste des frais ────────────────────────────────────────────────
   if (req.method === 'GET') {
-    const { userName, year } = req.query
+    const { year } = req.query
+    const userName = ownName(req.query.userName)
     if (!userName) return res.status(400).json({ error: 'userName requis' })
     const y    = year || new Date().getFullYear()
     const from = `${y}-01-01`
@@ -40,13 +51,17 @@ export default async function handler(req, res) {
   // ── POST – créer un frais ─────────────────────────────────────────────────
   if (req.method === 'POST') {
     const {
-      userName, date, amount, amount_net, vat_rate, vat_amount, vat_breakdown,
+      date, amount, amount_net, vat_rate, vat_amount, vat_breakdown,
       currency, category,
       merchant, description, receiptBase64, receiptMimeType,
       payment_method, force,
     } = req.body
+    const userName = ownName(req.body.userName)
 
     if (!userName || !date) return res.status(400).json({ error: 'userName et date requis' })
+    if (amount != null && !Number.isFinite(parseFloat(amount))) {
+      return res.status(400).json({ error: 'Montant invalide' })
+    }
 
     // ── Détection de doublon (même date + montant + utilisateur, ±1 jour) ───
     if (!force && amount != null) {
@@ -117,18 +132,22 @@ export default async function handler(req, res) {
 
   // ── PATCH – mise à jour partielle (admin: payment_method, etc.) ──────────
   if (req.method === 'PATCH') {
-    const { id, userName } = req.query
+    const { id } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
     const allowed = ['payment_method', 'category', 'description', 'amount', 'amount_net',
                      'vat_rate', 'vat_amount', 'vat_breakdown', 'merchant', 'date']
     const payload = {}
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
     for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount']) {
-      if (payload[k] != null) payload[k] = parseFloat(payload[k])
+      if (payload[k] != null) {
+        payload[k] = parseFloat(payload[k])
+        if (!Number.isFinite(payload[k])) return res.status(400).json({ error: `${k} invalide` })
+      }
     }
 
     let q = supabase.from('expenses').update(payload).eq('id', id)
-    if (userName) q = q.eq('user_name', userName)
+    // L'admin peut éditer tous les frais ; les autres uniquement les leurs
+    if (!isAdmin) q = q.eq('user_name', authUser.name)
     const { data, error } = await q.select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)
@@ -136,7 +155,8 @@ export default async function handler(req, res) {
 
   // ── DELETE – supprimer un frais ───────────────────────────────────────────
   if (req.method === 'DELETE') {
-    const { id, userName } = req.query
+    const { id } = req.query
+    const userName = ownName(req.query.userName)
     if (!id || !userName) return res.status(400).json({ error: 'id et userName requis' })
 
     // Récupérer le chemin du fichier pour le supprimer
