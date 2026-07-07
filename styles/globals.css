@@ -8,7 +8,10 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Refonte « Dashboard unifié » : Space Grotesk pour tout le texte UI */
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: #241a20;
+  background: #fdfcfc;
 }
 
 /* Scrollbar styling for dark display page */
