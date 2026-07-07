@@ -2,24 +2,20 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
 import Link from 'next/link'
-import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
 import { useGoogleCalendar } from '../lib/googleCalendar'
+import { C, FONT, MONO, personChip, initials } from '../lib/theme'
 
-const PERSON_COLORS = { Arnaud: '#3b82f6', Gabin: '#8b5cf6', Guillaume: '#111827', 'Sous-traitant': '#64748b', 'non défini': '#9ca3af' }
 function colorForName(name) {
-  if (!name) return '#9ca3af'
-  if (PERSON_COLORS[name]) return PERSON_COLORS[name]
+  const chip = personChip(name)
+  if (chip.fg !== C.inkSecondary) return chip.fg
+  if (!name) return C.muted
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   return `hsl(${Math.abs(hash) % 360}, 45%, 48%)`
 }
-function initials(name) {
-  if (!name) return '?'
-  return name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
-}
 
-const DAYS_FR   = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+const DAYS_FR   = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM']
 const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
 
 function startOfWeek(d) {
@@ -34,10 +30,10 @@ function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 function isSameDay(a, b) { return ymd(a) === ymd(b) }
 
 function weekLabel(monday) {
-  const sunday = addDays(monday, 6)
-  const m1 = MONTHS_FR[monday.getMonth()], m2 = MONTHS_FR[sunday.getMonth()]
-  if (m1 === m2) return `${monday.getDate()} – ${sunday.getDate()} ${m1} ${sunday.getFullYear()}`
-  return `${monday.getDate()} ${m1} – ${sunday.getDate()} ${m2} ${sunday.getFullYear()}`
+  const friday = addDays(monday, 4)
+  const m1 = MONTHS_FR[monday.getMonth()], m2 = MONTHS_FR[friday.getMonth()]
+  if (m1 === m2) return `${monday.getDate()} – ${friday.getDate()} ${m1} ${friday.getFullYear()}`
+  return `${monday.getDate()} ${m1} – ${friday.getDate()} ${m2} ${friday.getFullYear()}`
 }
 
 export default function Planning() {
@@ -46,7 +42,7 @@ export default function Planning() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const days  = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const days  = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i))  // lun–ven
   const weekKeys = days.map(ymd)
 
   // Personnes affichées : responsables réels (on garde "non défini" en ligne séparée à la fin)
@@ -66,13 +62,7 @@ export default function Planning() {
     .filter(p => !people.includes(p))
   const rows = [...people, ...otherPeople]
 
-  const GRID = { display: 'grid', gridTemplateColumns: `150px repeat(7, minmax(150px, 1fr))` }
-
-  function cellTint(n) {
-    if (n >= 5) return '#fef2f2'   // rouge clair — surcharge
-    if (n >= 3) return '#fffbeb'   // ambre clair — charge
-    return 'transparent'
-  }
+  const GRID = { display: 'grid', gridTemplateColumns: `156px repeat(5, minmax(0, 1fr))` }
 
   // ── Google Agenda (lecture + écriture d'événements) ──────────────────────
   const gcal = useGoogleCalendar()
@@ -112,170 +102,155 @@ export default function Planning() {
     return d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })
   }
 
+  const dayHeader = (d, i) => {
+    const isToday = isSameDay(d, today)
+    return (
+      <div key={i} style={{ padding: '12px 8px 10px', textAlign: 'center', borderLeft: `1px solid ${C.divider}`, background: isToday ? C.accentBg : 'transparent' }}>
+        <div style={{ font: `600 10px ${MONO}`, letterSpacing: '.1em', color: isToday ? C.accent : C.muted }}>{DAYS_FR[i]}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: isToday ? C.accent : C.ink }}>{d.getDate()}</div>
+      </div>
+    )
+  }
+  const taskCard = (t) => {
+    const done = t.status === 'completed'
+    const proj = t.projects
+    const dot = done ? C.success : (proj?.color_override || colorForName(t.responsible))
+    const inner = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 5, minWidth: 0, background: done ? '#faf7f8' : C.surface, border: `1px solid ${C.divider}` }}
+        title={`${t.title}${proj ? ' · ' + proj.name : ''}`}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flex: 'none' }} />
+        <span style={{ fontSize: 11, color: done ? C.faint : C.inkTertiary, textDecoration: done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+      </div>
+    )
+    return proj?.id
+      ? <Link key={t.id} href={`/projects/${proj.id}`} style={{ display: 'block', textDecoration: 'none' }}>{inner}</Link>
+      : <div key={t.id}>{inner}</div>
+  }
+
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head><title>Planning — Maze Project</title></Head>
 
-      <NavBar title="Planning">
-        <div className="flex items-center gap-1">
-          <button onClick={() => setWeekStart(w => addDays(w, -7))}
-            className="w-8 h-8 flex items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50">‹</button>
-          <button onClick={() => setWeekStart(startOfWeek(new Date()))}
-            className="px-3 h-8 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">Cette semaine</button>
-          <button onClick={() => setWeekStart(w => addDays(w, 7))}
-            className="w-8 h-8 flex items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50">›</button>
-        </div>
-      </NavBar>
-
-      <main className="w-full px-4 md:px-10 py-6 md:py-10" style={{ maxWidth: 1500, margin: '0 auto' }}>
-        <div className="flex items-baseline gap-3 mb-6">
-          <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>Capacité de la semaine</h2>
-          <span className="text-gray-400" style={{ fontSize: 15 }}>{weekLabel(weekStart)}</span>
+      <main style={{ maxWidth: 1280, margin: '0 auto', padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, borderBottom: `1px solid ${C.border}`, paddingBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 23, fontWeight: 700, letterSpacing: '-.4px' }}>Capacité de la semaine</span>
+            <span style={{ font: `11.5px ${MONO}`, color: C.muted }}>{weekLabel(weekStart).toUpperCase()} · PAR DEMI-JOURNÉE</span>
+          </div>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden', font: `600 12.5px ${FONT}` }}>
+            <button onClick={() => setWeekStart(w => addDays(w, -7))} style={{ padding: '7px 12px', color: C.inkSecondary, borderRight: `1px solid ${C.border}`, background: C.surface, border: 'none', cursor: 'pointer' }}>‹</button>
+            <button onClick={() => setWeekStart(startOfWeek(new Date()))} style={{ padding: '7px 14px', background: C.ink, color: '#fff', border: 'none', cursor: 'pointer' }}>Cette semaine</button>
+            <button onClick={() => setWeekStart(w => addDays(w, 7))} style={{ padding: '7px 12px', color: C.inkSecondary, borderLeft: `1px solid ${C.border}`, background: C.surface, border: 'none', cursor: 'pointer' }}>›</button>
+          </div>
         </div>
 
         {isLoading && tasks.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400 text-sm">Chargement…</div>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 40, textAlign: 'center', color: C.muted, fontSize: 13 }}>Chargement…</div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-            <div style={{ minWidth: 150 + 7 * 150 }}>
-              {/* En-tête jours */}
-              <div style={GRID} className="border-b border-gray-100">
-                <div className="px-3 py-2.5" />
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            {/* En-tête jours */}
+            <div style={{ ...GRID, borderBottom: `1px solid ${C.divider}` }}>
+              <div />
+              {days.map(dayHeader)}
+            </div>
+
+            {/* Lignes personnes */}
+            {rows.length === 0 ? (
+              <div style={{ padding: '40px 16px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Aucune tâche planifiée cette semaine.</div>
+            ) : rows.map(person => (
+              <div key={person} style={{ ...GRID, borderBottom: `1px solid ${C.divider}` }}>
+                {/* Cellule personne + gouttière AM/PM */}
+                <div style={{ display: 'flex', alignItems: 'stretch', borderRight: `1px solid ${C.divider}` }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 6px 12px 14px', minWidth: 0 }}>
+                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: colorForName(person), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>{initials(person)}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person}</span>
+                      <span style={{ font: `9.5px ${MONO}`, color: C.muted }}>{weekCountActive(person)} TÂCHE{weekCountActive(person) > 1 ? 'S' : ''}</span>
+                    </div>
+                  </div>
+                  <div style={{ width: 26, flex: 'none', display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `8.5px ${MONO}`, color: C.faintBorder, borderBottom: '1px dashed #eee0e5' }}>AM</span>
+                    <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `8.5px ${MONO}`, color: C.faintBorder }}>PM</span>
+                  </div>
+                </div>
+
+                {/* Cellules jours (AM = tâches, PM vide — pas de données demi-journée) */}
                 {days.map((d, i) => {
+                  const cellTasks = tasksFor(person, weekKeys[i])
                   const isToday = isSameDay(d, today)
                   return (
-                    <div key={i} className="px-3 py-2.5 text-center border-l border-gray-100"
-                      style={{ background: isToday ? '#eff6ff' : 'transparent' }}>
-                      <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: isToday ? '#1d4ed8' : '#9ca3af' }}>{DAYS_FR[i]}</div>
-                      <div className="text-sm font-semibold tabular-nums" style={{ color: isToday ? '#1d4ed8' : '#374151' }}>{d.getDate()}</div>
+                    <div key={i} style={{ borderLeft: `1px solid ${C.divider}`, background: isToday ? '#fdf4f6' : 'transparent', display: 'flex', flexDirection: 'column', minHeight: 100 }}>
+                      <div style={{ flex: 1, padding: 6, display: 'flex', flexDirection: 'column', gap: 4, borderBottom: '1px dashed #eee0e5', minHeight: 44 }}>
+                        {cellTasks.map(taskCard)}
+                      </div>
+                      <div style={{ flex: 1, padding: 6, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44 }} />
                     </div>
                   )
                 })}
               </div>
-
-              {/* Lignes personnes */}
-              {rows.length === 0 ? (
-                <div className="px-4 py-10 text-center text-gray-400 text-sm">Aucune tâche planifiée cette semaine.</div>
-              ) : rows.map(person => (
-                <div key={person} style={GRID} className="border-b border-gray-50 last:border-0">
-                  {/* Label personne */}
-                  <div className="px-3 py-3 flex items-center gap-2 border-r border-gray-100">
-                    <span className="w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
-                      style={{ background: colorForName(person), fontSize: 11 }}>{initials(person)}</span>
-                    <div className="min-w-0">
-                      <div className="font-medium text-gray-900 truncate" style={{ fontSize: 13 }}>{person}</div>
-                      <div className="text-gray-400" style={{ fontSize: 11 }}>{weekCountActive(person)} tâche{weekCountActive(person) > 1 ? 's' : ''}</div>
-                    </div>
-                  </div>
-
-                  {/* Cellules jours */}
-                  {days.map((d, i) => {
-                    const dayKey = weekKeys[i]
-                    const cellTasks = tasksFor(person, dayKey)
-                    const activeN = cellTasks.filter(t => t.status !== 'completed').length
-                    return (
-                      <div key={i} className="px-1.5 py-1.5 border-l border-gray-100 space-y-1 align-top"
-                        style={{ background: isSameDay(d, today) ? '#f8faff' : cellTint(activeN), minHeight: 56 }}>
-                        {cellTasks.map(t => {
-                          const done = t.status === 'completed'
-                          const proj = t.projects
-                          const dot = proj?.color_override || colorForName(t.responsible)
-                          const chip = (
-                            <div className="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-gray-100 transition-colors"
-                              style={{ background: '#f9fafb' }} title={`${t.title}${proj ? ' · ' + proj.name : ''}`}>
-                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dot }} />
-                              <span className={`truncate ${done ? 'line-through text-gray-400' : 'text-gray-700'}`} style={{ fontSize: 11.5 }}>{t.title}</span>
-                            </div>
-                          )
-                          return proj?.id
-                            ? <Link key={t.id} href={`/projects/${proj.id}`} className="block">{chip}</Link>
-                            : <div key={t.id}>{chip}</div>
-                        })}
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         )}
 
-        <p className="text-xs text-gray-400 mt-4">
-          Charge basée sur les tâches datées (date d'exécution). <span style={{ color: '#b45309' }}>■</span> 3+ tâches · <span style={{ color: '#dc2626' }}>■</span> 5+ tâches dans la journée.
-        </p>
+        <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>CHAQUE JOUR = MATIN / APRÈS-MIDI · UNE CARTE = UN PROJET · COLONNE ROSE = AUJOURD'HUI</span>
 
         {/* ── Agenda Google ── */}
-        <div className="mt-10">
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-gray-900" style={{ fontSize: 18 }}>Agenda Google</h3>
-              {gcal.connected && <span className="text-xs text-gray-400">{gcal.calendars.length} agenda(s)</span>}
-            </div>
-            <div className="flex items-center gap-2">
-              {gcal.error && <span className="text-xs text-red-600 max-w-xs truncate" title={gcal.error}>{gcal.error}</span>}
-              {gcal.connected ? (
-                <button onClick={loadEvents} className="px-3 py-1.5 rounded-md border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Rafraîchir</button>
-              ) : (
-                <button onClick={() => gcal.connect()} disabled={gcal.connecting}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-50" style={{ background: '#111827' }}>
-                  {gcal.connecting ? 'Connexion…' : 'Connecter Google Agenda'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {!gcal.connected ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-              Connecte ton compte Google pour voir et gérer tes événements ici. Tout reste synchronisé avec ton agenda (Mac, téléphone…).
-            </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>Agenda Google</span>
+          {gcal.connected && <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>{gcal.calendars.length} AGENDA{gcal.calendars.length > 1 ? 'S' : ''}</span>}
+          <div style={{ flex: 1 }} />
+          {gcal.error && <span style={{ fontSize: 11, color: C.danger, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={gcal.error}>{gcal.error}</span>}
+          {gcal.connected ? (
+            <button onClick={loadEvents} style={{ font: `11px ${MONO}`, color: C.inkSecondary, border: `1px solid ${C.border}`, padding: '4px 11px', borderRadius: 99, background: 'transparent', cursor: 'pointer' }}>↻ RAFRAÎCHIR</button>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-              <div style={{ minWidth: 150 + 7 * 150 }}>
-                <div style={GRID} className="border-b border-gray-100">
-                  <div className="px-3 py-2.5 text-xs font-semibold text-gray-400 flex items-center">Événements</div>
-                  {days.map((d, i) => {
-                    const isToday = isSameDay(d, today)
-                    return (
-                      <div key={i} className="px-3 py-2.5 text-center border-l border-gray-100" style={{ background: isToday ? '#eff6ff' : 'transparent' }}>
-                        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: isToday ? '#1d4ed8' : '#9ca3af' }}>{DAYS_FR[i]}</div>
-                        <div className="text-sm font-semibold tabular-nums" style={{ color: isToday ? '#1d4ed8' : '#374151' }}>{d.getDate()}</div>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div style={GRID}>
-                  <div className="px-3 py-2 border-r border-gray-100 text-xs text-gray-400 flex items-center">Tous agendas</div>
-                  {days.map((d, i) => {
-                    const dayKey = weekKeys[i]
-                    const evs = eventsForDay(dayKey)
-                    return (
-                      <div key={i} className="group px-1.5 py-1.5 border-l border-gray-100 space-y-1"
-                        style={{ background: isSameDay(d, today) ? '#f8faff' : 'transparent', minHeight: 70 }}>
-                        {evs.map(ev => (
-                          <button key={ev.id + ev._calendarId}
-                            onClick={() => ev._writable && setEvtModal({ mode: 'edit', event: ev })}
-                            className="w-full text-left flex items-start gap-1.5 px-1.5 py-1 rounded-md hover:bg-gray-100 transition-colors"
-                            style={{ background: '#f9fafb', cursor: ev._writable ? 'pointer' : 'default' }}
-                            title={`${ev.summary || '(sans titre)'}${ev._calName ? ' · ' + ev._calName : ''}`}>
-                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{ background: ev._color || '#9ca3af' }} />
-                            <span className="min-w-0 truncate">
-                              {eventTimeLabel(ev) && <span className="text-gray-400 mr-1" style={{ fontSize: 10.5 }}>{eventTimeLabel(ev)}</span>}
-                              <span className="text-gray-700" style={{ fontSize: 11.5 }}>{ev.summary || '(sans titre)'}</span>
-                            </span>
-                          </button>
-                        ))}
-                        <button onClick={() => setEvtModal({ mode: 'create', dateKey })}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity w-full text-center text-xs text-gray-400 hover:text-gray-700 py-0.5 rounded border border-dashed border-gray-200">
-                          + Événement
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
+            <button onClick={() => gcal.connect()} disabled={gcal.connecting}
+              style={{ font: `600 12px ${FONT}`, color: C.accentOnDark, background: C.ink, border: 'none', padding: '8px 14px', borderRadius: 5, cursor: 'pointer', opacity: gcal.connecting ? 0.5 : 1 }}>
+              {gcal.connecting ? 'Connexion…' : 'Connecter Google Agenda'}
+            </button>
           )}
         </div>
+
+        {!gcal.connected ? (
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 32, textAlign: 'center', color: C.muted, fontSize: 13 }}>
+            Connecte ton compte Google pour voir et gérer tes événements ici. Tout reste synchronisé avec ton agenda (Mac, téléphone…).
+          </div>
+        ) : (
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <div style={GRID}>
+              <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', borderRight: `1px solid ${C.divider}` }}>
+                <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>TOUS AGENDAS</span>
+              </div>
+              {days.map((d, i) => {
+                const dayKey = weekKeys[i]
+                const evs = eventsForDay(dayKey)
+                const isToday = isSameDay(d, today)
+                return (
+                  <div key={i} className="group" style={{ borderLeft: `1px solid ${C.divider}`, background: isToday ? '#fdf4f6' : 'transparent', padding: 8, display: 'flex', flexDirection: 'column', gap: 5, minHeight: 64 }}>
+                    {evs.map(ev => (
+                      <button key={ev.id + ev._calendarId}
+                        onClick={() => ev._writable && setEvtModal({ mode: 'edit', event: ev })}
+                        style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 6, padding: '5px 8px', borderRadius: 5, minWidth: 0, background: C.surface, border: `1px solid ${C.divider}`, cursor: ev._writable ? 'pointer' : 'default' }}
+                        title={`${ev.summary || '(sans titre)'}${ev._calName ? ' · ' + ev._calName : ''}`}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', flex: 'none', marginTop: 3, background: ev._color || C.muted }} />
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {eventTimeLabel(ev) && <span style={{ font: `10px ${MONO}`, color: C.muted, marginRight: 4 }}>{eventTimeLabel(ev)}</span>}
+                          <span style={{ fontSize: 11, color: C.inkTertiary }}>{ev.summary || '(sans titre)'}</span>
+                        </span>
+                      </button>
+                    ))}
+                    <button onClick={() => setEvtModal({ mode: 'create', dateKey: dayKey })}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ border: '1.5px dashed #e6dade', borderRadius: 5, textAlign: 'center', fontSize: 10.5, color: C.faint, padding: 5, background: 'transparent', cursor: 'pointer' }}>
+                      + Événement
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </main>
 
       {evtModal && (
