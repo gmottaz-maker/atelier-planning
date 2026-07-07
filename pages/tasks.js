@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
-import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
 import TaskFormDrawer from '../components/TaskFormDrawer'
+import { C, FONT, MONO, personChip } from '../lib/theme'
 
 const PINK = '#111827'
 const PEOPLE = ['Arnaud', 'Guillaume', 'Gabin', 'non défini']  // valeur par défaut, surchargée par useResponsibles()
@@ -26,15 +26,37 @@ function colorForName(name) {
 }
 
 const SECTIONS = [
-  { key: 'overdue',        label: 'En retard',                color: '#dc2626' },
-  { key: 'today',          label: "Aujourd'hui",              color: '#d97706' },
-  { key: 'tomorrow',       label: 'Demain',                   color: '#f59e0b' },
-  { key: 'thisWeek',       label: 'Cette semaine',            color: '#0ea5e9' },
-  { key: 'nextWeek',       label: 'Semaine prochaine',        color: '#6366f1' },
-  { key: 'later',          label: 'Plus tard',                color: '#6b7280' },
-  { key: 'noDate',         label: 'Sans date',                color: '#9ca3af' },
-  { key: 'completedToday', label: "Terminées aujourd'hui",    color: '#22c55e' },
+  { key: 'overdue',        label: 'En retard',                color: '#c03d2e' },
+  { key: 'today',          label: "Aujourd'hui",              color: '#a26a1f' },
+  { key: 'tomorrow',       label: 'Demain',                   color: '#a26a1f' },
+  { key: 'thisWeek',       label: 'Cette semaine',            color: '#3e6d9e' },
+  { key: 'nextWeek',       label: 'Semaine prochaine',        color: '#6b5f65' },
+  { key: 'later',          label: 'Plus tard',                color: '#9a8d93' },
+  { key: 'noDate',         label: 'Sans date',                color: '#9a8d93' },
+  { key: 'completedToday', label: "Terminées aujourd'hui",    color: '#3e8e6e' },
 ]
+
+// Badge d'échéance mono à droite de la ligne (12a)
+function dueBadge(task, days) {
+  if (days == null) return null
+  if (days < 0)   return { text: `${-days}J DE RETARD`, fg: '#c03d2e', bg: '#f9e7e4' }
+  if (days === 0) return { text: "AUJOURD'HUI",         fg: '#a26a1f', bg: '#f5ecda' }
+  if (days === 1) return { text: 'DEMAIN',              fg: '#a26a1f', bg: '#f5ecda' }
+  if (days <= 14) return { text: `J-${days}`,           fg: '#3e6d9e', bg: '#e5ecf4' }
+  return { text: `J-${days}`, fg: '#6b5f65', bg: '#f2eaed' }
+}
+
+// Rail de filtres (12a)
+const railLabel = { font: `500 10px ${MONO}`, letterSpacing: '.12em', color: C.muted, padding: '0 10px 6px' }
+function railItem(active) {
+  return {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '6px 10px', borderRadius: 6, fontSize: 13, textAlign: 'left',
+    border: 'none', width: '100%', cursor: 'pointer', marginBottom: 1, fontFamily: FONT,
+    background: active ? C.divider : 'transparent',
+    color: active ? C.ink : C.inkSecondary, fontWeight: active ? 600 : 400,
+  }
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -128,92 +150,57 @@ function CountdownBadge({ task }) {
 
 function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
   const completed   = task.status === 'completed'
-  const personColor = colorForName(task.responsible)
+  const chip        = personChip(task.responsible)
   const projectName = task.projects?.name
   const canDelete   = task.responsible === currentUser || currentUser === 'Guillaume'
-  const dateInfo    = !completed && fmtTaskDate(task)
+  const badge       = !completed && dueBadge(task, daysRemaining(task))
 
   return (
-    <div
-      className="group bg-white rounded-lg border transition-all hover:border-gray-300"
-      style={{
-        borderColor: completed ? '#f3f4f6' : '#e5e7eb',
-        opacity: completed ? 0.55 : 1,
-      }}
-    >
-      <div className="flex items-center gap-4 px-5 py-4">
-        <button
-          onClick={() => onToggle(task)}
-          className="flex-shrink-0 flex items-center justify-center transition-all hover:scale-110"
-          style={{ width: 28, height: 28 }}
-        >
-          <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all"
-            style={{
-              borderColor: completed ? '#22c55e' : '#d1d5db',
-              background: completed ? '#22c55e' : 'white',
-            }}>
-            {completed && (
-              <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
-                <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-          </div>
-        </button>
+    <div className="group" style={{
+      background: C.surface, border: `1px solid ${completed ? C.divider : C.border}`,
+      borderRadius: 8, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 12,
+      opacity: completed ? 0.6 : 1, fontFamily: FONT,
+    }}>
+      {/* Checkbox */}
+      <button onClick={() => onToggle(task)} aria-label="Basculer" style={{
+        width: 17, height: 17, borderRadius: '50%', flex: 'none', cursor: 'pointer', padding: 0,
+        border: completed ? 'none' : `2px solid ${C.faintBorder}`,
+        background: completed ? C.success : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9,
+      }}>{completed && '✓'}</button>
 
-        <div className="flex-1 min-w-0">
-          <button onClick={() => !completed && onEdit(task)}
-            className={`text-left w-full ${completed ? 'cursor-default' : ''}`}>
-            <div className="flex items-center gap-2">
-              {task.is_private && (
-                <span className="text-xs text-gray-400" title="Tâche privée">🔒</span>
-              )}
-              <p className={`leading-snug ${completed ? 'text-gray-400 line-through' : 'text-gray-900 font-medium'}`}
-                style={{ fontSize: 14 }}>
-                {task.title}
-              </p>
-            </div>
-            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs">
-              <span className="font-medium px-2 py-0.5 rounded-md"
-                style={{ background: personColor + '15', color: personColor }}>
-                {task.responsible}
-              </span>
-              {projectName && (
-                <span className="text-gray-500 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                  {projectName}
-                </span>
-              )}
-              {dateInfo && (
-                <span className="font-medium tabular-nums" style={{ color: dateInfo.color }}>
-                  {dateInfo.label}
-                </span>
-              )}
-              {task.notes && (
-                <span className="text-gray-400 italic truncate max-w-xs">{task.notes}</span>
-              )}
-            </div>
-          </button>
-        </div>
+      {/* Corps */}
+      <button onClick={() => !completed && onEdit(task)}
+        style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: completed ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {task.is_private && <span style={{ fontSize: 11 }} title="Privée">🔒</span>}
+          <span style={{ fontSize: 13.5, fontWeight: completed ? 400 : 600, color: completed ? C.muted : C.ink, textDecoration: completed ? 'line-through' : 'none' }}>{task.title}</span>
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: chip.fg, background: chip.bg, padding: '2px 9px', borderRadius: 6 }}>{task.responsible}</span>
+          {projectName && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: completed ? C.faintChevron : C.muted }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.faint }} />
+              {projectName}
+            </span>
+          )}
+        </span>
+      </button>
 
-        {/* Actions au survol */}
-        {!completed && (
-          <div className="flex items-center gap-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs">
-            <button onClick={() => onEdit(task)}
-              className="font-medium text-gray-500 hover:text-gray-900">
-              Modifier
-            </button>
-            {canDelete && (
-              <>
-                <span className="text-gray-200">·</span>
-                <button onClick={() => onDelete(task)}
-                  className="font-medium text-gray-500 hover:text-red-600">
-                  Supprimer
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Badge échéance */}
+      {badge && (
+        <span style={{ font: `10px ${MONO}`, color: badge.fg, background: badge.bg, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap', flex: 'none' }}>{badge.text}</span>
+      )}
+
+      {/* Actions au survol */}
+      {!completed && (
+        <span className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ display: 'flex', gap: 10, fontSize: 11.5, flex: 'none' }}>
+          <button onClick={() => onEdit(task)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Modifier</button>
+          {canDelete && (
+            <button onClick={() => onDelete(task)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Supprimer</button>
+          )}
+        </span>
+      )}
     </div>
   )
 }
@@ -466,19 +453,14 @@ export default function Tasks() {
   // ─── Rendu ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head>
         <title>Tâches — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           * { -webkit-tap-highlight-color: transparent; }
-          @keyframes taskStrike {
-            from { transform: translateY(-50%) rotate(-0.6deg) scaleX(0); }
-            to   { transform: translateY(-50%) rotate(-0.6deg) scaleX(1); }
-          }
           button, a { touch-action: manipulation; }
-          input:focus, select:focus { border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; outline: none; }
+          input:focus, select:focus { border-color: ${C.faintBorder} !important; box-shadow: 0 0 0 3px rgba(224,80,110,0.08) !important; outline: none; }
           @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
           body { padding-bottom: env(safe-area-inset-bottom); }
         `}</style>
@@ -487,26 +469,31 @@ export default function Tasks() {
       {/* Feedback toast */}
       {feedback && (
         <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 px-4 py-2 rounded-2xl shadow-lg text-sm font-medium text-white"
-          style={{ background: feedback.type === 'err' ? '#ef4444' : PINK }}>
+          style={{ background: feedback.type === 'err' ? C.danger : C.ink }}>
           {feedback.msg}
         </div>
       )}
 
-      {/* Header */}
-      <NavBar title="tâches">
-        {activeCount > 0 && (
-          <span className="px-1.5 py-0.5 rounded-full text-xs font-bold text-white"
-            style={{ background: PINK }}>{activeCount}</span>
-        )}
-        {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
-          <button onClick={requestNotifications} title="Activer les notifications"
-            className="w-8 h-8 flex items-center justify-center rounded-full border text-base"
-            style={{ borderColor: '#e5e7eb', color: '#9ca3af' }}>🔔</button>
-        )}
-        {notifStatus === 'granted' && (
-          <span title="Notifications activées" className="w-8 h-8 flex items-center justify-center rounded-full text-base" style={{ background: '#f0fdf4' }}>🔔</span>
-        )}
-      </NavBar>
+      {/* Header 12a */}
+      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '26px 32px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, borderBottom: `1px solid ${C.border}`, paddingBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 23, fontWeight: 700, letterSpacing: '-.4px' }}>Tâches</span>
+            <span style={{ font: `11.5px ${MONO}`, color: C.muted }}>
+              {activeCount} ACTIVE{activeCount > 1 ? 'S' : ''} · {activePersonFilter === 'all' ? "TOUTE L'ÉQUIPE" : activePersonFilter.toUpperCase()} · {({ today: "AUJOURD'HUI", week: 'CETTE SEMAINE', twoweeks: '2 SEMAINES', all: 'TOUT' })[view]}
+            </span>
+          </div>
+          <div style={{ flex: 1 }} />
+          {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
+            <button onClick={requestNotifications} title="Activer les notifications"
+              style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${C.border}`, background: C.surface, color: C.muted, cursor: 'pointer', fontSize: 15 }}>🔔</button>
+          )}
+          <button onClick={() => { setEditingTask(null); setShowForm(true) }}
+            style={{ border: `1px solid ${C.ink}`, background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>
+            + NOUVELLE TÂCHE
+          </button>
+        </div>
+      </div>
 
       {/* Tabs vue + Filtre personne — mobile uniquement */}
       <div className="md:hidden bg-white border-b px-4 pb-3 pt-2 space-y-2" style={{ borderColor: '#f0f0f0' }}>
@@ -539,147 +526,87 @@ export default function Tasks() {
         </div>
       </div>
 
-      {/* Layout : sidebar (desktop) + liste */}
-      <div className="w-full md:flex md:gap-8 px-6 sm:px-8 lg:px-10 py-8" style={{ maxWidth: 1800, margin: '0 auto' }}>
+      {/* Layout 12a : rail + liste */}
+      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '16px 32px 40px', display: 'flex', gap: 28 }}>
 
-        {/* ── Sidebar desktop ── */}
-        <aside className="hidden md:flex flex-col gap-6 flex-shrink-0 pt-1" style={{ width: 240 }}>
-          {/* Période */}
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Période</p>
-            {[
-              { key: 'today',    label: "Aujourd'hui" },
-              { key: 'week',     label: 'Cette semaine' },
-              { key: 'twoweeks', label: '2 semaines' },
-              { key: 'all',      label: 'Tout' },
-            ].map(v => (
-              <button key={v.key} onClick={() => setView(v.key)}
-                className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5"
-                style={view === v.key
-                  ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 14 }
-                  : { color: '#6b7280', background: 'transparent', fontWeight: 500, fontSize: 14 }}>
-                {v.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Personne */}
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Personne</p>
-            <button onClick={() => setPersonFilter('all')}
-              className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5 flex items-center justify-between"
-              style={activePersonFilter === 'all'
-                ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 14 }
-                : { color: '#6b7280', fontSize: 14, fontWeight: 500 }}>
-              <span>Toute l'équipe</span>
+        {/* ── Rail de filtres (desktop) ── */}
+        <aside className="hidden md:flex" style={{ width: 186, flex: 'none', flexDirection: 'column' }}>
+          <div style={railLabel}>PÉRIODE</div>
+          {[
+            { key: 'today',    label: "Aujourd'hui" },
+            { key: 'week',     label: 'Cette semaine' },
+            { key: 'twoweeks', label: '2 semaines' },
+            { key: 'all',      label: 'Tout' },
+          ].map(v => (
+            <button key={v.key} onClick={() => setView(v.key)} style={railItem(view === v.key)}>
+              <span>{v.label}</span>
             </button>
-            {(responsibles || []).filter(p => p !== 'non défini').map(p => {
-              const color = colorForName(p)
-              const n = totalActiveByPerson.filter(t => t.responsible === p).length
-              return (
-                <button key={p} onClick={() => setPersonFilter(p)}
-                  className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5 flex items-center justify-between"
-                  style={activePersonFilter === p
-                    ? { background: color + '14', color: color, fontWeight: 600, fontSize: 14 }
-                    : { color: '#6b7280', fontSize: 14, fontWeight: 500 }}>
-                  <span className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                    {p}
-                  </span>
-                  {n > 0 && (
-                    <span className="text-xs tabular-nums" style={{ color: activePersonFilter === p ? color : '#9ca3af' }}>{n}</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+          ))}
 
-          {/* Projet */}
+          <div style={{ ...railLabel, paddingTop: 14 }}>PERSONNE</div>
+          <button onClick={() => setPersonFilter('all')} style={railItem(activePersonFilter === 'all')}>
+            <span>Toute l'équipe</span>
+          </button>
+          {(responsibles || []).filter(p => p !== 'non défini').map(p => {
+            const n = totalActiveByPerson.filter(t => t.responsible === p).length
+            return (
+              <button key={p} onClick={() => setPersonFilter(p)} style={railItem(activePersonFilter === p)}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: personChip(p).fg }} />
+                  {p}
+                </span>
+                {n > 0 && <span style={{ font: `10.5px ${MONO}`, color: C.faint }}>{n}</span>}
+              </button>
+            )
+          })}
+
           {projectsWithTasks.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Projet</p>
-              <button onClick={() => setProjectFilter('all')}
-                className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5"
-                style={projectFilter === 'all'
-                  ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 14 }
-                  : { color: '#6b7280', fontSize: 14, fontWeight: 500 }}>
-                Tous les projets
+            <>
+              <div style={{ ...railLabel, paddingTop: 14 }}>PROJET</div>
+              <button onClick={() => setProjectFilter('all')} style={railItem(projectFilter === 'all')}>
+                <span>Tous les projets</span>
               </button>
               {projectsWithTasks.slice(0, 12).map(p => {
                 const n = projectTaskCounts[p.id]
                 return (
-                  <button key={p.id} onClick={() => setProjectFilter(p.id)}
-                    className="w-full text-left px-3 py-2 rounded-md transition-all mb-0.5 flex items-center justify-between gap-2"
-                    style={projectFilter === p.id
-                      ? { background: '#f3f4f6', color: '#111827', fontWeight: 600, fontSize: 13 }
-                      : { color: '#6b7280', fontSize: 13, fontWeight: 500 }}>
-                    <span className="truncate flex-1">{p.name}</span>
-                    {n > 0 && (
-                      <span className="text-xs text-gray-400 tabular-nums">{n}</span>
-                    )}
+                  <button key={p.id} onClick={() => setProjectFilter(p.id)} style={railItem(projectFilter === p.id)}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    {n > 0 && <span style={{ font: `10.5px ${MONO}`, color: C.faint, flex: 'none' }}>{n}</span>}
                   </button>
                 )
               })}
-            </div>
+            </>
           )}
         </aside>
 
         {/* ── Liste tâches ── */}
-        <div className="flex-1 min-w-0">
-          {/* Header desktop */}
-          <div className="hidden md:flex items-baseline justify-between mb-6">
-            <div>
-              <h1 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 26 }}>
-                {activePersonFilter === 'all' ? 'Tâches' : `Tâches · ${activePersonFilter}`}
-              </h1>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {activeCount > 0
-                  ? `${activeCount} tâche${activeCount > 1 ? 's' : ''} active${activeCount > 1 ? 's' : ''}`
-                  : 'Aucune tâche active'}
-                {projectFilter !== 'all' && projects.find(p => p.id === projectFilter) && (
-                  <> · sur <span className="text-gray-900 font-medium">{projects.find(p => p.id === projectFilter).name}</span></>
-                )}
-              </p>
-            </div>
-            <button onClick={() => { setEditingTask(null); setShowForm(true) }}
-              className="px-4 py-2 rounded-md text-sm font-medium text-white transition-opacity hover:opacity-90"
-              style={{ background: '#111827' }}>
-              + Nouvelle tâche
-            </button>
-          </div>
-
+        <div style={{ flex: 1, minWidth: 0 }}>
           {loading ? (
-            <div className="text-center py-20 text-gray-400 text-sm">Chargement…</div>
+            <div style={{ textAlign: 'center', padding: '80px 0', color: C.muted, fontSize: 13 }}>Chargement…</div>
           ) : visibleTasks.length === 0 ? (
-            <div className="text-center py-24 bg-white rounded-lg border border-gray-200">
-              <p className="text-gray-400 text-sm">Aucune tâche dans cette vue.</p>
+            <div style={{ textAlign: 'center', padding: '80px 0', background: C.surface, borderRadius: 8, border: `1px solid ${C.border}` }}>
+              <p style={{ color: C.muted, fontSize: 13 }}>Aucune tâche dans cette vue.</p>
               <button onClick={() => { setEditingTask(null); setShowForm(true) }}
-                className="mt-4 text-sm font-medium text-gray-700 hover:text-gray-900">
+                style={{ marginTop: 14, font: `600 12px ${FONT}`, color: C.inkSecondary, background: 'none', border: 'none', cursor: 'pointer' }}>
                 + Créer une tâche
               </button>
             </div>
           ) : (
-            <div className="space-y-8" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
               {SECTIONS.filter(s => sectionsForView.includes(s.key)).map(section => {
                 const items = grouped[section.key] || []
                 if (items.length === 0) return null
                 return (
-                  <section key={section.key}>
-                    <div className="flex items-baseline gap-3 mb-3">
-                      <div className="flex items-baseline gap-2.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: section.color }} />
-                        <h2 className="font-semibold tracking-tight" style={{ color: section.color, fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {section.label}
-                        </h2>
-                      </div>
-                      <span className="text-xs text-gray-400 tabular-nums">{items.length}</span>
+                  <section key={section.key} style={{ display: 'contents' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: section.color, flex: 'none' }} />
+                      <span style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', color: section.color }}>{section.label.toUpperCase()}</span>
+                      <span style={{ font: `10px ${MONO}`, color: C.muted }}>{items.length}</span>
                     </div>
-                    <div className="space-y-2">
-                      {items.map(task => (
-                        <TaskCard key={task.id} task={task} currentUser={currentUser}
-                          onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
-                      ))}
-                    </div>
+                    {items.map(task => (
+                      <TaskCard key={task.id} task={task} currentUser={currentUser}
+                        onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
+                    ))}
                   </section>
                 )
               })}
