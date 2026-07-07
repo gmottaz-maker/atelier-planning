@@ -12,6 +12,7 @@ import TaskFormDrawer from '../../components/TaskFormDrawer'
 import AutocompleteInput from '../../components/AutocompleteInput'
 import { useSuggestions } from '../../lib/useSuggestions'
 import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/AddressInput'
+import { C, FONT, MONO, personChip, initials as themeInitials } from '../../lib/theme'
 
 const PINK = '#111827'
 
@@ -1623,16 +1624,15 @@ export default function ProjectPage() {
 
   return (
     <>
-    <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head>
         <title>{project.name} — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           * { -webkit-tap-highlight-color: transparent; }
           input[type=time]::-webkit-calendar-picker-indicator { opacity: 0.4; }
           @media print {
-            body { background: white !important; font-family: 'Inter', sans-serif; }
+            body { background: white !important; }
             .no-print { display: none !important; }
             .print-only { display: block !important; }
             header, footer { display: none !important; }
@@ -1643,91 +1643,82 @@ export default function ProjectPage() {
         `}</style>
       </Head>
 
-      <NavBar title={project.name}>
-        <Link href="/" style={{ fontSize: 12, color: '#6b7280', textDecoration: 'none' }}>← Projets</Link>
-      </NavBar>
+      <div className="w-full" style={{ maxWidth: 1200, margin: '0 auto', padding: '22px 32px 40px' }}>
 
-      <div className="w-full px-4 md:px-10 py-6 md:py-10" style={{ maxWidth: 1800, margin: '0 auto' }}>
+        {/* Fil d'Ariane */}
+        <Link href="/" className="no-print" style={{ display: 'inline-block', font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textDecoration: 'none', marginBottom: 14 }}>
+          ← PROJETS / <span style={{ color: C.inkSecondary }}>{(project.name || '').toUpperCase()}</span>
+        </Link>
 
-        {/* ── Hero header ── */}
-        <div className="mb-8 md:mb-12 bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="h-2 w-full" style={{ background: color }} />
-          <div className="px-5 md:px-10 py-6 md:py-8">
-            <div className="flex flex-col md:flex-row items-start gap-6 md:gap-8">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Projet</p>
-                <h1 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 'clamp(24px, 6vw, 36px)' }}>
-                  {project.name}
-                </h1>
-                {project.client && (
-                  <p className="text-gray-500 mt-2" style={{ fontSize: 18 }}>{project.client}</p>
-                )}
-                <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+
+        {/* ── Hero header (11c) ── */}
+        <div className="mb-8" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ height: 5, width: '100%', background: daysLeft != null && daysLeft <= 7 ? C.accent : color }} />
+          <div style={{ padding: '22px 28px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 24 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ font: `10px ${MONO}`, letterSpacing: '.14em', color: C.muted, marginBottom: 6 }}>PROJET</p>
+                <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-.4px', lineHeight: 1.1, color: C.ink }}>{project.name}</h1>
+                {project.client && <p style={{ color: C.muted, marginTop: 6, fontSize: 15 }}>{project.client}</p>}
+                <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: '12px 28px' }}>
                   {project.deadline && (
                     <div>
-                      <div className="text-xs uppercase tracking-wider text-gray-400">Deadline</div>
-                      <div className="font-semibold text-gray-900 mt-0.5" style={{ fontSize: 16 }}>
+                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>DEADLINE</div>
+                      <div style={{ fontWeight: 600, marginTop: 3, fontSize: 15, color: C.ink }}>
                         {fmtDate(project.deadline)}
-                        <span className="ml-2 font-normal" style={{ fontSize: 13, color: daysLeft < 0 ? '#dc2626' : daysLeft <= 7 ? '#d97706' : '#16a34a' }}>
-                          {daysLeft < 0 ? `en retard de ${Math.abs(daysLeft)}j` : daysLeft === 0 ? "aujourd'hui" : `dans ${daysLeft}j`}
+                        <span style={{ marginLeft: 8, font: `11px ${MONO}`, fontWeight: 400, color: daysLeft < 0 ? C.danger : daysLeft <= 7 ? C.accent : C.success }}>
+                          {daysLeft < 0 ? `RETARD ${Math.abs(daysLeft)}J` : daysLeft === 0 ? "AUJOURD'HUI" : `DANS ${daysLeft}J`}
                         </span>
                       </div>
                     </div>
                   )}
                   {project.delivery_type && (
                     <div>
-                      <div className="text-xs uppercase tracking-wider text-gray-400">Mode</div>
-                      <div className="text-gray-900 mt-0.5" style={{ fontSize: 15 }}>{project.delivery_type}</div>
+                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>MODE</div>
+                      <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{project.delivery_type}</div>
                     </div>
                   )}
                   <div>
-                    <div className="text-xs uppercase tracking-wider text-gray-400">Statut</div>
-                    <div className="text-gray-900 mt-0.5" style={{ fontSize: 15 }}>{project.status === 'active' ? 'En cours' : 'Archivé'}</div>
+                    <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>STATUT</div>
+                    <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{project.status === 'active' ? 'En cours' : 'Archivé'}</div>
                   </div>
                   {activeTasks.length > 0 && (
                     <div>
-                      <div className="text-xs uppercase tracking-wider text-gray-400">Tâches actives</div>
-                      <div className="text-gray-900 mt-0.5" style={{ fontSize: 15 }}>{activeTasks.length}</div>
+                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>TÂCHES ACTIVES</div>
+                      <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{activeTasks.length}</div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Right side: responsable + progress */}
-              <div className="flex flex-col items-stretch gap-5 flex-shrink-0 w-full md:w-auto" style={{ minWidth: 260 }}>
+              {/* Responsable + progression */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18, flex: 'none', width: 260, maxWidth: '100%' }}>
                 {project.responsible && (
-                  <div className="flex items-center gap-3 justify-end">
-                    <div className="text-right">
-                      <div className="text-xs uppercase tracking-wider text-gray-400">Responsable</div>
-                      <div className="font-semibold text-gray-900 mt-0.5" style={{ fontSize: 15 }}>{project.responsible}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'flex-end' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>RESPONSABLE</div>
+                      <div style={{ fontWeight: 600, marginTop: 3, fontSize: 14, color: C.ink }}>{project.responsible}</div>
                     </div>
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold"
-                      style={{ background: PERSON_COLORS[project.responsible] || '#9ca3af', fontSize: 15, letterSpacing: '-0.02em' }}>
-                      {(project.responsible || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', background: personChip(project.responsible).fg }}>
+                      {themeInitials(project.responsible)}
                     </div>
                   </div>
                 )}
-
                 {(() => {
                   const done = tasks.filter(t => t.status === 'completed').length
                   const total = tasks.length
                   const pct = total > 0 ? Math.round((done / total) * 100) : 0
                   return (
-                    <div className="w-full">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs uppercase tracking-wider text-gray-400">Progression</span>
-                        <span className="font-semibold tabular-nums text-gray-900" style={{ fontSize: 14 }}>
-                          {total === 0 ? '—' : `${pct}%`}
-                        </span>
+                    <div style={{ width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>PROGRESSION</span>
+                        <span style={{ font: `600 13px ${MONO}`, color: C.ink }}>{total === 0 ? '—' : `${pct}%`}</span>
                       </div>
-                      <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
-                        <div className="h-full rounded-full transition-all" style={{
-                          width: `${pct}%`,
-                          background: total === 0 ? '#e5e7eb' : pct === 100 ? '#22c55e' : '#111827',
-                        }} />
+                      <div style={{ width: '100%', height: 7, borderRadius: 4, background: C.divider, overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: total === 0 ? C.faintBorder : pct === 100 ? C.success : C.ink }} />
                       </div>
-                      <div className="mt-1.5 text-xs text-gray-500 text-right">
-                        {total === 0 ? 'Aucune tâche' : `${done} / ${total} tâche${total > 1 ? 's' : ''}`}
+                      <div style={{ marginTop: 6, font: `10.5px ${MONO}`, color: C.muted, textAlign: 'right' }}>
+                        {total === 0 ? 'AUCUNE TÂCHE' : `${done} / ${total} TÂCHE${total > 1 ? 'S' : ''}`}
                       </div>
                     </div>
                   )
@@ -1736,9 +1727,9 @@ export default function ProjectPage() {
             </div>
 
             {project.description && (
-              <div className="mt-7 pt-6 border-t border-gray-100">
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Résumé</p>
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap" style={{ fontSize: 14 }}>{project.description}</p>
+              <div style={{ marginTop: 22, paddingTop: 20, borderTop: `1px solid ${C.divider}` }}>
+                <p style={{ font: `10px ${MONO}`, letterSpacing: '.14em', color: C.muted, marginBottom: 8 }}>RÉSUMÉ</p>
+                <p style={{ color: C.inkTertiary, lineHeight: 1.6, whiteSpace: 'pre-wrap', fontSize: 14 }}>{project.description}</p>
               </div>
             )}
           </div>
@@ -1747,8 +1738,8 @@ export default function ProjectPage() {
         {/* ── Mises à jour ── */}
         <div className="mb-8 md:mb-12">
           <div className="flex items-baseline justify-between mb-5">
-            <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Mises à jour</h2>
-            <span className="text-xs text-gray-500">{updates.length} note{updates.length > 1 ? 's' : ''}</span>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: C.ink }}>Mises à jour</h2>
+            <span style={{ font: `11px ${MONO}`, color: C.muted }}>{updates.length} NOTE{updates.length > 1 ? 'S' : ''}</span>
           </div>
 
           {/* Form */}
@@ -1794,8 +1785,8 @@ export default function ProjectPage() {
               <button
                 onClick={postUpdate}
                 disabled={postingUpdate || !newUpdate.trim()}
-                className="px-4 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-40"
-                style={{ background: '#111827' }}>
+                className="disabled:opacity-40"
+                style={{ background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '8px 16px', borderRadius: 5, border: 'none', cursor: 'pointer' }}>
                 {postingUpdate ? 'Publication…' : 'Publier'}
               </button>
             </div>
