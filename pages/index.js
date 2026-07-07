@@ -4,9 +4,9 @@ import Head from 'next/head'
 import { quoteStatusMeta } from '../lib/quoteStatus'
 import Link from 'next/link'
 import { useAuth } from './_app'
-import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
 import KDriveFolderPicker from '../components/KDriveFolderPicker'
+import { C, FONT, MONO } from '../lib/theme'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
 const COLOR_OPTIONS  = [
@@ -62,6 +62,22 @@ function formatDateShort(s) {
   if (!s) return ''
   const [,m,d] = s.split('-')
   return `${d}.${m}`
+}
+
+// Badge d'échéance « DANS xJ » (11b). urgent = accent, sinon neutre.
+function daysBadge(deadline) {
+  if (!deadline) return { text: 'Sans date', kind: 'none' }
+  const d = getDaysRemaining(deadline)
+  if (d < 0)  return { text: `RETARD ${-d}J`, kind: 'urgent' }
+  if (d <= 7) return { text: `DANS ${d}J`, kind: 'urgent' }
+  return { text: `DANS ${d}J`, kind: 'normal' }
+}
+// Buckets pour les pills de filtre temporel (11b)
+function timeBucket(deadline) {
+  const d = getDaysRemaining(deadline)
+  if (d != null && d < 7)  return 'week'
+  if (d != null && d < 14) return 'two'
+  return 'later'
 }
 
 // ─── Kanban par échéance ─────────────────────────────────────────────────────
@@ -709,11 +725,11 @@ export default function Admin() {
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [logisticsProject, setLogisticsProject]   = useState(null)
   const [pickerOpen, setPickerOpen]               = useState(false)
-  const [viewMode, setViewMode]                   = useState('list')
+  const [viewMode, setViewMode]                   = useState('cards')
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' && localStorage.getItem('projectsViewMode')
-    if (saved === 'kanban' || saved === 'list' || saved === 'gantt') setViewMode(saved)
+    if (saved === 'cards' || saved === 'kanban' || saved === 'list' || saved === 'gantt') setViewMode(saved)
   }, [])
 
   function changeViewMode(mode) {
@@ -840,116 +856,83 @@ export default function Admin() {
     const doneCount   = allTasks.filter(t => t.status === 'completed').length
     const totalCount  = allTasks.length
     const progress    = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
-    const respColor   = colorForName(project.responsible)
     const nextTask    = allTasks
       .filter(t => t.status === 'active')
       .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
+    const badge = daysBadge(project.deadline)
+    // Barre de statut : accent si urgent, muted si normal, faint si sans date
+    const stripe = badge.kind === 'urgent' ? C.accent : badge.kind === 'none' ? C.faintChevron : C.muted
 
     return (
       <div key={project.id}
-        className="group bg-white rounded-xl border hover:border-gray-300 hover:shadow-sm transition-all overflow-hidden flex flex-col"
-        style={{ borderColor: incomplete ? '#fed7aa' : '#e5e7eb', height: 340 }}>
-
-        {/* Urgency stripe */}
-        <div className="h-1.5 w-full flex-shrink-0" style={{ background: color }} />
-
-        <Link href={`/projects/${project.id}`} className="block px-6 py-5 flex-1 min-h-0 overflow-hidden hover:bg-gray-50/50 transition-colors">
-          {/* Header: title + responsable avatar */}
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-900 leading-tight tracking-tight" style={{ fontSize: 18 }}>
-                {project.name}
-              </h3>
-              <p className={`mt-1 ${incomplete ? 'font-medium' : 'text-gray-500'}`}
-                style={{ fontSize: 14, ...(incomplete ? { color: '#ea580c' } : {}) }}>
-                {project.client}
-              </p>
-            </div>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
-              style={{ background: respColor, fontSize: 13, letterSpacing: '-0.02em' }}
-              title={project.responsible}>
+        style={{ background: C.surface, border: `1px solid ${incomplete ? '#f3ccd7' : C.border}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column', fontFamily: FONT }}>
+        <div style={{ height: 5, background: stripe }} />
+        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+          {/* Titre + client + avatar */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Link href={`/projects/${project.id}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, textDecoration: 'none' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-.2px', color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
+              <span style={{ fontSize: 13, color: incomplete ? C.accent : C.muted, fontWeight: incomplete ? 600 : 400 }}>{project.client}</span>
+            </Link>
+            <div title={project.responsible}
+              style={{ width: 30, height: 30, borderRadius: '50%', background: colorForName(project.responsible), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>
               {initials(project.responsible)}
             </div>
           </div>
 
-          {project.description && (
-            <p className="text-gray-500 leading-relaxed line-clamp-2 mb-4" style={{ fontSize: 13 }}>{project.description}</p>
-          )}
-
-          {/* Deadline — proeminent */}
-          <div className="mb-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="font-semibold text-gray-900" style={{ fontSize: 15 }}>{formatDate(project.deadline)}</span>
-              {!incomplete && <DaysChip deadline={project.deadline} />}
-              {incomplete && (
-                <span className="text-xs font-medium" style={{ color: '#ea580c' }}>À compléter</span>
+          {/* Deadline + badge */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ font: `600 13px ${MONO}`, color: badge.kind === 'none' ? C.muted : C.ink }}>{formatDate(project.deadline) || 'Sans date'}</span>
+            {incomplete
+              ? <span style={{ font: `11px ${MONO}`, color: C.accent }}>À COMPLÉTER</span>
+              : badge.kind !== 'none' && (
+                <span style={{ font: `11px ${MONO}`, padding: '2px 8px', borderRadius: 99,
+                  color: badge.kind === 'urgent' ? C.accent : C.inkSecondary,
+                  background: badge.kind === 'urgent' ? C.accentBg : C.divider }}>{badge.text}</span>
               )}
-            </div>
           </div>
 
-          {/* Meta line */}
-          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-4" style={{ fontSize: 12 }}>
-            <span className="font-semibold" style={{ color: respColor }}>{project.responsible || 'non défini'}</span>
-            <span className="text-gray-300">·</span>
-            <span className="text-gray-500">{project.delivery_type}</span>
-            {fromTodoist && (
-              <>
-                <span className="text-gray-300">·</span>
-                <span style={{ color: '#16a34a' }}>Todoist</span>
-              </>
-            )}
+          {/* Méta : responsable · mode · devis */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
+            <span style={{ fontWeight: 600, color: C.inkTertiary }}>{project.responsible || 'non défini'}</span>
+            <span>·</span>
+            {fromTodoist
+              ? <span style={{ font: `10px ${MONO}`, color: C.inkSecondary }}>TODOIST</span>
+              : <span>{project.delivery_type}</span>}
             {project.quote_data?.status && (() => {
               const m = quoteStatusMeta(project.quote_data.status)
-              return (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 font-semibold"
-                  style={{ background: m.bg, color: m.color, fontSize: 11 }}>
-                  Devis · {m.label}
-                </span>
-              )
+              return (<><span>·</span>
+                <span style={{ font: `10px ${MONO}`, color: C.ink, border: `1px solid ${C.border}`, padding: '1px 7px', borderRadius: 99 }}>DEVIS · {m.label.toUpperCase()}</span>
+              </>)
             })()}
           </div>
 
-          {/* Progress bar — bigger */}
-          <div>
-            <div className="flex items-center justify-between mb-2" style={{ fontSize: 12 }}>
-              <span className="text-gray-500">
-                {totalCount === 0
-                  ? 'Aucune tâche'
-                  : `${doneCount} / ${totalCount} tâche${totalCount > 1 ? 's' : ''}`}
-              </span>
-              <span className="font-semibold tabular-nums" style={{ color: totalCount === 0 ? '#9ca3af' : '#111827', fontSize: 13 }}>
-                {totalCount === 0 ? '—' : `${progress}%`}
-              </span>
+          {/* Progression */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', font: `11px ${MONO}`, color: C.muted }}>
+              <span>{totalCount === 0 ? 'Aucune tâche' : `${doneCount} / ${totalCount} tâches`}</span>
+              <span style={{ color: totalCount === 0 ? C.muted : C.ink, fontWeight: 600 }}>{totalCount === 0 ? '—' : `${progress}%`}</span>
             </div>
-            <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
-              <div className="h-full rounded-full transition-all"
-                style={{
-                  width: `${progress}%`,
-                  background: totalCount === 0 ? '#e5e7eb' : progress === 100 ? '#22c55e' : '#111827',
-                }} />
+            <div style={{ height: 5, background: C.divider, borderRadius: 3 }}>
+              {totalCount > 0 && <div style={{ width: `${progress}%`, height: '100%', background: progress === 100 ? C.success : C.ink, borderRadius: 3 }} />}
             </div>
           </div>
 
-          {/* Next task */}
+          {/* Prochaine tâche */}
           {nextTask && (
-            <div className="mt-5 pt-4 border-t flex items-center gap-2" style={{ borderColor: '#f3f4f6' }}>
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: colorForName(nextTask.responsible) }} />
-              <span className="text-gray-600 flex-1 truncate" style={{ fontSize: 12 }}>{nextTask.title}</span>
-              <span className="text-gray-400 flex-shrink-0" style={{ fontSize: 11 }}>
-                {nextTask.responsible}{nextTask.execution_date ? ` · ${formatDateShort(nextTask.execution_date)}` : ''}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, borderTop: `1px solid ${C.divider}`, paddingTop: 9, fontSize: 11.5, color: C.inkSecondary }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: colorForName(nextTask.responsible), flex: 'none' }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextTask.title}</span>
+              <span style={{ font: `10px ${MONO}`, color: C.muted }}>{nextTask.responsible}{nextTask.execution_date ? ` · ${formatDateShort(nextTask.execution_date)}` : ''}</span>
             </div>
           )}
-        </Link>
+        </div>
 
-        {/* Actions — toujours visibles mais discrètes */}
-        <div className="px-6 py-3 flex items-center gap-3 border-t flex-shrink-0" style={{ borderColor: '#f3f4f6', fontSize: 12 }}>
-          <button onClick={() => handleEdit(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Modifier</button>
-          <span className="ml-auto text-gray-200">·</span>
-          <button onClick={() => handleArchive(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Archiver</button>
-          <span className="text-gray-200">·</span>
-          <button onClick={() => handleDelete(project)} className="text-gray-500 hover:text-red-600 transition-colors">Supprimer</button>
+        {/* Actions */}
+        <div style={{ padding: '9px 18px', borderTop: `1px solid ${C.divider}`, display: 'flex', gap: 12, fontSize: 11.5, color: C.muted }}>
+          <button onClick={() => handleEdit(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Modifier</button>
+          <button onClick={() => handleArchive(project)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Archiver</button>
+          <button onClick={() => handleDelete(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Supprimer</button>
         </div>
       </div>
     )
@@ -1035,16 +1018,12 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head>
         <title>Maze Project — Projets</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <style>{`
-          body { font-family: 'Inter', sans-serif; }
-          input:focus, select:focus, textarea:focus { border-color: #9ca3af !important; box-shadow: 0 0 0 3px rgba(17,24,39,0.06) !important; }
+          input:focus, select:focus, textarea:focus { border-color: ${C.faintBorder} !important; box-shadow: 0 0 0 3px rgba(224,80,110,0.08) !important; }
           * { -webkit-tap-highlight-color: transparent; }
           button, a { touch-action: manipulation; }
           @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
@@ -1052,24 +1031,15 @@ export default function Admin() {
         `}</style>
       </Head>
 
-      {/* Header */}
-      <NavBar title="Projets">
-        <button onClick={() => { resetForm(); setShowForm(true) }}
-          style={{ background: '#111827', color: '#fff' }}
-          className="px-4 py-2 text-sm font-medium rounded-md hover:opacity-90 transition-opacity">
-          Nouveau projet
-        </button>
-      </NavBar>
-
       {/* Feedback toast */}
       {feedback && (
-        <div className="fixed top-20 right-5 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-medium"
-          style={{ background: feedback.type === 'error' ? '#ef4444' : PINK, color: '#fff' }}>
+        <div className="fixed top-5 right-5 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-medium"
+          style={{ background: feedback.type === 'error' ? C.danger : C.ink, color: '#fff' }}>
           {feedback.msg}
         </div>
       )}
 
-      <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-8 md:space-y-12" style={{ maxWidth: 1800, margin: '0 auto' }}>
+      <main className="w-full" style={{ padding: '26px 32px', maxWidth: 1440, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
         {/* Formulaire Add/Edit */}
         {showForm && (
@@ -1188,37 +1158,44 @@ export default function Admin() {
 
         {/* Projets actifs */}
         <div className="mx-auto w-full" style={{ maxWidth: viewMode === 'list' ? 1180 : undefined }}>
-          <div className="flex items-baseline gap-3 mb-6">
-            <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>Projets en cours</h2>
-            <span className="text-base text-gray-400">{activeProjects.length}</span>
-            <div className="ml-auto self-center inline-flex items-center gap-0.5 p-1 rounded-lg bg-gray-100">
+          {/* Header 11b */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.4px' }}>Projets en cours</span>
+            <span style={{ font: `12px ${MONO}`, color: C.muted }}>{activeProjects.length}</span>
+            <div style={{ flex: 1 }} />
+            <div style={{ display: 'flex', border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden', fontSize: 12 }}>
               {[
+                { key: 'cards',  label: 'Cartes' },
                 { key: 'list',   label: 'Liste' },
                 { key: 'kanban', label: 'Kanban' },
-                { key: 'gantt',  label: 'Gantt' },
-              ].map(v => (
+              ].map((v, i) => (
                 <button key={v.key} onClick={() => changeViewMode(v.key)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
-                  style={viewMode === v.key
-                    ? { background: '#fff', color: '#111827', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
-                    : { background: 'transparent', color: '#6b7280' }}>
+                  style={{ padding: '6px 14px', cursor: 'pointer', border: 'none', borderLeft: i ? `1px solid ${C.border}` : 'none', font: `${viewMode === v.key ? 600 : 400} 12px ${FONT}`,
+                    background: viewMode === v.key ? C.ink : C.surface, color: viewMode === v.key ? '#fff' : C.inkSecondary }}>
                   {v.label}
                 </button>
               ))}
             </div>
+            <button onClick={() => { resetForm(); setShowForm(true) }}
+              style={{ border: 'none', background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>
+              + NOUVEAU PROJET
+            </button>
           </div>
 
-          {/* Résumé d'urgence */}
+          {/* Pills de filtre temporel 11b */}
           {activeProjects.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 mb-5">
-              {KANBAN_COLUMNS.map(col => {
-                const n = activeProjects.filter(p => deadlineBucket(p.deadline) === col.key).length
-                if (!n) return null
+            <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+              {[
+                { key: 'week',  label: 'CETTE SEMAINE' },
+                { key: 'two',   label: '2 SEMAINES' },
+                { key: 'later', label: 'PLUS TARD' },
+              ].map(b => {
+                const n = activeProjects.filter(p => timeBucket(p.deadline) === b.key).length
+                const accent = b.key === 'week'
                 return (
-                  <span key={col.key} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                    style={{ background: `${col.accent}14`, color: col.accent, fontSize: 12, fontWeight: 600 }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: col.accent }} />
-                    {n} {col.label.toLowerCase()}
+                  <span key={b.key} style={{ font: `11px ${MONO}`, padding: '4px 10px', borderRadius: 99,
+                    color: accent ? C.accent : C.inkSecondary, background: accent ? C.accentBg : C.divider }}>
+                    {b.label} · {n}
                   </span>
                 )
               })}
@@ -1238,8 +1215,12 @@ export default function Admin() {
           {loading ? (
             <ProjectsSkeleton />
           ) : activeProjects.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
-              <p className="text-gray-400 text-sm">Aucun projet actif.</p>
+            <div style={{ textAlign: 'center', padding: '80px 0', background: C.surface, borderRadius: 8, border: `1px solid ${C.border}` }}>
+              <p style={{ color: C.muted, fontSize: 13 }}>Aucun projet actif.</p>
+            </div>
+          ) : viewMode === 'cards' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, alignContent: 'start' }}>
+              {activeProjects.map(renderProjectCard)}
             </div>
           ) : viewMode === 'gantt' ? (
             <GanttView projects={activeProjects} />
