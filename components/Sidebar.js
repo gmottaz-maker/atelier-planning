@@ -21,7 +21,7 @@ const MAIN_ITEMS = [
 // Zone finances (admin uniquement) : 2 items transverses + 2 groupes labellisés
 const FIN_TOP = [
   { href: '/finances', label: 'Tableau de bord' },
-  { href: '/clients',  label: 'Clients & fourn.' },
+  { href: '/clients',  label: 'Contacts' },
 ]
 const FIN_GROUPS = [
   { label: 'FINANCES CLIENTS', items: [
