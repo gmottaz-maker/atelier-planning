@@ -5,10 +5,10 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { C, FONT, MONO, initials } from '../lib/theme'
 
-function Flag({ active, on, label, onClick }) {
+function RoleChip({ active, on, label, onClick }) {
   return (
     <button onClick={onClick}
-      style={{ font: `10px ${MONO}`, letterSpacing: '.06em', padding: '2px 9px', borderRadius: 99, cursor: 'pointer', flex: 'none',
+      style={{ font: `9.5px ${MONO}`, letterSpacing: '.05em', padding: '2px 8px', borderRadius: 99, cursor: 'pointer', flex: 'none',
         color: active ? on.fg : C.faint, background: active ? on.bg : 'transparent',
         border: `1px solid ${active ? 'transparent' : C.border}` }}>
       {label}
@@ -23,7 +23,6 @@ export default function Clients() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')     // all | customer | supplier
   const [tagFilter, setTagFilter] = useState(null)
-  const [open, setOpen] = useState({})
 
   const companies = list.filter(c => c.kind === 'company')
   const persons   = list.filter(c => c.kind !== 'company')
@@ -70,9 +69,34 @@ export default function Clients() {
       {label}{n != null ? ` · ${n}` : ''}
     </button>
   )
-  const tagChips = (tags) => (tags || []).map(t => (
-    <span key={t} style={{ fontSize: 10.5, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '1px 8px', borderRadius: 99 }}>{t}</span>
-  ))
+
+  const GRID = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, alignItems: 'stretch' }
+
+  function Card({ c, round, subtitle }) {
+    return (
+      <Link href={`/clients/${c.id}`}
+        style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, textDecoration: 'none', color: C.ink,
+          display: 'flex', flexDirection: 'column', gap: 10, transition: 'border-color .15s ease' }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = C.faintBorder }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{ width: 34, height: 34, borderRadius: round ? '50%' : 9, background: C.ink, color: C.accentOnDark, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `11px ${MONO}`, fontWeight: 700, flex: 'none' }}>{initials(c.name)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+            <div style={{ font: `10.5px ${MONO}`, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle || '—'}</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginTop: 'auto' }}>
+          <RoleChip active={c.is_customer} on={CUST} label="CLIENT" onClick={e => toggle(e, c, 'is_customer')} />
+          <RoleChip active={c.is_supplier} on={SUP} label="FOURN." onClick={e => toggle(e, c, 'is_supplier')} />
+          {(c.tags || []).slice(0, 3).map(t => (
+            <span key={t} style={{ fontSize: 10, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '2px 8px', borderRadius: 99 }}>{t}</span>
+          ))}
+          {(c.tags || []).length > 3 && <span style={{ font: `10px ${MONO}`, color: C.muted }}>+{c.tags.length - 3}</span>}
+        </div>
+      </Link>
+    )
+  }
 
   return (
     <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
@@ -109,64 +133,28 @@ export default function Clients() {
         {isLoading ? (
           <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Chargement…</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {visibleCompanies.map(c => {
-              const kids = personsByParent[c.id] || []
-              const isOpen = open[c.id]
-              return (
-                <div key={c.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
-                    <Link href={`/clients/${c.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: C.ink }}>
-                      <div style={{ width: 30, height: 30, borderRadius: 8, background: C.ink, color: C.accentOnDark, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `10px ${MONO}`, fontWeight: 700, flex: 'none' }}>{initials(c.name)}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {c.name}
-                          <span style={{ display: 'inline-flex', gap: 4 }}>{tagChips(c.tags)}</span>
-                        </div>
-                        <div style={{ font: `10.5px ${MONO}`, color: C.muted }}>{[c.city, kids.length ? `${kids.length} PERS.` : null].filter(Boolean).join(' · ') || '—'}</div>
-                      </div>
-                    </Link>
-                    <Flag active={c.is_customer} on={CUST} label="CLIENT" onClick={e => toggle(e, c, 'is_customer')} />
-                    <Flag active={c.is_supplier} on={SUP} label="FOURNISSEUR" onClick={e => toggle(e, c, 'is_supplier')} />
-                    {kids.length > 0 && (
-                      <button onClick={() => setOpen(o => ({ ...o, [c.id]: !o[c.id] }))}
-                        style={{ background: 'none', border: 'none', color: C.faintChevron, cursor: 'pointer', fontSize: 12, transform: isOpen ? 'rotate(90deg)' : 'none', flex: 'none' }}>▸</button>
-                    )}
-                  </div>
-                  {isOpen && kids.sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(p => (
-                    <Link key={p.id} href={`/clients/${p.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px 10px 46px', borderTop: `1px solid ${C.divider}`, textDecoration: 'none', color: C.ink }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
-                        <div style={{ font: `10.5px ${MONO}`, color: C.muted }}>{[p.email, p.phone].filter(Boolean).join(' · ') || '—'}</div>
-                      </div>
-                      {tagChips(p.tags)}
-                      <span style={{ color: C.faintChevron, fontSize: 12 }}>→</span>
-                    </Link>
-                  ))}
-                </div>
-              )
-            })}
+          <>
+            <div style={GRID}>
+              {visibleCompanies.map(c => {
+                const nkids = (personsByParent[c.id] || []).length
+                const sub = [c.city, nkids ? `${nkids} pers.` : null].filter(Boolean).join(' · ')
+                return <Card key={c.id} c={c} subtitle={sub} />
+              })}
+            </div>
 
             {visibleStandalone.length > 0 && (
               <>
-                <div style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', color: C.muted, marginTop: 12, padding: '0 2px' }}>SANS SOCIÉTÉ</div>
-                {visibleStandalone.map(p => (
-                  <Link key={p.id} href={`/clients/${p.id}`} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', textDecoration: 'none', color: C.ink }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>{p.name}<span style={{ display: 'inline-flex', gap: 4 }}>{tagChips(p.tags)}</span></div>
-                      <div style={{ font: `10.5px ${MONO}`, color: C.muted }}>{[p.email, p.phone, p.city].filter(Boolean).join(' · ') || '—'}</div>
-                    </div>
-                    <Flag active={p.is_customer} on={CUST} label="CLIENT" onClick={e => toggle(e, p, 'is_customer')} />
-                    <Flag active={p.is_supplier} on={SUP} label="FOURNISSEUR" onClick={e => toggle(e, p, 'is_supplier')} />
-                  </Link>
-                ))}
+                <div style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', color: C.muted, marginTop: 8, padding: '0 2px' }}>PERSONNES SANS SOCIÉTÉ</div>
+                <div style={GRID}>
+                  {visibleStandalone.map(p => <Card key={p.id} c={p} round subtitle={[p.email, p.city].filter(Boolean).join(' · ')} />)}
+                </div>
               </>
             )}
 
             {visibleCompanies.length === 0 && visibleStandalone.length === 0 && (
               <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Aucun contact. As-tu exécuté <code>seed-contacts.sql</code> dans Supabase ?</p>
             )}
-          </div>
+          </>
         )}
       </main>
     </div>
