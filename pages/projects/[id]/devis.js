@@ -44,6 +44,17 @@ export default function DevisPage() {
       .catch(() => {})
   }, [])
 
+  async function downloadPdf() {
+    try {
+      const r = await fetch(`/api/projects/${id}/devis-pdf?mode=${level === 'summary' ? 'summary' : 'detailed'}`)
+      if (!r.ok) throw new Error(`Erreur ${r.status}`)
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) { alert('Génération du PDF impossible : ' + e.message) }
+  }
+
   if (loading) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Chargement…</div>
   if (!project) return <div style={{ padding: 40, fontFamily: 'Inter, sans-serif' }}>Projet introuvable</div>
 
@@ -125,8 +136,13 @@ export default function DevisPage() {
         </div>
         <button
           onClick={() => window.print()}
+          style={{ padding: '8px 14px', borderRadius: 8, background: 'white', color: '#374151', border: '1px solid #e5e7eb', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+          Imprimer
+        </button>
+        <button
+          onClick={downloadPdf}
           style={{ padding: '8px 16px', borderRadius: 8, background: '#111827', color: 'white', border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-          Imprimer / PDF
+          Télécharger PDF
         </button>
       </div>
 
