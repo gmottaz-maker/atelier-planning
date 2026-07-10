@@ -77,6 +77,11 @@ export default function ContactDetail() {
     await mutate()
     router.push('/clients')
   }
+  async function toggleArchive() {
+    await fetch(`/api/contacts?id=${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archived: !contact.archived }) })
+    await mutate()
+    router.push('/clients')
+  }
 
   if (!contact || !form) {
     return (
@@ -205,7 +210,10 @@ export default function ContactDetail() {
           </div>
         )}
 
-        <button onClick={remove} style={{ font: `12px ${FONT}`, color: C.danger, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Supprimer ce contact</button>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <button onClick={toggleArchive} style={{ font: `12px ${FONT}`, color: C.inkSecondary, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{contact.archived ? 'Désarchiver' : 'Archiver ce contact'}</button>
+          <button onClick={remove} style={{ font: `12px ${FONT}`, color: C.danger, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Supprimer</button>
+        </div>
       </main>
     </div>
   )

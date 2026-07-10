@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS contacts (
   country     TEXT,
   vat_number  TEXT,
   website     TEXT,
-  tags        TEXT[] DEFAULT '{}',                 -- catégories libres (assurance, fiduciaire, matériel…)
+  tags        TEXT[] DEFAULT '{}',                 -- catégories libres (Client, Fournisseur, assurance…)
+  archived    BOOLEAN DEFAULT false,
   notes       TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW()

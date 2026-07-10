@@ -10,6 +10,7 @@ const Icon = ({ d, ...p }) => <svg width="14" height="14" viewBox="0 0 24 24" fi
 const EditIcon = <Icon d={<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" /></>} />
 const TagIcon  = <Icon d={<><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L3 13V3h10l7.59 7.59a2 2 0 0 1 0 2.82z" /><circle cx="7.5" cy="7.5" r="1" /></>} />
 const TrashIcon = <Icon d={<><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></>} />
+const ArchiveIcon = <Icon d={<><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></>} />
 
 function ActionBtn({ children, title, onClick, danger }) {
   return (
@@ -31,6 +32,7 @@ export default function Clients() {
   const [tagFilter, setTagFilter] = useState(null)
   const [tagEditId, setTagEditId] = useState(null)
   const [tagInput, setTagInput] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
 
   const companies = list.filter(c => c.kind === 'company')
   const persons   = list.filter(c => c.kind !== 'company')
@@ -59,6 +61,7 @@ export default function Clients() {
     mutate(list.filter(x => x.id !== c.id), false)
     try { await fetch(`/api/contacts?id=${c.id}`, { method: 'DELETE' }) } finally { mutate() }
   }
+  function archive(e, c) { e.preventDefault(); e.stopPropagation(); patch(c, { archived: !c.archived }) }
   function openTag(e, c) { e.preventDefault(); e.stopPropagation(); setTagEditId(tagEditId === c.id ? null : c.id); setTagInput('') }
   function addTag(c, t) { const tag = (t || '').trim(); if (tag && !(c.tags || []).includes(tag)) patch(c, { tags: [...(c.tags || []), tag] }); setTagInput('') }
   function removeTag(c, t) { patch(c, { tags: (c.tags || []).filter(x => x !== t) }) }
@@ -69,13 +72,14 @@ export default function Clients() {
   }
 
   // ── Construire les cartes : 1 par personne si la société a des contacts, sinon 1 par société ──
+  const wanted = c => showArchived ? c.archived : !c.archived
   const items = []
   for (const co of companies) {
-    const kids = personsByParent[co.id] || []
+    const kids = (personsByParent[co.id] || []).filter(wanted)
     if (kids.length) kids.forEach(p => items.push({ c: p, company: co }))
-    else items.push({ c: co, company: null })
+    else if (wanted(co)) items.push({ c: co, company: null })
   }
-  standalone.forEach(p => items.push({ c: p, company: null }))
+  standalone.filter(wanted).forEach(p => items.push({ c: p, company: null }))
 
   const needle = q.trim().toLowerCase()
   function matchItem(it) {
@@ -95,8 +99,10 @@ export default function Clients() {
     return ka < kb ? -1 : ka > kb ? 1 : (a.c.name || '').localeCompare(b.c.name || '')
   })
 
-  const nCust = list.filter(c => hasTag(c, 'Client')).length
-  const nSup  = list.filter(c => hasTag(c, 'Fournisseur')).length
+  const active = list.filter(c => !c.archived)
+  const nCust = active.filter(c => hasTag(c, 'Client')).length
+  const nSup  = active.filter(c => hasTag(c, 'Fournisseur')).length
+  const nArchived = list.filter(c => c.archived).length
   const tab = (k, label, n) => (
     <button onClick={() => setFilter(k)} key={k}
       style={{ padding: '6px 14px', cursor: 'pointer', border: 'none', font: `${filter === k ? 600 : 400} 12px ${FONT}`,
@@ -127,6 +133,7 @@ export default function Clients() {
           <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
             <ActionBtn title="Tagguer" onClick={e => openTag(e, c)}>{TagIcon}</ActionBtn>
             <ActionBtn title="Modifier" onClick={() => router.push(`/clients/${c.id}`)}>{EditIcon}</ActionBtn>
+            <ActionBtn title={c.archived ? 'Désarchiver' : 'Archiver'} onClick={e => archive(e, c)}>{ArchiveIcon}</ActionBtn>
             <ActionBtn title="Supprimer" danger onClick={e => del(e, c)}>{TrashIcon}</ActionBtn>
           </div>
         </div>
@@ -183,6 +190,11 @@ export default function Clients() {
           <div style={{ display: 'flex', border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden' }}>
             {tab('all', 'Tous')}{tab('customer', 'Clients', nCust)}{tab('supplier', 'Fournisseurs', nSup)}
           </div>
+          <button onClick={() => setShowArchived(v => !v)}
+            style={{ font: `600 12px ${FONT}`, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`,
+              background: showArchived ? C.ink : C.surface, color: showArchived ? '#fff' : C.inkSecondary }}>
+            {showArchived ? '← Actifs' : `Archivés${nArchived ? ` · ${nArchived}` : ''}`}
+          </button>
           <button onClick={nouveau} style={{ border: 'none', background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>+ NOUVEAU</button>
         </div>
 

@@ -4,7 +4,7 @@ import { requireAdmin } from '../../lib/requireAdmin'
 const supabase = getSupabaseServer()
 
 const EDITABLE = ['kind', 'name', 'parent_id', 'is_customer', 'is_supplier',
-  'email', 'phone', 'street', 'city', 'state', 'country', 'vat_number', 'notes', 'tags', 'website']
+  'email', 'phone', 'street', 'city', 'state', 'country', 'vat_number', 'notes', 'tags', 'website', 'archived']
 
 export default async function handler(req, res) {
   if (!(await requireAdmin(req, res))) return
