@@ -39,11 +39,27 @@ function weekLabel(monday) {
 export default function Planning() {
   const { responsibles } = useResponsibles()
   const { data: tasks = [], isLoading } = useSWR('/api/tasks')
+  const { data: projects = [] } = useSWR('/api/projects')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const days  = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i))  // lun–ven
   const weekKeys = days.map(ymd)
+
+  // ── Plages de travail (planning manuel par demi-journée, indépendant de l'agenda) ──
+  const activeProjects = (Array.isArray(projects) ? projects : []).filter(p => p.status === 'active')
+  const projById = Object.fromEntries((Array.isArray(projects) ? projects : []).map(p => [String(p.id), p]))
+  const { data: slots = [], mutate: mutateSlots } = useSWR(`/api/work-slots?from=${weekKeys[0]}&to=${weekKeys[4]}`)
+  const slotList = Array.isArray(slots) ? slots : []
+  const slotsFor = (person, dayKey, half) => slotList.filter(s => s.user_name === person && s.date === dayKey && s.half === half)
+  const personSlotCount = (person) => slotList.filter(s => s.user_name === person).length
+  const [slotCtx, setSlotCtx] = useState(null)   // { person, dayKey, half }
+  async function addSlot(project_id, label) {
+    if (!slotCtx) return
+    await fetch('/api/work-slots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_name: slotCtx.person, project_id: project_id || null, label: label || null, date: slotCtx.dayKey, half: slotCtx.half }) })
+    setSlotCtx(null); mutateSlots()
+  }
+  async function delSlot(id) { await fetch(`/api/work-slots?id=${id}`, { method: 'DELETE' }); mutateSlots() }
 
   // Personnes affichées : responsables réels (on garde "non défini" en ligne séparée à la fin)
   const people = (Array.isArray(responsibles) ? responsibles : []).filter(r => r && r !== 'non défini' && r !== 'Sous-traitant')
@@ -57,10 +73,7 @@ export default function Planning() {
     return inWeek.filter(t => (t.responsible || 'non défini') === person && t.status !== 'completed').length
   }
 
-  // "Non assigné" + sous-traitants regroupés s'il y a des tâches
-  const otherPeople = Array.from(new Set(inWeek.map(t => t.responsible || 'non défini')))
-    .filter(p => !people.includes(p))
-  const rows = [...people, ...otherPeople]
+  const rows = people
 
   const GRID = { display: 'grid', gridTemplateColumns: `156px repeat(5, minmax(0, 1fr))` }
 
@@ -126,6 +139,18 @@ export default function Planning() {
       ? <Link key={t.id} href={`/projects/${proj.id}`} style={{ display: 'block', textDecoration: 'none' }}>{inner}</Link>
       : <div key={t.id}>{inner}</div>
   }
+  const slotCard = (s) => {
+    const proj = s.project_id ? projById[String(s.project_id)] : null
+    const name = proj?.name || s.label || 'Autre'
+    const dot = proj?.color_override || C.accent
+    return (
+      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 5, minWidth: 0, background: C.surface, border: `1px solid ${C.divider}` }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flex: 'none' }} />
+        <span style={{ flex: 1, fontSize: 11, color: C.inkTertiary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        <button onClick={() => delSlot(s.id)} title="Retirer" style={{ border: 'none', background: 'none', color: C.faintChevron, cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0, flex: 'none' }}>×</button>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
@@ -158,7 +183,7 @@ export default function Planning() {
 
             {/* Lignes personnes */}
             {rows.length === 0 ? (
-              <div style={{ padding: '40px 16px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Aucune tâche planifiée cette semaine.</div>
+              <div style={{ padding: '40px 16px', textAlign: 'center', color: C.muted, fontSize: 13 }}>Aucune personne (ajoute des responsables dans les réglages).</div>
             ) : rows.map(person => (
               <div key={person} style={{ ...GRID, borderBottom: `1px solid ${C.divider}` }}>
                 {/* Cellule personne + gouttière AM/PM */}
@@ -167,7 +192,7 @@ export default function Planning() {
                     <span style={{ width: 26, height: 26, borderRadius: '50%', background: colorForName(person), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>{initials(person)}</span>
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                       <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person}</span>
-                      <span style={{ font: `9.5px ${MONO}`, color: C.muted }}>{weekCountActive(person)} TÂCHE{weekCountActive(person) > 1 ? 'S' : ''}</span>
+                      <span style={{ font: `9.5px ${MONO}`, color: C.muted }}>{personSlotCount(person)} DEMI-JOURNÉE{personSlotCount(person) > 1 ? 'S' : ''}</span>
                     </div>
                   </div>
                   <div style={{ width: 26, flex: 'none', display: 'flex', flexDirection: 'column' }}>
@@ -176,16 +201,21 @@ export default function Planning() {
                   </div>
                 </div>
 
-                {/* Cellules jours (AM = tâches, PM vide — pas de données demi-journée) */}
+                {/* Cellules jours : demi-journées AM/PM avec plages de travail cliquables */}
                 {days.map((d, i) => {
-                  const cellTasks = tasksFor(person, weekKeys[i])
+                  const dayKey = weekKeys[i]
                   const isToday = isSameDay(d, today)
+                  const half = (h) => (
+                    <div style={{ flex: 1, padding: 6, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44, borderBottom: h === 'am' ? '1px dashed #eee0e5' : 'none' }}>
+                      {slotsFor(person, dayKey, h).map(slotCard)}
+                      <button onClick={() => setSlotCtx({ person, dayKey, half: h })} title="Ajouter une plage"
+                        style={{ marginTop: 'auto', border: `1px dashed ${C.border}`, borderRadius: 5, background: 'transparent', color: C.faintChevron, cursor: 'pointer', font: `11px ${MONO}`, padding: '1px 0' }}>+</button>
+                    </div>
+                  )
                   return (
                     <div key={i} style={{ borderLeft: `1px solid ${C.divider}`, background: isToday ? '#fdf4f6' : 'transparent', display: 'flex', flexDirection: 'column', minHeight: 100 }}>
-                      <div style={{ flex: 1, padding: 6, display: 'flex', flexDirection: 'column', gap: 4, borderBottom: '1px dashed #eee0e5', minHeight: 44 }}>
-                        {cellTasks.map(taskCard)}
-                      </div>
-                      <div style={{ flex: 1, padding: 6, display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44 }} />
+                      {half('am')}
+                      {half('pm')}
                     </div>
                   )
                 })}
@@ -194,7 +224,7 @@ export default function Planning() {
           </div>
         )}
 
-        <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>CHAQUE JOUR = MATIN / APRÈS-MIDI · UNE CARTE = UN PROJET · COLONNE ROSE = AUJOURD'HUI</span>
+        <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>CLIQUE « + » POUR AFFECTER UN PROJET SUR UNE DEMI-JOURNÉE · INDÉPENDANT DE L'AGENDA GOOGLE</span>
 
         {/* ── Agenda Google ── */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
@@ -256,6 +286,10 @@ export default function Planning() {
       {evtModal && (
         <EventModal data={evtModal} calendars={gcal.calendars} gcal={gcal}
           onClose={() => setEvtModal(null)} onSaved={loadEvents} />
+      )}
+
+      {slotCtx && (
+        <SlotModal ctx={slotCtx} projects={activeProjects} onPick={addSlot} onClose={() => setSlotCtx(null)} />
       )}
     </div>
   )
@@ -356,6 +390,51 @@ function EventModal({ data, calendars, gcal, onClose, onSaved }) {
           </button>
           <button onClick={onClose} className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800">Annuler</button>
           {isEdit && <button onClick={remove} disabled={saving} className="ml-auto px-3 py-2 text-sm text-red-600 hover:text-red-700">Supprimer</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Modale : affecter un projet à une demi-journée ──────────────────────────
+function SlotModal({ ctx, projects, onPick, onClose }) {
+  const [q, setQ] = useState('')
+  const [free, setFree] = useState('')
+  const needle = q.trim().toLowerCase()
+  const matches = (projects || []).filter(p => !needle || (p.name || '').toLowerCase().includes(needle) || (p.client || '').toLowerCase().includes(needle))
+  const halfLabel = ctx.half === 'am' ? 'matin' : 'après-midi'
+  const [y, m, d] = ctx.dayKey.split('-')
+  const dateLabel = new Date(+y, +m - 1, +d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(36,26,32,.4)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: C.surface, borderRadius: 10, width: '100%', maxWidth: 420, padding: 18, fontFamily: FONT, color: C.ink, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Affecter — {ctx.person}</div>
+          <div style={{ font: `11px ${MONO}`, color: C.muted, textTransform: 'uppercase' }}>{dateLabel} · {halfLabel}</div>
+        </div>
+        <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un projet…"
+          style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface }} />
+        <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {matches.length === 0 ? (
+            <p style={{ fontSize: 13, color: C.muted, padding: '8px 4px' }}>Aucun projet actif.</p>
+          ) : matches.map(p => (
+            <button key={p.id} onClick={() => onPick(p.id, null)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '8px 10px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              onMouseEnter={e => e.currentTarget.style.background = C.divider}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.color_override || C.accent, flex: 'none' }} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+              <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>{p.client}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8, borderTop: `1px solid ${C.divider}`, paddingTop: 12 }}>
+          <input value={free} onChange={e => setFree(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && free.trim()) onPick(null, free.trim()) }}
+            placeholder="Autre / texte libre…"
+            style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface }} />
+          <button onClick={() => free.trim() && onPick(null, free.trim())}
+            style={{ border: 'none', background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '8px 14px', borderRadius: 6, cursor: 'pointer' }}>Ajouter</button>
         </div>
       </div>
     </div>
