@@ -87,7 +87,7 @@ export default function MeetingPage() {
         `}</style>
       </Head>
 
-      <main className="meeting-doc" style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 40px' }}>
+      <main className="meeting-doc" style={{ padding: '26px 40px' }}>
         {!generated ? (
           <EmptyState onGenerate={generate} loading={loading} />
         ) : (

@@ -1643,7 +1643,7 @@ export default function ProjectPage() {
         `}</style>
       </Head>
 
-      <div className="w-full" style={{ maxWidth: 1200, margin: '0 auto', padding: '22px 32px 40px' }}>
+      <div className="w-full" style={{ padding: '22px 32px 40px' }}>
 
         {/* Fil d'Ariane */}
         <Link href="/" className="no-print" style={{ display: 'inline-block', font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textDecoration: 'none', marginBottom: 14 }}>

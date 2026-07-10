@@ -475,7 +475,7 @@ export default function Tasks() {
       )}
 
       {/* Header 12a */}
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '26px 32px 0' }}>
+      <div style={{ padding: '26px 32px 0' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, borderBottom: `1px solid ${C.border}`, paddingBottom: 16, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 23, fontWeight: 700, letterSpacing: '-.4px' }}>Tâches</span>
@@ -527,7 +527,7 @@ export default function Tasks() {
       </div>
 
       {/* Layout 12a : rail + liste */}
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '16px 32px 40px', display: 'flex', gap: 28 }}>
+      <div style={{ padding: '16px 32px 40px', display: 'flex', gap: 28 }}>
 
         {/* ── Rail de filtres (desktop) ── */}
         <aside className="hidden md:flex" style={{ width: 186, flex: 'none', flexDirection: 'column' }}>

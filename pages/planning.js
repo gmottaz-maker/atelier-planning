@@ -131,7 +131,7 @@ export default function Planning() {
     <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head><title>Planning — Maze Project</title></Head>
 
-      <main style={{ maxWidth: 1280, margin: '0 auto', padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <main style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, borderBottom: `1px solid ${C.border}`, paddingBottom: 16, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
