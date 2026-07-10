@@ -52,6 +52,7 @@ export default function Finances() {
     .filter(p => p.quote_data && p.quote_data.status)
     .map(p => ({ p, status: p.quote_data.status, total: computeQuoteTotal(p.quote_data), invoiced: invoicedProjectIds.has(String(p.id)) }))
   const devisEnvoyes     = offers.filter(o => o.status === 'envoye')
+  const devisACorriger   = offers.filter(o => o.status === 'a_corriger')
   const accepteAFacturer = offers.filter(o => o.status === 'accepte' && !o.invoiced)
 
   // ── Factures émises ──
@@ -150,21 +151,22 @@ export default function Finances() {
             <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontSize: 16, fontWeight: 700 }}>Devis à suivre</span>
-                <span style={{ font: `11px ${MONO}`, color: C.muted }}>{devisEnvoyes.length + accepteAFacturer.length}</span>
+                <span style={{ font: `11px ${MONO}`, color: C.muted }}>{accepteAFacturer.length + devisACorriger.length + devisEnvoyes.length}</span>
               </div>
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 16px' }}>
-                {devisEnvoyes.length + accepteAFacturer.length === 0 ? (
+                {accepteAFacturer.length + devisACorriger.length + devisEnvoyes.length === 0 ? (
                   <p style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>Rien à relancer.</p>
-                ) : [...accepteAFacturer, ...devisEnvoyes].map((o, i, arr) => {
+                ) : [...accepteAFacturer, ...devisACorriger, ...devisEnvoyes].map((o, i, arr) => {
                   const m = quoteStatusMeta(o.status)
+                  const note = o.status === 'accepte' ? ' · À FACTURER' : o.status === 'a_corriger' ? ' · À CORRIGER' : ''
                   return (
                     <Link key={o.p.id} href={`/projects/${o.p.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.divider}`, textDecoration: 'none', color: C.ink }}>
                       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.p.name}</span>
-                        <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>{o.p.client}{o.status === 'accepte' ? ' · À FACTURER' : ''}</span>
+                        <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>{o.p.client}{note}</span>
                       </div>
                       <span style={{ font: `600 13px ${MONO}`, whiteSpace: 'nowrap' }}>{fmtCHF(o.total)}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: o.status === 'accepte' ? C.success : C.violet, background: o.status === 'accepte' ? C.successBg : C.violetBg, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap', textTransform: 'uppercase' }}>{m.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: m.color, background: m.bg, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap', textTransform: 'uppercase' }}>{m.label}</span>
                     </Link>
                   )
                 })}
