@@ -1039,7 +1039,7 @@ export default function Admin() {
         </div>
       )}
 
-      <main className="w-full" style={{ padding: '26px 32px', maxWidth: 1440, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <main className="w-full" style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
         {/* Formulaire Add/Edit */}
         {showForm && (
