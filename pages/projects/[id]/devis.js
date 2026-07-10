@@ -47,7 +47,11 @@ export default function DevisPage() {
   async function downloadPdf() {
     try {
       const r = await fetch(`/api/projects/${id}/devis-pdf?mode=${level === 'summary' ? 'summary' : 'detailed'}`)
-      if (!r.ok) throw new Error(`Erreur ${r.status}`)
+      if (!r.ok) {
+        let msg = `Erreur ${r.status}`
+        try { const j = await r.json(); if (j.error) msg = j.error } catch (_) {}
+        throw new Error(msg)
+      }
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank', 'noopener')

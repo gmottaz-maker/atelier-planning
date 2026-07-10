@@ -69,7 +69,11 @@ export default function FacturesEmises() {
   async function downloadPdf(inv, mode) {
     try {
       const r = await fetch(`/api/customer-invoices/${inv.id}/pdf?mode=${mode}`)
-      if (!r.ok) throw new Error(`Erreur ${r.status}`)
+      if (!r.ok) {
+        let msg = `Erreur ${r.status}`
+        try { const j = await r.json(); if (j.error) msg = j.error } catch (_) {}
+        throw new Error(msg)
+      }
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank', 'noopener')
