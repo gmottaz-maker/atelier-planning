@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
 import KDriveFolderPicker from '../components/KDriveFolderPicker'
+import ContactPicker from '../components/ContactPicker'
 import { C, FONT, MONO } from '../lib/theme'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
@@ -1063,6 +1064,7 @@ export default function Admin() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Client *</label>
+                  <div style={{ marginBottom: 8 }}><ContactPicker placeholder="Choisir dans les contacts…" onSelect={({ name }) => handleFieldChange('client', name)} /></div>
                   <input type="text" required value={form.client}
                     onChange={e => handleFieldChange('client', e.target.value)}
                     placeholder="Ex: Hôtel du Lac" className={inputClass} />

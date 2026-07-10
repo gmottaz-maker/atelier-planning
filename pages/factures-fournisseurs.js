@@ -5,6 +5,7 @@ import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
+import ContactPicker from '../components/ContactPicker'
 
 const PINK = '#111827'
 const STATUS_LABELS = { pending: 'À payer', paid: 'Payée', overdue: 'En retard' }
@@ -565,6 +566,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Fournisseur *</label>
+                <div className="mb-2"><ContactPicker placeholder="Choisir dans les contacts…" onSelect={({ name }) => set('supplier_name', name)} /></div>
                 <input className={inputCls} value={form.supplier_name} onChange={e => set('supplier_name', e.target.value)} />
               </div>
               <div>
