@@ -12,10 +12,12 @@
   "dependencies": {
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
+    "@sparticuz/chromium": "^149.0.0",
     "@supabase/supabase-js": "^2.39.0",
     "fast-xml-parser": "^5.8.0",
     "next": "14.1.0",
     "pdfkit": "^0.18.0",
+    "puppeteer-core": "^25.3.0",
     "react": "^18",
     "react-dom": "^18",
     "swissqrbill": "^4.3.0",
