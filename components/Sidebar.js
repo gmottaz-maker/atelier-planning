@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { useState } from 'react'
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import { useAuth } from '../pages/_app'
@@ -19,16 +18,22 @@ const MAIN_ITEMS = [
   { href: '/activity',  label: 'Activité', match: (p) => p === '/activity' },
 ]
 
-// Sous-menu Banque (accordéon, admin uniquement)
-const BANK_ITEMS = [
-  { href: '/finances',              label: 'Tableau de bord' },
-  { href: '/clients',               label: 'Clients & fourn.' },
-  { href: '/offres',                label: 'Offres' },
-  { href: '/factures-fournisseurs', label: 'Fact. fournisseurs' },
-  { href: '/factures-emises',       label: 'Fact. émises' },
-  { href: '/justificatifs',         label: 'Justificatifs' },
-  { href: '/banque',                label: 'Banque' },
-  { href: '/compta',                label: 'Compta' },
+// Zone finances (admin uniquement) : 2 items transverses + 2 groupes labellisés
+const FIN_TOP = [
+  { href: '/finances', label: 'Tableau de bord' },
+  { href: '/clients',  label: 'Clients & fourn.' },
+]
+const FIN_GROUPS = [
+  { label: 'FINANCES CLIENTS', items: [
+    { href: '/offres',          label: 'Offres' },
+    { href: '/factures-emises', label: 'Factures sortantes' },
+  ] },
+  { label: 'FINANCES INTERNES', items: [
+    { href: '/factures-fournisseurs', label: 'Factures entrantes' },
+    { href: '/justificatifs',         label: 'Justificatifs' },
+    { href: '/banque',                label: 'Transactions bancaires' },
+    { href: '/compta',                label: 'Compta' },
+  ] },
 ]
 
 function itemStyle(active) {
@@ -61,8 +66,17 @@ export default function Sidebar() {
     projects: Array.isArray(projects) ? projects.filter(pr => pr.status === 'active').length : 0,
   }
 
-  const bankActive = BANK_ITEMS.some(i => p === i.href)
-  const [bankOpen, setBankOpen] = useState(bankActive)
+  const finLink = (item) => {
+    const active = p === item.href
+    return (
+      <Link key={item.href} href={item.href}
+        style={{ ...itemStyle(active), fontSize: 12.5 }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.divider }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+        {item.label}
+      </Link>
+    )
+  }
 
   return (
     <aside
@@ -100,27 +114,14 @@ export default function Sidebar() {
 
       <div style={{ height: 1, background: C.divider, margin: '8px 4px' }} />
 
-      {/* Banque — accordéon (admin) */}
+      {/* Finances (admin) */}
       {isAdmin && (
         <>
-          <button
-            onClick={() => setBankOpen(o => !o)}
-            style={{ ...itemStyle(false), fontWeight: 600, border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', background: 'transparent' }}
-          >
-            Banque
-            <span style={{ marginLeft: 'auto', color: C.faintChevron, fontSize: 11, transition: 'transform .15s ease', transform: bankOpen ? 'rotate(90deg)' : 'none' }}>▸</span>
-          </button>
-          {bankOpen && BANK_ITEMS.map(item => {
-            const active = p === item.href
-            return (
-              <Link key={item.href} href={item.href}
-                style={{ ...itemStyle(active), paddingLeft: 22, fontSize: 12.5 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.divider }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-                {item.label}
-              </Link>
-            )
-          })}
+          {FIN_TOP.map(finLink)}
+          {FIN_GROUPS.flatMap(g => [
+            <div key={g.label} style={{ font: `500 10px ${MONO}`, letterSpacing: '.1em', color: C.muted, padding: '10px 12px 4px' }}>{g.label}</div>,
+            ...g.items.map(finLink),
+          ])}
         </>
       )}
 
