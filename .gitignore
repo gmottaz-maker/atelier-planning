@@ -16,3 +16,6 @@ ios/
 **/.DS_Store
 .vercel
 .env*.local
+
+# Import contacts (PII — à exécuter en local, pas dans l'historique git)
+seed-contacts.sql

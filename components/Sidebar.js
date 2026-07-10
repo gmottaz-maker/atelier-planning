@@ -22,6 +22,7 @@ const MAIN_ITEMS = [
 // Sous-menu Banque (accordéon, admin uniquement)
 const BANK_ITEMS = [
   { href: '/finances',              label: 'Tableau de bord' },
+  { href: '/clients',               label: 'Clients & fourn.' },
   { href: '/offres',                label: 'Offres' },
   { href: '/factures-fournisseurs', label: 'Fact. fournisseurs' },
   { href: '/factures-emises',       label: 'Fact. émises' },
