@@ -51,6 +51,7 @@ export default async function handler(req, res) {
     const {
       project_id, client_name, client_address, amount, amount_net, vat_rate, vat_amount,
       currency, issue_date, due_date, iban_recipient, quote_snapshot, notes,
+      detail_level, status,
     } = req.body
 
     if (!client_name || amount == null) return res.status(400).json({ error: 'client_name et amount requis' })
@@ -84,6 +85,8 @@ export default async function handler(req, res) {
         iban_recipient: iban_recipient || process.env.AMAZING_LAB_IBAN || null,
         qr_reference,
         quote_snapshot: quote_snapshot || null,
+        detail_level: detail_level === 'summary' ? 'summary' : 'detailed',
+        status: status || 'created',
         notes,
       }).select().single())
 

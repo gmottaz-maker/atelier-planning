@@ -25,6 +25,10 @@ export default async function handler(req, res) {
     .from('customer_invoices').select('*, projects(name, client)').eq('id', id).single()
   if (error || !inv) return res.status(404).end()
 
+  // Mode d'affichage : détaillée (lignes) ou résumée (total seul).
+  // ?mode= prime, sinon le niveau enregistré sur la facture.
+  const mode = req.query.mode || inv.detail_level || 'detailed'
+
   // Charger les infos entreprise depuis app_settings (fallback env)
   const { data: settings } = await supabase
     .from('app_settings').select('value').eq('key', 'company_info').maybeSingle()
@@ -117,6 +121,7 @@ export default async function handler(req, res) {
   const logistics = q.logistics || []
 
   function drawSection(title, rows, mapRow) {
+    if (mode === 'summary') return   // facture résumée : pas de détail des lignes
     if (rows.length === 0) return
     doc.moveDown(1)
     doc.fontSize(9).fillColor('#111827').font('Helvetica-Bold').text(title.toUpperCase())

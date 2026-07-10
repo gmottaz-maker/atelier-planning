@@ -8,8 +8,8 @@ import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
 
 const PINK = '#111827'
-const STATUS_LABELS = { pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
-const STATUS_COLORS = { pending: '#f59e0b', paid: '#22c55e', overdue: '#dc2626', cancelled: '#9ca3af' }
+const STATUS_LABELS = { created: 'Créée', sent: 'Envoyée', pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
+const STATUS_COLORS = { created: '#6b7280', sent: '#1d4ed8', pending: '#f59e0b', paid: '#22c55e', overdue: '#dc2626', cancelled: '#9ca3af' }
 
 function fmtCHF(n) {
   if (n == null) return '—'
@@ -23,8 +23,10 @@ function fmtDate(s) {
 
 function effectiveStatus(inv) {
   if (inv.status === 'paid' || inv.status === 'cancelled') return inv.status
+  if (inv.status === 'created') return 'created'
+  // envoyée / en attente : passe en retard si échéance dépassée
   if (inv.due_date && new Date(inv.due_date) < new Date()) return 'overdue'
-  return 'pending'
+  return inv.status === 'sent' ? 'sent' : 'pending'
 }
 
 export default function FacturesEmises() {
@@ -63,6 +65,24 @@ export default function FacturesEmises() {
   }
 
   useEffect(() => { load() }, [year])
+
+  async function downloadPdf(inv, mode) {
+    try {
+      const r = await fetch(`/api/customer-invoices/${inv.id}/pdf?mode=${mode}`)
+      if (!r.ok) throw new Error(`Erreur ${r.status}`)
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) { alert('Téléchargement impossible : ' + e.message) }
+  }
+  async function markSent(inv) {
+    const sent_at = new Date().toISOString()
+    setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, status: 'sent', sent_at } : x))
+    await adminFetch(`/api/customer-invoices/${inv.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'sent', sent_at }) })
+    load()
+  }
+  function sendEmail() { alert('Envoi par e-mail : configuration à venir.') }
 
   const visible = invoices.filter(inv => filter === 'all' ? true : effectiveStatus(inv) === filter)
   const totals = invoices.reduce((acc, inv) => {
@@ -134,7 +154,7 @@ export default function FacturesEmises() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Échéance</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Montant</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Statut</th>
-                  <th className="px-4 py-3 w-8"></th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -156,8 +176,24 @@ export default function FacturesEmises() {
                           style={{ background: STATUS_COLORS[st] + '18', color: STATUS_COLORS[st] }}>
                           {STATUS_LABELS[st]}
                         </span>
+                        {inv.sent_at && (st === 'sent' || st === 'paid') && (
+                          <span className="ml-2 text-xs text-gray-400">le {fmtDate(inv.sent_at.slice(0, 10))}</span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-300">›</td>
+                      <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5 justify-end whitespace-nowrap">
+                          <button title="Télécharger la facture détaillée (PDF + QR)" onClick={() => downloadPdf(inv, 'detailed')}
+                            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">⤓ Détaillée</button>
+                          <button title="Télécharger la facture résumée (PDF + QR)" onClick={() => downloadPdf(inv, 'summary')}
+                            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">⤓ Résumée</button>
+                          <button title="Envoyer par e-mail (configuration à venir)" onClick={sendEmail}
+                            className="text-xs font-medium text-gray-500 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">✉</button>
+                          {(st === 'sent' || st === 'paid' || st === 'cancelled') ? null : (
+                            <button title="Marquer comme envoyée (avec date du jour)" onClick={() => markSent(inv)}
+                              className="text-xs font-medium border rounded px-2 py-1" style={{ color: '#1d4ed8', borderColor: '#bfdbfe' }}>✓ Envoyée</button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
@@ -193,7 +229,8 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     due_date:       invoice?.due_date || '',
     iban_recipient: invoice?.iban_recipient || '',
     notes:          invoice?.notes || '',
-    status:         invoice?.status || 'pending',
+    status:         invoice?.status || 'created',
+    detail_level:   invoice?.detail_level || 'detailed',
   })
   const [lines, setLines]   = useState({
     purchases: invoice?.quote_snapshot?.purchases || [],
@@ -411,6 +448,19 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
               <label className="block text-xs font-medium text-gray-500 mb-1.5">Adresse client</label>
               <textarea rows={3} className={inputCls} value={form.client_address} onChange={e => set('client_address', e.target.value)}
                 placeholder="Société Sàrl&#10;Rue X 12&#10;1200 Genève" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Type de facture (PDF)</label>
+              <div className="inline-flex rounded-md border border-gray-200 overflow-hidden text-sm">
+                {[{ k: 'detailed', l: 'Détaillée' }, { k: 'summary', l: 'Résumée' }].map(o => (
+                  <button key={o.k} type="button" onClick={() => set('detail_level', o.k)}
+                    className="px-4 py-1.5 font-medium"
+                    style={form.detail_level === o.k ? { background: '#111827', color: '#fff' } : { background: '#fff', color: '#6b7280' }}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Détaillée = lignes du devis ; Résumée = total seul. Modifiable, et disponible aux deux formats au téléchargement.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
