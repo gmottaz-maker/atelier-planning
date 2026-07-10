@@ -118,16 +118,21 @@ export default function ContactDetail() {
         {/* Rôles + tags */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => set('is_customer', !form.is_customer)}
-              style={{ font: `11px ${MONO}`, padding: '4px 12px', borderRadius: 99, cursor: 'pointer', color: form.is_customer ? C.success : C.faint, background: form.is_customer ? C.successBg : 'transparent', border: `1px solid ${form.is_customer ? 'transparent' : C.border}` }}>CLIENT</button>
-            <button onClick={() => set('is_supplier', !form.is_supplier)}
-              style={{ font: `11px ${MONO}`, padding: '4px 12px', borderRadius: 99, cursor: 'pointer', color: form.is_supplier ? C.warning : C.faint, background: form.is_supplier ? C.warningBg : 'transparent', border: `1px solid ${form.is_supplier ? 'transparent' : C.border}` }}>FOURNISSEUR</button>
+            {['Client', 'Fournisseur'].map(rt => {
+              const active = form.tags.includes(rt)
+              const on = rt === 'Client' ? { fg: C.success, bg: C.successBg } : { fg: C.warning, bg: C.warningBg }
+              return (
+                <button key={rt} onClick={() => active ? removeTag(rt) : addTag(rt)}
+                  style={{ font: `11px ${MONO}`, padding: '4px 12px', borderRadius: 99, cursor: 'pointer', textTransform: 'uppercase',
+                    color: active ? on.fg : C.faint, background: active ? on.bg : 'transparent', border: `1px solid ${active ? 'transparent' : C.border}` }}>{rt}</button>
+              )
+            })}
           </div>
           {/* Tags */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>TAGS</span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              {form.tags.map(t => (
+              {form.tags.filter(t => t !== 'Client' && t !== 'Fournisseur').map(t => (
                 <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '3px 6px 3px 10px', borderRadius: 99 }}>
                   {t}
                   <button onClick={() => removeTag(t)} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>

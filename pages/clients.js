@@ -43,15 +43,16 @@ export default function Clients() {
   }
   const allTags = [...new Set(list.flatMap(c => c.tags || []))].sort()
 
-  const CUST = { fg: C.success, bg: C.successBg }
-  const SUP  = { fg: C.warning, bg: C.warningBg }
+  const ROLE_TAGS = ['Client', 'Fournisseur']
+  const roleStyle = t => t === 'Client' ? { fg: C.success, bg: C.successBg } : { fg: C.warning, bg: C.warningBg }
+  const hasTag = (c, t) => !!c && (c.tags || []).includes(t)
 
   async function patch(c, body) {
     mutate(list.map(x => x.id === c.id ? { ...x, ...body } : x), false)
     try { await fetch(`/api/contacts?id=${c.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) }
     finally { mutate() }
   }
-  function toggle(e, c, field) { e.preventDefault(); e.stopPropagation(); patch(c, { [field]: !c[field] }) }
+  function toggleTag(e, c, t) { e.preventDefault(); e.stopPropagation(); patch(c, { tags: hasTag(c, t) ? (c.tags || []).filter(x => x !== t) : [...(c.tags || []), t] }) }
   async function del(e, c) {
     e.preventDefault(); e.stopPropagation()
     if (!confirm(`Supprimer « ${c.name} » ?`)) return
@@ -79,8 +80,8 @@ export default function Clients() {
   const needle = q.trim().toLowerCase()
   function matchItem(it) {
     const c = it.c, co = it.company
-    if (filter === 'customer' && !(c.is_customer || co?.is_customer)) return false
-    if (filter === 'supplier' && !(c.is_supplier || co?.is_supplier)) return false
+    if (filter === 'customer' && !(hasTag(c, 'Client') || hasTag(co, 'Client'))) return false
+    if (filter === 'supplier' && !(hasTag(c, 'Fournisseur') || hasTag(co, 'Fournisseur'))) return false
     if (tagFilter && !((c.tags || []).includes(tagFilter) || (co?.tags || []).includes(tagFilter))) return false
     if (needle) {
       const hay = [c.name, c.email, c.city, co?.name].filter(Boolean).join(' ').toLowerCase()
@@ -94,8 +95,8 @@ export default function Clients() {
     return ka < kb ? -1 : ka > kb ? 1 : (a.c.name || '').localeCompare(b.c.name || '')
   })
 
-  const nCust = list.filter(c => c.is_customer).length
-  const nSup  = list.filter(c => c.is_supplier).length
+  const nCust = list.filter(c => hasTag(c, 'Client')).length
+  const nSup  = list.filter(c => hasTag(c, 'Fournisseur')).length
   const tab = (k, label, n) => (
     <button onClick={() => setFilter(k)} key={k}
       style={{ padding: '6px 14px', cursor: 'pointer', border: 'none', font: `${filter === k ? 600 : 400} 12px ${FONT}`,
@@ -133,11 +134,17 @@ export default function Clients() {
         {/* Coordonnées */}
         <div style={{ font: `11px ${MONO}`, color: contact ? C.inkTertiary : C.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact || 'pas de coordonnées'}</div>
 
-        {/* Rôles + tags utilisés */}
+        {/* Rôles (= tags Client/Fournisseur togglables) + autres tags */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-          <button onClick={e => toggle(e, c, 'is_customer')} style={{ font: `9.5px ${MONO}`, padding: '2px 8px', borderRadius: 99, cursor: 'pointer', flex: 'none', color: c.is_customer ? CUST.fg : C.faint, background: c.is_customer ? CUST.bg : 'transparent', border: `1px solid ${c.is_customer ? 'transparent' : C.border}` }}>CLIENT</button>
-          <button onClick={e => toggle(e, c, 'is_supplier')} style={{ font: `9.5px ${MONO}`, padding: '2px 8px', borderRadius: 99, cursor: 'pointer', flex: 'none', color: c.is_supplier ? SUP.fg : C.faint, background: c.is_supplier ? SUP.bg : 'transparent', border: `1px solid ${c.is_supplier ? 'transparent' : C.border}` }}>FOURN.</button>
-          {(c.tags || []).map(t => (
+          {ROLE_TAGS.map(rt => {
+            const on = roleStyle(rt), active = hasTag(c, rt)
+            return (
+              <button key={rt} onClick={e => toggleTag(e, c, rt)}
+                style={{ font: `9.5px ${MONO}`, padding: '2px 8px', borderRadius: 99, cursor: 'pointer', flex: 'none', textTransform: 'uppercase',
+                  color: active ? on.fg : C.faint, background: active ? on.bg : 'transparent', border: `1px solid ${active ? 'transparent' : C.border}` }}>{rt}</button>
+            )
+          })}
+          {(c.tags || []).filter(t => !ROLE_TAGS.includes(t)).map(t => (
             <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '2px 4px 2px 8px', borderRadius: 99 }}>
               {t}<button onClick={() => removeTag(c, t)} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0 }}>×</button>
             </span>
@@ -179,11 +186,11 @@ export default function Clients() {
           <button onClick={nouveau} style={{ border: 'none', background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>+ NOUVEAU</button>
         </div>
 
-        {/* Filtre par tag (uniquement les tags utilisés) */}
-        {allTags.length > 0 && (
+        {/* Filtre par tag (tags utilisés, hors rôles Client/Fournisseur qui ont leurs onglets) */}
+        {allTags.filter(t => !ROLE_TAGS.includes(t)).length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ font: `10px ${MONO}`, color: C.muted, marginRight: 2 }}>TAGS</span>
-            {allTags.map(t => (
+            {allTags.filter(t => !ROLE_TAGS.includes(t)).map(t => (
               <button key={t} onClick={() => setTagFilter(tagFilter === t ? null : t)}
                 style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99, cursor: 'pointer',
                   color: tagFilter === t ? '#fff' : C.violet, background: tagFilter === t ? C.violet : C.violetBg, border: 'none' }}>{t}</button>
