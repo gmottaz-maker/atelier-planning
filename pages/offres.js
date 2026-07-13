@@ -8,6 +8,7 @@ import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { QUOTE_STATUSES, quoteStatusMeta } from '../lib/quoteStatus'
 import { computeQuoteTotal } from '../lib/quoteTotals'
+import SendDocumentModal from '../components/SendDocumentModal'
 
 const INV_STATUSES = [
   { key: 'pending',   label: 'En attente', color: '#b45309', bg: '#fffbeb' },
@@ -33,6 +34,7 @@ export default function Offres() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState('all')
+  const [sendDoc, setSendDoc]   = useState(null)   // { type, docId, mode, contactId, projectName, number }
 
   async function load() {
     setLoading(true)
@@ -198,11 +200,17 @@ export default function Offres() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <a href={`/projects/${o.p.id}/devis`} target="_blank" rel="noopener"
-                          className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
-                          PDF
-                        </a>
+                        <div className="flex items-center gap-3">
+                          <a href={`/projects/${o.p.id}/devis`} target="_blank" rel="noopener"
+                            className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                            PDF
+                          </a>
+                          <button onClick={() => setSendDoc({ type: 'devis', docId: o.p.id, mode: 'detail', contactId: o.p.client_contact_id, projectName: o.p.name, number: o.number || autoRef })}
+                            title="Envoyer l'offre par e-mail" className="text-gray-400 hover:text-gray-900">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z" /><polyline points="22 6 12 13 2 6" /></svg>
+                          </button>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         {inv ? (
@@ -218,6 +226,10 @@ export default function Offres() {
                                 className="text-gray-400 hover:text-gray-900" title="Télécharger la facture (PDF QR-bill)">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                               </a>
+                              <button onClick={() => setSendDoc({ type: 'facture', docId: inv.id, contactId: o.p.client_contact_id, projectName: o.p.name, number: inv.invoice_number })}
+                                title="Envoyer la facture par e-mail" className="text-gray-400 hover:text-gray-900">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z" /><polyline points="22 6 12 13 2 6" /></svg>
+                              </button>
                             </div>
                             <input type="date" value={inv.sent_at ? String(inv.sent_at).slice(0, 10) : ''} onChange={e => changeInvoiceSentDate(inv, e.target.value)}
                               title="Date d'envoi de la facture"
@@ -253,6 +265,13 @@ export default function Offres() {
           </div>
         )}
       </main>
+
+      {sendDoc && (
+        <SendDocumentModal
+          type={sendDoc.type} docId={sendDoc.docId} mode={sendDoc.mode}
+          contactId={sendDoc.contactId} projectName={sendDoc.projectName} number={sendDoc.number}
+          onClose={() => setSendDoc(null)} onSent={() => load()} />
+      )}
     </div>
   )
 }

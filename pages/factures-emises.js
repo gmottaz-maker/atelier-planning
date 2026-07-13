@@ -7,6 +7,7 @@ import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
 import CatalogPicker, { toPurchaseRow, toRateRow } from '../components/CatalogPicker'
+import SendDocumentModal from '../components/SendDocumentModal'
 import { pdfFilename } from '../lib/pdfFilename'
 
 const PINK = '#111827'
@@ -146,7 +147,11 @@ export default function FacturesEmises() {
     await adminFetch(`/api/customer-invoices/${inv.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'sent', sent_at }) })
     load()
   }
-  function sendEmail() { alert('Envoi par e-mail : configuration à venir.') }
+  const [sendDoc, setSendDoc] = useState(null)
+  function openSend(inv) {
+    const proj = projects.find(p => String(p.id) === String(inv.project_id))
+    setSendDoc({ type: 'facture', docId: inv.id, contactId: proj?.client_contact_id, projectName: proj?.name || inv.client_name, number: inv.invoice_number })
+  }
 
   const visible = invoices.filter(inv => filter === 'all' ? true : effectiveStatus(inv) === filter)
   const totals = invoices.reduce((acc, inv) => {
@@ -250,7 +255,7 @@ export default function FacturesEmises() {
                             className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">⤓ Détaillée</button>
                           <button title="Télécharger la facture résumée (PDF + QR)" onClick={() => downloadPdf(inv, 'summary')}
                             className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">⤓ Résumée</button>
-                          <button title="Envoyer par e-mail (configuration à venir)" onClick={sendEmail}
+                          <button title="Envoyer la facture par e-mail" onClick={() => openSend(inv)}
                             className="text-xs font-medium text-gray-500 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">✉</button>
                           {(st === 'sent' || st === 'paid' || st === 'cancelled') ? null : (
                             <button title="Marquer comme envoyée (avec date du jour)" onClick={() => markSent(inv)}
@@ -275,6 +280,13 @@ export default function FacturesEmises() {
           onClose={() => { setDrawerOpen(false); setEditing(null); setCreateForProject(null) }}
           onSaved={() => { setDrawerOpen(false); setEditing(null); setCreateForProject(null); load() }}
         />
+      )}
+
+      {sendDoc && (
+        <SendDocumentModal
+          type={sendDoc.type} docId={sendDoc.docId} mode={sendDoc.mode}
+          contactId={sendDoc.contactId} projectName={sendDoc.projectName} number={sendDoc.number}
+          onClose={() => setSendDoc(null)} onSent={() => load()} />
       )}
     </div>
   )
