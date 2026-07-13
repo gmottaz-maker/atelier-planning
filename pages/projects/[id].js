@@ -12,6 +12,7 @@ import TaskFormDrawer from '../../components/TaskFormDrawer'
 import AutocompleteInput from '../../components/AutocompleteInput'
 import { useSuggestions } from '../../lib/useSuggestions'
 import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/AddressInput'
+import CatalogPicker, { toPurchaseRow, toRateRow } from '../../components/CatalogPicker'
 import { C, FONT, MONO, personChip, initials as themeInitials } from '../../lib/theme'
 
 const PINK = '#111827'
@@ -1399,6 +1400,28 @@ export default function ProjectPage() {
     }))
     setQuoteDirty(true)
   }
+
+  // ── Ajout de lignes pré-remplies depuis le catalogue ──
+  function appendManagementRow(pre) {
+    setQuote(q => ({ ...q, management: [...q.management, { ...emptyLaborRow(), ...pre }] }))
+    setQuoteDirty(true)
+  }
+  function appendLogisticsRow(pre) {
+    setQuote(q => ({ ...q, logistics: [...q.logistics, { ...emptyLogisticsRow(), ...pre }] }))
+    setQuoteDirty(true)
+  }
+  function appendSubcontractingRow(pre) {
+    setQuote(q => ({ ...q, subcontracting: [...(q.subcontracting || []), { ...emptySubcontractingRow(), ...pre }] }))
+    setQuoteDirty(true)
+  }
+  function appendItemRow(itemIdx, kind, pre) {
+    const base = kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()
+    setQuote(q => ({
+      ...q,
+      items: q.items.map((it, i) => i === itemIdx ? { ...it, [kind]: [...(it[kind] || []), { ...base, ...pre }] } : it),
+    }))
+    setQuoteDirty(true)
+  }
   function updateItemRow(itemIdx, kind, rowIdx, field, value) {
     setQuote(q => ({
       ...q,
@@ -2527,8 +2550,11 @@ export default function ProjectPage() {
                         <div className="flex items-center gap-4">
                           <span className="text-sm font-semibold tabular-nums" style={{ color: '#3730a3' }}>{fmtCHF(managementTotal)} CHF</span>
                           {!collapsedSections.management && (
-                            <button onClick={addManagementRow}
-                              className="text-xs font-medium text-indigo-700 hover:text-indigo-900">+ Ligne</button>
+                            <>
+                              <CatalogPicker kind="heure" onPick={it => appendManagementRow(toRateRow(it))} />
+                              <button onClick={addManagementRow}
+                                className="text-xs font-medium text-indigo-700 hover:text-indigo-900">+ Ligne</button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -2627,8 +2653,11 @@ export default function ProjectPage() {
                               <div className="border-b border-gray-100">
                                 <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#fffbeb' }}>
                                   <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#92400e' }}>● Achats (matériaux)</h4>
-                                  <button onClick={() => addItemRow(itemIdx, 'purchases')}
-                                    className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Ligne</button>
+                                  <span className="flex items-center gap-2">
+                                    <CatalogPicker kind="article" onPick={it => appendItemRow(itemIdx, 'purchases', toPurchaseRow(it))} />
+                                    <button onClick={() => addItemRow(itemIdx, 'purchases')}
+                                      className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Ligne</button>
+                                  </span>
                                 </div>
                             <div className="overflow-x-auto">
                               <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
@@ -2685,8 +2714,11 @@ export default function ProjectPage() {
                           <div>
                             <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#faf5ff' }}>
                               <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#6b21a8' }}>● Main d'œuvre (découpe, peinture…)</h4>
-                              <button onClick={() => addItemRow(itemIdx, 'labor')}
-                                className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Ligne</button>
+                              <span className="flex items-center gap-2">
+                                <CatalogPicker kind="heure" onPick={it => appendItemRow(itemIdx, 'labor', toRateRow(it))} />
+                                <button onClick={() => addItemRow(itemIdx, 'labor')}
+                                  className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Ligne</button>
+                              </span>
                             </div>
                             <div className="overflow-x-auto">
                               <table className="w-full" style={{ minWidth: 800, tableLayout: 'fixed' }}>
@@ -2758,8 +2790,11 @@ export default function ProjectPage() {
                         <div className="flex items-center gap-4">
                           <span className="text-sm font-semibold tabular-nums" style={{ color: '#9a3412' }}>{fmtCHF(subcontractingTotal)} CHF</span>
                           {!collapsedSections.subcontracting && (
-                            <button onClick={addSubcontractingRow}
-                              className="text-xs font-medium text-orange-700 hover:text-orange-900">+ Ligne</button>
+                            <>
+                              <CatalogPicker kind="all" onPick={it => appendSubcontractingRow(toRateRow(it))} />
+                              <button onClick={addSubcontractingRow}
+                                className="text-xs font-medium text-orange-700 hover:text-orange-900">+ Ligne</button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -2825,8 +2860,11 @@ export default function ProjectPage() {
                         <div className="flex items-center gap-4">
                           <span className="text-sm font-semibold tabular-nums" style={{ color: '#155e75' }}>{fmtCHF(logisticsTotal)} CHF</span>
                           {!collapsedSections.logistics && (
-                            <button onClick={addLogisticsRow}
-                              className="text-xs font-medium text-cyan-700 hover:text-cyan-900">+ Ligne</button>
+                            <>
+                              <CatalogPicker kind="all" onPick={it => appendLogisticsRow(toRateRow(it))} />
+                              <button onClick={addLogisticsRow}
+                                className="text-xs font-medium text-cyan-700 hover:text-cyan-900">+ Ligne</button>
+                            </>
                           )}
                         </div>
                       </div>

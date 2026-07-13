@@ -22,6 +22,7 @@ const MAIN_ITEMS = [
 const FIN_TOP = [
   { href: '/finances', label: 'Tableau de bord' },
   { href: '/clients',  label: 'Contacts' },
+  { href: '/catalog',  label: 'Catalogue' },
 ]
 const FIN_GROUPS = [
   { label: 'FINANCES CLIENTS', items: [

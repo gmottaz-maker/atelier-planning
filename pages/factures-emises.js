@@ -6,6 +6,7 @@ import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
+import CatalogPicker, { toPurchaseRow, toRateRow } from '../components/CatalogPicker'
 
 const PINK = '#111827'
 const STATUS_LABELS = { created: 'Créée', sent: 'Envoyée', pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
@@ -330,6 +331,11 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     setPickedQuoteData(null)
     setLines(L => ({ ...L, [t]: L[t].filter((_, ix) => ix !== i) }))
   }
+  // Ajout d'une ligne pré-remplie depuis le catalogue
+  function addFilled(t, pre) {
+    setPickedQuoteData(null)
+    setLines(L => ({ ...L, [t]: [...L[t], { _uid: genUid(), ...pre }] }))
+  }
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -529,7 +535,7 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
             {/* ── Positions ── */}
             <div className="border-t border-gray-100 pt-4">
               <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: 14 }}>Positions (HT)</h3>
-              <LinesEditor lines={lines} addLine={addLine} updLine={updLine} rmLine={rmLine} />
+              <LinesEditor lines={lines} addLine={addLine} updLine={updLine} rmLine={rmLine} addFilled={addFilled} />
               <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
                 <div className="flex justify-between items-baseline text-xs text-gray-600">
                   <span>Sous-total HT</span>
@@ -590,18 +596,22 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
   )
 }
 
-function LinesEditor({ lines, addLine, updLine, rmLine }) {
+function LinesEditor({ lines, addLine, updLine, rmLine, addFilled }) {
   const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
   const sec = 'mb-4'
   const inputSm = 'w-full px-2 py-1 border border-gray-200 rounded text-xs bg-white focus:border-gray-400 focus:outline-none'
 
-  function Section({ title, type, columns, rows, computeRowTotal }) {
+  function Section({ title, type, columns, rows, computeRowTotal, catalogKind }) {
+    const mapFn = type === 'purchases' ? toPurchaseRow : toRateRow
     return (
       <div className={sec}>
         <div className='flex items-center justify-between mb-1.5'>
           <span className='text-xs font-semibold text-gray-700 uppercase tracking-wider'>{title}</span>
-          <button type='button' onClick={() => addLine(type)}
-            className='text-xs font-medium text-gray-500 hover:text-gray-900'>+ Ligne</button>
+          <span className='flex items-center gap-2'>
+            <CatalogPicker kind={catalogKind} onPick={it => addFilled(type, mapFn(it))} />
+            <button type='button' onClick={() => addLine(type)}
+              className='text-xs font-medium text-gray-500 hover:text-gray-900'>+ Ligne</button>
+          </span>
         </div>
         {rows.length === 0 ? (
           <p className='text-xs text-gray-400 italic py-1'>Aucune ligne</p>
@@ -640,6 +650,7 @@ function LinesEditor({ lines, addLine, updLine, rmLine }) {
           { k: 'discount_amount', w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. CHF' },
         ]}
         rows={lines.purchases}
+        catalogKind='article'
         computeRowTotal={r => applyDiscount(num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), r)}
       />
       <Section title="Main d'œuvre" type='labor'
@@ -652,6 +663,7 @@ function LinesEditor({ lines, addLine, updLine, rmLine }) {
           { k: 'discount_amount', w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. CHF' },
         ]}
         rows={lines.labor}
+        catalogKind='heure'
         computeRowTotal={r => applyDiscount(num(r.rate) * num(r.quantity), r)}
       />
       <Section title='Logistique' type='logistics'
@@ -664,6 +676,7 @@ function LinesEditor({ lines, addLine, updLine, rmLine }) {
           { k: 'discount_amount', w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. CHF' },
         ]}
         rows={lines.logistics}
+        catalogKind='all'
         computeRowTotal={r => applyDiscount(num(r.rate) * num(r.quantity), r)}
       />
     </div>
