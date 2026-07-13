@@ -21,6 +21,59 @@ function fmtDate(s) {
   return `${d}.${m}.${y}`
 }
 
+// ── Snapshot de devis ──────────────────────────────────────────────
+// Nouveau format (groupé par item) vs ancien format plat.
+const _num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+const _uid = () => `r_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+function isGroupedQuote(q) {
+  return !!q && (Array.isArray(q.items) || Array.isArray(q.management))
+}
+// Aplatit un devis groupé { management, items, subcontracting, logistics } en
+// lignes plates { purchases, labor, logistics } — marges résolues dans les
+// montants facturables (pour le total et l'éditeur de lignes).
+function flattenQuote(q) {
+  q = q || {}
+  const gm = q.general_margin ?? ''
+  const effMargin = r => (r?.margin !== '' && r?.margin != null ? _num(r.margin) : _num(gm))
+  if (!isGroupedQuote(q)) {
+    return {
+      purchases: (q.purchases || []).map(r => ({ ...r, _uid: r._uid || _uid() })),
+      labor:     (q.labor     || []).map(r => ({ ...r, _uid: r._uid || _uid() })),
+      logistics: (q.logistics || []).map(r => ({ ...r, _uid: r._uid || _uid() })),
+    }
+  }
+  const purchases = []
+  const labor = (q.management || []).map(r => ({
+    ...r, item: r.item || 'Gestion de projet / visuel', _uid: r._uid || _uid(),
+  }))
+  for (const it of (q.items || [])) {
+    const itemName = it.name || 'Item'
+    for (const r of (it.purchases || [])) {
+      purchases.push({
+        ...r, item: itemName,
+        margin: r.margin !== '' && r.margin != null ? r.margin : gm,
+        _uid: r._uid || _uid(),
+      })
+    }
+    for (const r of (it.labor || [])) labor.push({ ...r, item: itemName, _uid: r._uid || _uid() })
+  }
+  for (const r of (q.subcontracting || [])) {
+    labor.push({
+      ...r,
+      item: r.item ? `Sous-traitance · ${r.item}` : 'Sous-traitance',
+      rate: (_num(r.rate) * (1 + effMargin(r) / 100)).toFixed(2),
+      _uid: r._uid || _uid(),
+    })
+  }
+  // Logistique : marge propre à la ligne sinon 0 (jamais la marge générale) —
+  // cohérent avec buildQuoteSections/l'offre.
+  const marginLog = r => (r?.margin !== '' && r?.margin != null ? _num(r.margin) : 0)
+  const logistics = (q.logistics || []).map(r => ({
+    ...r, rate: (_num(r.rate) * (1 + marginLog(r) / 100)).toFixed(2), _uid: r._uid || _uid(),
+  }))
+  return { purchases, labor, logistics }
+}
+
 function effectiveStatus(inv) {
   if (inv.status === 'paid' || inv.status === 'cancelled') return inv.status
   if (inv.status === 'created') return 'created'
@@ -236,11 +289,13 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     status:         invoice?.status || 'created',
     detail_level:   invoice?.detail_level || 'detailed',
   })
-  const [lines, setLines]   = useState({
-    purchases: invoice?.quote_snapshot?.purchases || [],
-    labor:     invoice?.quote_snapshot?.labor || [],
-    logistics: invoice?.quote_snapshot?.logistics || [],
-  })
+  const [lines, setLines]   = useState(() => flattenQuote(invoice?.quote_snapshot))
+  // Devis groupé source à re-sauvegarder tel quel (préserve le découpage par
+  // item). null dès que l'utilisateur édite les lignes à la main → on retombe
+  // sur le format plat.
+  const [pickedQuoteData, setPickedQuoteData] = useState(
+    isGroupedQuote(invoice?.quote_snapshot) ? invoice.quote_snapshot : null
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -262,12 +317,15 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
       : t === 'logistics'
         ? { _uid: genUid(), trajet:'', description:'', rate:'', quantity:'' }
         : { _uid: genUid(), item:'', description:'', rate:'', quantity:'' }
+    setPickedQuoteData(null)
     setLines(L => ({ ...L, [t]: [...L[t], empty] }))
   }
   function updLine(t, i, k, v) {
+    setPickedQuoteData(null)
     setLines(L => ({ ...L, [t]: L[t].map((r, ix) => ix === i ? { ...r, [k]: v } : r) }))
   }
   function rmLine(t, i) {
+    setPickedQuoteData(null)
     setLines(L => ({ ...L, [t]: L[t].filter((_, ix) => ix !== i) }))
   }
 
@@ -281,79 +339,28 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProjectId, projects.length])
 
-  // Pré-remplir depuis le projet — on aplatit la structure { management, items, logistics }
-  // (ou l'ancien { purchases, labor, logistics }) en lignes plates pour la facture
+  // Pré-remplir depuis le projet. On conserve le devis groupé tel quel dans
+  // pickedQuoteData (→ snapshot qui préserve le découpage par item pour le PDF),
+  // et on l'aplatit en lignes plates pour le total et l'éditeur.
   function pickProject(pid) {
     const p = projects.find(x => x.id === pid)
     if (!p) { set('project_id', pid); return }
     const q = p.quote_data || {}
+    const flat = flattenQuote(q)
 
-    // Marge effective pour une ligne: spécifique sinon marge générale du devis
-    const gm = q.general_margin ?? ''
-    const effMargin = r => {
-      if (r?.margin !== '' && r?.margin != null) return num(r.margin)
-      return num(gm)
-    }
-
-    // Nouveau format : { management, items, subcontracting, logistics, general_margin }
-    let flatPurchases = []
-    let flatLabor     = []
-    let flatLogistics = []
-    if (Array.isArray(q.items) || Array.isArray(q.management)) {
-      // Gestion → labor (pas de marge, c'est de la main d'œuvre)
-      flatLabor = (q.management || []).map(r => ({
-        ...r,
-        item: r.item || 'Gestion de projet / visuel',
-        _uid: r._uid || genUid(),
-      }))
-      for (const it of (q.items || [])) {
-        const itemName = it.name || 'Item'
-        // Achats : la marge effective est résolue en row.margin pour que la facture la calcule comme avant
-        for (const r of (it.purchases || [])) {
-          flatPurchases.push({
-            ...r,
-            item: itemName,
-            margin: r.margin !== '' && r.margin != null ? r.margin : gm,
-            _uid: r._uid || genUid(),
-          })
-        }
-        for (const r of (it.labor || [])) {
-          flatLabor.push({ ...r, item: itemName, _uid: r._uid || genUid() })
-        }
-      }
-      // Sous-traitance → labor avec marge intégrée dans le tarif (la facture n'applique pas de marge sur le labor)
-      for (const r of (q.subcontracting || [])) {
-        const billedRate = num(r.rate) * (1 + effMargin(r) / 100)
-        flatLabor.push({
-          ...r,
-          item: r.item ? `Sous-traitance · ${r.item}` : 'Sous-traitance',
-          rate: billedRate.toFixed(2),
-          _uid: r._uid || genUid(),
-        })
-      }
-      // Logistique → idem (marge intégrée dans le tarif)
-      flatLogistics = (q.logistics || []).map(r => {
-        const billedRate = num(r.rate) * (1 + effMargin(r) / 100)
-        return { ...r, rate: billedRate.toFixed(2), _uid: r._uid || genUid() }
-      })
-    } else {
-      // Ancien format
-      flatPurchases = (q.purchases || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
-      flatLabor     = (q.labor     || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
-      flatLogistics = (q.logistics || []).map(r => ({ ...r, _uid: r._uid || genUid() }))
-    }
+    setPickedQuoteData(isGroupedQuote(q) ? q : null)
 
     const total =
-      flatPurchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
-      flatLabor    .reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
-      flatLogistics.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
+      flat.purchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
+      flat.labor    .reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
+      flat.logistics.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
     setForm(f => ({
       ...f,
       project_id: pid,
       client_name: p.client || f.client_name,
       amount: total > 0 ? total.toFixed(2) : f.amount,
     }))
-    setLines({ purchases: flatPurchases, labor: flatLabor, logistics: flatLogistics })
+    setLines(flat)
   }
 
   async function save() {
@@ -365,34 +372,29 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
       const gross = hasLines ? linesGross : num(form.amount)
       const net   = hasLines ? linesNet   : (vatRate >= 0 ? gross / (1 + vatRate / 100) : gross)
       const vat   = gross - net
-      const snapshotToSave = hasLines ? lines : null
+      // On fige le devis groupé tel quel (préserve le découpage par item pour le
+      // PDF) si l'utilisateur n'a pas édité les lignes à la main ; sinon le plat.
+      const snapshotToSave = pickedQuoteData || (hasLines ? lines : null)
       const baseBody = {
         ...form,
         amount: gross.toFixed(2),
         amount_net: net.toFixed(2),
         vat_amount: vat.toFixed(2),
       }
-      if (isEdit) {
-        const body = { ...baseBody, quote_snapshot: snapshotToSave }
-        const r = await adminFetch(`/api/customer-invoices/${invoice.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-        const d = await r.json()
-        if (d.error) { setError(d.error); return }
-      } else {
-        const p = projects.find(x => x.id === form.project_id)
-        const fallbackSnap = hasLines ? lines : (p?.quote_data || null)
-        const body = { ...baseBody, quote_snapshot: fallbackSnap }
-        const r = await adminFetch('/api/customer-invoices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-        const d = await r.json()
-        if (d.error) { setError(d.error); return }
-      }
+      const body = { ...baseBody, quote_snapshot: snapshotToSave }
+      const r = isEdit
+        ? await adminFetch(`/api/customer-invoices/${invoice.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        : await adminFetch('/api/customer-invoices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+      const d = await r.json()
+      if (d.error) { setError(d.error); return }
       onSaved()
     } finally { setSaving(false) }
   }
