@@ -25,6 +25,8 @@ function fmtDate(s) {
 // Nouveau format (groupé par item) vs ancien format plat.
 const _num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
 const _uid = () => `r_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+// Escompte par ligne : % puis montant CHF, sur le montant facturé (borné à 0).
+const applyDiscount = (amt, r) => Math.max(0, amt * (1 - _num(r.discount) / 100) - _num(r.discount_amount))
 function isGroupedQuote(q) {
   return !!q && (Array.isArray(q.items) || Array.isArray(q.management))
 }
@@ -302,9 +304,9 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
   // Recompute total when lines change (les positions sont HT, on applique la TVA globale)
   const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
   const linesNet =
-    lines.purchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
-    lines.labor.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
-    lines.logistics.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
+    lines.purchases.reduce((s, r) => s + applyDiscount(num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), r), 0) +
+    lines.labor.reduce((s, r) => s + applyDiscount(num(r.rate) * num(r.quantity), r), 0) +
+    lines.logistics.reduce((s, r) => s + applyDiscount(num(r.rate) * num(r.quantity), r), 0)
   const vatRate     = num(form.vat_rate)
   const linesVat    = linesNet * (vatRate / 100)
   const linesGross  = linesNet + linesVat
@@ -351,9 +353,9 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     setPickedQuoteData(isGroupedQuote(q) ? q : null)
 
     const total =
-      flat.purchases.reduce((s, r) => s + num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), 0) +
-      flat.labor    .reduce((s, r) => s + num(r.rate) * num(r.quantity), 0) +
-      flat.logistics.reduce((s, r) => s + num(r.rate) * num(r.quantity), 0)
+      flat.purchases.reduce((s, r) => s + applyDiscount(num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), r), 0) +
+      flat.labor    .reduce((s, r) => s + applyDiscount(num(r.rate) * num(r.quantity), r), 0) +
+      flat.logistics.reduce((s, r) => s + applyDiscount(num(r.rate) * num(r.quantity), r), 0)
     setForm(f => ({
       ...f,
       project_id: pid,
@@ -629,34 +631,40 @@ function LinesEditor({ lines, addLine, updLine, rmLine }) {
     <div>
       <Section title='Achats / matériel' type='purchases'
         columns={[
-          { k: 'item',        w: '1.3fr', placeholder: 'Item' },
-          { k: 'description', w: '2fr',   placeholder: 'Description' },
-          { k: 'unit_price',  w: '0.8fr', type: 'number', align: 'right', placeholder: 'P.U.' },
+          { k: 'item',        w: '1.2fr', placeholder: 'Item' },
+          { k: 'description', w: '1.8fr', placeholder: 'Description' },
+          { k: 'unit_price',  w: '0.7fr', type: 'number', align: 'right', placeholder: 'P.U.' },
           { k: 'quantity',    w: '0.5fr', type: 'number', align: 'right', placeholder: 'Qté' },
           { k: 'margin',      w: '0.6fr', type: 'number', align: 'right', placeholder: 'Marge %' },
+          { k: 'discount',        w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. %' },
+          { k: 'discount_amount', w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. CHF' },
         ]}
         rows={lines.purchases}
-        computeRowTotal={r => num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100)}
+        computeRowTotal={r => applyDiscount(num(r.unit_price) * num(r.quantity) * (1 + num(r.margin)/100), r)}
       />
       <Section title="Main d'œuvre" type='labor'
         columns={[
-          { k: 'item',        w: '1.3fr', placeholder: 'Item' },
-          { k: 'description', w: '2fr',   placeholder: 'Description' },
-          { k: 'rate',        w: '0.8fr', type: 'number', align: 'right', placeholder: 'Tarif' },
+          { k: 'item',        w: '1.2fr', placeholder: 'Item' },
+          { k: 'description', w: '1.8fr', placeholder: 'Description' },
+          { k: 'rate',        w: '0.7fr', type: 'number', align: 'right', placeholder: 'Tarif' },
           { k: 'quantity',    w: '0.5fr', type: 'number', align: 'right', placeholder: 'Qté' },
+          { k: 'discount',        w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. %' },
+          { k: 'discount_amount', w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. CHF' },
         ]}
         rows={lines.labor}
-        computeRowTotal={r => num(r.rate) * num(r.quantity)}
+        computeRowTotal={r => applyDiscount(num(r.rate) * num(r.quantity), r)}
       />
       <Section title='Logistique' type='logistics'
         columns={[
-          { k: 'trajet',      w: '1.3fr', placeholder: 'Trajet' },
-          { k: 'description', w: '2fr',   placeholder: 'Description' },
-          { k: 'rate',        w: '0.8fr', type: 'number', align: 'right', placeholder: 'Tarif' },
+          { k: 'trajet',      w: '1.2fr', placeholder: 'Trajet' },
+          { k: 'description', w: '1.8fr', placeholder: 'Description' },
+          { k: 'rate',        w: '0.7fr', type: 'number', align: 'right', placeholder: 'Tarif' },
           { k: 'quantity',    w: '0.5fr', type: 'number', align: 'right', placeholder: 'Qté' },
+          { k: 'discount',        w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. %' },
+          { k: 'discount_amount', w: '0.6fr', type: 'number', align: 'right', placeholder: 'Esc. CHF' },
         ]}
         rows={lines.logistics}
-        computeRowTotal={r => num(r.rate) * num(r.quantity)}
+        computeRowTotal={r => applyDiscount(num(r.rate) * num(r.quantity), r)}
       />
     </div>
   )

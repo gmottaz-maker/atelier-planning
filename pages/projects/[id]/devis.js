@@ -14,7 +14,20 @@ function serviceBilled(r, gm) { return serviceTotal(r) * (1 + effectiveMargin(r,
 // La logistique n'hérite pas de la marge générale : 0 % sauf marge spécifique sur la ligne
 function marginLogistics(r) { return (r?.margin !== '' && r?.margin != null) ? num(r.margin) : 0 }
 function serviceBilledLogistics(r) { return serviceTotal(r) * (1 + marginLogistics(r) / 100) }
+// Escompte par ligne : % puis montant CHF, sur le montant facturé (borné à 0).
+function applyDisc(amt, r) { return Math.max(0, amt * (1 - num(r.discount) / 100) - num(r.discount_amount)) }
+function purchaseNet(r, gm) { return applyDisc(purchaseBilled(r, gm), r) }
+function laborNet(r)        { return applyDisc(serviceTotal(r), r) }
+function serviceNet(r, gm)  { return applyDisc(serviceBilled(r, gm), r) }
+function logisticsNet(r)    { return applyDisc(serviceBilledLogistics(r), r) }
 function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
+function discLabel(r) {
+  const p = num(r.discount), a = num(r.discount_amount)
+  const parts = []
+  if (p) parts.push('−' + String(r.discount).replace('.', ',') + ' %')
+  if (a) parts.push('−' + fmtCHF(a) + ' CHF')
+  return parts.length ? '  ·  escompte ' + parts.join(' ') : ''
+}
 
 function fmtDateLong(d) {
   return d.toLocaleDateString('fr-CH', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -80,14 +93,14 @@ export default function DevisPage() {
         logistics: rawQ.logistics || [],
       }
   const gm = rawQ.general_margin ?? ''
-  const managementTotal     = (q.management || []).reduce((s, r) => s + serviceTotal(r), 0)
+  const managementTotal     = (q.management || []).reduce((s, r) => s + laborNet(r), 0)
   const itemsTotal          = (q.items || []).reduce((s, it) => {
-    const p = (it.purchases || []).reduce((a, r) => a + purchaseBilled(r, gm), 0)
-    const l = (it.labor     || []).reduce((a, r) => a + serviceTotal(r), 0)
+    const p = (it.purchases || []).reduce((a, r) => a + purchaseNet(r, gm), 0)
+    const l = (it.labor     || []).reduce((a, r) => a + laborNet(r), 0)
     return s + p + l
   }, 0)
-  const subcontractingTotal = (q.subcontracting || []).reduce((s, r) => s + serviceBilled(r, gm), 0)
-  const logisticsTotal      = (q.logistics || []).reduce((s, r) => s + serviceBilledLogistics(r), 0)
+  const subcontractingTotal = (q.subcontracting || []).reduce((s, r) => s + serviceNet(r, gm), 0)
+  const logisticsTotal      = (q.logistics || []).reduce((s, r) => s + logisticsNet(r), 0)
   const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
   const today = new Date()
@@ -206,8 +219,8 @@ export default function DevisPage() {
               { label: 'Total',       width: '14%', align: 'right' },
             ]}
             rows={q.management.map(r => [
-              r.item, r.description,
-              num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
+              r.item, (r.description || '') + discLabel(r),
+              num(r.quantity), r.unit || '', fmtCHF(laborNet(r)),
             ])}
           />
         )}
@@ -218,8 +231,8 @@ export default function DevisPage() {
             <SectionHeader title="Fabrication" total={itemsTotal} />
 
             {(q.items || []).map((it, idx) => {
-              const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r, gm), 0)
-              const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+              const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseNet(r, gm), 0)
+              const laborSub = (it.labor || []).reduce((s, r) => s + laborNet(r), 0)
               const subTotal = purchSub + laborSub
               if (subTotal === 0 && (it.purchases || []).length === 0 && (it.labor || []).length === 0) return null
               return (
@@ -246,8 +259,8 @@ export default function DevisPage() {
                         { label: 'Total',       width: '13%', align: 'right' },
                       ]}
                       rows={it.purchases.map(r => [
-                        r.description, r.dimension,
-                        num(r.quantity), r.unit || '', fmtCHF(purchaseBilled(r, gm)),
+                        (r.description || '') + discLabel(r), r.dimension,
+                        num(r.quantity), r.unit || '', fmtCHF(purchaseNet(r, gm)),
                       ])}
                       subtotalLabel="Sous-total achats"
                       subtotal={purchSub}
@@ -263,8 +276,8 @@ export default function DevisPage() {
                         { label: 'Total',       width: '14%', align: 'right' },
                       ]}
                       rows={it.labor.map(r => [
-                        r.description,
-                        num(r.quantity), r.unit || '', fmtCHF(serviceTotal(r)),
+                        (r.description || '') + discLabel(r),
+                        num(r.quantity), r.unit || '', fmtCHF(laborNet(r)),
                       ])}
                       subtotalLabel="Sous-total main d'œuvre"
                       subtotal={laborSub}
@@ -290,8 +303,8 @@ export default function DevisPage() {
               { label: 'Total',       width: '14%', align: 'right' },
             ]}
             rows={q.subcontracting.map(r => [
-              r.item, r.description,
-              num(r.quantity), r.unit || '', fmtCHF(serviceBilled(r, gm)),
+              r.item, (r.description || '') + discLabel(r),
+              num(r.quantity), r.unit || '', fmtCHF(serviceNet(r, gm)),
             ])}
           />
         )}
@@ -310,8 +323,8 @@ export default function DevisPage() {
               { label: 'Total',       width: '14%', align: 'right' },
             ]}
             rows={q.logistics.map(r => [
-              r.trajet, r.description,
-              num(r.quantity), r.unit || '', fmtCHF(serviceBilledLogistics(r)),
+              r.trajet, (r.description || '') + discLabel(r),
+              num(r.quantity), r.unit || '', fmtCHF(logisticsNet(r)),
             ])}
           />
         )}

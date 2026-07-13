@@ -1297,14 +1297,20 @@ export default function ProjectPage() {
   // La logistique n'hérite PAS de la marge générale : 0 % sauf marge spécifique sur la ligne
   function effectiveMarginLogistics(r) { return (r?.margin !== '' && r?.margin != null) ? num(r.margin) : 0 }
   function serviceBilledLogistics(r)   { return serviceTotal(r) * (1 + effectiveMarginLogistics(r) / 100) }
+  // Escompte par ligne : % puis montant CHF, sur le montant facturé (borné à 0).
+  function applyDiscount(amt, r) { return Math.max(0, amt * (1 - num(r.discount) / 100) - num(r.discount_amount)) }
+  function purchaseNet(r)   { return applyDiscount(purchaseBilled(r), r) }
+  function laborNet(r)      { return applyDiscount(serviceTotal(r), r) }
+  function serviceNet(r)    { return applyDiscount(serviceBilled(r), r) }
+  function logisticsNet(r)  { return applyDiscount(serviceBilledLogistics(r), r) }
   function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
   function genItemUid() { return `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
   const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
-  function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '' } }
-  function emptyLaborRow()    { return { _uid: genRowUid(), item: '', description: '', rate: '100', quantity: '', unit: '' } }
-  function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '', margin: '' } }
-  function emptySubcontractingRow(){ return { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '', unit: '', margin: '' } }
+  function emptyPurchaseRow() { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '', discount: '', discount_amount: '' } }
+  function emptyLaborRow()    { return { _uid: genRowUid(), item: '', description: '', rate: '100', quantity: '', unit: '', discount: '', discount_amount: '' } }
+  function emptyLogisticsRow(){ return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '', margin: '', discount: '', discount_amount: '' } }
+  function emptySubcontractingRow(){ return { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '', unit: '', margin: '', discount: '', discount_amount: '' } }
 
   // Modèle par défaut d'un nouveau devis (gestion projet + logistique pré-remplies)
   function defaultQuote() {
@@ -1412,8 +1418,8 @@ export default function ProjectPage() {
     setQuoteDirty(true)
   }
   function itemTotal(it) {
-    const p = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
-    const l = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+    const p = (it.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
+    const l = (it.labor || []).reduce((s, r) => s + laborNet(r), 0)
     return p + l
   }
 
@@ -2399,10 +2405,10 @@ export default function ProjectPage() {
         {/* ── Offre ── */}
         <div className="mt-12 no-print">
           {(() => {
-            const managementTotal     = quote.management.reduce((s, r) => s + serviceTotal(r), 0)
+            const managementTotal     = quote.management.reduce((s, r) => s + laborNet(r), 0)
             const itemsTotal          = quote.items.reduce((s, it) => s + itemTotal(it), 0)
-            const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceBilled(r), 0)
-            const logisticsTotal      = quote.logistics.reduce((s, r) => s + serviceBilledLogistics(r), 0)
+            const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceNet(r), 0)
+            const logisticsTotal      = quote.logistics.reduce((s, r) => s + logisticsNet(r), 0)
             const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
             const autoRef             = `${new Date().getFullYear()}-${String(project?.id || '').slice(-4).toUpperCase()}`
             const statusMeta          = quoteStatusMeta(quote.status)
@@ -2532,17 +2538,19 @@ export default function ProjectPage() {
                           <thead>
                             <tr>
                               <th className={th} style={{ width: '15%' }}>Item</th>
-                              <th className={th} style={{ width: '30%' }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
-                              <th className={th} style={{ width: '10%' }}>Unité</th>
-                              <th className={th + ' text-right'} style={{ width: '20%' }}>Total</th>
+                              <th className={th} style={{ width: '22%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: '11%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
+                              <th className={th} style={{ width: '9%' }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
+                              <th className={th + ' text-right'} style={{ width: '10%' }}>Esc.&nbsp;CHF</th>
+                              <th className={th + ' text-right'} style={{ width: '13%' }}>Total</th>
                               <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {quote.management.length === 0 ? (
-                              <tr><td colSpan={7} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
+                              <tr><td colSpan={9} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
                             ) : quote.management.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} /></td>
@@ -2550,7 +2558,9 @@ export default function ProjectPage() {
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateManagementRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateManagementRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateManagementRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateManagementRow(i, 'discount', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateManagementRow(i, 'discount_amount', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(laborNet(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeManagementRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>
@@ -2560,7 +2570,7 @@ export default function ProjectPage() {
                           {quote.management.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
+                                <td colSpan={7} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(managementTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
@@ -2588,8 +2598,8 @@ export default function ProjectPage() {
                           <div className="text-center text-sm text-emerald-700/70 py-6">Aucun item pour l'instant. Ajoute Bar, Pergola, etc.</div>
                         )}
                         {quote.items.map((it, itemIdx) => {
-                          const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseBilled(r), 0)
-                          const laborSub = (it.labor || []).reduce((s, r) => s + serviceTotal(r), 0)
+                          const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
+                          const laborSub = (it.labor || []).reduce((s, r) => s + laborNet(r), 0)
                           const subTotal = purchSub + laborSub
                           return (
                             <div key={it._uid || itemIdx} className="bg-white rounded-xl border border-emerald-200 overflow-hidden shadow-sm">
@@ -2624,20 +2634,22 @@ export default function ProjectPage() {
                               <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th} style={{ width: '30%' }}>Description</th>
-                                    <th className={th} style={{ width: '15%' }}>Dimension</th>
-                                    <th className={th + ' text-right'} style={{ width: '13%' }}>Prix d'achat</th>
-                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
-                                    <th className={th} style={{ width: '10%' }}>Unité</th>
+                                    <th className={th} style={{ width: '24%' }}>Description</th>
+                                    <th className={th} style={{ width: '12%' }}>Dimension</th>
+                                    <th className={th + ' text-right'} style={{ width: '11%' }}>Prix d'achat</th>
+                                    <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
+                                    <th className={th} style={{ width: '9%' }}>Unité</th>
                                     <th className={th + ' text-right'} style={{ width: '6%' }}>Total</th>
                                     <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
-                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Total facturé</th>
+                                    <th className={th + ' text-right'} style={{ width: '7%' }}>Esc.&nbsp;%</th>
+                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Esc.&nbsp;CHF</th>
+                                    <th className={th + ' text-right'} style={{ width: '6%' }}>Total facturé</th>
                                     <th className={th} style={{ width: '4%' }}></th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {(it.purchases || []).length === 0 ? (
-                                    <tr><td colSpan={9} className="text-center text-sm text-gray-400 py-4">Aucun achat.</td></tr>
+                                    <tr><td colSpan={11} className="text-center text-sm text-gray-400 py-4">Aucun achat.</td></tr>
                                   ) : it.purchases.map((r, i) => (
                                     <tr key={r._uid || i} className="group hover:bg-gray-50">
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'description', e.target.value)} /></td>
@@ -2647,7 +2659,9 @@ export default function ProjectPage() {
                                       <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                       <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
                                       <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'margin', e.target.value)} /></td>
-                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseBilled(r))}</td>
+                                      <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'discount', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'discount_amount', e.target.value)} /></td>
+                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseNet(r))}</td>
                                       <td className={td + ' text-center'}>
                                         <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                       </td>
@@ -2657,7 +2671,7 @@ export default function ProjectPage() {
                                 {(it.purchases || []).length > 0 && (
                                   <tfoot>
                                     <tr>
-                                      <td colSpan={7} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats</td>
+                                      <td colSpan={9} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats</td>
                                       <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(purchSub)}</td>
                                       <td className="bg-gray-50"></td>
                                     </tr>
@@ -2678,24 +2692,28 @@ export default function ProjectPage() {
                               <table className="w-full" style={{ minWidth: 800, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th} style={{ width: '45%' }}>Description</th>
-                                    <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
-                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
-                                    <th className={th} style={{ width: '10%' }}>Unité</th>
-                                    <th className={th + ' text-right'} style={{ width: '20%' }}>Total</th>
+                                    <th className={th} style={{ width: '33%' }}>Description</th>
+                                    <th className={th + ' text-right'} style={{ width: '12%' }}>Prix</th>
+                                    <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
+                                    <th className={th} style={{ width: '9%' }}>Unité</th>
+                                    <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
+                                    <th className={th + ' text-right'} style={{ width: '10%' }}>Esc.&nbsp;CHF</th>
+                                    <th className={th + ' text-right'} style={{ width: '16%' }}>Total</th>
                                     <th className={th} style={{ width: '4%' }}></th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {(it.labor || []).length === 0 ? (
-                                    <tr><td colSpan={6} className="text-center text-sm text-gray-400 py-4">Aucune main d'œuvre.</td></tr>
+                                    <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-4">Aucune main d'œuvre.</td></tr>
                                   ) : it.labor.map((r, i) => (
                                     <tr key={r._uid || i} className="group hover:bg-gray-50">
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'rate', e.target.value)} /></td>
                                       <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateItemRow(itemIdx, 'labor', i, 'quantity', v)} /></td>
                                       <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
-                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceTotal(r))}</td>
+                                      <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'discount', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'discount_amount', e.target.value)} /></td>
+                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(laborNet(r))}</td>
                                       <td className={td + ' text-center'}>
                                         <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                       </td>
@@ -2705,7 +2723,7 @@ export default function ProjectPage() {
                                 {(it.labor || []).length > 0 && (
                                   <tfoot>
                                     <tr>
-                                      <td colSpan={4} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
+                                      <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
                                       <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(laborSub)}</td>
                                       <td className="bg-gray-50"></td>
                                     </tr>
@@ -2750,19 +2768,21 @@ export default function ProjectPage() {
                         <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '15%' }}>Item</th>
-                              <th className={th} style={{ width: '30%' }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
-                              <th className={th} style={{ width: '10%' }}>Unité</th>
+                              <th className={th} style={{ width: '13%' }}>Item</th>
+                              <th className={th} style={{ width: '22%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: '12%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
+                              <th className={th} style={{ width: '9%' }}>Unité</th>
                               <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: '14%' }}>Total</th>
+                              <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
+                              <th className={th + ' text-right'} style={{ width: '10%' }}>Esc.&nbsp;CHF</th>
+                              <th className={th + ' text-right'} style={{ width: '8%' }}>Total</th>
                               <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {(quote.subcontracting || []).length === 0 ? (
-                              <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={10} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
                             ) : quote.subcontracting.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateSubcontractingRow(i, 'item', e.target.value)} /></td>
@@ -2771,7 +2791,9 @@ export default function ProjectPage() {
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateSubcontractingRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateSubcontractingRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateSubcontractingRow(i, 'margin', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceBilled(r))}</td>
+                                <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateSubcontractingRow(i, 'discount', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateSubcontractingRow(i, 'discount_amount', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceNet(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeSubcontractingRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>
@@ -2781,7 +2803,7 @@ export default function ProjectPage() {
                           {(quote.subcontracting || []).length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total sous-traitance</td>
+                                <td colSpan={8} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total sous-traitance</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(subcontractingTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
@@ -2813,19 +2835,21 @@ export default function ProjectPage() {
                         <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '15%' }}>Item</th>
-                              <th className={th} style={{ width: '30%' }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: '13%' }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: '8%' }}>Qté</th>
-                              <th className={th} style={{ width: '10%' }}>Unité</th>
+                              <th className={th} style={{ width: '13%' }}>Item</th>
+                              <th className={th} style={{ width: '22%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: '12%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
+                              <th className={th} style={{ width: '9%' }}>Unité</th>
                               <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: '14%' }}>Total</th>
+                              <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
+                              <th className={th + ' text-right'} style={{ width: '10%' }}>Esc.&nbsp;CHF</th>
+                              <th className={th + ' text-right'} style={{ width: '8%' }}>Total</th>
                               <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {quote.logistics.length === 0 ? (
-                              <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={10} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
                             ) : quote.logistics.map((r, i) => (
                               <tr key={r._uid || i} className="group hover:bg-gray-50">
                                 <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
@@ -2834,7 +2858,9 @@ export default function ProjectPage() {
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder="0" onChange={e => updateLogisticsRow(i, 'margin', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceBilledLogistics(r))}</td>
+                                <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateLogisticsRow(i, 'discount', e.target.value)} /></td>
+                                <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateLogisticsRow(i, 'discount_amount', e.target.value)} /></td>
+                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(logisticsNet(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
                                 </td>
@@ -2844,7 +2870,7 @@ export default function ProjectPage() {
                           {quote.logistics.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
+                                <td colSpan={8} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
                                 <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(logisticsTotal)}</td>
                                 <td className="bg-gray-50"></td>
                               </tr>
