@@ -6,6 +6,10 @@ import { C, FONT, MONO } from '../lib/theme'
 const UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'm³', 'km', 'PAN', 'pce', 'forfait', 'kg', 'l']
 const CSV_COLS = ['id', 'type', 'name', 'unit', 'vat_rate', 'purchase_price', 'margin', 'sale_price', 'vendor', 'notes']
 
+const numOr = (v, d = 0) => { const n = parseFloat(v); return isNaN(n) ? d : n }
+const round2 = n => Math.round(n * 100) / 100
+const computeSale = (purchase, margin) => round2(numOr(purchase) * (1 + numOr(margin) / 100))
+
 // ── CSV ──────────────────────────────────────────────────────────
 function toCSV(rows) {
   const esc = v => {
@@ -70,12 +74,23 @@ export default function Catalog() {
     try { await fetch(`/api/catalog?id=${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) }
     finally { mutate() }
   }
-  // onBlur d'un champ : persiste si modifié
+  // onBlur d'un champ : persiste si modifié. Sur un article, éditer prix d'achat
+  // ou marge recalcule le prix de vente — sauf s'il a été saisi manuellement
+  // (i.e. il diffère de l'ancien calcul → on ne l'écrase pas).
   function commit(it, k) {
     if (!draft[it.id] || !(k in draft[it.id])) return
     const v = draft[it.id][k]
     setDraft(d => { const c = { ...d[it.id] }; delete c[k]; return { ...d, [it.id]: c } })
-    if (String(v) !== String(it[k] ?? '')) patch(it.id, { [k]: v })
+    if (String(v) === String(it[k] ?? '')) return
+    const body = { [k]: v }
+    if ((k === 'purchase_price' || k === 'margin') && it.type !== 'heure') {
+      const oldComputed = computeSale(it.purchase_price, it.margin)
+      const saleAuto = it.sale_price == null || it.sale_price === '' || round2(numOr(it.sale_price)) === oldComputed
+      const newPurchase = k === 'purchase_price' ? v : it.purchase_price
+      const newMargin = k === 'margin' ? v : it.margin
+      if (saleAuto && numOr(newPurchase) > 0) body.sale_price = computeSale(newPurchase, newMargin)
+    }
+    patch(it.id, body)
   }
   function commitNow(it, k, v) {   // selects/toggles : persiste direct
     patch(it.id, { [k]: v })
