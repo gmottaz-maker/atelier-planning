@@ -243,11 +243,16 @@ export default function DevisPage() {
               const subTotal = purchSub + laborSub
               if (subTotal === 0 && (it.purchases || []).length === 0 && (it.labor || []).length === 0) return null
               return (
-                <section key={idx} style={{ marginBottom: level === 'detail' ? 22 : 6, marginLeft: 14, marginTop: level === 'detail' ? 14 : 0 }}>
+                <section key={idx} style={{
+                  marginBottom: level === 'detail' ? 20 : 4, marginLeft: 6, marginTop: level === 'detail' ? 12 : 0,
+                  borderLeft: level === 'detail' ? '2px solid #d1d5db' : '2px solid transparent',
+                  paddingLeft: level === 'detail' ? 16 : 8,
+                }}>
                   <h3 style={{
                     fontSize: 12, fontWeight: 700, color: '#111827',
-                    marginBottom: level === 'detail' ? 10 : 0, paddingBottom: 5,
-                    borderBottom: level === 'detail' ? '1px solid #d1d5db' : 'none',
+                    margin: level === 'detail' ? '0 0 8px' : 0,
+                    padding: level === 'detail' ? '4px 8px' : 0,
+                    background: level === 'detail' ? '#f3f4f6' : 'transparent', borderRadius: 4,
                     display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                   }}>
                     <span>{it.name || `Item ${idx + 1}`}</span>
@@ -256,7 +261,7 @@ export default function DevisPage() {
                     </span>
                   </h3>
                   {level === 'detail' && ((it.purchases || []).length > 0 || (it.labor || []).length > 0) && (
-                    <div style={{ paddingLeft: 18 }}>
+                    <div>
                       {(it.purchases || []).length > 0 && (
                         <DevisTable
                           title="Achats / matériel"
