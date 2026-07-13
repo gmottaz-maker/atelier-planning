@@ -58,18 +58,23 @@ export default function Offres() {
 
   const offers = projects.filter(hasQuote).map(p => ({
     p,
-    total:   computeQuoteTotal(p.quote_data),
-    status:  p.quote_data.status || 'brouillon',
-    number:  p.quote_data.number,
-    invoice: invoices.find(inv => String(inv.project_id) === String(p.id)),
+    total:    computeQuoteTotal(p.quote_data),
+    status:   p.quote_data.status || 'brouillon',
+    number:   p.quote_data.number,
+    archived: !!p.quote_data.archived,
+    invoice:  invoices.find(inv => String(inv.project_id) === String(p.id)),
   })).sort((a, b) => (a.p.deadline || '').localeCompare(b.p.deadline || ''))
 
-  const shown = filter === 'all' ? offers : offers.filter(o => o.status === filter)
+  const active = offers.filter(o => !o.archived)
+  const archivedOffers = offers.filter(o => o.archived)
+  const shown = filter === 'archived' ? archivedOffers
+    : filter === 'all' ? active
+    : active.filter(o => o.status === filter)
 
-  const byStatus = QUOTE_STATUSES.reduce((m, s) => { m[s.key] = offers.filter(o => o.status === s.key).length; return m }, {})
-  const totalAccepted = offers.filter(o => o.status === 'accepte').reduce((s, o) => s + o.total, 0)
-  const totalInvoiced = offers.filter(o => o.invoice).reduce((s, o) => s + (o.invoice.amount || 0), 0)
-  const totalPaid     = offers.filter(o => o.invoice && o.invoice.status === 'paid').reduce((s, o) => s + (o.invoice.amount || 0), 0)
+  const byStatus = QUOTE_STATUSES.reduce((m, s) => { m[s.key] = active.filter(o => o.status === s.key).length; return m }, {})
+  const totalAccepted = active.filter(o => o.status === 'accepte').reduce((s, o) => s + o.total, 0)
+  const totalInvoiced = active.filter(o => o.invoice).reduce((s, o) => s + (o.invoice.amount || 0), 0)
+  const totalPaid     = active.filter(o => o.invoice && o.invoice.status === 'paid').reduce((s, o) => s + (o.invoice.amount || 0), 0)
 
   async function changeOfferStatus(o, status) {
     setProjects(prev => prev.map(pr => pr.id === o.p.id ? { ...pr, quote_data: { ...pr.quote_data, status } } : pr))
@@ -85,6 +90,25 @@ export default function Offres() {
       body: JSON.stringify({ status }),
     }).catch(() => load())
   }
+  // Enregistre un champ arbitraire dans le quote_data du projet (date d'envoi, archivage…)
+  async function patchQuote(o, patch) {
+    const quote_data = { ...o.p.quote_data, ...patch }
+    setProjects(prev => prev.map(pr => pr.id === o.p.id ? { ...pr, quote_data } : pr))
+    await adminFetch(`/api/projects/${o.p.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...o.p, quote_data }),
+    }).catch(() => load())
+  }
+  const changeOfferSentDate = (o, d) => patchQuote(o, { sent_date: d || null })
+  const changeOfferArchived = (o, archived) => patchQuote(o, { archived })
+  async function changeInvoiceSentDate(inv, d) {
+    const sent_at = d || null
+    setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, sent_at } : x))
+    await adminFetch(`/api/customer-invoices/${inv.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sent_at }),
+    }).catch(() => load())
+  }
 
   const th = "px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide"
 
@@ -96,7 +120,7 @@ export default function Offres() {
       <main className="w-full px-4 md:px-10 py-6 md:py-10" style={{ maxWidth: 1400, margin: '0 auto' }}>
         <div className="flex items-baseline gap-3 mb-6">
           <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>Suivi des offres</h2>
-          <span className="text-gray-400" style={{ fontSize: 15 }}>{offers.length}</span>
+          <span className="text-gray-400" style={{ fontSize: 15 }}>{active.length}</span>
         </div>
 
         {/* Résumé */}
@@ -117,11 +141,11 @@ export default function Offres() {
 
         {/* Filtre statut */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          {[{ key: 'all', label: 'Toutes' }, ...QUOTE_STATUSES].map(s => (
+          {[{ key: 'all', label: 'Toutes' }, ...QUOTE_STATUSES, { key: 'archived', label: 'Archivées' }].map(s => (
             <button key={s.key} onClick={() => setFilter(s.key)}
               className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
               style={filter === s.key ? { background: '#111827', color: '#fff' } : { background: '#fff', color: '#6b7280', border: '1px solid #e5e7eb' }}>
-              {s.label}{s.key !== 'all' && ` · ${byStatus[s.key] || 0}`}
+              {s.label}{s.key !== 'all' && ` · ${s.key === 'archived' ? archivedOffers.length : (byStatus[s.key] || 0)}`}
             </button>
           ))}
         </div>
@@ -138,9 +162,10 @@ export default function Offres() {
                   <th className={th}>Client / Projet</th>
                   <th className={th}>N°</th>
                   <th className={th + ' text-right'}>Montant</th>
-                  <th className={th}>Statut offre</th>
+                  <th className={th}>Statut / envoi offre</th>
                   <th className={th}>Offre</th>
                   <th className={th}>Facture</th>
+                  <th className={th}></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -160,11 +185,17 @@ export default function Offres() {
                       <td className="px-4 py-3 text-gray-600 tabular-nums" style={{ fontSize: 13 }}>{o.number || autoRef}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums" style={{ fontSize: 14 }}>{fmtCHF(o.total)}</td>
                       <td className="px-4 py-3">
-                        <select value={o.status} onChange={e => changeOfferStatus(o, e.target.value)}
-                          className="text-xs font-semibold rounded-full pl-2.5 pr-1 py-1 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-300"
-                          style={{ background: sm.bg, color: sm.color }}>
-                          {QUOTE_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                        </select>
+                        <div className="flex flex-col gap-1.5" style={{ maxWidth: 150 }}>
+                          <select value={o.status} onChange={e => changeOfferStatus(o, e.target.value)}
+                            className="text-xs font-semibold rounded-full pl-2.5 pr-1 py-1 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            style={{ background: sm.bg, color: sm.color }}>
+                            {QUOTE_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                          </select>
+                          <input type="date" value={o.p.quote_data.sent_date || ''} onChange={e => changeOfferSentDate(o, e.target.value)}
+                            title="Date d'envoi de l'offre"
+                            className="text-gray-500 rounded-md border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300"
+                            style={{ fontSize: 11 }} />
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <a href={`/projects/${o.p.id}/devis`} target="_blank" rel="noopener"
@@ -175,17 +206,23 @@ export default function Offres() {
                       </td>
                       <td className="px-4 py-3">
                         {inv ? (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-gray-500 tabular-nums" style={{ fontSize: 12 }}>{inv.invoice_number}</span>
-                            <select value={inv.status} onChange={e => changeInvoiceStatus(inv, e.target.value)}
-                              className="text-xs font-semibold rounded-full pl-2.5 pr-1 py-1 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-300"
-                              style={{ background: im.bg, color: im.color }}>
-                              {INV_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                            </select>
-                            <a href={`/api/customer-invoices/${inv.id}/pdf`} target="_blank" rel="noopener"
-                              className="text-gray-400 hover:text-gray-900" title="Télécharger la facture (PDF QR-bill)">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                            </a>
+                          <div className="flex flex-col gap-1.5" style={{ maxWidth: 180 }}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-gray-500 tabular-nums" style={{ fontSize: 12 }}>{inv.invoice_number}</span>
+                              <select value={inv.status} onChange={e => changeInvoiceStatus(inv, e.target.value)}
+                                className="text-xs font-semibold rounded-full pl-2.5 pr-1 py-1 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                style={{ background: im.bg, color: im.color }}>
+                                {INV_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                              </select>
+                              <a href={`/api/customer-invoices/${inv.id}/pdf`} target="_blank" rel="noopener"
+                                className="text-gray-400 hover:text-gray-900" title="Télécharger la facture (PDF QR-bill)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                              </a>
+                            </div>
+                            <input type="date" value={inv.sent_at ? String(inv.sent_at).slice(0, 10) : ''} onChange={e => changeInvoiceSentDate(inv, e.target.value)}
+                              title="Date d'envoi de la facture"
+                              className="text-gray-500 rounded-md border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300"
+                              style={{ fontSize: 11, maxWidth: 150 }} />
                           </div>
                         ) : o.status === 'accepte' ? (
                           <Link href={`/factures-emises?from=${o.p.id}`}
@@ -196,6 +233,17 @@ export default function Offres() {
                         ) : (
                           <span className="text-gray-300 text-sm">—</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => changeOfferArchived(o, !o.archived)}
+                          title={o.archived ? 'Désarchiver' : 'Archiver'}
+                          className="text-gray-300 hover:text-gray-700 transition-colors">
+                          {o.archived ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h18v5H3z" /><path d="M5 8v13h14V8" /><path d="M12 17V11" /><path d="M9 14l3-3 3 3" /></svg>
+                          ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h18v5H3z" /><path d="M5 8v13h14V8" /><path d="M10 12h4" /></svg>
+                          )}
+                        </button>
                       </td>
                     </tr>
                   )
