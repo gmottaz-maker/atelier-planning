@@ -7,6 +7,7 @@ import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
 import CatalogPicker, { toPurchaseRow, toRateRow } from '../components/CatalogPicker'
+import { pdfFilename } from '../lib/pdfFilename'
 
 const PINK = '#111827'
 const STATUS_LABELS = { created: 'Créée', sent: 'Envoyée', pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
@@ -132,7 +133,10 @@ export default function FacturesEmises() {
       }
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
-      window.open(url, '_blank', 'noopener')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = pdfFilename('facture', inv.projects?.name || inv.client_name)
+      document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { alert('Téléchargement impossible : ' + e.message) }
   }
@@ -366,6 +370,7 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
       ...f,
       project_id: pid,
       client_name: p.client || f.client_name,
+      client_address: p.client_address || f.client_address,
       amount: total > 0 ? total.toFixed(2) : f.amount,
     }))
     setLines(flat)

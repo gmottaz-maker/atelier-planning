@@ -5,6 +5,7 @@ import { requireAdmin } from '../../../../lib/requireAdmin'
 import { SwissQRBill } from 'swissqrbill/svg'
 import { buildFactureHtml } from '../../../../lib/factureHtml'
 import { htmlToPdf } from '../../../../lib/htmlToPdf'
+import { pdfFilename } from '../../../../lib/pdfFilename'
 
 export const config = { maxDuration: 30 }
 
@@ -59,7 +60,7 @@ export default async function handler(req, res) {
     const html = buildFactureHtml(inv, company, effectiveMode, qrSvg)
     const pdf = await htmlToPdf(html)
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="facture-${inv.invoice_number}.pdf"`)
+    res.setHeader('Content-Disposition', `inline; filename="${pdfFilename('facture', inv.projects?.name || inv.client_name)}"`)
     res.send(Buffer.from(pdf))
   } catch (e) {
     console.error('facture-pdf:', e)

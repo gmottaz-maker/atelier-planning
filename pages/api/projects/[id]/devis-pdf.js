@@ -4,6 +4,7 @@ import { getSupabaseServer } from '../../../../lib/supabase-server'
 import { requireUser } from '../../../../lib/requireAdmin'
 import { buildDevisHtml } from '../../../../lib/devisHtml'
 import { htmlToPdf } from '../../../../lib/htmlToPdf'
+import { pdfFilename } from '../../../../lib/pdfFilename'
 
 export const config = { maxDuration: 30 }
 
@@ -20,13 +21,10 @@ export default async function handler(req, res) {
   const { data: settings } = await supabase.from('app_settings').select('value').eq('key', 'company_info').maybeSingle()
   const company = settings?.value || {}
 
-  const rawQ = project.quote_data || {}
-  const ref = rawQ.number || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(project.id).slice(-4).toUpperCase()}`
-
   try {
     const pdf = await htmlToPdf(buildDevisHtml(project, company, mode))
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="devis-${ref}.pdf"`)
+    res.setHeader('Content-Disposition', `inline; filename="${pdfFilename('devis', project.name)}"`)
     res.send(Buffer.from(pdf))
   } catch (e) {
     console.error('devis-pdf:', e)

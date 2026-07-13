@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import { pdfFilename } from '../../../lib/pdfFilename'
 
 function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n }
 function effectiveMargin(r, generalMargin) {
@@ -67,7 +68,10 @@ export default function DevisPage() {
       }
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
-      window.open(url, '_blank', 'noopener')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = pdfFilename('devis', project?.name)
+      document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { alert('Génération du PDF impossible : ' + e.message) }
   }
@@ -192,6 +196,9 @@ export default function DevisPage() {
           <div>
             <div style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Pour</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{project.client || '—'}</div>
+            {(project.client_address || '').split('\n').filter(Boolean).map((l, i) => (
+              <div key={i} style={{ fontSize: 10, color: '#6b7280' }}>{l}</div>
+            ))}
           </div>
           <div>
             <div style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>Objet</div>
@@ -248,40 +255,44 @@ export default function DevisPage() {
                       {fmtCHF(subTotal)} CHF
                     </span>
                   </h3>
-                  {level === 'detail' && (it.purchases || []).length > 0 && (
-                    <DevisTable
-                      title="Achats / matériel"
-                      columns={[
-                        { label: 'Description', width: 'auto',align: 'left'  },
-                        { label: 'Dimension',   width: '15%', align: 'left'  },
-                        { label: 'Qté',         width: '7%',  align: 'right' },
-                        { label: 'Unité',       width: '10%', align: 'left'  },
-                        { label: 'Total',       width: '13%', align: 'right' },
-                      ]}
-                      rows={it.purchases.map(r => [
-                        (r.description || '') + discLabel(r), r.dimension,
-                        num(r.quantity), r.unit || '', fmtCHF(purchaseNet(r, gm)),
-                      ])}
-                      subtotalLabel="Sous-total achats"
-                      subtotal={purchSub}
-                    />
-                  )}
-                  {level === 'detail' && (it.labor || []).length > 0 && (
-                    <DevisTable
-                      title="Main d'œuvre"
-                      columns={[
-                        { label: 'Description', width: 'auto',align: 'left'  },
-                        { label: 'Qté',         width: '8%',  align: 'right' },
-                        { label: 'Unité',       width: '11%', align: 'left'  },
-                        { label: 'Total',       width: '14%', align: 'right' },
-                      ]}
-                      rows={it.labor.map(r => [
-                        (r.description || '') + discLabel(r),
-                        num(r.quantity), r.unit || '', fmtCHF(laborNet(r)),
-                      ])}
-                      subtotalLabel="Sous-total main d'œuvre"
-                      subtotal={laborSub}
-                    />
+                  {level === 'detail' && ((it.purchases || []).length > 0 || (it.labor || []).length > 0) && (
+                    <div style={{ paddingLeft: 18 }}>
+                      {(it.purchases || []).length > 0 && (
+                        <DevisTable
+                          title="Achats / matériel"
+                          columns={[
+                            { label: 'Description', width: 'auto',align: 'left'  },
+                            { label: 'Dimension',   width: '15%', align: 'left'  },
+                            { label: 'Qté',         width: '7%',  align: 'right' },
+                            { label: 'Unité',       width: '10%', align: 'left'  },
+                            { label: 'Total',       width: '13%', align: 'right' },
+                          ]}
+                          rows={it.purchases.map(r => [
+                            (r.description || '') + discLabel(r), r.dimension,
+                            num(r.quantity), r.unit || '', fmtCHF(purchaseNet(r, gm)),
+                          ])}
+                          subtotalLabel="Sous-total achats"
+                          subtotal={purchSub}
+                        />
+                      )}
+                      {(it.labor || []).length > 0 && (
+                        <DevisTable
+                          title="Main d'œuvre"
+                          columns={[
+                            { label: 'Description', width: 'auto',align: 'left'  },
+                            { label: 'Qté',         width: '8%',  align: 'right' },
+                            { label: 'Unité',       width: '11%', align: 'left'  },
+                            { label: 'Total',       width: '14%', align: 'right' },
+                          ]}
+                          rows={it.labor.map(r => [
+                            (r.description || '') + discLabel(r),
+                            num(r.quantity), r.unit || '', fmtCHF(laborNet(r)),
+                          ])}
+                          subtotalLabel="Sous-total main d'œuvre"
+                          subtotal={laborSub}
+                        />
+                      )}
+                    </div>
                   )}
                 </section>
               )
