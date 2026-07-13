@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
 import KDriveFolderPicker from '../components/KDriveFolderPicker'
-import ContactPicker from '../components/ContactPicker'
+import BillingContactSelect from '../components/BillingContactSelect'
 import { C, FONT, MONO } from '../lib/theme'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
@@ -698,7 +698,8 @@ function ProjectTasksModal({ project, tasks, onClose }) {
 // ─── Formulaire projet ────────────────────────────────────────────────────────
 
 const emptyForm = {
-  name: '', client: '', description: '', short_description: '', deadline: '',
+  name: '', client: '', client_address: '', client_contact_id: null,
+  description: '', short_description: '', deadline: '',
   delivery_type: 'Livraison', responsible: 'non défini', color_override: null, notes: '',
   kdrive_folder_id: null, kdrive_folder_path: '',
 }
@@ -816,6 +817,8 @@ export default function Admin() {
     setForm({
       name: project.name,
       client: project.client,
+      client_address: project.client_address || '',
+      client_contact_id: project.client_contact_id || null,
       description: project.description || '',
       short_description: project.short_description || '',
       deadline: project.deadline || '',
@@ -1064,10 +1067,17 @@ export default function Admin() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Client *</label>
-                  <div style={{ marginBottom: 8 }}><ContactPicker placeholder="Choisir dans les contacts…" onSelect={({ name }) => handleFieldChange('client', name)} /></div>
+                  <BillingContactSelect
+                    key={editingProject?.id || 'new'}
+                    initialContactId={editingProject?.client_contact_id}
+                    onChange={vals => setForm(f => ({ ...f, ...vals }))} />
                   <input type="text" required value={form.client}
                     onChange={e => handleFieldChange('client', e.target.value)}
-                    placeholder="Ex: Hôtel du Lac" className={inputClass} />
+                    placeholder="Nom / société (auto, modifiable)" className={inputClass} style={{ marginTop: 6 }} />
+                  <textarea rows={3} value={form.client_address || ''}
+                    onChange={e => handleFieldChange('client_address', e.target.value)}
+                    placeholder="Adresse postale (à l'att. de…, rue, NPA ville)"
+                    className={inputClass} style={{ marginTop: 6, resize: 'none' }} />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-3">
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Description courte (vue Atelier)</label>

@@ -13,7 +13,6 @@ import AutocompleteInput from '../../components/AutocompleteInput'
 import { useSuggestions } from '../../lib/useSuggestions'
 import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/AddressInput'
 import CatalogPicker, { toPurchaseRow, toRateRow } from '../../components/CatalogPicker'
-import ContactPicker from '../../components/ContactPicker'
 import { C, FONT, MONO, personChip, initials as themeInitials } from '../../lib/theme'
 
 const PINK = '#111827'
@@ -2525,34 +2524,17 @@ export default function ProjectPage() {
 
                 {quoteExpanded && (
                   <div className="space-y-6">
-                    {/* ── Destinataire (offre & facture) ── */}
-                    <div className="px-4 py-3 bg-white border border-gray-200 rounded-xl">
-                      <div className="flex items-center justify-between gap-3 mb-2">
-                        <span className="text-sm font-semibold text-gray-700">Destinataire — offre &amp; facture</span>
-                        <div style={{ width: 280, maxWidth: '55%' }}>
-                          <ContactPicker
-                            placeholder="Choisir un contact / une société…"
-                            onSelect={billing => {
-                              setProject(p => ({ ...p, client: billing.name, client_address: billing.address, client_contact_id: billing.contact?.id ?? null }))
-                              setQuoteDirty(true)
-                            }} />
-                        </div>
+                    {/* Destinataire (société + personne + adresse) : édité via « Modifier » le projet. */}
+                    {(project.client || project.client_address) && (
+                      <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
+                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Destinataire — offre &amp; facture</div>
+                        <div className="text-sm font-semibold text-gray-800">{project.client || '—'}</div>
+                        {(project.client_address || '').split('\n').filter(Boolean).map((l, i) => (
+                          <div key={i} className="text-xs text-gray-500">{l}</div>
+                        ))}
+                        <p className="text-xs text-gray-400 mt-1.5">Modifier via « Modifier » le projet (choix entreprise + personne).</p>
                       </div>
-                      <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1.4fr' }}>
-                        <input
-                          className="px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400"
-                          placeholder="Nom / société"
-                          value={project.client || ''}
-                          onChange={e => { setProject(p => ({ ...p, client: e.target.value })); setQuoteDirty(true) }} />
-                        <textarea
-                          rows={3}
-                          className="px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 resize-none"
-                          placeholder="Adresse postale (à l'att. de…, rue, NPA ville)"
-                          value={project.client_address || ''}
-                          onChange={e => { setProject(p => ({ ...p, client_address: e.target.value })); setQuoteDirty(true) }} />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1.5">Choisir une personne rattachée à une société remplit automatiquement société + « à l'att. de » + adresse. Modifiable à la main.</p>
-                    </div>
+                    )}
 
                     {/* ── Marge générale ── */}
                     <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">

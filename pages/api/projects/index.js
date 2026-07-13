@@ -40,6 +40,7 @@ export default async function handler(req, res) {
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date, disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
       kdrive_folder_id,
+      client_address, client_contact_id,
     } = req.body
 
     if (!name || !client) {
@@ -49,6 +50,8 @@ export default async function handler(req, res) {
     const { data, error } = await supabase.from('projects').insert([{
       name, client, description, short_description, delivery_type, responsible, color_override, notes,
       deadline: deadline || null,
+      client_address: client_address || null,
+      client_contact_id: client_contact_id || null,
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date: disassembly_date || null,
       disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
