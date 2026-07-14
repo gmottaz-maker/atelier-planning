@@ -58,18 +58,27 @@ export default function Offres() {
     return lines > 0
   }
 
-  const offers = projects.filter(hasQuote).map(p => ({
-    p,
-    total:    computeQuoteTotal(p.quote_data),
-    status:   p.quote_data.status || 'brouillon',
-    number:   p.quote_data.number,
-    archived: !!p.quote_data.archived,
-    invoice:  invoices.find(inv => String(inv.project_id) === String(p.id)),
-  })).sort((a, b) => (a.p.deadline || '').localeCompare(b.p.deadline || ''))
+  const offers = projects.filter(hasQuote).map(p => {
+    const status = p.quote_data.status || 'brouillon'
+    return {
+      p,
+      total:    computeQuoteTotal(p.quote_data),
+      status,
+      number:   p.quote_data.number,
+      archived: !!p.quote_data.archived,
+      // « Envoyée » : date d'envoi renseignée, ou statut au-delà du brouillon
+      sent:     !!p.quote_data.sent_date || status !== 'brouillon',
+      invoice:  invoices.find(inv => String(inv.project_id) === String(p.id)),
+    }
+  }).sort((a, b) => (a.p.deadline || '').localeCompare(b.p.deadline || ''))
 
   const active = offers.filter(o => !o.archived)
   const archivedOffers = offers.filter(o => o.archived)
+  const sentCount = active.filter(o => o.sent).length
+  const unsentCount = active.filter(o => !o.sent).length
   const shown = filter === 'archived' ? archivedOffers
+    : filter === 'sent' ? active.filter(o => o.sent)
+    : filter === 'unsent' ? active.filter(o => !o.sent)
     : filter === 'all' ? active
     : active.filter(o => o.status === filter)
 
@@ -141,13 +150,25 @@ export default function Offres() {
           ))}
         </div>
 
-        {/* Filtre statut */}
+        {/* Filtres : envoi (onglets) puis statut */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          {[{ key: 'all', label: 'Toutes' }, ...QUOTE_STATUSES, { key: 'archived', label: 'Archivées' }].map(s => (
+          {[
+            { key: 'all',    label: 'Toutes' },
+            { key: 'sent',   label: 'Envoyées',     count: sentCount },
+            { key: 'unsent', label: 'Non envoyées', count: unsentCount },
+          ].map(s => (
             <button key={s.key} onClick={() => setFilter(s.key)}
               className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
               style={filter === s.key ? { background: '#111827', color: '#fff' } : { background: '#fff', color: '#6b7280', border: '1px solid #e5e7eb' }}>
-              {s.label}{s.key !== 'all' && ` · ${s.key === 'archived' ? archivedOffers.length : (byStatus[s.key] || 0)}`}
+              {s.label}{s.count != null && ` · ${s.count}`}
+            </button>
+          ))}
+          <span style={{ width: 1, height: 20, background: '#e5e7eb', margin: '0 4px' }} />
+          {[...QUOTE_STATUSES, { key: 'archived', label: 'Archivées' }].map(s => (
+            <button key={s.key} onClick={() => setFilter(s.key)}
+              className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
+              style={filter === s.key ? { background: '#111827', color: '#fff' } : { background: '#fff', color: '#6b7280', border: '1px solid #e5e7eb' }}>
+              {s.label} · {s.key === 'archived' ? archivedOffers.length : (byStatus[s.key] || 0)}
             </button>
           ))}
         </div>

@@ -302,7 +302,8 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
     vat_rate:       invoice?.vat_rate ?? '8.1',
     currency:       invoice?.currency || 'CHF',
     issue_date:     invoice?.issue_date || new Date().toISOString().slice(0, 10),
-    due_date:       invoice?.due_date || '',
+    // Échéance par défaut : 30 jours après l'émission
+    due_date:       invoice?.due_date || (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10) })(),
     iban_recipient: invoice?.iban_recipient || '',
     notes:          invoice?.notes || '',
     status:         invoice?.status || 'created',
