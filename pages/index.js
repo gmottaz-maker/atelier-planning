@@ -869,7 +869,7 @@ export default function Admin() {
 
     return (
       <div key={project.id}
-        style={{ background: C.surface, border: `1px solid ${incomplete ? '#f3ccd7' : C.border}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column', fontFamily: FONT }}>
+        style={{ background: C.surface, border: `1px solid ${incomplete ? '#f3ccd7' : C.border}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 268, fontFamily: FONT }}>
         <div style={{ height: 5, background: stripe }} />
         <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
           {/* Titre + client + avatar */}
