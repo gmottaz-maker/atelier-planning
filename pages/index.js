@@ -740,6 +740,7 @@ export default function Admin() {
   const [feedback, setFeedback]         = useState(null)
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [logisticsProject, setLogisticsProject]   = useState(null)
+  const [archiveTarget, setArchiveTarget]         = useState(null)
   const [pickerOpen, setPickerOpen]               = useState(false)
   const [viewMode, setViewMode]                   = useState('cards')
 
@@ -815,16 +816,23 @@ export default function Admin() {
     mutateProjects()
   }
 
-  async function handleArchive(project) {
-    const hasInvoice = invoiceProjectIds.has(String(project.id))
-    if (!hasInvoice && !confirm(`⚠️ « ${project.name} » n'a aucune facture liée.\n\nArchiver quand même ?`)) return
-    await fetch(`/api/projects/${project.id}`, {
+  async function doArchive(project) {
+    // Mise à jour optimiste immédiate (le projet quitte la liste active tout de suite)
+    mutateProjects((projects || []).map(p => p.id === project.id ? { ...p, status: 'archived' } : p), false)
+    const res = await fetch(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: actorHeaders(),
       body: JSON.stringify({ ...project, status: 'archived' }),
-    })
-    showFeedback('Projet archivé')
+    }).catch(() => null)
+    if (res && res.ok) showFeedback('Projet archivé')
+    else showFeedback('Erreur lors de l\'archivage', 'error')
     fetchProjects()
+  }
+
+  function handleArchive(project) {
+    // Avertissement si aucune facture liée → modale in-app (confirm() natif peu fiable en webview)
+    if (invoiceProjectIds.has(String(project.id))) doArchive(project)
+    else setArchiveTarget(project)
   }
 
   async function handleRestore(project) {
@@ -1367,6 +1375,25 @@ export default function Admin() {
       {/* Modal logistique */}
       {logisticsProject && (
         <LogisticsModal project={logisticsProject} onClose={() => setLogisticsProject(null)} onSave={handleSaveLogistics} />
+      )}
+
+      {/* Avertissement archivage sans facture liée */}
+      {archiveTarget && (
+        <div onMouseDown={() => setArchiveTarget(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,.45)', zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, maxWidth: 420, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,.25)', padding: 24, fontFamily: FONT }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: C.ink, marginBottom: 8 }}>Archiver sans facture ?</div>
+            <p style={{ fontSize: 14, color: C.inkSecondary, lineHeight: 1.55, margin: 0 }}>
+              « <strong>{archiveTarget.name}</strong> » n'a aucune facture liée. Archiver quand même ?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
+              <button onClick={() => setArchiveTarget(null)}
+                style={{ padding: '9px 16px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: C.inkSecondary, font: `600 13px ${FONT}`, cursor: 'pointer' }}>Annuler</button>
+              <button onClick={() => { const p = archiveTarget; setArchiveTarget(null); doArchive(p) }}
+                style={{ padding: '9px 16px', borderRadius: 6, border: 'none', background: C.ink, color: '#fff', font: `600 13px ${FONT}`, cursor: 'pointer' }}>Archiver</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal tâches projet */}
