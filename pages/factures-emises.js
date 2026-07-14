@@ -136,7 +136,7 @@ export default function FacturesEmises() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = pdfFilename('facture', inv.projects?.name || inv.client_name)
+      a.download = pdfFilename(mode === 'summary' ? 'facture-résumée' : 'facture-détaillée', inv.projects?.name || inv.client_name)
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { alert('Téléchargement impossible : ' + e.message) }

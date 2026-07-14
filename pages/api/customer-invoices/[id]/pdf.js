@@ -60,7 +60,8 @@ export default async function handler(req, res) {
     const html = buildFactureHtml(inv, company, effectiveMode, qrSvg)
     const pdf = await htmlToPdf(html)
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="${pdfFilename('facture', inv.projects?.name || inv.client_name)}"`)
+    const docType = effectiveMode === 'summary' ? 'facture-résumée' : 'facture-détaillée'
+    res.setHeader('Content-Disposition', `inline; filename="${pdfFilename(docType, inv.projects?.name || inv.client_name)}"`)
     res.send(Buffer.from(pdf))
   } catch (e) {
     console.error('facture-pdf:', e)
