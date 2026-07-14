@@ -36,7 +36,7 @@ export default function ContactDetail() {
       loadedId.current = contact.id
       setForm({
         name: contact.name || '', email: contact.email || '', phone: contact.phone || '',
-        website: contact.website || '', street: contact.street || '', city: contact.city || '',
+        website: contact.website || '', street: contact.street || '', zip: contact.zip || '', city: contact.city || '',
         state: contact.state || '', country: contact.country || '', vat_number: contact.vat_number || '',
         notes: contact.notes || '', tags: contact.tags || [], parent_id: contact.parent_id || null,
         is_customer: !!contact.is_customer, is_supplier: !!contact.is_supplier,
@@ -162,6 +162,7 @@ export default function ContactDetail() {
             <Field label="SITE WEB"><input style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} /></Field>
             <Field label="N° TVA"><input style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} /></Field>
             <Field label="RUE"><input style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} /></Field>
+            <Field label="NPA"><input style={inputStyle} value={form.zip} onChange={e => set('zip', e.target.value)} /></Field>
             <Field label="VILLE"><input style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} /></Field>
             <Field label="RÉGION / CANTON"><input style={inputStyle} value={form.state} onChange={e => set('state', e.target.value)} /></Field>
             <Field label="PAYS"><input style={inputStyle} value={form.country} onChange={e => set('country', e.target.value)} /></Field>

@@ -8,7 +8,8 @@ function composeAddress(company, person) {
   const src = company || person
   if (!src) return ''
   if (src.street) lines.push(src.street)
-  if (src.city) lines.push(src.city)
+  const cityLine = [src.zip, src.city].filter(Boolean).join(' ')
+  if (cityLine) lines.push(cityLine)
   if (src.country && !/^(ch|suisse|switzerland)$/i.test(String(src.country).trim())) lines.push(src.country)
   return lines.join('\n')
 }

@@ -6,11 +6,12 @@ import useSWR from 'swr'
 export function contactToBilling(c, list) {
   const co = c.kind === 'person' && c.parent_id ? list.find(x => String(x.id) === String(c.parent_id)) : null
   const name = co?.name || c.name
-  const src = (c.street || c.city) ? c : (co || c)
+  const src = (c.street || c.city || c.zip) ? c : (co || c)
   const lines = []
   if (co) lines.push(`À l'att. de ${c.name}`)
   if (src.street) lines.push(src.street)
-  if (src.city) lines.push(src.city)
+  const cityLine = [src.zip, src.city].filter(Boolean).join(' ')
+  if (cityLine) lines.push(cityLine)
   if (src.country && src.country !== 'Suisse') lines.push(src.country)
   return { name, address: lines.join('\n'), contact: c }
 }
