@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useAuth } from './_app'
@@ -355,6 +355,12 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
   }
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+  // Échéance = émission + 30j, recalée tant que l'utilisateur ne l'a pas modifiée à la main.
+  const dueTouched = useRef(isEdit)
+  const addDays = (dateStr, n) => { const d = new Date(dateStr); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+  function setIssueDate(v) {
+    setForm(f => ({ ...f, issue_date: v, ...(v && !dueTouched.current ? { due_date: addDays(v, 30) } : {}) }))
+  }
 
   // Auto-pré-remplir si on arrive depuis un projet
   useEffect(() => {
@@ -523,11 +529,11 @@ function CustomerInvoiceDrawer({ invoice, projects, initialProjectId, onClose, o
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Émise le</label>
-                <input type="date" className={inputCls} value={form.issue_date} onChange={e => set('issue_date', e.target.value)} />
+                <input type="date" className={inputCls} value={form.issue_date} onChange={e => setIssueDate(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Échéance</label>
-                <input type="date" className={inputCls} value={form.due_date} onChange={e => set('due_date', e.target.value)} />
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Échéance <span className="text-gray-400">(+30j auto)</span></label>
+                <input type="date" className={inputCls} value={form.due_date} onChange={e => { dueTouched.current = true; set('due_date', e.target.value) }} />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">IBAN bénéficiaire (laissé vide = config par défaut)</label>
