@@ -44,13 +44,15 @@ function getDaysRemaining(deadline) {
   const d = new Date(deadline); d.setHours(0,0,0,0)
   return Math.ceil((d - today) / 86400000)
 }
+// Feu tricolore par échéance : rouge = proche (≤ 2 semaines / en retard),
+// orange = 2 à 3 semaines, vert = le reste.
 function getAutoColor(deadline) {
   const d = getDaysRemaining(deadline)
-  if (d === null) return '#9ca3af'
-  if (d < 0)  return '#dc2626'
-  if (d < 7)  return '#ef4444'
-  if (d < 14) return '#f59e0b'
-  return '#22c55e'
+  if (d === null) return '#9ca3af'   // sans date → gris
+  if (d < 0)   return '#dc2626'      // en retard
+  if (d < 14)  return '#ef4444'      // proche (< 2 semaines)
+  if (d <= 21) return '#f59e0b'      // 2 à 3 semaines
+  return '#22c55e'                   // le reste
 }
 function getProjectColor(p) {
   if (p.color_override) return p.color_override
@@ -899,8 +901,8 @@ export default function Admin() {
       .filter(t => t.status === 'active')
       .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
     const badge = daysBadge(project.deadline, project.phase)
-    // Barre de statut : couleur de phase si définie, sinon accent/urgent, muted, faint
-    const stripe = badge.kind === 'phase' ? badge.color : badge.kind === 'urgent' ? C.accent : badge.kind === 'none' ? C.faintChevron : C.muted
+    // Liseré de carte : couleur de phase si définie, sinon feu tricolore d'échéance
+    const stripe = getProjectColor(project)
 
     return (
       <div key={project.id}
@@ -1299,6 +1301,8 @@ export default function Admin() {
                 const kanbanCols = buildKanbanColumns()
                 return kanbanCols.map(col => {
                   const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase) === col.key)
+                  // Masque « En retard » quand aucun projet n'est en retard
+                  if (col.key === 'overdue' && colProjects.length === 0) return null
                   return (
                     <div key={col.key} className="flex-shrink-0 w-80">
                       <div className="flex items-center gap-2 mb-4 px-1">
