@@ -50,6 +50,36 @@ export default function SendDocumentModal({ type, docId, mode, contactId, projec
   const [error, setError] = useState('')
   const [seeded, setSeeded] = useState(false)
 
+  // ── Modèles de message ──
+  const { data: templates = [], mutate: mutateTpl } = useSWR('/api/email-templates')
+  const tplList = Array.isArray(templates) ? templates : []
+  const [tplId, setTplId] = useState('')
+  const fill = s => String(s || '').replace(/\{projet\}/gi, projectName || '').replace(/\{numero\}/gi, number || '')
+  function applyTemplate(id) {
+    setTplId(id)
+    const t = tplList.find(x => String(x.id) === String(id))
+    if (t) { setSubject(fill(t.subject)); setMessage(fill(t.body)) }
+  }
+  async function saveTemplate() {
+    const name = window.prompt('Nom du modèle :')
+    if (!name) return
+    const r = await adminFetch('/api/email-templates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, scope: 'all', subject, body: message }),
+    })
+    const d = await r.json()
+    if (d.error) { setError(d.error); return }
+    await mutateTpl()
+    setTplId(String(d.id))
+  }
+  async function deleteTemplate() {
+    const t = tplList.find(x => String(x.id) === String(tplId))
+    if (!t || !window.confirm(`Supprimer le modèle « ${t.name} » ?`)) return
+    await adminFetch(`/api/email-templates?id=${t.id}`, { method: 'DELETE' })
+    setTplId('')
+    mutateTpl()
+  }
+
   // Pré-remplit le destinataire depuis le contact du projet.
   useEffect(() => {
     if (seeded || !list.length || contactId == null) return
@@ -100,12 +130,28 @@ export default function SendDocumentModal({ type, docId, mode, contactId, projec
             </div>
           )}
           <div>
+            <label className={lbl}>Modèle</label>
+            <div className="flex items-center gap-2">
+              <select value={tplId} onChange={e => applyTemplate(e.target.value)} className={inp} style={{ flex: 1 }}>
+                <option value="">— Aucun (message par défaut) —</option>
+                {tplList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <button type="button" onClick={saveTemplate} title="Enregistrer le message actuel comme modèle"
+                className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2.5 py-2 whitespace-nowrap">Enregistrer</button>
+              {tplId && (
+                <button type="button" onClick={deleteTemplate} title="Supprimer ce modèle"
+                  className="text-xs font-medium text-gray-400 hover:text-red-600 border border-gray-200 rounded px-2.5 py-2">Suppr.</button>
+              )}
+            </div>
+          </div>
+          <div>
             <label className={lbl}>Objet</label>
             <input value={subject} onChange={e => setSubject(e.target.value)} className={inp} />
           </div>
           <div>
             <label className={lbl}>Message</label>
             <textarea value={message} onChange={e => setMessage(e.target.value)} rows={8} className={inp} style={{ resize: 'vertical' }} />
+            <p className="text-xs text-gray-400 mt-1">Placeholders dans un modèle : <code>{'{projet}'}</code> et <code>{'{numero}'}</code> (remplacés à la sélection).</p>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-md px-3 py-2">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
