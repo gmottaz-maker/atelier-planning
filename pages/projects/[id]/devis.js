@@ -188,6 +188,7 @@ export default function DevisPage() {
             <div style={{ fontSize: 26, fontWeight: 700, color: '#111827', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Devis</div>
             <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Réf. {ref}</div>
             <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{fmtDateLong(today)}</div>
+            {project.reference && <div style={{ fontSize: 10, color: '#374151', marginTop: 6 }}>Référence : {project.reference}</div>}
           </div>
         </header>
 

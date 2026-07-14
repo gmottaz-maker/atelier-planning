@@ -1711,6 +1711,12 @@ export default function ProjectPage() {
                     <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>STATUT</div>
                     <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{project.status === 'active' ? 'En cours' : 'Archivé'}</div>
                   </div>
+                  {project.reference && (
+                    <div>
+                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>RÉFÉRENCE</div>
+                      <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{project.reference}</div>
+                    </div>
+                  )}
                   {activeTasks.length > 0 && (
                     <div>
                       <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>TÂCHES ACTIVES</div>

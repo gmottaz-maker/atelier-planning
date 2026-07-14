@@ -84,7 +84,7 @@ export default async function handler(req, res) {
         await supabase.from('projects').update({ quote_data, updated_at: new Date().toISOString() }).eq('id', id)
       }
     } else {
-      const { data: inv, error } = await supabase.from('customer_invoices').select('*, projects(name, client)').eq('id', id).single()
+      const { data: inv, error } = await supabase.from('customer_invoices').select('*, projects(name, client, reference)').eq('id', id).single()
       if (error || !inv) return res.status(404).json({ error: 'Facture introuvable' })
       const effectiveMode = mode || inv.detail_level || 'detailed'
       pdf = await htmlToPdf(buildFactureHtml(inv, company, effectiveMode, invoiceQrSvg(inv, company)))

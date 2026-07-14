@@ -698,7 +698,7 @@ function ProjectTasksModal({ project, tasks, onClose }) {
 // ─── Formulaire projet ────────────────────────────────────────────────────────
 
 const emptyForm = {
-  name: '', client: '', client_address: '', client_contact_id: null,
+  name: '', client: '', client_address: '', client_contact_id: null, reference: '',
   description: '', short_description: '', deadline: '',
   delivery_type: 'Livraison', responsible: 'non défini', color_override: null, notes: '',
   kdrive_folder_id: null, kdrive_folder_path: '',
@@ -819,6 +819,7 @@ export default function Admin() {
       client: project.client,
       client_address: project.client_address || '',
       client_contact_id: project.client_contact_id || null,
+      reference: project.reference || '',
       description: project.description || '',
       short_description: project.short_description || '',
       deadline: project.deadline || '',
@@ -1102,6 +1103,12 @@ export default function Admin() {
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Date de livraison</label>
                   <input type="date" value={form.deadline}
                     onChange={e => handleFieldChange('deadline', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Référence</label>
+                  <input type="text" value={form.reference}
+                    onChange={e => handleFieldChange('reference', e.target.value)}
+                    placeholder="Réf. client / commande (sur l'offre & la facture)" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Mode de livraison</label>

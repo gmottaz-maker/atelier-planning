@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       site_visit_summary,
       kdrive_folder_id,
       quote_data,
-      client_address, client_contact_id,
+      client_address, client_contact_id, reference,
     } = req.body
 
     const payload = {
@@ -59,6 +59,7 @@ export default async function handler(req, res) {
     if (quote_data !== undefined) payload.quote_data = quote_data
     if (client_address !== undefined) payload.client_address = client_address || null
     if (client_contact_id !== undefined) payload.client_contact_id = client_contact_id || null
+    if (reference !== undefined) payload.reference = reference || null
 
     if (site_visit_data !== undefined) payload.site_visit_data = site_visit_data
     if (site_visit_summary !== undefined) payload.site_visit_summary = site_visit_summary

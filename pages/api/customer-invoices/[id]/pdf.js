@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const mode = req.query.mode || 'detailed'
 
   const { data: inv, error } = await supabase
-    .from('customer_invoices').select('*, projects(name, client)').eq('id', id).single()
+    .from('customer_invoices').select('*, projects(name, client, reference)').eq('id', id).single()
   if (error || !inv) return res.status(404).end()
 
   const { data: settings } = await supabase
