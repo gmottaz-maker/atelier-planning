@@ -7,6 +7,7 @@ import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
 import KDriveFolderPicker from '../components/KDriveFolderPicker'
 import BillingContactSelect from '../components/BillingContactSelect'
+import { PROJECT_PHASES, phaseMeta, isOngoing } from '../lib/projectPhase'
 import { C, FONT, MONO } from '../lib/theme'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
@@ -51,7 +52,12 @@ function getAutoColor(deadline) {
   if (d < 14) return '#f59e0b'
   return '#22c55e'
 }
-function getProjectColor(p) { return p.color_override || getAutoColor(p.deadline) }
+function getProjectColor(p) {
+  if (p.color_override) return p.color_override
+  const pm = phaseMeta(p.phase)
+  if (pm) return pm.color              // phase définie → couleur de phase (pas de rouge « retard »)
+  return getAutoColor(p.deadline)
+}
 function isFromTodoist(p)   { return p.notes && p.notes.startsWith('todoist:') }
 function needsCompletion(p) { return p.client === 'À définir' }
 function formatDate(s) {
@@ -66,7 +72,9 @@ function formatDateShort(s) {
 }
 
 // Badge d'échéance « DANS xJ » (11b). urgent = accent, sinon neutre.
-function daysBadge(deadline) {
+function daysBadge(deadline, phase) {
+  const pm = phaseMeta(phase)
+  if (pm) return { text: pm.label.toUpperCase(), kind: 'phase', color: pm.color, bg: pm.bg }
   if (!deadline) return { text: 'Sans date', kind: 'none' }
   const d = getDaysRemaining(deadline)
   if (d < 0)  return { text: `RETARD ${-d}J`, kind: 'urgent' }
@@ -109,9 +117,11 @@ function buildKanbanColumns() {
     cols.push({ key: ym, label: `${name.charAt(0).toUpperCase()}${name.slice(1)}`, accent: monthAccents[i] })
   }
   cols.push({ key: 'later', label: 'Plus tard', accent: '#64748b' })
+  cols.push({ key: 'ongoing', label: 'En cours / livré', accent: '#1d4ed8' })   // projets avec une phase
   return cols
 }
-function kanbanColumnKey(deadline, columns) {
+function kanbanColumnKey(deadline, columns, phase) {
+  if (isOngoing(phase)) return 'ongoing'    // phase définie → hors logique d'échéance
   if (!deadline) return 'later'
   if (getDaysRemaining(deadline) < 0) return 'overdue'
   const ym = deadline.slice(0, 7)
@@ -140,7 +150,9 @@ function groupByMonth(projects) {
 
 // ─── DaysChip ────────────────────────────────────────────────────────────────
 
-function DaysChip({ deadline }) {
+function DaysChip({ deadline, phase }) {
+  const pm = phaseMeta(phase)
+  if (pm) return <span style={{ background: pm.bg, color: pm.color }} className="px-2 py-0.5 rounded-full text-xs font-semibold">{pm.label}</span>
   const d = getDaysRemaining(deadline)
   if (d === null) return <span style={{ background:'#f3f4f6',color:'#6b7280' }} className="px-2 py-0.5 rounded-full text-xs font-medium">Sans date</span>
   if (d < 0)  return <span style={{ background:'#fee2e2',color:'#dc2626' }} className="px-2 py-0.5 rounded-full text-xs font-bold">En retard ({Math.abs(d)}j)</span>
@@ -699,7 +711,7 @@ function ProjectTasksModal({ project, tasks, onClose }) {
 
 const emptyForm = {
   name: '', client: '', client_address: '', client_contact_id: null, reference: '',
-  description: '', short_description: '', deadline: '',
+  description: '', short_description: '', deadline: '', phase: '',
   delivery_type: 'Livraison', responsible: 'non défini', color_override: null, notes: '',
   kdrive_folder_id: null, kdrive_folder_path: '',
 }
@@ -713,6 +725,8 @@ export default function Admin() {
   // Données via SWR : affichage instantané depuis le cache + revalidation auto
   const { data: projects = [], isLoading: projectsLoading, mutate: mutateProjects } = useSWR('/api/projects')
   const { data: tasks = [], mutate: mutateTasks } = useSWR('/api/tasks')
+  const { data: invoices = [] } = useSWR('/api/customer-invoices')
+  const invoiceProjectIds = new Set((Array.isArray(invoices) ? invoices : []).map(i => String(i.project_id)))
   const fetchProjects = () => mutateProjects()
   const fetchTasks    = () => mutateTasks()
   // On ne montre le skeleton qu'au tout premier chargement (cache vide)
@@ -792,7 +806,18 @@ export default function Admin() {
     fetchProjects()
   }
 
+  async function patchPhase(project, phase) {
+    mutateProjects(projects.map(p => p.id === project.id ? { ...p, phase } : p), false)
+    await fetch(`/api/projects/${project.id}`, {
+      method: 'PUT', headers: actorHeaders(),
+      body: JSON.stringify({ ...project, phase }),
+    }).catch(() => {})
+    mutateProjects()
+  }
+
   async function handleArchive(project) {
+    const hasInvoice = invoiceProjectIds.has(String(project.id))
+    if (!hasInvoice && !confirm(`⚠️ « ${project.name} » n'a aucune facture liée.\n\nArchiver quand même ?`)) return
     await fetch(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: actorHeaders(),
@@ -820,6 +845,7 @@ export default function Admin() {
       client_address: project.client_address || '',
       client_contact_id: project.client_contact_id || null,
       reference: project.reference || '',
+      phase: project.phase || '',
       description: project.description || '',
       short_description: project.short_description || '',
       deadline: project.deadline || '',
@@ -864,9 +890,9 @@ export default function Admin() {
     const nextTask    = allTasks
       .filter(t => t.status === 'active')
       .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
-    const badge = daysBadge(project.deadline)
-    // Barre de statut : accent si urgent, muted si normal, faint si sans date
-    const stripe = badge.kind === 'urgent' ? C.accent : badge.kind === 'none' ? C.faintChevron : C.muted
+    const badge = daysBadge(project.deadline, project.phase)
+    // Barre de statut : couleur de phase si définie, sinon accent/urgent, muted, faint
+    const stripe = badge.kind === 'phase' ? badge.color : badge.kind === 'urgent' ? C.accent : badge.kind === 'none' ? C.faintChevron : C.muted
 
     return (
       <div key={project.id}
@@ -890,11 +916,13 @@ export default function Admin() {
             <span style={{ font: `600 13px ${MONO}`, color: badge.kind === 'none' ? C.muted : C.ink }}>{formatDate(project.deadline) || 'Sans date'}</span>
             {incomplete
               ? <span style={{ font: `11px ${MONO}`, color: C.accent }}>À COMPLÉTER</span>
-              : badge.kind !== 'none' && (
-                <span style={{ font: `11px ${MONO}`, padding: '2px 8px', borderRadius: 99,
-                  color: badge.kind === 'urgent' ? C.accent : C.inkSecondary,
-                  background: badge.kind === 'urgent' ? C.accentBg : C.divider }}>{badge.text}</span>
-              )}
+              : badge.kind === 'phase'
+                ? <span style={{ font: `11px ${MONO}`, padding: '2px 8px', borderRadius: 99, color: badge.color, background: badge.bg }}>{badge.text}</span>
+                : badge.kind !== 'none' && (
+                  <span style={{ font: `11px ${MONO}`, padding: '2px 8px', borderRadius: 99,
+                    color: badge.kind === 'urgent' ? C.accent : C.inkSecondary,
+                    background: badge.kind === 'urgent' ? C.accentBg : C.divider }}>{badge.text}</span>
+                )}
           </div>
 
           {/* Méta : responsable · mode · devis */}
@@ -934,7 +962,13 @@ export default function Admin() {
         </div>
 
         {/* Actions */}
-        <div style={{ padding: '9px 18px', borderTop: `1px solid ${C.divider}`, display: 'flex', gap: 12, fontSize: 11.5, color: C.muted }}>
+        <div style={{ padding: '9px 18px', borderTop: `1px solid ${C.divider}`, display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, color: C.muted }}>
+          <select value={project.phase || ''} onChange={e => patchPhase(project, e.target.value)}
+            title="Phase du projet"
+            style={{ border: `1px solid ${C.border}`, borderRadius: 5, background: C.surface, color: C.inkSecondary, font: `11px ${FONT}`, padding: '2px 4px', cursor: 'pointer', maxWidth: 120 }}>
+            <option value="">En préparation</option>
+            {PROJECT_PHASES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
           <button onClick={() => handleEdit(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Modifier</button>
           <button onClick={() => handleArchive(project)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Archiver</button>
           <button onClick={() => handleDelete(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Supprimer</button>
@@ -983,7 +1017,7 @@ export default function Admin() {
             {/* Échéance */}
             <span className="inline-flex items-center gap-2">
               <span className="text-gray-500 tabular-nums">{formatDate(project.deadline) || 'Sans date'}</span>
-              {!incomplete && <DaysChip deadline={project.deadline} />}
+              {!incomplete && <DaysChip deadline={project.deadline} phase={project.phase} />}
             </span>
 
             {/* Avancement */}
@@ -1117,6 +1151,14 @@ export default function Admin() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Phase</label>
+                  <select value={form.phase} onChange={e => handleFieldChange('phase', e.target.value)} className={inputClass}>
+                    <option value="">En préparation</option>
+                    {PROJECT_PHASES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">Une phase définie retire le projet des « en retard ».</p>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Responsable</label>
                   <select value={form.responsible} onChange={e => handleFieldChange('responsible', e.target.value)} className={inputClass}>
                     {responsibles.map(r => <option key={r}>{r}</option>)}
@@ -1248,7 +1290,7 @@ export default function Admin() {
               {(() => {
                 const kanbanCols = buildKanbanColumns()
                 return kanbanCols.map(col => {
-                  const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols) === col.key)
+                  const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase) === col.key)
                   return (
                     <div key={col.key} className="flex-shrink-0 w-80">
                       <div className="flex items-center gap-2 mb-4 px-1">

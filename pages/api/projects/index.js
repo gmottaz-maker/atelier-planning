@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date, disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
       kdrive_folder_id,
-      client_address, client_contact_id, reference,
+      client_address, client_contact_id, reference, phase,
     } = req.body
 
     if (!name || !client) {
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       client_address: client_address || null,
       client_contact_id: client_contact_id || null,
       reference: reference || null,
+      phase: phase || null,
       logistics_address, logistics_time, logistics_contact, logistics_notes,
       disassembly_date: disassembly_date || null,
       disassembly_address, disassembly_time, disassembly_contact, disassembly_notes,
