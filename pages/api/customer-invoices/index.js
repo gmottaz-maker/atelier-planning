@@ -1,39 +1,8 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
+import { nextInvoiceNumber, qrReference } from '../../../lib/invoiceNumber'
 
 const supabase = getSupabaseServer()
-
-// Génère un n° de facture séquentiel par année (ex: 2026-001).
-// Max calculé numériquement (un tri texte classerait "999" après "1000") ;
-// la course entre deux POST simultanés est rattrapée par la contrainte
-// UNIQUE + retry dans le handler.
-async function nextInvoiceNumber(year) {
-  const { data } = await supabase
-    .from('customer_invoices')
-    .select('invoice_number')
-    .like('invoice_number', `${year}-%`)
-  let maxSeq = 0
-  for (const row of data || []) {
-    const n = parseInt(row.invoice_number.split('-')[1] || '0', 10)
-    if (Number.isFinite(n) && n > maxSeq) maxSeq = n
-  }
-  return `${year}-${String(maxSeq + 1).padStart(3, '0')}`
-}
-
-// Génère une référence QR-bill (26 chiffres + 1 chiffre checksum = 27 chiffres)
-// Format simple : YYMMDD + invoice id padded
-function qrReference(invoiceNumber, projectId) {
-  const digits = (invoiceNumber + (projectId || '')).replace(/\D/g, '').padStart(26, '0').slice(-26)
-  // Modulo 10 recursif (norme suisse)
-  const table = [[0,9,4,6,8,2,7,1,3,5],[9,4,6,8,2,7,1,3,5,0],[4,6,8,2,7,1,3,5,0,9],
-                 [6,8,2,7,1,3,5,0,9,4],[8,2,7,1,3,5,0,9,4,6],[2,7,1,3,5,0,9,4,6,8],
-                 [7,1,3,5,0,9,4,6,8,2],[1,3,5,0,9,4,6,8,2,7],[3,5,0,9,4,6,8,2,7,1],
-                 [5,0,9,4,6,8,2,7,1,3]]
-  let carry = 0
-  for (const ch of digits) carry = table[carry][parseInt(ch, 10)]
-  const check = (10 - carry) % 10
-  return digits + String(check)
-}
 
 export default async function handler(req, res) {
   if (!(await requireAdmin(req, res))) return
@@ -51,7 +20,7 @@ export default async function handler(req, res) {
     const {
       project_id, client_name, client_address, amount, amount_net, vat_rate, vat_amount,
       currency, issue_date, due_date, iban_recipient, quote_snapshot, notes,
-      detail_level, status,
+      detail_level, status, object,
     } = req.body
 
     if (!client_name || amount == null) return res.status(400).json({ error: 'client_name et amount requis' })
@@ -67,7 +36,7 @@ export default async function handler(req, res) {
     let data = null
     let error = null
     for (let attempt = 0; attempt < 2; attempt++) {
-      const invoice_number = await nextInvoiceNumber(year)
+      const invoice_number = await nextInvoiceNumber(supabase, year)
       const qr_reference = qrReference(invoice_number, project_id)
 
       ;({ data, error } = await supabase.from('customer_invoices').insert({
@@ -88,6 +57,7 @@ export default async function handler(req, res) {
         detail_level: detail_level === 'summary' ? 'summary' : 'detailed',
         status: status || 'created',
         notes,
+        object: object || null,
       }).select().single())
 
       if (!error || error.code !== '23505') break

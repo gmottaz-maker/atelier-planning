@@ -21,6 +21,7 @@ export default function Stockage() {
   const [q, setQ] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [draft, setDraft] = useState({})   // { 'g:12':{field:val} , 'i:34':{...} }
+  const [billOpen, setBillOpen] = useState(false)
 
   const clients = [...new Set([...gList.map(g => g.client), ...iList.map(i => i.client)])].sort((a, b) => a.localeCompare(b))
   const needle = q.trim().toLowerCase()
@@ -114,6 +115,10 @@ export default function Stockage() {
             style={{ font: `600 12px ${FONT}`, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`, background: showArchived ? C.ink : C.surface, color: showArchived ? '#fff' : C.inkSecondary }}>
             {showArchived ? 'Archivés inclus' : 'Actifs'}
           </button>
+          <button onClick={() => setBillOpen(true)}
+            style={{ font: `600 12px ${FONT}`, padding: '8px 14px', borderRadius: 6, cursor: 'pointer', border: 'none', background: C.ink, color: C.accentOnDark }}>
+            Générer le trimestre
+          </button>
         </div>
 
         {shownClients.map(client => (
@@ -197,6 +202,71 @@ export default function Stockage() {
         ))}
         {shownClients.length === 0 && <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Aucun client en stock.</p>}
       </main>
+
+      {billOpen && <BillingModal onClose={() => setBillOpen(false)} />}
+    </div>
+  )
+}
+
+function BillingModal({ onClose }) {
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [quarter, setQuarter] = useState(Math.floor(now.getMonth() / 3) + 1)
+  const [preview, setPreview] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  async function run(dry) {
+    setBusy(true); setMsg('')
+    try {
+      const d = await api('/api/storage-invoices/generate', 'POST', { year: Number(year), quarter: Number(quarter), dry })
+      if (d.error) { setMsg('Erreur : ' + d.error); return }
+      if (dry) setPreview(d)
+      else { setMsg(`✅ ${d.created.length} facture(s) créée(s)${d.skipped.length ? `, ${d.skipped.length} déjà existante(s)` : ''}.`); setPreview(null) }
+    } finally { setBusy(false) }
+  }
+
+  const sel = { padding: '8px 10px', borderRadius: 6, border: `1px solid ${C.border}`, font: `14px ${FONT}`, background: '#fff' }
+  return (
+    <div onMouseDown={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8vh 16px', overflowY: 'auto' }}>
+      <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, maxWidth: 480, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,.25)', fontFamily: FONT }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderBottom: `1px solid ${C.divider}` }}>
+          <h3 style={{ font: `700 16px ${FONT}`, margin: 0 }}>Générer les factures de stockage</h3>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 20, color: C.muted, cursor: 'pointer' }}>×</button>
+        </div>
+        <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+            <label style={{ font: `12px ${FONT}`, color: C.muted }}>Trimestre<br />
+              <select value={quarter} onChange={e => { setQuarter(e.target.value); setPreview(null) }} style={{ ...sel, marginTop: 4 }}>
+                {[1, 2, 3, 4].map(n => <option key={n} value={n}>T{n}</option>)}
+              </select>
+            </label>
+            <label style={{ font: `12px ${FONT}`, color: C.muted }}>Année<br />
+              <input type="number" value={year} onChange={e => { setYear(e.target.value); setPreview(null) }} style={{ ...sel, marginTop: 4, width: 100 }} />
+            </label>
+            <button onClick={() => run(true)} disabled={busy} style={{ marginLeft: 'auto', font: `600 12px ${FONT}`, padding: '9px 14px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: C.inkSecondary, cursor: 'pointer' }}>Prévisualiser</button>
+          </div>
+          <p style={{ font: `11px ${MONO}`, color: C.muted, margin: 0 }}>Facture au dernier jour du trimestre, échéance +30j, statut « Créée ». Contact/adresse à assigner ensuite.</p>
+
+          {preview && (
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+              <div style={{ padding: '8px 12px', font: `600 11px ${MONO}`, color: C.muted, background: C.pageBg, textTransform: 'uppercase' }}>{preview.object} — {preview.created.length} facture(s)</div>
+              {preview.created.map((c, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 12px', fontSize: 13, borderTop: `1px solid ${C.divider}` }}>
+                  <span>{c.client}</span><span style={{ font: `13px ${MONO}` }}>{fmt(c.amount)} CHF</span>
+                </div>
+              ))}
+              {preview.skipped.length > 0 && <div style={{ padding: '7px 12px', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.divider}` }}>Déjà facturés : {preview.skipped.join(', ')}</div>}
+              {preview.created.length === 0 && <div style={{ padding: '7px 12px', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.divider}` }}>Rien à générer (déjà fait ou aucun groupe facturable).</div>}
+            </div>
+          )}
+          {msg && <div style={{ fontSize: 13, color: msg.startsWith('✅') ? C.success : C.danger }}>{msg}</div>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: `1px solid ${C.divider}` }}>
+          <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: C.inkSecondary, font: `600 13px ${FONT}`, cursor: 'pointer' }}>Fermer</button>
+          <button onClick={() => run(false)} disabled={busy} style={{ padding: '9px 18px', borderRadius: 6, border: 'none', background: C.ink, color: '#fff', font: `600 13px ${FONT}`, cursor: 'pointer', opacity: busy ? 0.5 : 1 }}>Générer</button>
+        </div>
+      </div>
     </div>
   )
 }

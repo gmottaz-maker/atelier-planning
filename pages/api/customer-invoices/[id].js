@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const allowed = ['client_name', 'client_address', 'amount', 'amount_net', 'vat_rate', 'vat_amount',
                      'currency', 'issue_date',
                      'due_date', 'iban_recipient', 'notes', 'status', 'quote_snapshot',
-                     'detail_level', 'sent_at']
+                     'detail_level', 'sent_at', 'object']
     const payload = { updated_at: new Date().toISOString() }
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
     for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount']) {
