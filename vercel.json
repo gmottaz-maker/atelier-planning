@@ -11,6 +11,10 @@
     {
       "path": "/api/sync-odoo-clients",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/storage-invoices/cron",
+      "schedule": "0 6 * * *"
     }
   ]
 }
