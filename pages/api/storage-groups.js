@@ -2,15 +2,15 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireAdmin } from '../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
-const EDITABLE = ['client', 'brand', 'pallets', 'archived']
-const NUM = new Set(['pallets'])
+const EDITABLE = ['client', 'brand', 'pallets', 'archived', 'billing_mode', 'annual_billed_pallets', 'annual_year']
+const NUM = new Set(['pallets', 'annual_billed_pallets', 'annual_year'])
 
 function pick(body) {
   const p = {}
   for (const k of EDITABLE) if (k in body) {
     let v = body[k]
     if (v === '' || v === undefined) v = k === 'pallets' ? 0 : null
-    else if (NUM.has(k)) { const n = parseFloat(v); v = isNaN(n) ? 0 : n }
+    else if (NUM.has(k)) { const n = parseFloat(v); v = isNaN(n) ? (k === 'pallets' ? 0 : null) : n }
     p[k] = v
   }
   return p

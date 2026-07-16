@@ -65,6 +65,16 @@ export default function Stockage() {
     reader.readAsDataURL(file)
   }
 
+  const CUR_YEAR = new Date().getFullYear()
+  // Palettes facturables au trimestre : surplus au-delà de l'annuel si mode annuel (année courante).
+  const groupSurplus = g => (g.billing_mode === 'annual' && Number(g.annual_year) === CUR_YEAR)
+    ? Math.max(0, num(g.pallets) - num(g.annual_billed_pallets)) : num(g.pallets)
+  function setMode(g, mode) {
+    if (mode === 'annual') patchGroup(g.id, { billing_mode: 'annual', annual_billed_pallets: num(g.pallets), annual_year: CUR_YEAR })
+    else patchGroup(g.id, { billing_mode: 'quarterly', annual_billed_pallets: null, annual_year: null })
+  }
+  const clientQuarterAmount = c => gList.filter(g => g.client === c && !g.archived).reduce((s, g) => s + groupSurplus(g) * RATE * QUARTER_MONTHS, 0)
+
   const activeGroups = c => gList.filter(g => g.client === c && (showArchived || !g.archived))
   const activeItems = c => iList.filter(i => i.client === c && (showArchived || !i.archived))
   const clientPallets = c => gList.filter(g => g.client === c && !g.archived).reduce((s, g) => s + num(g.pallets), 0)
@@ -126,7 +136,7 @@ export default function Stockage() {
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '14px 18px', borderBottom: `1px solid ${C.divider}` }}>
               <span style={{ font: `700 16px ${FONT}` }}>{client}</span>
               <span style={{ font: `12px ${MONO}`, color: C.muted }}>
-                {clientPallets(client)} palette(s) · {fmt(clientPallets(client) * RATE * QUARTER_MONTHS)} CHF / trimestre
+                {clientPallets(client)} palette(s) · {fmt(clientQuarterAmount(client))} CHF / trimestre
               </span>
             </div>
 
@@ -137,20 +147,32 @@ export default function Stockage() {
                 <button onClick={() => addGroup(client)} style={{ font: `600 11px ${FONT}`, border: 'none', background: 'transparent', color: C.accent, cursor: 'pointer' }}>+ groupe</button>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead><tr><th style={{ ...th, width: '45%' }}>Marque / projet</th><th style={{ ...th, textAlign: 'right', width: '18%' }}>Palettes</th><th style={{ ...th, textAlign: 'right', width: '25%' }}>CHF / trimestre</th><th style={{ ...th, width: '12%' }}></th></tr></thead>
+                <thead><tr><th style={{ ...th, width: '34%' }}>Marque / projet</th><th style={{ ...th, textAlign: 'right', width: '12%' }}>Palettes</th><th style={{ ...th, width: '22%' }}>Mode</th><th style={{ ...th, textAlign: 'right', width: '20%' }}>CHF / trimestre</th><th style={{ ...th, width: '12%' }}></th></tr></thead>
                 <tbody>
-                  {activeGroups(client).map(g => (
+                  {activeGroups(client).map(g => {
+                    const annual = g.billing_mode === 'annual'
+                    return (
                     <tr key={g.id} style={{ opacity: g.archived ? 0.5 : 1 }}>
                       <td style={cell}>{field('g', g, 'brand', { ...inp, fontWeight: 600 }, 'text', 'Marque')}</td>
                       <td style={cell}>{field('g', g, 'pallets', inpR, 'number', '0')}</td>
-                      <td style={{ ...cell, textAlign: 'right', font: `13px ${MONO}`, color: C.ink, paddingRight: 12 }}>{fmt(num(val('g', g, 'pallets')) * RATE * QUARTER_MONTHS)}</td>
+                      <td style={cell}>
+                        <select value={g.billing_mode || 'quarterly'} onChange={e => setMode(g, e.target.value)}
+                          style={{ font: `12px ${FONT}`, color: C.inkSecondary, border: `1px solid ${C.border}`, borderRadius: 5, padding: '4px 6px', background: '#fff' }}>
+                          <option value="quarterly">Trimestriel</option>
+                          <option value="annual">Annuel</option>
+                        </select>
+                        {annual && <span style={{ font: `10px ${MONO}`, color: C.muted, marginLeft: 6 }}>{num(g.annual_billed_pallets)} pal · {g.annual_year}</span>}
+                      </td>
+                      <td style={{ ...cell, textAlign: 'right', font: `13px ${MONO}`, color: groupSurplus(g) > 0 ? C.ink : C.muted, paddingRight: 12 }}>
+                        {annual && groupSurplus(g) === 0 ? '— (annuel)' : fmt(groupSurplus(g) * RATE * QUARTER_MONTHS)}
+                      </td>
                       <td style={{ ...cell, textAlign: 'right' }}>
                         <button title={g.archived ? 'Désarchiver' : 'Archiver'} onClick={() => patchGroup(g.id, { archived: !g.archived })} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', padding: 3 }}>⊘</button>
                         <button title="Supprimer" onClick={() => delGroup(g)} style={{ border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 15, padding: 3 }}>×</button>
                       </td>
                     </tr>
-                  ))}
-                  {activeGroups(client).length === 0 && <tr><td colSpan={4} style={{ ...cell, color: C.muted, fontSize: 12, padding: 10 }}>Aucun groupe.</td></tr>}
+                  )})}
+                  {activeGroups(client).length === 0 && <tr><td colSpan={5} style={{ ...cell, color: C.muted, fontSize: 12, padding: 10 }}>Aucun groupe.</td></tr>}
                 </tbody>
               </table>
             </div>
