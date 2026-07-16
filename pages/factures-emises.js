@@ -136,7 +136,7 @@ export default function FacturesEmises() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = pdfFilename(mode === 'summary' ? 'facture-résumée' : 'facture-détaillée', inv.projects?.name || inv.client_name)
+      a.download = pdfFilename(mode === 'summary' ? 'facture-résumée' : 'facture-détaillée', inv.projects?.name || inv.object || inv.client_name)
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { alert('Téléchargement impossible : ' + e.message) }
@@ -150,7 +150,7 @@ export default function FacturesEmises() {
   const [sendDoc, setSendDoc] = useState(null)
   function openSend(inv) {
     const proj = projects.find(p => String(p.id) === String(inv.project_id))
-    setSendDoc({ type: 'facture', docId: inv.id, contactId: proj?.client_contact_id, projectName: proj?.name || inv.client_name, number: inv.invoice_number })
+    setSendDoc({ type: 'facture', docId: inv.id, contactId: proj?.client_contact_id, projectName: proj?.name || inv.object || inv.client_name, number: inv.invoice_number })
   }
 
   const visible = invoices.filter(inv => filter === 'all' ? true : effectiveStatus(inv) === filter)
@@ -234,7 +234,7 @@ export default function FacturesEmises() {
                       onClick={() => { setEditing(inv); setDrawerOpen(true) }}>
                       <td className="px-4 py-3 font-mono text-xs text-gray-700">{inv.invoice_number}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{inv.client_name}</td>
-                      <td className="px-4 py-3 text-gray-600 text-xs truncate" style={{ maxWidth: 200 }}>{inv.projects?.name || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600 text-xs truncate" style={{ maxWidth: 200 }}>{inv.projects?.name || inv.object || '—'}</td>
                       <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(inv.issue_date)}</td>
                       <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(inv.due_date)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
