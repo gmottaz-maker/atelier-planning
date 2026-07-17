@@ -121,7 +121,7 @@ export default function Sidebar() {
         <>
           {FIN_TOP.map(finLink)}
           {FIN_GROUPS.flatMap(g => [
-            <div key={g.label} style={{ font: `500 10px ${MONO}`, letterSpacing: '.1em', color: C.muted, padding: '10px 12px 4px' }}>{g.label}</div>,
+            <div key={g.label} style={{ font: `700 10px ${MONO}`, letterSpacing: '.14em', color: C.inkTertiary, textTransform: 'uppercase', padding: '18px 12px 6px' }}>{g.label}</div>,
             ...g.items.map(finLink),
           ])}
         </>
