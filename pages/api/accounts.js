@@ -11,12 +11,19 @@ export default async function handler(req, res) {
   if (!(await requireAdmin(req, res))) return
 
   if (req.method === 'GET') {
-    const [{ data: accounts, error: e1 }, { data: mappings, error: e2 }] = await Promise.all([
+    const [{ data: accounts, error: e1 }, { data: mappings, error: e2 }, sup, exp] = await Promise.all([
       supabase.from('accounts').select('*').eq('archived', false).order('sort'),
       supabase.from('account_mappings').select('*').order('scope').order('category'),
+      supabase.from('supplier_invoices').select('category'),
+      supabase.from('expenses').select('category'),
     ])
     if (e1 || e2) return res.status(500).json({ error: (e1 || e2).message })
-    return res.status(200).json({ accounts, mappings })
+    // Catégories réellement utilisées dans les pièces (pour proposer le mapping)
+    const uniq = rows => [...new Set((rows || []).map(r => (r.category || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+    return res.status(200).json({
+      accounts, mappings,
+      categories: { supplier: uniq(sup.data), expense: uniq(exp.data), sale: ['stockage'] },
+    })
   }
 
   if (req.method === 'PUT') {

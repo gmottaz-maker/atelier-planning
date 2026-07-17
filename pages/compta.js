@@ -306,7 +306,107 @@ export default function Compta() {
             </div>
           </div>
         )}
+
+        <AccountMapping onChanged={loadJournal} />
       </main>
+    </div>
+  )
+}
+
+// ─── Correspondance catégorie → compte ───────────────────────────────────────
+const SCOPES = [
+  { key: 'supplier', label: 'Factures fournisseurs', hint: 'Compte de charge utilisé au débit' },
+  { key: 'expense',  label: 'Frais / justificatifs', hint: 'Compte de charge utilisé au débit' },
+  { key: 'sale',     label: 'Ventes',                hint: 'Compte de produit utilisé au crédit' },
+]
+
+function AccountMapping({ onChanged }) {
+  const [data, setData] = useState(null)
+  const [saving, setSaving] = useState('')
+
+  async function load() {
+    try {
+      const r = await adminFetch('/api/accounts')
+      const d = await r.json()
+      setData(d.error ? null : d)
+    } catch (_) { setData(null) }
+  }
+  useEffect(() => { load() }, [])
+
+  async function setMapping(scope, category, account) {
+    const key = `${scope}:${category}`
+    setSaving(key)
+    try {
+      await adminFetch('/api/accounts', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope, category, account }),
+      })
+      await load()
+      onChanged?.()
+    } finally { setSaving('') }
+  }
+
+  if (!data) return null
+  const { accounts = [], mappings = [], categories = {} } = data
+  const accountOf = (scope, category) =>
+    mappings.find(m => m.scope === scope && m.category === category)?.account || ''
+  // Comptes proposés : produits pour les ventes, charges (et actifs immobilisés) sinon
+  const optionsFor = scope => accounts.filter(a =>
+    scope === 'sale' ? a.kind === 'produit' : (a.kind === 'charge' || a.number.startsWith('15')))
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
+      <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: 16 }}>Correspondance catégorie → compte</h2>
+      <p className="text-xs text-gray-500 mb-4">
+        Détermine sur quel compte chaque pièce est imputée dans le journal. La ligne « (défaut) » s'applique
+        aux catégories non mappées.
+      </p>
+
+      <div className="space-y-5">
+        {SCOPES.map(s => {
+          const cats = ['', ...(categories[s.key] || [])]
+          return (
+            <div key={s.key}>
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <h3 className="font-semibold text-gray-800" style={{ fontSize: 13 }}>{s.label}</h3>
+                <span className="text-gray-400" style={{ fontSize: 11 }}>{s.hint}</span>
+              </div>
+              <table className="w-full" style={{ fontSize: 13 }}>
+                <tbody>
+                  {cats.map(cat => {
+                    const key = `${s.key}:${cat}`
+                    return (
+                      <tr key={key} className="border-t border-gray-100">
+                        <td className="py-1.5" style={{ width: '45%' }}>
+                          {cat === '' ? <span className="text-gray-500 italic">(défaut)</span> : cat}
+                        </td>
+                        <td className="py-1.5">
+                          <select
+                            value={accountOf(s.key, cat)}
+                            onChange={e => setMapping(s.key, cat, e.target.value)}
+                            disabled={saving === key}
+                            className="px-2 py-1 border border-gray-200 rounded-md bg-white w-full"
+                            style={{ fontSize: 12, maxWidth: 380 }}>
+                            <option value="">— choisir un compte —</option>
+                            {optionsFor(s.key).map(a => (
+                              <option key={a.number} value={a.number}>{a.number} — {a.label}</option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {cats.length === 1 && (
+                    <tr><td colSpan={2} className="py-2 text-gray-400" style={{ fontSize: 12 }}>
+                      Aucune catégorie utilisée pour l'instant — seul le défaut s'applique.
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
