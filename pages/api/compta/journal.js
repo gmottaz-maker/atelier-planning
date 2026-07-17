@@ -2,7 +2,7 @@
 // ?from=YYYY-MM-DD&to=YYYY-MM-DD[&format=csv|json]
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
-import { buildJournal, vatSummary } from '../../../lib/comptaJournal'
+import { buildJournal, vatSummary, vatReturn, accountBalance } from '../../../lib/comptaJournal'
 
 const supabase = getSupabaseServer()
 
@@ -33,7 +33,12 @@ export default async function handler(req, res) {
   })
   const tva = vatSummary(lines)
 
-  if (format === 'json') return res.status(200).json({ lines, totalDebit, tva })
+  if (format === 'json') {
+    const accounts = await supabase.from('accounts').select('number, label')
+    const labels = Object.fromEntries((accounts.data || []).map(a => [a.number, a.label]))
+    const balance = accountBalance(lines).map(a => ({ ...a, label: labels[a.account] || '' }))
+    return res.status(200).json({ lines, totalDebit, tva, decompte: vatReturn(lines), balance })
+  }
 
   const cols = ['Date', 'Pièce', 'Libellé', 'Tiers', 'Débit', 'Crédit', 'Montant', 'Taux TVA', 'Type']
   const rows = lines.map(l => [l.date, l.piece, l.libelle, l.tiers, l.debit, l.credit, l.montant.toFixed(2), l.taux ?? '', l.type].map(esc).join(';'))

@@ -227,6 +227,85 @@ export default function Compta() {
             📥 Télécharger le journal (CSV)
           </button>
         </div>
+
+        {/* Décompte TVA (méthode effective) */}
+        {journal?.decompte && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
+            <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: 16 }}>Décompte TVA — méthode effective</h2>
+            <p className="text-xs text-gray-500 mb-4">Chiffres correspondant au formulaire AFC pour la période choisie (sélectionne « Trimestre » ci-dessus).</p>
+            <table className="w-full" style={{ fontSize: 13 }}>
+              <thead>
+                <tr className="text-gray-500" style={{ fontSize: 11 }}>
+                  <th className="text-left py-1.5">Poste</th>
+                  <th className="text-right py-1.5">Chiffre d'affaires HT</th>
+                  <th className="text-right py-1.5">Impôt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {journal.decompte.rates.map((r, i) => (
+                  <tr key={i} className="border-t border-gray-100">
+                    <td className="py-1.5">Prestations imposables à {r.rate}%</td>
+                    <td className="text-right tabular-nums">{fmtCHF(r.net)}</td>
+                    <td className="text-right tabular-nums">{fmtCHF(r.vat)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t border-gray-200 font-semibold">
+                  <td className="py-1.5">Total impôt dû</td>
+                  <td className="text-right tabular-nums">{fmtCHF(journal.decompte.totalRevenue)}</td>
+                  <td className="text-right tabular-nums">{fmtCHF(journal.decompte.vatDue)}</td>
+                </tr>
+                <tr className="border-t border-gray-100">
+                  <td className="py-1.5">Impôt préalable — matériel et prestations (400)</td>
+                  <td></td>
+                  <td className="text-right tabular-nums">− {fmtCHF(journal.decompte.vatInput)}</td>
+                </tr>
+                {journal.decompte.vatInputInvest > 0 && (
+                  <tr className="border-t border-gray-100">
+                    <td className="py-1.5">Impôt préalable — investissements (405)</td>
+                    <td></td>
+                    <td className="text-right tabular-nums">− {fmtCHF(journal.decompte.vatInputInvest)}</td>
+                  </tr>
+                )}
+                <tr className="border-t-2 border-gray-300 font-bold">
+                  <td className="py-2">{journal.decompte.balance >= 0 ? 'À payer à l\'AFC (500)' : 'En votre faveur (510)'}</td>
+                  <td></td>
+                  <td className="text-right tabular-nums" style={{ fontSize: 16 }}>{fmtCHF(Math.abs(journal.decompte.balance))}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Balance des comptes */}
+        {journal?.balance?.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
+            <h2 className="font-semibold text-gray-900 mb-3" style={{ fontSize: 16 }}>Balance des comptes</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ fontSize: 13 }}>
+                <thead>
+                  <tr className="text-gray-500" style={{ fontSize: 11 }}>
+                    <th className="text-left py-1.5">Compte</th>
+                    <th className="text-left py-1.5">Libellé</th>
+                    <th className="text-right py-1.5">Débit</th>
+                    <th className="text-right py-1.5">Crédit</th>
+                    <th className="text-right py-1.5">Solde</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {journal.balance.map(a => (
+                    <tr key={a.account} className="border-t border-gray-100">
+                      <td className="py-1.5 tabular-nums font-medium">{a.account}</td>
+                      <td className="py-1.5 text-gray-600">{a.label}</td>
+                      <td className="text-right tabular-nums text-gray-600">{a.debit ? fmtCHF(a.debit) : ''}</td>
+                      <td className="text-right tabular-nums text-gray-600">{a.credit ? fmtCHF(a.credit) : ''}</td>
+                      <td className="text-right tabular-nums font-semibold">{fmtCHF(a.solde)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
