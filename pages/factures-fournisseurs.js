@@ -82,50 +82,31 @@ export default function FacturesFournisseurs() {
     }
   }, [])
 
-  async function processDroppedFile(file) {
-    if (!file) return
-    const isImage = file.type.startsWith('image/')
-    const isPdf   = file.type === 'application/pdf'
-    if (!isImage && !isPdf) return
-    const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-    setProcessing(p => [...p, { id, name: file.name, status: 'reading' }])
+  // Importe UNE facture détectée. `split` = le document en contient plusieurs,
+  // auquel cas on n'archive que les pages de celle-ci.
+  async function importScanned(id, inv, base64, file, split) {
+    const body = {
+      supplier_name:     inv.supplier_name || 'À compléter',
+      invoice_number:    inv.invoice_number || null,
+      amount:            inv.amount ?? 0,
+      amount_net:        inv.amount_net ?? null,
+      vat_rate:          inv.vat_rate ?? null,
+      vat_amount:        inv.vat_amount ?? null,
+      vat_breakdown:     Array.isArray(inv.vat_breakdown) && inv.vat_breakdown.length > 0 ? inv.vat_breakdown : null,
+      currency:          inv.currency || 'CHF',
+      issue_date:        inv.issue_date || null,
+      due_date:          inv.due_date || null,
+      payment_reference: inv.payment_reference || null,
+      iban:              inv.iban || null,
+      file_base64:       base64,
+      file_filename:     file.name,
+      file_mime_type:    file.type,
+      page_from:         split ? inv.page_from ?? null : null,
+      page_to:           split ? inv.page_to ?? null : null,
+      created_by:        currentUser,
+    }
+    const multiVat = Array.isArray(inv.vat_breakdown) && inv.vat_breakdown.length > 1
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const r = new FileReader()
-        r.onload = e => resolve(e.target.result.split(',')[1])
-        r.onerror = reject
-        r.readAsDataURL(file)
-      })
-      // Scan IA
-      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'scanning' } : x))
-      const scanRes = await adminFetch('/api/supplier-invoices/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mimeType: file.type }),
-      })
-      const scan = await scanRes.json()
-
-      // Création facture avec données scannées (ou champs vides si OCR a échoué)
-      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'uploading' } : x))
-      const body = {
-        supplier_name:     scan.supplier_name || 'À compléter',
-        invoice_number:    scan.invoice_number || null,
-        amount:            scan.amount ?? 0,
-        amount_net:        scan.amount_net ?? null,
-        vat_rate:          scan.vat_rate ?? null,
-        vat_amount:        scan.vat_amount ?? null,
-        vat_breakdown:     Array.isArray(scan.vat_breakdown) && scan.vat_breakdown.length > 0 ? scan.vat_breakdown : null,
-        currency:          scan.currency || 'CHF',
-        issue_date:        scan.issue_date || null,
-        due_date:          scan.due_date || null,
-        payment_reference: scan.payment_reference || null,
-        iban:              scan.iban || null,
-        file_base64:       base64,
-        file_filename:     file.name,
-        file_mime_type:    file.type,
-        created_by:        currentUser,
-      }
-      const multiVat = Array.isArray(scan.vat_breakdown) && scan.vat_breakdown.length > 1
       const r = await adminFetch('/api/supplier-invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -133,10 +114,9 @@ export default function FacturesFournisseurs() {
       })
       const d = await r.json()
       if (r.status === 409) {
-        const dup = d.duplicate_of
         setProcessing(p => p.map(x => x.id === id ? {
           ...x, status: 'duplicate',
-          duplicate: dup,
+          duplicate: d.duplicate_of,
           retry: async () => {
             setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'uploading' } : xx))
             const r2 = await adminFetch('/api/supplier-invoices', {
@@ -156,9 +136,57 @@ export default function FacturesFournisseurs() {
         return
       }
       if (d.error) throw new Error(d.error)
-      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done', multiVat, vatBreakdown: scan.vat_breakdown } : x))
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done', multiVat, vatBreakdown: inv.vat_breakdown } : x))
       load()
       setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), multiVat ? 10000 : 3000)
+    } catch (e) {
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
+    }
+  }
+
+  async function processDroppedFile(file) {
+    if (!file) return
+    const isImage = file.type.startsWith('image/')
+    const isPdf   = file.type === 'application/pdf'
+    if (!isImage && !isPdf) return
+    const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    setProcessing(p => [...p, { id, name: file.name, status: 'reading' }])
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const r = new FileReader()
+        r.onload = e => resolve(e.target.result.split(',')[1])
+        r.onerror = reject
+        r.readAsDataURL(file)
+      })
+      // Scan IA — un même PDF peut contenir plusieurs factures
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'scanning' } : x))
+      const scanRes = await adminFetch('/api/supplier-invoices/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType: file.type }),
+      })
+      const scan = await scanRes.json()
+      if (scan.error) throw new Error(scan.error)
+      // Si l'OCR n'a rien reconnu, on crée quand même une facture à compléter à la main.
+      const found = Array.isArray(scan.invoices) ? scan.invoices : [scan]
+      const list  = found.length > 0 ? found : [{}]
+      const split = list.length > 1
+
+      // Une ligne de progression par facture, pour gérer doublons et erreurs séparément
+      const items = list.map((inv, i) => ({
+        id: split ? `${id}_${i}` : id,
+        name: split ? `${i + 1}/${list.length} · ${inv.supplier_name || 'À compléter'}` : file.name,
+        inv,
+      }))
+      setProcessing(p => [
+        ...p.filter(x => x.id !== id),
+        ...items.map(it => ({ id: it.id, name: it.name, status: 'uploading' })),
+      ])
+
+      // En série : le POST fait un upload kDrive, et l'anti-doublon doit voir
+      // la facture précédente déjà insérée.
+      for (const it of items) await importScanned(it.id, it.inv, base64, file, split)
     } catch (e) {
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
       setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)

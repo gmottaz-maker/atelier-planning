@@ -1,6 +1,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { ensureSupplierInvoiceFolder, upload } from '../../../lib/kdrive'
 import { requireAdmin } from '../../../lib/requireAdmin'
+import { extractPages } from '../../../lib/pdfSplit'
 
 const supabase = getSupabaseServer()
 
@@ -28,6 +29,7 @@ export default async function handler(req, res) {
       currency, issue_date, due_date,
       payment_reference, iban, category, notes,
       file_base64, file_filename, file_mime_type,
+      page_from, page_to,
       created_by, force,
     } = req.body
 
@@ -76,7 +78,12 @@ export default async function handler(req, res) {
       try {
         const year = (issue_date || new Date().toISOString().slice(0, 10)).slice(0, 4)
         const folderId = await ensureSupplierInvoiceFolder(year)
-        const buffer = Buffer.from(file_base64, 'base64')
+        let buffer = Buffer.from(file_base64, 'base64')
+        // Scan groupé : ne garder que les pages de cette facture. Si le découpage
+        // échoue (PDF illisible), on archive le document entier plutôt que rien.
+        if ((file_mime_type || '').includes('pdf') && (page_from || page_to)) {
+          try { buffer = await extractPages(buffer, page_from, page_to) } catch {}
+        }
         const safeName = `${(supplier_name || 'facture').replace(/[^a-zA-Z0-9-_ ]/g, '_')}_${Date.now()}_${file_filename}`.slice(0, 200)
         const kf = await upload(folderId, safeName, buffer, file_mime_type || 'application/pdf')
         kdrive_file_id = kf.id
