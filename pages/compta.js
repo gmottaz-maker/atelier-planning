@@ -24,6 +24,7 @@ export default function Compta() {
   const [to, setTo]     = useState(todayStr)
   const [mode, setMode] = useState('all')   // all | paid
   const [preview, setPreview] = useState(null)
+  const [journal, setJournal] = useState(null)
   const [loading, setLoading] = useState(false)
 
   async function loadPreview() {
@@ -55,11 +56,32 @@ export default function Compta() {
     }
   }
 
-  useEffect(() => { loadPreview() }, [from, to, mode])
+  // Journal partie double + récap TVA (méthode effective)
+  async function loadJournal() {
+    try {
+      const r = await adminFetch(`/api/compta/journal?from=${from}&to=${to}&format=json`)
+      const d = await r.json()
+      setJournal(d.error ? null : d)
+    } catch (_) { setJournal(null) }
+  }
+  useEffect(() => { loadPreview(); loadJournal() }, [from, to, mode])
 
   function download() {
     const url = `/api/compta/export?from=${from}&to=${to}&mode=${mode}`
     window.open(url, '_blank')
+  }
+
+  async function downloadJournal() {
+    try {
+      const r = await adminFetch(`/api/compta/journal?from=${from}&to=${to}`)
+      if (!r.ok) throw new Error(`Erreur ${r.status}`)
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `journal-${from}_${to}.csv`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (e) { alert('Téléchargement impossible : ' + e.message) }
   }
 
   function setRange(preset) {
@@ -167,6 +189,43 @@ export default function Compta() {
           <p className="text-xs text-gray-400 mt-2 text-center">
             Format CSV compatible Excel (séparateur ;). Une ligne par facture/frais + totaux en bas.
           </p>
+        </div>
+
+        {/* Journal comptable (partie double) */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
+          <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: 16 }}>Journal comptable (partie double)</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            Écritures au plan comptable suisse PME : débiteurs/ventes + TVA due, charges + impôt préalable/créanciers,
+            frais, et paiements bancaires rapprochés. Importable dans Banana, Crésus, bexio ou Excel.
+          </p>
+
+          {journal && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {[
+                  { label: 'Chiffre d\'affaires HT', value: journal.tva.revenueNet, color: '#166534', bg: '#f0fdf4', border: '#bbf7d0' },
+                  { label: 'TVA due (2200)', value: journal.tva.vatDue, color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+                  { label: 'Impôt préalable (1170)', value: journal.tva.vatInput, color: '#9a3412', bg: '#fff7ed', border: '#fed7aa' },
+                  { label: 'TVA à payer', value: journal.tva.vatToPay, color: '#111827', bg: '#f9fafb', border: '#e5e7eb' },
+                ].map((c, i) => (
+                  <div key={i} className="rounded-lg p-3 border" style={{ background: c.bg, borderColor: c.border }}>
+                    <div className="text-xs mb-1" style={{ color: c.color }}>{c.label}</div>
+                    <div className="font-bold tabular-nums" style={{ fontSize: 18, color: c.color }}>{fmtCHF(c.value)}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mb-3">
+                {journal.lines.length} écriture(s) · total mouvementé {fmtCHF(journal.totalDebit)} CHF · débit = crédit ✓
+                <span className="ml-1">— récap TVA selon la méthode effective.</span>
+              </p>
+            </>
+          )}
+
+          <button onClick={downloadJournal}
+            className="w-full px-4 py-2.5 rounded-md text-sm font-medium text-white"
+            style={{ background: PINK }}>
+            📥 Télécharger le journal (CSV)
+          </button>
         </div>
       </main>
     </div>
