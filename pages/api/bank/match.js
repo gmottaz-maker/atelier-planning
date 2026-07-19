@@ -1,6 +1,7 @@
 // Confirme ou retire un match entre une transaction et une facture/dépense.
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
+import { paymentDateOf } from '../../../lib/bankReconcile'
 
 const supabase = getSupabaseServer()
 
@@ -22,17 +23,24 @@ export default async function handler(req, res) {
 
   // La transaction doit exister (évite d'écrire un match orphelin)
   const { data: tx, error: txReadErr } = await supabase.from('bank_transactions')
-    .select('id, amount, matched_to_type, matched_to_id').eq('id', transaction_id).maybeSingle()
+    .select('id, amount, booking_date, value_date, matched_to_type, matched_to_id').eq('id', transaction_id).maybeSingle()
   if (txReadErr) return res.status(500).json({ error: txReadErr.message })
   if (!tx) return res.status(404).json({ error: 'Transaction introuvable' })
 
   // Désassocier
   if (unmatch) {
-    // Libérer la facture liée
+    // Libérer la facture liée. Un ordre déjà transmis à la banque retrouve son
+    // statut « transmis » plutôt que de repartir à « à payer ».
     const invoiceTable = INVOICE_TABLES[tx.matched_to_type]
     if (invoiceTable && tx.matched_to_id) {
+      let status = 'pending'
+      if (tx.matched_to_type === 'supplier_invoice') {
+        const { data: inv } = await supabase.from('supplier_invoices')
+          .select('sent_to_bank_at').eq('id', tx.matched_to_id).maybeSingle()
+        if (inv?.sent_to_bank_at) status = 'sent_to_bank'
+      }
       await supabase.from(invoiceTable)
-        .update({ status: 'pending', paid_transaction_id: null, paid_at: null })
+        .update({ status, paid_transaction_id: null, paid_at: null })
         .eq('id', tx.matched_to_id)
     }
     const { error } = await supabase.from('bank_transactions')
@@ -67,10 +75,11 @@ export default async function handler(req, res) {
   }).eq('id', transaction_id)
   if (txErr) return res.status(500).json({ error: txErr.message })
 
-  // Mettre à jour le statut de la facture liée
+  // Mettre à jour le statut de la facture liée.
+  // paid_at = date réelle du paiement au relevé, pas l'instant du rapprochement.
   if (invoiceTable) {
     await supabase.from(invoiceTable)
-      .update({ status: 'paid', paid_transaction_id: transaction_id, paid_at: new Date().toISOString() })
+      .update({ status: 'paid', paid_transaction_id: transaction_id, paid_at: paymentDateOf(tx) })
       .eq('id', target_id)
   }
 

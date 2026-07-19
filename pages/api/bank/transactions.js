@@ -21,7 +21,9 @@ export default async function handler(req, res) {
   if (suggestions === '1') {
     // Charger les candidats pertinents (factures pending + dépenses récentes)
     const [{ data: suppliers }, { data: customers }, { data: expenses }] = await Promise.all([
-      supabase.from('supplier_invoices').select('*').eq('status', 'pending'),
+      // 'sent_to_bank' = ordre transmis en attente d'exécution : c'est justement
+      // ce qu'un débit du relevé vient solder.
+      supabase.from('supplier_invoices').select('*').in('status', ['pending', 'sent_to_bank']),
       supabase.from('customer_invoices').select('*').eq('status', 'pending'),
       supabase.from('expenses').select('*').order('date', { ascending: false }).limit(200),
     ])

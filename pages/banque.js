@@ -121,12 +121,35 @@ export default function Banque() {
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
 
         {importResult && (
-          <div className="rounded-md px-4 py-3 text-sm"
+          <div className="rounded-md px-4 py-3 text-sm space-y-2"
             style={{ background: importResult.error ? '#fee2e2' : '#f0fdf4',
                      color:      importResult.error ? '#991b1b' : '#15803d' }}>
-            {importResult.error
-              ? `Erreur : ${importResult.error}`
-              : `${importResult.inserted} transaction(s) importée(s) · ${importResult.duplicates} doublon(s) ignoré(s) · ${importResult.total} total`}
+            {importResult.error ? (
+              `Erreur : ${importResult.error}`
+            ) : (
+              <>
+                <div>{`${importResult.inserted} transaction(s) importée(s) · ${importResult.duplicates} doublon(s) ignoré(s) · ${importResult.total} total`}</div>
+                {importResult.reconciled?.length > 0 && (
+                  <div className="pt-1 border-t border-green-200/60">
+                    <div className="font-semibold mb-1">
+                      {importResult.reconciled.length} facture(s) fournisseur passée(s) en payée :
+                    </div>
+                    <ul className="space-y-0.5">
+                      {importResult.reconciled.map(r => (
+                        <li key={r.invoice_id} className="text-xs">
+                          {r.supplier_name}{r.invoice_number ? ` · n° ${r.invoice_number}` : ''} — {Number(r.amount).toFixed(2)} CHF, payée le {r.paid_at}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {importResult.ambiguous > 0 && (
+                  <div className="text-xs text-amber-700">
+                    ⚠ {importResult.ambiguous} paiement(s) probable(s) mais ambigu(s) — à rapprocher à la main dans « À matcher ».
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

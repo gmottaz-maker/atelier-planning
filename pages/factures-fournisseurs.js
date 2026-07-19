@@ -6,10 +6,9 @@ import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
+import { DISPLAY_STATUSES, STATUS_ORDER, effectiveStatus } from '../lib/supplierStatus'
 
 const PINK = '#111827'
-const STATUS_LABELS = { pending: 'À payer', paid: 'Payée', overdue: 'En retard' }
-const STATUS_COLORS = { pending: '#f59e0b', paid: '#22c55e', overdue: '#dc2626' }
 
 function fmtCHF(n) {
   if (n == null) return '—'
@@ -22,10 +21,29 @@ function fmtDate(s) {
   return `${d}.${m}.${y}`
 }
 
-function dueStatus(inv) {
-  if (inv.status === 'paid') return 'paid'
-  if (inv.due_date && new Date(inv.due_date) < new Date()) return 'overdue'
-  return 'pending'
+const dueStatus = effectiveStatus
+
+// Valeur de tri d'une colonne. Les nombres se comparent en nombres, les dates en
+// chaînes ISO, et le statut suit sa progression plutôt que l'alphabet.
+function sortValue(inv, key) {
+  switch (key) {
+    case 'amount':  return parseFloat(inv.amount || 0)
+    case 'status':  return STATUS_ORDER.indexOf(dueStatus(inv))
+    case 'payment': return String(inv.paid_at || inv.scheduled_payment_date || '').slice(0, 10)
+    default:        return String(inv[key] ?? '').toLowerCase()
+  }
+}
+
+function sortInvoices(list, { key, dir }) {
+  const sign = dir === 'asc' ? 1 : -1
+  return [...list].sort((a, b) => {
+    const va = sortValue(a, key), vb = sortValue(b, key)
+    // Les cases vides restent en bas quel que soit le sens du tri
+    const ea = va === '' || va === -1, eb = vb === '' || vb === -1
+    if (ea !== eb) return ea ? 1 : -1
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * sign
+    return String(va).localeCompare(String(vb), 'fr', { numeric: true }) * sign
+  })
 }
 
 export default function FacturesFournisseurs() {
@@ -38,7 +56,8 @@ export default function FacturesFournisseurs() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading]   = useState(true)
   const [year, setYear]         = useState(new Date().getFullYear())
-  const [filter, setFilter]     = useState('all')   // all | pending | paid | overdue
+  const [filter, setFilter]     = useState('all')   // all | pending | sent_to_bank | paid | overdue
+  const [sort, setSort]         = useState({ key: 'due_date', dir: 'asc' })
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [dragging, setDragging] = useState(false)
@@ -193,15 +212,22 @@ export default function FacturesFournisseurs() {
     }
   }
 
-  const visible = invoices.filter(inv => filter === 'all' ? true : dueStatus(inv) === filter)
+  const visible = sortInvoices(
+    invoices.filter(inv => filter === 'all' ? true : dueStatus(inv) === filter),
+    sort,
+  )
+  // Un clic bascule le sens, un clic sur une autre colonne repart en ascendant
+  const toggleSort = key => setSort(s => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))
   const totals = invoices.reduce((acc, inv) => {
     const st = dueStatus(inv)
-    acc.total += parseFloat(inv.amount || 0)
-    if (st === 'pending')  acc.pending += parseFloat(inv.amount || 0)
-    if (st === 'overdue')  acc.overdue += parseFloat(inv.amount || 0)
-    if (st === 'paid')     acc.paid    += parseFloat(inv.amount || 0)
+    const amt = parseFloat(inv.amount || 0)
+    acc.total += amt
+    if (st === 'pending')      acc.pending += amt
+    if (st === 'overdue')      acc.overdue += amt
+    if (st === 'sent_to_bank') acc.sent    += amt
+    if (st === 'paid')         acc.paid    += amt
     return acc
-  }, { total: 0, pending: 0, overdue: 0, paid: 0 })
+  }, { total: 0, pending: 0, overdue: 0, sent: 0, paid: 0 })
 
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
@@ -277,11 +303,12 @@ export default function FacturesFournisseurs() {
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             { label: 'Total année', value: totals.total,   color: '#111827' },
             { label: 'À payer',     value: totals.pending, color: '#f59e0b' },
             { label: 'En retard',   value: totals.overdue, color: '#dc2626' },
+            { label: 'Transmis',    value: totals.sent,    color: '#3b82f6' },
             { label: 'Payé',        value: totals.paid,    color: '#22c55e' },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
@@ -301,10 +328,11 @@ export default function FacturesFournisseurs() {
           </select>
           <div className="flex gap-1.5">
             {[
-              { key: 'all',     label: 'Toutes' },
-              { key: 'pending', label: 'À payer' },
-              { key: 'overdue', label: 'En retard' },
-              { key: 'paid',    label: 'Payées' },
+              { key: 'all',          label: 'Toutes' },
+              { key: 'pending',      label: 'À payer' },
+              { key: 'overdue',      label: 'En retard' },
+              { key: 'sent_to_bank', label: 'Transmises' },
+              { key: 'paid',         label: 'Payées' },
             ].map(f => (
               <button key={f.key} onClick={() => setFilter(f.key)}
                 className="px-3 py-1.5 rounded-md text-xs font-medium"
@@ -329,12 +357,25 @@ export default function FacturesFournisseurs() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Fournisseur</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>N° facture</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Émise le</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Échéance</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Montant</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Statut</th>
+                  {[
+                    { key: 'supplier_name',  label: 'Fournisseur' },
+                    { key: 'invoice_number', label: 'N° facture' },
+                    { key: 'issue_date',     label: 'Émise le' },
+                    { key: 'due_date',       label: 'Échéance' },
+                    { key: 'amount',         label: 'Montant', align: 'right' },
+                    { key: 'payment',        label: 'Paiement' },
+                    { key: 'status',         label: 'Statut' },
+                  ].map(c => (
+                    <th key={c.key}
+                      className={`px-4 py-3 font-semibold text-gray-700 cursor-pointer select-none hover:text-gray-900 ${c.align === 'right' ? 'text-right' : 'text-left'}`}
+                      style={{ fontSize: 11 }}
+                      onClick={() => toggleSort(c.key)}>
+                      {c.label}
+                      <span className="ml-1" style={{ color: sort.key === c.key ? '#111827' : '#d1d5db' }}>
+                        {sort.key === c.key ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    </th>
+                  ))}
                   <th className="px-4 py-3 w-8"></th>
                 </tr>
               </thead>
@@ -354,10 +395,17 @@ export default function FacturesFournisseurs() {
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
                         {fmtCHF(inv.amount)} <span className="text-xs font-normal text-gray-400">{inv.currency || 'CHF'}</span>
                       </td>
+                      <td className="px-4 py-3 text-gray-600 tabular-nums">
+                        {inv.paid_at ? (
+                          fmtDate(String(inv.paid_at).slice(0, 10))
+                        ) : inv.scheduled_payment_date ? (
+                          <span className="text-blue-600">{fmtDate(inv.scheduled_payment_date)}</span>
+                        ) : '—'}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
-                          style={{ background: STATUS_COLORS[st] + '18', color: STATUS_COLORS[st] }}>
-                          {STATUS_LABELS[st]}
+                          style={{ background: DISPLAY_STATUSES[st].color + '18', color: DISPLAY_STATUSES[st].color }}>
+                          {DISPLAY_STATUSES[st].label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">›</td>
@@ -401,6 +449,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
     category:          invoice?.category || '',
     notes:             invoice?.notes || '',
     status:            invoice?.status || 'pending',
+    scheduled_payment_date: invoice?.scheduled_payment_date || '',
   })
   const [filePreview, setFilePreview] = useState(null) // { name, mime, base64 }
   const [scanLoading, setScanLoading] = useState(false)
@@ -666,14 +715,33 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
                 <textarea rows={2} className={inputCls} value={form.notes} onChange={e => set('notes', e.target.value)} />
               </div>
               {isEdit && (
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">Statut</label>
-                  <select className={inputCls} value={form.status} onChange={e => set('status', e.target.value)}>
-                    <option value="pending">À payer</option>
-                    <option value="paid">Payée</option>
-                    <option value="overdue">En retard</option>
-                  </select>
-                </div>
+                <>
+                  <div className={form.status === 'sent_to_bank' ? '' : 'col-span-2'}>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Statut</label>
+                    {/* « En retard » se déduit de l'échéance, il ne se choisit pas */}
+                    <select className={inputCls} value={form.status} onChange={e => set('status', e.target.value)}>
+                      <option value="pending">À payer</option>
+                      <option value="sent_to_bank">Transmis à la banque</option>
+                      <option value="paid">Payée</option>
+                    </select>
+                  </div>
+                  {form.status === 'sent_to_bank' && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Date de paiement</label>
+                      <input type="date" className={inputCls} value={form.scheduled_payment_date}
+                        onChange={e => set('scheduled_payment_date', e.target.value)} />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Peut être future. Le statut passera à « payée » tout seul au prochain import CAMT.
+                      </p>
+                    </div>
+                  )}
+                  {form.status === 'paid' && invoice?.paid_at && (
+                    <div className="col-span-2 text-xs text-gray-500">
+                      Payée le {fmtDate(String(invoice.paid_at).slice(0, 10))}
+                      {invoice.paid_transaction_id ? ' — rapprochée du relevé bancaire' : ''}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
