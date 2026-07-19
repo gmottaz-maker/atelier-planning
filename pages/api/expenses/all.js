@@ -2,6 +2,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { withSignedReceipts } from '../../../lib/receipts'
+import { withExpenseMatches } from '../../../lib/reconcileRun'
 
 const supabase = getSupabaseServer()
 
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
   const { data, error } = await q
   if (error) return res.status(500).json({ error: error.message })
 
-  // URLs signées (bucket privé)
-  const rows = await withSignedReceipts(supabase, data)
+  // URLs signées (bucket privé) + statut de rapprochement bancaire
+  const rows = await withExpenseMatches(supabase, await withSignedReceipts(supabase, data))
   return res.status(200).json(rows)
 }

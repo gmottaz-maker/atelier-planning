@@ -1,6 +1,10 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser, ADMIN_USER } from '../../../lib/requireAdmin'
 import { withSignedReceipts, withSignedReceipt } from '../../../lib/receipts'
+import { ensureReceiptFolder, upload, del } from '../../../lib/kdrive'
+import { extractPages } from '../../../lib/pdfSplit'
+import { quarterOf, receiptFilename } from '../../../lib/receiptFile'
+import { reconcileNewExpense } from '../../../lib/reconcileRun'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -47,7 +51,8 @@ export default async function handler(req, res) {
     const {
       date, amount, amount_net, vat_rate, vat_amount, vat_breakdown,
       currency, category,
-      merchant, description, receiptBase64, receiptMimeType,
+      merchant, description, receiptBase64, receiptMimeType, receiptFilename: receiptOrigName,
+      page_from, page_to,
       payment_method, force,
     } = req.body
     const userName = ownName(req.body.userName)
@@ -77,20 +82,25 @@ export default async function handler(req, res) {
       }
     }
 
-    let receipt_path = null
-
-    // Upload du reçu dans Supabase Storage (bucket public)
+    // Pièce justificative : classée sur kDrive par trimestre, comme les factures
+    // fournisseurs. Un scan groupé n'archive que les pages de ce reçu.
+    let kdrive_file_id = null
+    let kdrive_filename = null
     if (receiptBase64 && receiptMimeType) {
       try {
-        const buffer = Buffer.from(receiptBase64, 'base64')
-        const ext    = (receiptMimeType.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
-        const path   = `${userName}/${Date.now()}.${ext}`
-        const { error: upErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, buffer, { contentType: receiptMimeType, upsert: false })
-        if (!upErr) receipt_path = path
-        else console.error('Storage upload:', upErr.message)
-      } catch (e) { console.error('Receipt upload error:', e) }
+        const { year, quarter } = quarterOf(date)
+        const folderId = await ensureReceiptFolder(year, quarter)
+        let buffer = Buffer.from(receiptBase64, 'base64')
+        if ((receiptMimeType || '').includes('pdf') && (page_from || page_to)) {
+          try { buffer = await extractPages(buffer, page_from, page_to) } catch {}
+        }
+        const filename = receiptFilename({ merchant, amount, date }, receiptOrigName)
+        const kf = await upload(folderId, filename, buffer, receiptMimeType)
+        kdrive_file_id = kf.id
+        kdrive_filename = kf.name
+      } catch (e) {
+        return res.status(500).json({ error: 'kDrive upload: ' + e.message })
+      }
     }
 
     const { data, error } = await supabase
@@ -103,7 +113,8 @@ export default async function handler(req, res) {
         category:    category || 'Autre',
         merchant:    merchant || null,
         description: description || null,
-        receipt_path,
+        kdrive_file_id,
+        kdrive_filename,
         payment_method: payment_method || 'company',
         amount_net:    amount_net    != null && amount_net    !== '' ? parseFloat(amount_net)  : null,
         vat_rate:      vat_rate      != null && vat_rate      !== '' ? parseFloat(vat_rate)    : null,
@@ -115,8 +126,11 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error: error.message })
 
+    // Pré-rapprochement : un frais carte société correspond à un débit du relevé.
+    const reconcile = await reconcileNewExpense(supabase, data, authUser.name)
+
     const withUrl = await withSignedReceipt(supabase, data)
-    return res.status(200).json(withUrl)
+    return res.status(200).json({ ...withUrl, reconcile })
   }
 
   // ── PATCH – mise à jour partielle (admin: payment_method, etc.) ──────────
@@ -148,16 +162,19 @@ export default async function handler(req, res) {
     const userName = ownName(req.query.userName)
     if (!id || !userName) return res.status(400).json({ error: 'id et userName requis' })
 
-    // Récupérer le chemin du fichier pour le supprimer
+    // Récupérer les fichiers liés pour les supprimer (Supabase et/ou kDrive)
     const { data: exp } = await supabase
       .from('expenses')
-      .select('receipt_path')
+      .select('receipt_path, kdrive_file_id')
       .eq('id', id)
       .eq('user_name', userName)
       .maybeSingle()
 
     if (exp?.receipt_path) {
       await supabase.storage.from(BUCKET).remove([exp.receipt_path])
+    }
+    if (exp?.kdrive_file_id) {
+      try { await del(exp.kdrive_file_id) } catch (e) { console.error('kDrive del:', e.message) }
     }
 
     const { error } = await supabase

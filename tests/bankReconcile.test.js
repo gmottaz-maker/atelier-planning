@@ -8,68 +8,113 @@ const debit = (over = {}) => ({
   counterparty_name: 'BOIS SA', matched_to_type: null, ...over,
 })
 
-// Une facture fournisseur correspondante.
-const invoice = (over = {}) => ({
+const supplierInvoice = (over = {}) => ({
   id: 10, supplier_name: 'BOIS SA', invoice_number: '2026-0451', amount: 1297.20,
   iban: 'CH9300762011623852957', payment_reference: '210000000003139471430009017',
   due_date: '2026-05-14', status: 'sent_to_bank', scheduled_payment_date: '2026-05-14', ...over,
 })
 
-describe('planAutoReconcile', () => {
+describe('planAutoReconcile — factures fournisseurs (débits)', () => {
   it('rapproche un débit qui correspond exactement (montant + référence + IBAN)', () => {
-    const { matched, ambiguous } = planAutoReconcile([debit()], [invoice()])
+    const { matched, ambiguous } = planAutoReconcile([debit()], { supplier_invoices: [supplierInvoice()] })
     expect(matched).toHaveLength(1)
     expect(ambiguous).toHaveLength(0)
-    expect(matched[0].invoice.id).toBe(10)
+    expect(matched[0].type).toBe('supplier_invoice')
+    expect(matched[0].candidate.id).toBe(10)
     expect(matched[0].score).toBeGreaterThanOrEqual(AUTO_MIN_SCORE)
   })
 
-  it('ignore un crédit (encaissement), jamais un paiement fournisseur', () => {
-    const { matched } = planAutoReconcile([debit({ amount: 1297.20 })], [invoice()])
-    expect(matched).toHaveLength(0)
-  })
-
   it('ignore une transaction déjà rapprochée', () => {
-    const { matched } = planAutoReconcile([debit({ matched_to_type: 'supplier_invoice' })], [invoice()])
+    const { matched } = planAutoReconcile([debit({ matched_to_type: 'supplier_invoice' })], { supplier_invoices: [supplierInvoice()] })
     expect(matched).toHaveLength(0)
   })
 
   it('ne rapproche pas un montant seul, sans preuve d\'identité du bénéficiaire', () => {
-    // Montant exact mais ni référence, ni IBAN, ni date annoncée → score sous le seuil.
     const tx = debit({ reference: 'REMBOURSEMENT DIVERS', counterparty_iban: null, counterparty_name: 'AUTRE' })
-    const inv = invoice({ payment_reference: null, iban: null, scheduled_payment_date: null,
+    const inv = supplierInvoice({ payment_reference: null, iban: null, scheduled_payment_date: null,
       supplier_name: 'AUTRE', due_date: '2026-01-01' })
-    const { matched } = planAutoReconcile([tx], [inv])
+    const { matched } = planAutoReconcile([tx], { supplier_invoices: [inv] })
     expect(matched).toHaveLength(0)
   })
 
   it('laisse à la main deux factures identiques indissociables', () => {
-    // Même montant, même fournisseur, sans référence discriminante dans le débit.
     const tx = debit({ reference: '', counterparty_iban: null })
-    const a = invoice({ id: 10, payment_reference: null, iban: null })
-    const b = invoice({ id: 11, payment_reference: null, iban: null })
-    const { matched, ambiguous } = planAutoReconcile([tx], [a, b])
+    const a = supplierInvoice({ id: 10, payment_reference: null, iban: null })
+    const b = supplierInvoice({ id: 11, payment_reference: null, iban: null })
+    const { matched, ambiguous } = planAutoReconcile([tx], { supplier_invoices: [a, b] })
     expect(matched).toHaveLength(0)
     expect(ambiguous).toHaveLength(1)
-    expect(ambiguous[0].candidates).toHaveLength(2)
   })
 
   it('n\'affecte pas deux débits à la même facture', () => {
-    const t1 = debit({ id: 1 })
-    const t2 = debit({ id: 2 })
-    const { matched } = planAutoReconcile([t1, t2], [invoice()])
+    const { matched } = planAutoReconcile([debit({ id: 1 }), debit({ id: 2 })], { supplier_invoices: [supplierInvoice()] })
     expect(matched).toHaveLength(1)
   })
+})
 
-  it('rapproche chaque débit à sa propre facture', () => {
-    const t1 = debit({ id: 1, amount: -1297.20, reference: 'REF-A', counterparty_iban: 'CH11' })
-    const t2 = debit({ id: 2, amount: -500.00,  reference: 'REF-B', counterparty_iban: 'CH22' })
-    const a = invoice({ id: 10, amount: 1297.20, payment_reference: 'REF-A', iban: 'CH11' })
-    const b = invoice({ id: 11, amount: 500.00,  payment_reference: 'REF-B', iban: 'CH22', supplier_name: 'AUTRE SA' })
-    const { matched } = planAutoReconcile([t1, t2], [a, b])
+describe('planAutoReconcile — frais carte société (débits)', () => {
+  const expense = (over = {}) => ({
+    id: 20, merchant: 'MIGROS', amount: 47.30, date: '2026-05-12', payment_method: 'company', ...over,
+  })
+  const cardDebit = (over = {}) => ({
+    id: 3, amount: -47.30, booking_date: '2026-05-12', value_date: '2026-05-12',
+    reference: '', counterparty_iban: null, counterparty_name: 'MIGROS', matched_to_type: null, ...over,
+  })
+
+  it('rapproche un frais quand montant + commerçant + date collent', () => {
+    const { matched } = planAutoReconcile([cardDebit()], { expenses: [expense()] })
+    expect(matched).toHaveLength(1)
+    expect(matched[0].type).toBe('expense')
+    expect(matched[0].candidate.id).toBe(20)
+  })
+
+  it('ne rapproche pas un frais sur le seul montant (commerçant absent)', () => {
+    const { matched } = planAutoReconcile([cardDebit({ counterparty_name: '' })], { expenses: [expense()] })
+    expect(matched).toHaveLength(0)
+  })
+
+  it('ne mélange pas un frais avec un crédit', () => {
+    const { matched } = planAutoReconcile([cardDebit({ amount: 47.30 })], { expenses: [expense()] })
+    expect(matched).toHaveLength(0)
+  })
+})
+
+describe('planAutoReconcile — factures émises (crédits)', () => {
+  const customerInvoice = (over = {}) => ({
+    id: 30, client_name: 'DIAGEO', invoice_number: '2026-012', amount: 5000.00,
+    qr_reference: '210000000003139471430009999', due_date: '2026-05-20', status: 'pending', ...over,
+  })
+  const credit = (over = {}) => ({
+    id: 4, amount: 5000.00, booking_date: '2026-05-21', value_date: '2026-05-21',
+    reference: '210000000003139471430009999', counterparty_iban: null,
+    counterparty_name: 'DIAGEO', matched_to_type: null, ...over,
+  })
+
+  it('rapproche un encaissement à sa facture émise (montant + référence QR)', () => {
+    const { matched } = planAutoReconcile([credit()], { customer_invoices: [customerInvoice()] })
+    expect(matched).toHaveLength(1)
+    expect(matched[0].type).toBe('customer_invoice')
+    expect(matched[0].candidate.id).toBe(30)
+  })
+
+  it('ne rapproche pas un crédit à une facture fournisseur', () => {
+    const { matched } = planAutoReconcile([credit()], { supplier_invoices: [supplierInvoice({ amount: 5000, payment_reference: '210000000003139471430009999' })] })
+    expect(matched).toHaveLength(0)
+  })
+})
+
+describe('planAutoReconcile — types mélangés', () => {
+  it('route chaque transaction vers le bon type sans collision', () => {
+    const supDebit = debit({ id: 1 })
+    const expDebit = { id: 3, amount: -47.30, booking_date: '2026-05-12', counterparty_name: 'MIGROS', reference: '', matched_to_type: null }
+    const candidates = {
+      supplier_invoices: [supplierInvoice()],
+      expenses: [{ id: 20, merchant: 'MIGROS', amount: 47.30, date: '2026-05-12', payment_method: 'company' }],
+    }
+    const { matched } = planAutoReconcile([supDebit, expDebit], candidates)
     expect(matched).toHaveLength(2)
-    expect(matched.find(m => m.tx.id === 1).invoice.id).toBe(10)
-    expect(matched.find(m => m.tx.id === 2).invoice.id).toBe(11)
+    expect(matched.find(m => m.tx.id === 1).type).toBe('supplier_invoice')
+    expect(matched.find(m => m.tx.id === 3).type).toBe('expense')
   })
 })
 

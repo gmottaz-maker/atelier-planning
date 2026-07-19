@@ -1,7 +1,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { parseCamt053 } from '../../../lib/camt053'
 import { requireAdmin } from '../../../lib/requireAdmin'
-import { planAutoReconcile, paymentDateOf } from '../../../lib/bankReconcile'
+import { reconcileTransactions } from '../../../lib/reconcileRun'
 
 const supabase = getSupabaseServer()
 
@@ -51,54 +51,7 @@ export default async function handler(req, res) {
     else console.error('Insert error:', error.message)
   }
 
-  const reconciliation = await reconcileSupplierPayments(admin?.name)
+  const reconciliation = await reconcileTransactions(supabase, admin?.name)
 
   return res.status(200).json({ inserted, duplicates, total: rows.length, import_id: importId, ...reconciliation })
-}
-
-// Vérifie quels ordres transmis à la banque sont réellement passés, et solde les
-// factures correspondantes avec la date réelle du débit.
-// Balaie tous les débits non rapprochés, pas seulement ceux de cet import : une
-// facture saisie après coup se rapproche ainsi au CAMT suivant.
-async function reconcileSupplierPayments(adminName) {
-  const [{ data: txs, error: txErr }, { data: invoices, error: invErr }] = await Promise.all([
-    supabase.from('bank_transactions').select('*').is('matched_to_type', null).lt('amount', 0),
-    supabase.from('supplier_invoices').select('*').in('status', ['sent_to_bank', 'pending']),
-  ])
-  if (txErr || invErr) {
-    console.error('Reconcile read error:', (txErr || invErr).message)
-    return { reconciled: [], ambiguous: 0 }
-  }
-
-  const { matched, ambiguous } = planAutoReconcile(txs || [], invoices || [])
-  const reconciled = []
-  for (const m of matched) {
-    const paidAt = paymentDateOf(m.tx)
-    const { error: e1 } = await supabase.from('bank_transactions').update({
-      matched_to_type: 'supplier_invoice',
-      matched_to_id: m.invoice.id,
-      matched_at: new Date().toISOString(),
-      matched_by: adminName ? `${adminName} (auto CAMT)` : 'auto CAMT',
-      match_confidence: m.score,
-    }).eq('id', m.tx.id)
-    if (e1) { console.error('Reconcile match error:', e1.message); continue }
-
-    const { error: e2 } = await supabase.from('supplier_invoices').update({
-      status: 'paid',
-      paid_transaction_id: m.tx.id,
-      paid_at: paidAt,
-    }).eq('id', m.invoice.id)
-    if (e2) { console.error('Reconcile status error:', e2.message); continue }
-
-    reconciled.push({
-      invoice_id: m.invoice.id,
-      supplier_name: m.invoice.supplier_name,
-      invoice_number: m.invoice.invoice_number,
-      amount: m.invoice.amount,
-      paid_at: paidAt,
-      score: m.score,
-      reasons: m.reasons,
-    })
-  }
-  return { reconciled, ambiguous: ambiguous.length }
 }

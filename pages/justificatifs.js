@@ -77,6 +77,65 @@ export default function Justificatifs() {
     }
   }, [])
 
+  // Importe UN reçu détecté. `split` = le document en contient plusieurs,
+  // auquel cas on n'archive que les pages de celui-ci.
+  async function importScanned(id, rec, base64, file, split) {
+    const body = {
+      userName:        user?.name || 'Guillaume',
+      date:            rec.date || new Date().toISOString().slice(0, 10),
+      amount:          rec.amount ?? null,
+      amount_net:      rec.amount_net ?? null,
+      vat_rate:        rec.vat_rate ?? null,
+      vat_amount:      rec.vat_amount ?? null,
+      vat_breakdown:   Array.isArray(rec.vat_breakdown) && rec.vat_breakdown.length > 0 ? rec.vat_breakdown : null,
+      currency:        rec.currency || 'CHF',
+      category:        rec.category || 'Autre',
+      merchant:        rec.merchant || null,
+      description:     rec.description || null,
+      receiptBase64:   base64,
+      receiptMimeType: file.type,
+      receiptFilename: file.name,
+      page_from:       split ? rec.page_from ?? null : null,
+      page_to:         split ? rec.page_to ?? null : null,
+      payment_method:  dropMode,
+    }
+    const multiVat = Array.isArray(rec.vat_breakdown) && rec.vat_breakdown.length > 1
+    try {
+      const r = await adminFetch('/api/expenses', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const d = await r.json()
+      if (r.status === 409) {
+        setProcessing(p => p.map(x => x.id === id ? {
+          ...x, status: 'duplicate', duplicate: d.duplicate_of,
+          retry: async () => {
+            setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'uploading' } : xx))
+            const r2 = await adminFetch('/api/expenses', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...body, force: true }),
+            })
+            const d2 = await r2.json()
+            if (d2.error) setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'error', error: d2.error } : xx))
+            else {
+              setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'done', reconcile: d2.reconcile } : xx))
+              load()
+              setTimeout(() => setProcessing(pp => pp.filter(xx => xx.id !== id)), 4000)
+            }
+          },
+        } : x))
+        return
+      }
+      if (d.error) throw new Error(d.error)
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done', multiVat, vatBreakdown: rec.vat_breakdown, reconcile: d.reconcile } : x))
+      load()
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), multiVat ? 10000 : 4000)
+    } catch (e) {
+      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
+    }
+  }
+
   async function processDroppedFile(file) {
     if (!file) return
     const isImage = file.type.startsWith('image/')
@@ -91,64 +150,31 @@ export default function Justificatifs() {
         r.onerror = reject
         r.readAsDataURL(file)
       })
+      // Scan IA — un même document peut contenir plusieurs reçus
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'scanning' } : x))
       const scanRes = await adminFetch('/api/expenses/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64, mimeType: file.type }),
       })
       const scan = await scanRes.json()
-      const body = {
-        userName:        user?.name || 'Guillaume',
-        date:            scan.date || new Date().toISOString().slice(0, 10),
-        amount:          scan.amount ?? null,
-        amount_net:      scan.amount_net ?? null,
-        vat_rate:        scan.vat_rate ?? null,
-        vat_amount:      scan.vat_amount ?? null,
-        vat_breakdown:   Array.isArray(scan.vat_breakdown) && scan.vat_breakdown.length > 0 ? scan.vat_breakdown : null,
-        currency:        scan.currency || 'CHF',
-        category:        scan.category || 'Autre',
-        merchant:        scan.merchant || null,
-        description:     scan.description || null,
-        receiptBase64:   base64,
-        receiptMimeType: file.type,
-        payment_method:  dropMode,
-      }
-      const multiVat = Array.isArray(scan.vat_breakdown) && scan.vat_breakdown.length > 1
-      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'uploading' } : x))
-      const r = await adminFetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const d = await r.json()
-      if (r.status === 409) {
-        const dup = d.duplicate_of
-        setProcessing(p => p.map(x => x.id === id ? {
-          ...x, status: 'duplicate',
-          duplicate: dup,
-          retry: async () => {
-            setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'uploading' } : xx))
-            const r2 = await adminFetch('/api/expenses', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...body, force: true }),
-            })
-            const d2 = await r2.json()
-            if (d2.error) {
-              setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'error', error: d2.error } : xx))
-            } else {
-              setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'done' } : xx))
-              load()
-              setTimeout(() => setProcessing(pp => pp.filter(xx => xx.id !== id)), 3000)
-            }
-          },
-        } : x))
-        return
-      }
-      if (d.error) throw new Error(d.error)
-      setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done', multiVat, vatBreakdown: scan.vat_breakdown } : x))
-      load()
-      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), multiVat ? 10000 : 3000)
+      if (scan.error) throw new Error(scan.error)
+      const found = Array.isArray(scan.receipts) ? scan.receipts : [scan]
+      const list  = found.length > 0 ? found : [{}]
+      const split = list.length > 1
+
+      const items = list.map((rec, i) => ({
+        id: split ? `${id}_${i}` : id,
+        name: split ? `${i + 1}/${list.length} · ${rec.merchant || 'Reçu'}` : file.name,
+        rec,
+      }))
+      setProcessing(p => [
+        ...p.filter(x => x.id !== id),
+        ...items.map(it => ({ id: it.id, name: it.name, status: 'uploading' })),
+      ])
+
+      // En série : chaque POST fait un upload kDrive et un pré-rapprochement qui
+      // doit voir les frais précédents déjà insérés.
+      for (const it of items) await importScanned(it.id, it.rec, base64, file, split)
     } catch (e) {
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
       setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
@@ -248,11 +274,16 @@ export default function Justificatifs() {
                   {p.status === 'reading'   && 'Lecture…'}
                   {p.status === 'scanning'  && 'Analyse IA…'}
                   {p.status === 'uploading' && 'Sauvegarde…'}
-                  {p.status === 'done' && !p.multiVat && 'Importé ✓'}
-                  {p.status === 'done' && p.multiVat && (
-                    <span className="text-amber-700">
-                      Importé ✓ — ⚠ Plusieurs taux TVA détectés ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})
-                    </span>
+                  {p.status === 'done' && (
+                    <>
+                      {p.multiVat ? (
+                        <span className="text-amber-700">
+                          Importé ✓ — ⚠ Plusieurs taux TVA ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})
+                        </span>
+                      ) : 'Importé ✓'}
+                      {p.reconcile?.status === 'matched'   && <span className="text-green-700"> · rapproché à un débit</span>}
+                      {p.reconcile?.status === 'ambiguous' && <span className="text-blue-700"> · paiement probable, à valider</span>}
+                    </>
                   )}
                   {p.status === 'error'     && `Erreur : ${p.error}`}
                   {p.status === 'duplicate' && (
@@ -359,6 +390,7 @@ export default function Justificatifs() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Catégorie</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Mode</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Montant</th>
+                  <th className="px-4 py-3 text-center font-semibold text-gray-700" style={{ fontSize: 11 }}>Rapproché</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-700" style={{ fontSize: 11 }}>Reçu</th>
                 </tr>
               </thead>
@@ -391,8 +423,23 @@ export default function Justificatifs() {
                       {fmtCHF(r.amount)} <span className="text-xs font-normal text-gray-400">{r.currency || 'CHF'}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
+                      {r.matched_transaction ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
+                          style={{ background: '#22c55e18', color: '#16a34a' }}
+                          title={`Débit du ${fmtDate(String(r.matched_transaction.date).slice(0,10))}`}>
+                          ✓ payé
+                        </span>
+                      ) : r.payment_method === 'company' ? (
+                        <span className="text-xs text-gray-400">à rapprocher</span>
+                      ) : <span className="text-xs text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
                       {r.receipt_url ? (
                         <a href={r.receipt_url} target="_blank" rel="noopener"
+                          onClick={e => e.stopPropagation()}
+                          className="text-xs text-gray-500 hover:text-gray-900 underline">voir</a>
+                      ) : r.kdrive_file_id ? (
+                        <a href={`/api/kdrive/download?fileId=${r.kdrive_file_id}`} target="_blank" rel="noopener"
                           onClick={e => e.stopPropagation()}
                           className="text-xs text-gray-500 hover:text-gray-900 underline">voir</a>
                       ) : <span className="text-xs text-gray-300">—</span>}
@@ -506,7 +553,7 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
           </div>
 
           <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
-            {row.receipt_url && (
+            {row.receipt_url ? (
               <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
                 <a href={row.receipt_url} target="_blank" rel="noopener" className="block">
                   <img src={row.receipt_url} alt="reçu" style={{ maxHeight: 280, width: '100%', objectFit: 'contain' }}
@@ -516,6 +563,16 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
                   <span className="text-xs text-gray-500">Reçu attaché</span>
                   <a href={row.receipt_url} target="_blank" rel="noopener" className="text-xs text-gray-700 underline">Ouvrir en grand</a>
                 </div>
+              </div>
+            ) : row.kdrive_file_id ? (
+              <a href={`/api/kdrive/download?fileId=${row.kdrive_file_id}`} target="_blank" rel="noopener"
+                className="block w-full text-center px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400">
+                📎 Ouvrir le justificatif ({row.kdrive_filename || 'kDrive'})
+              </a>
+            ) : null}
+            {row.matched_transaction && (
+              <div className="rounded-md px-3 py-2 text-xs" style={{ background: '#f0fdf4', color: '#15803d' }}>
+                ✓ Rapproché à un débit du {fmtDate(String(row.matched_transaction.date).slice(0,10))} ({fmtCHF(Math.abs(row.matched_transaction.amount))} CHF)
               </div>
             )}
 
