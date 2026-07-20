@@ -6,6 +6,15 @@ import { requireUser } from '../../../lib/requireAdmin'
 
 const supabase = getSupabaseServer()
 
+const MIME_BY_EXT = {
+  pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+  gif: 'image/gif', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif',
+}
+function mimeFromName(name) {
+  const ext = (/\.([a-z0-9]+)$/i.exec(name || '')?.[1] || '').toLowerCase()
+  return MIME_BY_EXT[ext] || 'application/pdf'
+}
+
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
   const { fileId } = req.query
@@ -18,12 +27,14 @@ export default async function handler(req, res) {
     supabase.from('supplier_invoices').select('id, kdrive_filename').eq('kdrive_file_id', id).limit(1).maybeSingle(),
     supabase.from('customer_invoices').select('id, invoice_number').eq('pdf_kdrive_id', id).limit(1).maybeSingle(),
     supabase.from('project_updates').select('id, image_filename, image_mime_type').eq('image_kdrive_id', id).limit(1).maybeSingle(),
+    supabase.from('expenses').select('id, kdrive_filename').eq('kdrive_file_id', id).limit(1).maybeSingle(),
   ])
   const found = checks.find(c => c.data)
   if (!found) return res.status(404).json({ error: 'Fichier non trouvé' })
 
   const filename = found.data.filename || found.data.kdrive_filename || found.data.image_filename || `facture-${found.data.invoice_number || id}.pdf`
-  const mime     = found.data.mime_type || found.data.image_mime_type || 'application/pdf'
+  // Un reçu peut être une image ; on déduit le type de l'extension à défaut de champ dédié.
+  const mime     = found.data.mime_type || found.data.image_mime_type || mimeFromName(filename)
 
   try {
     const r = await downloadStream(id)
