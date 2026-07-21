@@ -5,6 +5,7 @@ import { ensureReceiptFolder, upload, del } from '../../../lib/kdrive'
 import { extractPages } from '../../../lib/pdfSplit'
 import { quarterOf, receiptFilename } from '../../../lib/receiptFile'
 import { reconcileNewExpense } from '../../../lib/reconcileRun'
+import { learnMerchantAccount, lookupMerchantAccount } from '../../../lib/merchantAccounts'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -50,7 +51,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const {
       date, amount, amount_net, vat_rate, vat_amount, vat_breakdown,
-      currency, category,
+      currency, category, account,
       merchant, description, receiptBase64, receiptMimeType, receiptFilename: receiptOrigName,
       page_from, page_to,
       payment_method, force,
@@ -103,6 +104,11 @@ export default async function handler(req, res) {
       }
     }
 
+    // Catégorie comptable : celle fournie, sinon le compte appris pour ce
+    // commerçant (pré-catégorisation automatique au fil des imports).
+    let resolvedAccount = account || null
+    if (!resolvedAccount && merchant) resolvedAccount = await lookupMerchantAccount(supabase, merchant)
+
     const { data, error } = await supabase
       .from('expenses')
       .insert({
@@ -111,6 +117,7 @@ export default async function handler(req, res) {
         amount:      amount != null ? parseFloat(amount) : null,
         currency:    currency || 'CHF',
         category:    category || 'Autre',
+        account:     resolvedAccount,
         merchant:    merchant || null,
         description: description || null,
         kdrive_file_id,
@@ -126,6 +133,11 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error: error.message })
 
+    // Apprentissage : si un compte a été fourni explicitement, on le mémorise
+    // pour ce commerçant (une pré-catégorisation issue de l'apprentissage ne
+    // renforce pas la règle d'elle-même).
+    if (account && merchant) await learnMerchantAccount(supabase, merchant, account)
+
     // Pré-rapprochement : un frais carte société correspond à un débit du relevé.
     const reconcile = await reconcileNewExpense(supabase, data, authUser.name)
 
@@ -137,7 +149,7 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     const { id } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
-    const allowed = ['payment_method', 'category', 'description', 'amount', 'amount_net',
+    const allowed = ['payment_method', 'category', 'account', 'description', 'amount', 'amount_net',
                      'vat_rate', 'vat_amount', 'vat_breakdown', 'merchant', 'date']
     const payload = {}
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
@@ -153,6 +165,12 @@ export default async function handler(req, res) {
     if (!isAdmin) q = q.eq('user_name', authUser.name)
     const { data, error } = await q.select().single()
     if (error) return res.status(500).json({ error: error.message })
+
+    // Apprentissage : attribuer ou corriger le compte d'un ticket enseigne au
+    // système le compte de ce commerçant pour la suite.
+    if ('account' in payload && data?.account && data?.merchant) {
+      await learnMerchantAccount(supabase, data.merchant, data.account)
+    }
     return res.status(200).json(data)
   }
 

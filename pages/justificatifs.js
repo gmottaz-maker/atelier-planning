@@ -37,6 +37,13 @@ export default function Justificatifs() {
   const [processing, setProcessing] = useState([])
   const [editing, setEditing] = useState(null)
   const [dropMode, setDropMode] = useState('company') // mode appliqué aux prochains imports
+  const [accounts, setAccounts] = useState([])  // comptes de charge (catégorie comptable)
+
+  useEffect(() => {
+    adminFetch('/api/accounts').then(r => r.json()).then(d => {
+      setAccounts((d.accounts || []).filter(a => a.kind === 'charge'))
+    }).catch(() => {})
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -493,7 +500,12 @@ export default function Justificatifs() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">{r.merchant || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{r.category}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      <div>{r.category}</div>
+                      {r.account
+                        ? <div className="text-gray-400 tabular-nums">{r.account}</div>
+                        : r.payment_method === 'company' && <div className="text-amber-500">compte à définir</div>}
+                    </td>
                     <td className="px-4 py-3">
                       <button onClick={e => { e.stopPropagation(); togglePaymentMethod(r) }}
                         className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block hover:opacity-80 transition-opacity"
@@ -540,6 +552,7 @@ export default function Justificatifs() {
         <JustificatifDrawer
           row={editing}
           people={allPeople.length ? allPeople : ['Arnaud', 'Gabin', 'Guillaume']}
+          accounts={accounts}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load() }}
         />
@@ -552,7 +565,7 @@ export default function Justificatifs() {
 
 const CATEGORIES = ['Repas', 'Transport', 'Hébergement', 'Fournitures', 'Matériel', 'Autre']
 
-function JustificatifDrawer({ row, people, onClose, onSaved }) {
+function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
   const [form, setForm] = useState({
     date:           row.date,
     amount:         row.amount ?? '',
@@ -561,6 +574,7 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
     vat_amount:     row.vat_amount ?? '',
     currency:       row.currency || 'CHF',
     category:       row.category || 'Autre',
+    account:        row.account || '',
     merchant:       row.merchant || '',
     description:    row.description || '',
     payment_method: row.payment_method || 'personal',
@@ -599,6 +613,7 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
           vat_rate:   form.vat_rate   === '' ? null : parseFloat(form.vat_rate),
           vat_amount: form.vat_amount === '' ? null : parseFloat(form.vat_amount),
           category: form.category,
+          account: form.account,
           merchant: form.merchant,
           description: form.description,
           payment_method: form.payment_method,
@@ -702,11 +717,24 @@ function JustificatifDrawer({ row, people, onClose, onSaved }) {
                 <label className="block text-xs font-medium text-gray-500 mb-1">Commerçant</label>
                 <input className={inputCls} value={form.merchant} onChange={e => set('merchant', e.target.value)} />
               </div>
-              <div className="col-span-2">
+              <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
                 <select className={inputCls} value={form.category} onChange={e => set('category', e.target.value)}>
                   {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Catégorie comptable
+                  {row.account && !form.account && <span className="text-gray-400 font-normal"> · apprise</span>}
+                </label>
+                <select className={inputCls} value={form.account} onChange={e => set('account', e.target.value)}>
+                  <option value="">— à définir —</option>
+                  {accounts.map(a => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}
+                </select>
+                {form.merchant && (
+                  <p className="text-xs text-gray-400 mt-1">Retenu pour « {form.merchant} » aux prochains tickets.</p>
+                )}
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
