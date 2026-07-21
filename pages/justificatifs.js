@@ -64,8 +64,7 @@ export default function Justificatifs() {
     function onDrop(e) {
       e.preventDefault()
       setDragging(false)
-      const files = Array.from(e.dataTransfer?.files || [])
-      files.forEach(processDroppedFile)
+      handleFiles(e.dataTransfer?.files)
     }
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('dragleave', onDragLeave)
@@ -76,6 +75,27 @@ export default function Justificatifs() {
       window.removeEventListener('drop', onDrop)
     }
   }, [])
+
+  const uid = () => `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+
+  // Nature du fichier déposé. Un HEIC (photo iPhone) n'est pas décodable par
+  // Claude : on le convertit en JPEG côté navigateur. Détection par type MIME
+  // ET par extension (les navigateurs ne renseignent pas toujours le type).
+  function fileKind(file) {
+    const name = (file.name || '').toLowerCase()
+    if (file.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf'
+    if (file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/.test(name)) return 'heic'
+    if (file.type.startsWith('image/')) return 'image'
+    return 'unsupported'
+  }
+
+  async function toJpegIfHeic(file, kind) {
+    if (kind !== 'heic') return file
+    const heic2any = (await import('heic2any')).default
+    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 })
+    const blob = Array.isArray(out) ? out[0] : out
+    return new File([blob], (file.name || 'photo').replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' })
+  }
 
   // Importe UN reçu détecté. `split` = le document en contient plusieurs,
   // auquel cas on n'archive que les pages de celui-ci.
@@ -120,7 +140,6 @@ export default function Justificatifs() {
             else {
               setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'done', reconcile: d2.reconcile } : xx))
               load()
-              setTimeout(() => setProcessing(pp => pp.filter(xx => xx.id !== id)), 4000)
             }
           },
         } : x))
@@ -129,32 +148,34 @@ export default function Justificatifs() {
       if (d.error) throw new Error(d.error)
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'done', multiVat, vatBreakdown: rec.vat_breakdown, reconcile: d.reconcile } : x))
       load()
-      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), multiVat ? 10000 : 4000)
     } catch (e) {
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
-      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
     }
   }
 
-  async function processDroppedFile(file) {
+  async function processDroppedFile(file, kind) {
     if (!file) return
-    const isImage = file.type.startsWith('image/')
-    const isPdf   = file.type === 'application/pdf'
-    if (!isImage && !isPdf) return
-    const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    const id = uid()
     setProcessing(p => [...p, { id, name: file.name, status: 'reading' }])
     try {
+      // HEIC → JPEG avant tout (Claude ne décode pas le HEIC)
+      let usable = file
+      if (kind === 'heic') {
+        setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'converting' } : x))
+        try { usable = await toJpegIfHeic(file, kind) }
+        catch { throw new Error('Conversion HEIC échouée — convertis la photo en JPEG et réessaie') }
+      }
       const base64 = await new Promise((resolve, reject) => {
         const r = new FileReader()
         r.onload = e => resolve(e.target.result.split(',')[1])
         r.onerror = reject
-        r.readAsDataURL(file)
+        r.readAsDataURL(usable)
       })
       // Scan IA — un même document peut contenir plusieurs reçus
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'scanning' } : x))
       const scanRes = await adminFetch('/api/expenses/scan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mimeType: file.type }),
+        body: JSON.stringify({ image: base64, mimeType: usable.type }),
       })
       const scan = await scanRes.json()
       if (scan.error) throw new Error(scan.error)
@@ -167,9 +188,27 @@ export default function Justificatifs() {
         name: split ? `${i + 1}/${list.length} · ${rec.merchant || 'Reçu'}` : file.name,
         rec,
       }))
+
+      // Contrôle de couverture : sur un PDF multi-tickets, vérifier qu'aucune
+      // page n'a été oubliée par l'IA. Si des pages ne sont attribuées à aucun
+      // reçu, on l'affiche pour que rien ne se perde en silence.
+      let coverage = null
+      if (split && scan.page_count) {
+        const covered = new Set()
+        for (const rec of list) {
+          const a = parseInt(rec.page_from, 10), b = parseInt(rec.page_to, 10)
+          if (a >= 1 && b >= a) for (let pg = a; pg <= b; pg++) covered.add(pg)
+        }
+        const missing = []
+        for (let pg = 1; pg <= scan.page_count; pg++) if (!covered.has(pg)) missing.push(pg)
+        if (missing.length) coverage = { pageCount: scan.page_count, missing }
+      }
+
       setProcessing(p => [
         ...p.filter(x => x.id !== id),
         ...items.map(it => ({ id: it.id, name: it.name, status: 'uploading' })),
+        ...(coverage ? [{ id: `${id}_cov`, name: file.name, status: 'warning',
+          warning: `PDF de ${coverage.pageCount} pages : page(s) ${coverage.missing.join(', ')} attribuée(s) à aucun reçu — vérifie qu'aucun ticket n'a été oublié.` }] : []),
       ])
 
       // En série : chaque POST fait un upload kDrive et un pré-rapprochement qui
@@ -177,8 +216,27 @@ export default function Justificatifs() {
       for (const it of items) await importScanned(it.id, it.rec, base64, file, split)
     } catch (e) {
       setProcessing(p => p.map(x => x.id === id ? { ...x, status: 'error', error: e.message } : x))
-      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 6000)
     }
+  }
+
+  // Point d'entrée d'un lot déposé : trie les fichiers, signale ceux qui ne sont
+  // pas pris en charge, et traite le reste par groupes de 3 (évite de saturer
+  // l'API et garde une progression lisible).
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList || [])
+    const queue = []
+    for (const file of files) {
+      const kind = fileKind(file)
+      if (kind === 'unsupported') {
+        setProcessing(p => [...p, { id: uid(), name: file.name, status: 'skipped',
+          error: `Format non pris en charge (${file.type || 'type inconnu'}). Dépose un PDF, un JPEG ou un PNG.` }])
+        continue
+      }
+      queue.push({ file, kind })
+    }
+    let i = 0
+    const worker = async () => { while (i < queue.length) { const it = queue[i++]; await processDroppedFile(it.file, it.kind) } }
+    await Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker))
   }
 
   async function togglePaymentMethod(row) {
@@ -232,8 +290,8 @@ export default function Justificatifs() {
         </div>
         <label className="px-4 py-2 text-sm font-medium rounded-md text-white cursor-pointer" style={{ background: PINK }}>
           📁 Importer
-          <input type="file" multiple accept="image/*,application/pdf" className="hidden"
-            onChange={e => { Array.from(e.target.files || []).forEach(processDroppedFile); e.target.value = '' }} />
+          <input type="file" multiple accept="image/*,application/pdf,.heic,.heif" className="hidden"
+            onChange={e => { handleFiles(e.target.files); e.target.value = '' }} />
         </label>
       </NavBar>
 
@@ -254,53 +312,79 @@ export default function Justificatifs() {
         </div>
       )}
 
-      {/* Toast de progression */}
-      {processing.length > 0 && (
-        <div className="fixed bottom-5 right-5 z-30 space-y-2 max-w-sm">
-          {processing.map(p => (
-            <div key={p.id} className="bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex items-center gap-3">
-              {p.status === 'done' ? (
-                <span className="text-green-600">✓</span>
-              ) : p.status === 'error' ? (
-                <span className="text-red-500">✕</span>
-              ) : p.status === 'duplicate' ? (
-                <span className="text-amber-600">⚠</span>
-              ) : (
-                <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
-                <p className="text-xs text-gray-500">
-                  {p.status === 'reading'   && 'Lecture…'}
-                  {p.status === 'scanning'  && 'Analyse IA…'}
-                  {p.status === 'uploading' && 'Sauvegarde…'}
-                  {p.status === 'done' && (
-                    <>
-                      {p.multiVat ? (
-                        <span className="text-amber-700">
-                          Importé ✓ — ⚠ Plusieurs taux TVA ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})
-                        </span>
-                      ) : 'Importé ✓'}
-                      {p.reconcile?.status === 'matched'   && <span className="text-green-700"> · rapproché à un débit</span>}
-                      {p.reconcile?.status === 'ambiguous' && <span className="text-blue-700"> · paiement probable, à valider</span>}
-                    </>
-                  )}
-                  {p.status === 'error'     && `Erreur : ${p.error}`}
-                  {p.status === 'duplicate' && (
-                    <>
-                      Doublon détecté ({p.duplicate?.amount} CHF, {p.duplicate?.date}){' '}
-                      <button onClick={p.retry} className="ml-1 underline text-amber-700 hover:text-amber-900">Importer quand même</button>
-                      {' · '}
-                      <button onClick={() => setProcessing(pp => pp.filter(xx => xx.id !== p.id))}
-                        className="underline text-gray-500 hover:text-gray-700">Ignorer</button>
-                    </>
-                  )}
-                </p>
+      {/* Panneau d'import — persiste jusqu'à ce qu'on l'efface, pour que rien ne
+          disparaisse en silence. Récapitulatif en tête, une ligne par fichier. */}
+      {processing.length > 0 && (() => {
+        const busy   = processing.filter(p => ['reading', 'converting', 'scanning', 'uploading'].includes(p.status)).length
+        const done   = processing.filter(p => p.status === 'done').length
+        const errors = processing.filter(p => p.status === 'error').length
+        const skipped= processing.filter(p => p.status === 'skipped').length
+        const dups   = processing.filter(p => p.status === 'duplicate').length
+        const warns  = processing.filter(p => p.status === 'warning').length
+        const attention = errors + skipped + dups + warns
+        return (
+          <div className="fixed bottom-5 right-5 z-30 w-96 max-w-[92vw] bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col" style={{ maxHeight: '72vh' }}>
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-gray-900">
+                {busy > 0 ? `Import en cours… ${done}/${processing.length - warns}` : 'Import terminé'}
+                <span className="ml-2 font-normal text-gray-500 text-xs">
+                  {done} importé{done > 1 ? 's' : ''}
+                  {attention > 0 && ` · ${attention} à vérifier`}
+                </span>
               </div>
+              {busy === 0 && (
+                <button onClick={() => setProcessing([])}
+                  className="text-xs font-medium text-gray-500 hover:text-gray-900">Tout effacer</button>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+            <div className="overflow-y-auto divide-y divide-gray-50">
+              {processing.map(p => (
+                <div key={p.id} className="px-4 py-2.5 flex items-start gap-3">
+                  {p.status === 'done' ? <span className="text-green-600 mt-0.5">✓</span>
+                    : p.status === 'error' ? <span className="text-red-500 mt-0.5">✕</span>
+                    : p.status === 'skipped' ? <span className="text-gray-400 mt-0.5">⨯</span>
+                    : (p.status === 'duplicate' || p.status === 'warning') ? <span className="text-amber-600 mt-0.5">⚠</span>
+                    : <div className="w-4 h-4 mt-0.5 rounded-full border-2 animate-spin flex-shrink-0" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {p.status === 'reading'    && 'Lecture…'}
+                      {p.status === 'converting' && 'Conversion HEIC…'}
+                      {p.status === 'scanning'   && 'Analyse IA…'}
+                      {p.status === 'uploading'  && 'Sauvegarde…'}
+                      {p.status === 'done' && (
+                        <>
+                          {p.multiVat ? (
+                            <span className="text-amber-700">Importé ✓ — ⚠ Plusieurs taux TVA ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})</span>
+                          ) : 'Importé ✓'}
+                          {p.reconcile?.status === 'matched'   && <span className="text-green-700"> · rapproché à un débit</span>}
+                          {p.reconcile?.status === 'ambiguous' && <span className="text-blue-700"> · paiement probable, à valider</span>}
+                        </>
+                      )}
+                      {p.status === 'error'   && <span className="text-red-600">Erreur : {p.error}</span>}
+                      {p.status === 'skipped' && <span className="text-gray-500">{p.error}</span>}
+                      {p.status === 'warning' && <span className="text-amber-700">{p.warning}</span>}
+                      {p.status === 'duplicate' && (
+                        <>
+                          Doublon détecté ({p.duplicate?.amount} CHF, {p.duplicate?.date}){' '}
+                          <button onClick={p.retry} className="ml-1 underline text-amber-700 hover:text-amber-900">Importer quand même</button>
+                          {' · '}
+                          <button onClick={() => setProcessing(pp => pp.filter(xx => xx.id !== p.id))}
+                            className="underline text-gray-500 hover:text-gray-700">Ignorer</button>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  {['error', 'skipped', 'warning'].includes(p.status) && (
+                    <button onClick={() => setProcessing(pp => pp.filter(xx => xx.id !== p.id))}
+                      className="text-gray-300 hover:text-gray-500 text-sm flex-shrink-0" title="Retirer">×</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
 
