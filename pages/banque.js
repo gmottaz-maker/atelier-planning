@@ -37,16 +37,43 @@ export default function Banque() {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState(null)
   const [selected, setSelected] = useState(null)
+  const [suggestions, setSuggestions] = useState(null)  // null = en cours, [] = aucune
 
   async function load() {
     setLoading(true)
-    const r = await adminFetch(`/api/bank/transactions?status=${filter}&suggestions=1`)
+    const r = await adminFetch(`/api/bank/transactions?status=${filter}`)
     const data = await r.json()
     setTransactions(Array.isArray(data) ? data : [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [filter])
+
+  // Ouvre le tiroir immédiatement, charge ses suggestions à part (une seule
+  // transaction) plutôt que de les précalculer pour toute la liste.
+  async function openTx(tx) {
+    setSelected(tx)
+    if (tx.matched_to_type) { setSuggestions([]); return }
+    setSuggestions(null)
+    try {
+      const r = await adminFetch(`/api/bank/transactions?suggest_for=${tx.id}`)
+      const d = await r.json()
+      setSuggestions(Array.isArray(d.suggestions) ? d.suggestions : [])
+    } catch { setSuggestions([]) }
+  }
+
+  // Met à jour la transaction localement, et la retire de la vue si elle ne
+  // correspond plus au filtre — sans recharger toute la liste.
+  function applyLocal(txId, patch) {
+    setTransactions(ts => ts.flatMap(t => {
+      if (t.id !== txId) return [t]
+      const nt = { ...t, ...patch }
+      const visible = filter === 'all'
+        || (filter === 'matched' && nt.matched_to_type)
+        || (filter === 'unmatched' && !nt.matched_to_type)
+      return visible ? [nt] : []
+    }))
+  }
 
   async function importFile(file) {
     if (!file) return
@@ -72,31 +99,51 @@ export default function Banque() {
     }
   }
 
+  // MAJ optimiste : l'écran réagit tout de suite, l'API confirme en arrière-plan.
+  // En cas d'échec seulement, on resynchronise par un rechargement.
   async function confirmMatch(tx, suggestion) {
-    await adminFetch('/api/bank/match', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        transaction_id: tx.id,
-        type: suggestion.type,
-        target_id: suggestion.candidate.id,
-        confidence: suggestion.score,
-        actor: currentUser,
-      }),
+    applyLocal(tx.id, {
+      matched_to_type: suggestion.type,
+      matched_to_id: suggestion.candidate.id,
+      matched_at: new Date().toISOString(),
     })
     setSelected(null)
-    load()
+    try {
+      const r = await adminFetch('/api/bank/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction_id: tx.id,
+          type: suggestion.type,
+          target_id: suggestion.candidate.id,
+          confidence: suggestion.score,
+          actor: currentUser,
+        }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+    } catch (e) {
+      alert('Échec du matching : ' + e.message)
+      load()
+    }
   }
 
   async function unmatch(tx) {
     if (!confirm('Annuler ce matching ?')) return
-    await adminFetch('/api/bank/match', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transaction_id: tx.id, unmatch: true }),
-    })
+    applyLocal(tx.id, { matched_to_type: null, matched_to_id: null, matched_at: null })
     setSelected(null)
-    load()
+    try {
+      const r = await adminFetch('/api/bank/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: tx.id, unmatch: true }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+    } catch (e) {
+      alert('Échec de l\'annulation : ' + e.message)
+      load()
+    }
   }
 
   const stats = transactions.reduce((acc, t) => {
@@ -201,10 +248,10 @@ export default function Banque() {
                 {transactions.map(tx => {
                   const matched = !!tx.matched_to_type
                   const isCredit = parseFloat(tx.amount) > 0
-                  const topScore = tx.suggestions?.[0]?.score || 0
+                  const topScore = tx.top_score || 0
                   return (
                     <tr key={tx.id}
-                      onClick={() => setSelected(tx)}
+                      onClick={() => openTx(tx)}
                       className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer">
                       <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(tx.booking_date)}</td>
                       <td className="px-4 py-3">
@@ -248,6 +295,7 @@ export default function Banque() {
 
       {selected && (
         <MatchDrawer tx={selected}
+          suggestions={suggestions}
           onClose={() => setSelected(null)}
           onConfirm={confirmMatch}
           onUnmatch={unmatch} />
@@ -256,7 +304,7 @@ export default function Banque() {
   )
 }
 
-function MatchDrawer({ tx, onClose, onConfirm, onUnmatch }) {
+function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -317,11 +365,13 @@ function MatchDrawer({ tx, onClose, onConfirm, onUnmatch }) {
             ) : (
               <>
                 <p className="text-xs uppercase tracking-wider text-gray-400 mb-3">Suggestions</p>
-                {!tx.suggestions || tx.suggestions.length === 0 ? (
+                {suggestions === null ? (
+                  <p className="text-sm text-gray-400">Recherche de correspondances…</p>
+                ) : suggestions.length === 0 ? (
                   <p className="text-sm text-gray-400">Aucune suggestion automatique. Vérifie que la facture correspondante existe.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {tx.suggestions.map((s, i) => {
+                    {suggestions.map((s, i) => {
                       const c = s.candidate
                       const name = c.supplier_name || c.client_name || c.merchant || 'Sans nom'
                       const amt = c.amount
