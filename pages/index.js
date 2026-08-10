@@ -54,7 +54,9 @@ function getAutoColor(deadline) {
   if (d <= 21) return '#f59e0b'      // 2 à 3 semaines
   return '#22c55e'                   // le reste
 }
+const SUSPENDED_COLOR = '#94a3b8'      // gris ardoise — projet en pause
 function getProjectColor(p) {
+  if (p.suspended) return SUSPENDED_COLOR   // en pause → gris, jamais « en retard »
   if (p.color_override) return p.color_override
   const pm = phaseMeta(p.phase)
   if (pm) return pm.color              // phase définie → couleur de phase (pas de rouge « retard »)
@@ -74,7 +76,8 @@ function formatDateShort(s) {
 }
 
 // Badge d'échéance « DANS xJ » (11b). urgent = accent, sinon neutre.
-function daysBadge(deadline, phase) {
+function daysBadge(deadline, phase, suspended) {
+  if (suspended) return { text: 'EN PAUSE', kind: 'phase', color: SUSPENDED_COLOR, bg: '#f1f5f9' }
   const pm = phaseMeta(phase)
   if (pm) return { text: pm.label.toUpperCase(), kind: 'phase', color: pm.color, bg: pm.bg }
   if (!deadline) return { text: 'Sans date', kind: 'none' }
@@ -120,9 +123,11 @@ function buildKanbanColumns() {
   }
   cols.push({ key: 'later', label: 'Plus tard', accent: '#64748b' })
   cols.push({ key: 'ongoing', label: 'En cours / livré', accent: '#1d4ed8' })   // projets avec une phase
+  cols.push({ key: 'suspended', label: 'En pause', accent: SUSPENDED_COLOR })     // projets suspendus
   return cols
 }
-function kanbanColumnKey(deadline, columns, phase) {
+function kanbanColumnKey(deadline, columns, phase, suspended) {
+  if (suspended) return 'suspended'         // en pause → hors logique d'échéance
   if (isOngoing(phase)) return 'ongoing'    // phase définie → hors logique d'échéance
   if (!deadline) return 'later'
   if (getDaysRemaining(deadline) < 0) return 'overdue'
@@ -152,7 +157,8 @@ function groupByMonth(projects) {
 
 // ─── DaysChip ────────────────────────────────────────────────────────────────
 
-function DaysChip({ deadline, phase }) {
+function DaysChip({ deadline, phase, suspended }) {
+  if (suspended) return <span style={{ background:'#f1f5f9', color: SUSPENDED_COLOR }} className="px-2 py-0.5 rounded-full text-xs font-semibold">En pause</span>
   const pm = phaseMeta(phase)
   if (pm) return <span style={{ background: pm.bg, color: pm.color }} className="px-2 py-0.5 rounded-full text-xs font-semibold">{pm.label}</span>
   const d = getDaysRemaining(deadline)
@@ -308,6 +314,8 @@ function GanttView({ projects }) {
               const left  = x(startOf(p))
               const right = x(endOf(p))
               const width = Math.max(8, right - left)
+              // Un projet suspendu (ou avec une phase en cours) n'est pas « en retard ».
+              const neutral = p.suspended || isOngoing(p.phase)
               const d = getDaysRemaining(p.deadline)
               return (
                 <div key={p.id} className="flex items-center border-b border-gray-50 hover:bg-gray-50/50 transition-colors" style={{ height: 46 }}>
@@ -327,9 +335,9 @@ function GanttView({ projects }) {
                     <span style={{
                       position: 'absolute', top: '50%', transform: 'translateY(-50%)',
                       left: left + width + 8, fontSize: 11, fontWeight: 600,
-                      color: d < 0 ? '#dc2626' : '#6b7280', whiteSpace: 'nowrap',
+                      color: (!neutral && d < 0) ? '#dc2626' : '#6b7280', whiteSpace: 'nowrap',
                     }}>
-                      {formatDateShort(p.deadline)}{d < 0 ? ` · ${Math.abs(d)}j retard` : d === 0 ? " · auj." : ''}
+                      {formatDateShort(p.deadline)}{neutral ? (p.suspended ? ' · pause' : '') : d < 0 ? ` · ${Math.abs(d)}j retard` : d === 0 ? " · auj." : ''}
                     </span>
                   </div>
                 </div>
@@ -818,6 +826,15 @@ export default function Admin() {
     mutateProjects()
   }
 
+  async function patchSuspended(project, suspended) {
+    mutateProjects(projects.map(p => p.id === project.id ? { ...p, suspended } : p), false)
+    await fetch(`/api/projects/${project.id}`, {
+      method: 'PUT', headers: actorHeaders(),
+      body: JSON.stringify({ ...project, suspended }),
+    }).catch(() => {})
+    mutateProjects()
+  }
+
   async function doArchive(project) {
     // Mise à jour optimiste immédiate (le projet quitte la liste active tout de suite)
     mutateProjects((projects || []).map(p => p.id === project.id ? { ...p, status: 'archived' } : p), false)
@@ -900,7 +917,7 @@ export default function Admin() {
     const nextTask    = allTasks
       .filter(t => t.status === 'active')
       .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
-    const badge = daysBadge(project.deadline, project.phase)
+    const badge = daysBadge(project.deadline, project.phase, project.suspended)
     // Liseré de carte : couleur de phase si définie, sinon feu tricolore d'échéance
     const stripe = getProjectColor(project)
 
@@ -980,7 +997,12 @@ export default function Admin() {
             {PROJECT_PHASES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
           <button onClick={() => handleEdit(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Modifier</button>
-          <button onClick={() => handleArchive(project)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Archiver</button>
+          <button onClick={() => patchSuspended(project, !project.suspended)}
+            title={project.suspended ? 'Réactiver le projet' : 'Mettre en pause (le sort des « en retard »)'}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: project.suspended ? '#1d4ed8' : C.muted, cursor: 'pointer', padding: 0, font: `600 11.5px ${FONT}` }}>
+            {project.suspended ? 'Réactiver' : 'Suspendre'}
+          </button>
+          <button onClick={() => handleArchive(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Archiver</button>
           <button onClick={() => handleDelete(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Supprimer</button>
         </div>
       </div>
@@ -1027,7 +1049,7 @@ export default function Admin() {
             {/* Échéance */}
             <span className="inline-flex items-center gap-2">
               <span className="text-gray-500 tabular-nums">{formatDate(project.deadline) || 'Sans date'}</span>
-              {!incomplete && <DaysChip deadline={project.deadline} phase={project.phase} />}
+              {!incomplete && <DaysChip deadline={project.deadline} phase={project.phase} suspended={project.suspended} />}
             </span>
 
             {/* Avancement */}
@@ -1300,9 +1322,9 @@ export default function Admin() {
               {(() => {
                 const kanbanCols = buildKanbanColumns()
                 return kanbanCols.map(col => {
-                  const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase) === col.key)
-                  // Masque « En retard » quand aucun projet n'est en retard
-                  if (col.key === 'overdue' && colProjects.length === 0) return null
+                  const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase, p.suspended) === col.key)
+                  // Masque « En retard », « En cours / livré » et « En pause » quand vides
+                  if (['overdue', 'ongoing', 'suspended'].includes(col.key) && colProjects.length === 0) return null
                   return (
                     <div key={col.key} className="flex-shrink-0 w-80">
                       <div className="flex items-center gap-2 mb-4 px-1">
