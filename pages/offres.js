@@ -258,7 +258,7 @@ export default function Offres() {
                               style={{ fontSize: 11, maxWidth: 150 }} />
                           </div>
                         ) : o.status === 'accepte' ? (
-                          <Link href={`/factures-emises?from=${o.p.id}`}
+                          <Link href={`/factures-emises/new?from=${o.p.id}`}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white"
                             style={{ background: '#111827' }}>
                             Créer la facture
