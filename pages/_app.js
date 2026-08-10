@@ -86,7 +86,12 @@ export default function App({ Component, pageProps }) {
     function applySession(session) {
       syncAuthCookie(session)
       if (!session) { setUser(null); return }
-      const fallbackName = session.user.user_metadata?.name || session.user.email
+      // Nom du profil mis en cache au dernier passage : évite la fenêtre où
+      // user.name vaut l'e-mail (le temps de relire `profiles`), fenêtre pendant
+      // laquelle une page admin renverrait à l'accueil.
+      let cachedName = null
+      try { cachedName = localStorage.getItem('profileName:' + session.user.id) } catch {}
+      const fallbackName = cachedName || session.user.user_metadata?.name || session.user.email
       setUser(prev =>
         prev?.id === session.user.id
           ? prev
@@ -95,6 +100,7 @@ export default function App({ Component, pageProps }) {
       fetchProfile(session.user.id)
         .then(profile => {
           if (cancelled || !profile?.name) return
+          try { localStorage.setItem('profileName:' + session.user.id, profile.name) } catch {}
           setUser(u => (u && u.id === session.user.id ? { ...u, name: profile.name } : u))
         })
         .catch(() => {})
