@@ -2685,7 +2685,13 @@ export default function ProjectPage() {
             body: JSON.stringify(body),
           })
           const created = await res.json()
-          if (created.id) handleTaskAdded(created)
+          // Ne pas avaler l'erreur : sinon un refus côté base passe pour une
+          // tâche qui « ne s'affiche pas ».
+          if (!res.ok || created.error) {
+            alert('Création impossible : ' + (created.error || `erreur ${res.status}`))
+            return
+          }
+          handleTaskAdded(created)
           setDrawerCategory(null)
         }}
         onClose={() => setDrawerCategory(null)}

@@ -346,21 +346,20 @@ export default function Tasks() {
   }
 
   async function handleSave(body, id) {
-    if (id) {
-      await fetch(`/api/tasks/${id}`, {
-        method: 'PUT',
-        headers: actorHeaders(),
-        body: JSON.stringify(body),
-      })
-      showMsg('Tâche mise à jour ✓')
-    } else {
-      await fetch('/api/tasks', {
-        method: 'POST',
-        headers: actorHeaders(),
-        body: JSON.stringify(body),
-      })
-      showMsg('Tâche créée ✓')
+    // Vérifier la réponse : sans ça, un refus côté base passait pour un succès
+    // (« Tâche créée ✓ ») alors que rien n'était enregistré.
+    const r = await fetch(id ? `/api/tasks/${id}` : '/api/tasks', {
+      method: id ? 'PUT' : 'POST',
+      headers: actorHeaders(),
+      body: JSON.stringify(body),
+    })
+    let d = {}
+    try { d = await r.json() } catch (_) {}
+    if (!r.ok || d.error) {
+      showMsg('Erreur : ' + (d.error || `échec ${r.status}`))
+      return
     }
+    showMsg(id ? 'Tâche mise à jour ✓' : 'Tâche créée ✓')
     setShowForm(false)
     setEditingTask(null)
     fetchAll()
