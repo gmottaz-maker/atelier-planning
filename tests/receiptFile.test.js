@@ -29,6 +29,22 @@ describe('receiptFilename', () => {
       .toBe('2026-05-12_MIGROS_47.30.heic')
   })
 
+  it('déduit l\'extension du type MIME quand il n\'y a pas de nom de fichier', () => {
+    // Cas d'une photo prise depuis la page Horaires : pas de nom d'origine.
+    // Sans cette déduction, un JPEG serait enregistré en .pdf sur kDrive.
+    expect(receiptFilename({ merchant: 'Migros', amount: 47.3, date: '2026-05-12' }, '', 'image/jpeg'))
+      .toBe('2026-05-12_MIGROS_47.30.jpg')
+    expect(receiptFilename({ merchant: 'Migros', amount: 47.3, date: '2026-05-12' }, '', 'image/png'))
+      .toBe('2026-05-12_MIGROS_47.30.png')
+    expect(receiptFilename({ merchant: 'Migros', amount: 47.3, date: '2026-05-12' }, '', 'application/pdf'))
+      .toBe('2026-05-12_MIGROS_47.30.pdf')
+  })
+
+  it('privilégie le nom d\'origine sur le type MIME', () => {
+    expect(receiptFilename({ merchant: 'Migros', amount: 47.3, date: '2026-05-12' }, 'scan.pdf', 'image/jpeg'))
+      .toBe('2026-05-12_MIGROS_47.30.pdf')
+  })
+
   it('reste lisible sans commerçant', () => {
     expect(name({ merchant: null, amount: 10, date: '2026-05-12' }, 'a.pdf'))
       .toBe('2026-05-12_JUSTIFICATIF_10.00.pdf')

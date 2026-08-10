@@ -110,6 +110,15 @@ function getVaudHolidays(year) {
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
+// Source d'affichage d'un reçu : URL signée Supabase (anciens frais) ou
+// fichier kDrive (nouveaux frais, classés par trimestre).
+function receiptSrc(exp) {
+  if (!exp) return null
+  if (exp.receipt_url) return exp.receipt_url
+  if (exp.kdrive_file_id) return `/api/kdrive/download?fileId=${exp.kdrive_file_id}`
+  return null
+}
+
 async function apiFetch(path, options = {}) {
   const r = await fetch(path, options)
   if (!r.ok) {
@@ -380,7 +389,7 @@ export default function SchedulePage() {
     setExpEditId(exp.id)
     setExpForm({ date: exp.date, amount: exp.amount ?? '', currency: exp.currency || 'CHF', category: exp.category || 'Autre', merchant: exp.merchant || '', description: exp.description || '', payment_method: exp.payment_method || 'personal' })
     setExpReceiptB64(null); setExpReceiptMime(null)
-    setExpReceiptPreview(exp.receipt_url || null)
+    setExpReceiptPreview(receiptSrc(exp))
     setExpScanError(''); setExpSaveError('')
     setExpenseModal(true)
   }
@@ -409,13 +418,17 @@ export default function SchedulePage() {
         body: JSON.stringify({ image: expReceiptB64, mimeType: expReceiptMime }),
       })
       if (result.error) { setExpScanError(result.error); return }
+      // L'API renvoie une liste (un document peut contenir plusieurs reçus) ;
+      // ici on saisit un frais à la fois, donc on prend le premier.
+      const rec = Array.isArray(result.receipts) ? result.receipts[0] : result
+      if (!rec) { setExpScanError('Aucun reçu détecté sur cette image.'); return }
       setExpForm(f => ({
         ...f,
-        date:     result.date     || f.date,
-        amount:   result.amount   != null ? String(result.amount) : f.amount,
-        currency: result.currency || f.currency,
-        merchant: result.merchant || f.merchant,
-        category: result.category || f.category,
+        date:     rec.date     || f.date,
+        amount:   rec.amount   != null ? String(rec.amount) : f.amount,
+        currency: rec.currency || f.currency,
+        merchant: rec.merchant || f.merchant,
+        category: rec.category || f.category,
       }))
     } catch (e) { setExpScanError(e.message) }
     finally { setExpScanLoading(false) }
@@ -1272,13 +1285,18 @@ export default function SchedulePage() {
                     onClick={() => openEditExpense(exp)}
                   >
                     {/* Receipt thumbnail or category icon */}
-                    <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
-                      style={{ background: exp.receipt_url ? '#f3f4f6' : `${cat.color}18`, fontSize: exp.receipt_url ? 10 : 20 }}>
-                      {exp.receipt_url
-                        ? <img src={exp.receipt_url} alt="reçu" className="w-full h-full object-cover" onError={e => { e.target.style.display='none' }} />
-                        : cat.icon
-                      }
-                    </div>
+                    {(() => {
+                      const src = receiptSrc(exp)
+                      return (
+                        <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
+                          style={{ background: src ? '#f3f4f6' : `${cat.color}18`, fontSize: src ? 10 : 20 }}>
+                          {src
+                            ? <img src={src} alt="reçu" className="w-full h-full object-cover" onError={e => { e.target.style.display='none' }} />
+                            : cat.icon
+                          }
+                        </div>
+                      )
+                    })()}
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800 truncate">{exp.merchant || exp.category}</p>

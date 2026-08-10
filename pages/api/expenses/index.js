@@ -85,22 +85,33 @@ export default async function handler(req, res) {
 
     // Pièce justificative : classée sur kDrive par trimestre, comme les factures
     // fournisseurs. Un scan groupé n'archive que les pages de ce reçu.
+    // Si kDrive est indisponible, on retombe sur Supabase Storage plutôt que de
+    // refuser la saisie : perdre le frais coûte plus cher qu'un reçu mal rangé.
     let kdrive_file_id = null
     let kdrive_filename = null
+    let receipt_path = null
     if (receiptBase64 && receiptMimeType) {
+      let buffer = Buffer.from(receiptBase64, 'base64')
+      if ((receiptMimeType || '').includes('pdf') && (page_from || page_to)) {
+        try { buffer = await extractPages(buffer, page_from, page_to) } catch {}
+      }
       try {
         const { year, quarter } = quarterOf(date)
         const folderId = await ensureReceiptFolder(year, quarter)
-        let buffer = Buffer.from(receiptBase64, 'base64')
-        if ((receiptMimeType || '').includes('pdf') && (page_from || page_to)) {
-          try { buffer = await extractPages(buffer, page_from, page_to) } catch {}
-        }
-        const filename = receiptFilename({ merchant, amount, date }, receiptOrigName)
+        const filename = receiptFilename({ merchant, amount, date }, receiptOrigName, receiptMimeType)
         const kf = await upload(folderId, filename, buffer, receiptMimeType)
         kdrive_file_id = kf.id
         kdrive_filename = kf.name
       } catch (e) {
-        return res.status(500).json({ error: 'kDrive upload: ' + e.message })
+        console.error('kDrive upload (repli Supabase):', e.message)
+        try {
+          const ext  = (receiptMimeType.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+          const path = `${userName}/${Date.now()}.${ext}`
+          const { error: upErr } = await supabase.storage
+            .from(BUCKET).upload(path, buffer, { contentType: receiptMimeType, upsert: false })
+          if (!upErr) receipt_path = path
+          else console.error('Storage upload:', upErr.message)
+        } catch (e2) { console.error('Receipt fallback error:', e2) }
       }
     }
 
@@ -122,6 +133,7 @@ export default async function handler(req, res) {
         description: description || null,
         kdrive_file_id,
         kdrive_filename,
+        receipt_path,
         payment_method: payment_method || 'company',
         amount_net:    amount_net    != null && amount_net    !== '' ? parseFloat(amount_net)  : null,
         vat_rate:      vat_rate      != null && vat_rate      !== '' ? parseFloat(vat_rate)    : null,
