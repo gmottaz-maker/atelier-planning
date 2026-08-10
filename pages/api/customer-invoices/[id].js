@@ -13,11 +13,13 @@ export default async function handler(req, res) {
     return res.status(200).json(data)
   }
 
-  if (req.method === 'PUT') {
+  // PATCH = PUT (mise à jour partielle : statut, dates d'envoi/paiement depuis
+  // la liste). Sans ce cas, les requêtes PATCH tombaient en 405 sans rien faire.
+  if (req.method === 'PUT' || req.method === 'PATCH') {
     const allowed = ['client_name', 'client_address', 'amount', 'amount_net', 'vat_rate', 'vat_amount',
                      'currency', 'issue_date',
                      'due_date', 'iban_recipient', 'notes', 'status', 'quote_snapshot',
-                     'detail_level', 'sent_at', 'object',
+                     'detail_level', 'sent_at', 'paid_at', 'object',
                      'discount_label', 'discount_rate', 'discount_amount']
     const payload = { updated_at: new Date().toISOString() }
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]

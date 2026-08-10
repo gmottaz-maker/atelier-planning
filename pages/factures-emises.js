@@ -137,12 +137,34 @@ export default function FacturesEmises() {
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { alert('Téléchargement impossible : ' + e.message) }
   }
-  async function markSent(inv) {
-    const sent_at = new Date().toISOString()
-    setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, status: 'sent', sent_at } : x))
-    await adminFetch(`/api/customer-invoices/${inv.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'sent', sent_at }) })
-    load()
+  // Mise à jour d'une facture depuis la liste (statut, dates) — optimiste, avec
+  // resynchronisation seulement en cas d'échec.
+  async function patchInvoice(inv, patch) {
+    setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, ...patch } : x))
+    try {
+      const r = await adminFetch(`/api/customer-invoices/${inv.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+    } catch (e) {
+      alert('Enregistrement impossible : ' + e.message)
+      load()
+    }
   }
+
+  // Changer le statut renseigne la date correspondante si elle manque, pour ne
+  // pas avoir à la saisir à la main dans le cas courant.
+  function changeStatus(inv, status) {
+    const patch = { status }
+    const now = new Date().toISOString().slice(0, 10)
+    if (status === 'sent' && !inv.sent_at) patch.sent_at = now
+    if (status === 'paid' && !inv.paid_at) patch.paid_at = now
+    patchInvoice(inv, patch)
+  }
+
+  // La date affichée suit le statut : date de paiement si payée, sinon d'envoi.
+  const dateFieldOf = inv => (inv.status === 'paid' ? 'paid_at' : 'sent_at')
   const [sendDoc, setSendDoc] = useState(null)
   function openSend(inv) {
     const proj = projects.find(p => String(p.id) === String(inv.project_id))
@@ -236,27 +258,39 @@ export default function FacturesEmises() {
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
                         {fmtCHF(inv.amount)} <span className="text-xs font-normal text-gray-400">{inv.currency}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
-                          style={{ background: STATUS_COLORS[st] + '18', color: STATUS_COLORS[st] }}>
-                          {STATUS_LABELS[st]}
-                        </span>
-                        {inv.sent_at && (st === 'sent' || st === 'paid') && (
-                          <span className="ml-2 text-xs text-gray-400">le {fmtDate(inv.sent_at.slice(0, 10))}</span>
-                        )}
+                      {/* Statut modifiable + date correspondante (envoi, ou paiement si payée) */}
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <select value={inv.status || 'created'} onChange={e => changeStatus(inv, e.target.value)}
+                            title="Changer le statut"
+                            className="text-xs font-semibold rounded-full border px-2 py-1 cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-300"
+                            style={{ background: STATUS_COLORS[st] + '18', color: STATUS_COLORS[st], borderColor: STATUS_COLORS[st] + '40' }}>
+                            {['created', 'sent', 'pending', 'paid', 'cancelled'].map(k => (
+                              <option key={k} value={k} style={{ color: '#111827', background: '#fff' }}>{STATUS_LABELS[k]}</option>
+                            ))}
+                          </select>
+                          <input type="date"
+                            value={inv[dateFieldOf(inv)] ? String(inv[dateFieldOf(inv)]).slice(0, 10) : ''}
+                            onChange={e => patchInvoice(inv, { [dateFieldOf(inv)]: e.target.value || null })}
+                            title={inv.status === 'paid' ? 'Date de paiement' : 'Date d\'envoi'}
+                            className="text-xs text-gray-500 rounded-md border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300"
+                            style={{ width: 124 }} />
+                        </div>
                       </td>
+                      {/* Actions : trois boutons de même gabarit */}
                       <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1.5 justify-end whitespace-nowrap">
-                          <button title="Télécharger la facture détaillée (PDF + QR)" onClick={() => downloadPdf(inv, 'detailed')}
-                            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">⤓ Détaillée</button>
-                          <button title="Télécharger la facture résumée (PDF + QR)" onClick={() => downloadPdf(inv, 'summary')}
-                            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">⤓ Résumée</button>
-                          <button title="Envoyer la facture par e-mail" onClick={() => openSend(inv)}
-                            className="text-xs font-medium text-gray-500 hover:text-gray-900 border border-gray-200 rounded px-2 py-1">✉</button>
-                          {(st === 'sent' || st === 'paid' || st === 'cancelled') ? null : (
-                            <button title="Marquer comme envoyée (avec date du jour)" onClick={() => markSent(inv)}
-                              className="text-xs font-medium border rounded px-2 py-1" style={{ color: '#1d4ed8', borderColor: '#bfdbfe' }}>✓ Envoyée</button>
-                          )}
+                        <div className="flex items-center gap-2 justify-end whitespace-nowrap">
+                          {[
+                            { label: 'Détaillée', title: 'Télécharger le PDF détaillé (avec QR-bill)', icon: '⤓', act: () => downloadPdf(inv, 'detailed') },
+                            { label: 'Résumée',   title: 'Télécharger le PDF résumé (avec QR-bill)',   icon: '⤓', act: () => downloadPdf(inv, 'summary') },
+                            { label: 'Envoyer',   title: 'Envoyer la facture par e-mail',              icon: '✉', act: () => openSend(inv) },
+                          ].map(b => (
+                            <button key={b.label} title={b.title} onClick={b.act}
+                              className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:border-gray-500 hover:text-gray-900"
+                              style={{ width: 104, padding: '6px 0' }}>
+                              <span style={{ fontSize: 13 }}>{b.icon}</span>{b.label}
+                            </button>
+                          ))}
                         </div>
                       </td>
                     </tr>
