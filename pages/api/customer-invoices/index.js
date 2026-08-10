@@ -21,6 +21,7 @@ export default async function handler(req, res) {
       project_id, client_name, client_address, amount, amount_net, vat_rate, vat_amount,
       currency, issue_date, due_date, iban_recipient, quote_snapshot, notes,
       detail_level, status, object,
+      discount_label, discount_rate, discount_amount,
     } = req.body
 
     if (!client_name || amount == null) return res.status(400).json({ error: 'client_name et amount requis' })
@@ -58,6 +59,9 @@ export default async function handler(req, res) {
         status: status || 'created',
         notes,
         object: object || null,
+        discount_label:  discount_label || null,
+        discount_rate:   discount_rate   != null && discount_rate   !== '' ? parseFloat(discount_rate)   : null,
+        discount_amount: discount_amount != null && discount_amount !== '' ? parseFloat(discount_amount) : null,
       }).select().single())
 
       if (!error || error.code !== '23505') break

@@ -16,6 +16,7 @@ import ContactPicker from '../../components/ContactPicker'
 import SendDocumentModal from '../../components/SendDocumentModal'
 import QuoteEditor, { defaultQuote } from '../../components/QuoteEditor'
 import { computeQuoteTotal } from '../../lib/quoteTotals'
+import { invoiceTotals } from '../../lib/invoiceTotals'
 import { pdfFilename } from '../../lib/pdfFilename'
 
 const fmtCHF = n => new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)
@@ -40,6 +41,7 @@ export default function FactureEmisePage() {
     project_id: '', client_name: '', client_address: '', currency: 'CHF',
     vat_rate: '8.1', issue_date: today(), due_date: addDays(today(), 30),
     iban_recipient: '', notes: '', status: 'created', detail_level: 'detailed',
+    object: '', discount_label: '', discount_rate: '', discount_amount: '',
   })
   const [loading, setLoading] = useState(true)
   const [dirty, setDirty]     = useState(false)
@@ -77,6 +79,10 @@ export default function FactureEmisePage() {
           due_date: inv.due_date || addDays(inv.issue_date || today(), 30),
           iban_recipient: inv.iban_recipient || '', notes: inv.notes || '',
           status: inv.status || 'created', detail_level: inv.detail_level || 'detailed',
+          object: inv.object || '',
+          discount_label: inv.discount_label || '',
+          discount_rate: inv.discount_rate ?? '',
+          discount_amount: inv.discount_amount ?? '',
         })
         setQuote(isGrouped(inv.quote_snapshot) ? inv.quote_snapshot : defaultQuote())
         dueTouched.current = true
@@ -108,9 +114,13 @@ export default function FactureEmisePage() {
     setDirty(true)
   }
 
-  const net   = computeQuoteTotal(quote)
-  const vat   = net * (parseFloat(form.vat_rate) || 0) / 100
-  const gross = net + vat
+  const totals = invoiceTotals({
+    subtotal: computeQuoteTotal(quote),
+    discount_rate: form.discount_rate,
+    discount_amount: form.discount_amount,
+    vat_rate: form.vat_rate,
+  })
+  const { subtotal, discount, net, vat, gross } = totals
 
   async function save({ close = false } = {}) {
     if (!form.client_name) { setError('Le client est requis.'); return }
@@ -202,6 +212,14 @@ export default function FactureEmisePage() {
                 <p className="text-xs text-gray-400 mt-1">Choisir un projet recopie son offre dans l'éditeur ci-dessous.</p>
               </div>
               <div>
+                <label className={label}>Objet — nom libre {form.project_id && <span className="text-gray-400">(remplace le nom du projet)</span>}</label>
+                <input className={input} value={form.object} onChange={e => set('object', e.target.value)}
+                  placeholder="ex. Stockage T3 2026, Acompte chantier…" />
+                <p className="text-xs text-gray-400 mt-1">
+                  Permet de nommer la facture sans la lier à un projet. Sans objet ni projet, la facture n'a pas d'intitulé.
+                </p>
+              </div>
+              <div>
                 <label className={label}>Depuis la base contacts</label>
                 <ContactPicker onSelect={({ name, address }) => {
                   setForm(f => ({ ...f, client_name: name, client_address: address || f.client_address })); setDirty(true)
@@ -287,10 +305,46 @@ export default function FactureEmisePage() {
             <QuoteEditor value={quote} onChange={q => { setQuote(q); setDirty(true) }} />
           </div>
 
+          {/* ── Escompte sur toute la facture ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
+            <h2 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Escompte sur la facture</h2>
+            <div className="grid md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
+                <label className={label}>Libellé <span className="text-gray-400">(imprimé sur le PDF)</span></label>
+                <input className={input} value={form.discount_label} onChange={e => set('discount_label', e.target.value)}
+                  placeholder="ex. Remise commerciale, Geste client…" />
+              </div>
+              <div>
+                <label className={label}>Pourcentage</label>
+                <input type="number" step="0.1" min="0" className={input + ' text-right tabular-nums'}
+                  value={form.discount_rate} onChange={e => set('discount_rate', e.target.value)} placeholder="0" />
+              </div>
+              <div>
+                <label className={label}>Montant fixe ({form.currency})</label>
+                <input type="number" step="0.01" min="0" className={input + ' text-right tabular-nums'}
+                  value={form.discount_amount} onChange={e => set('discount_amount', e.target.value)} placeholder="0" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">
+              S'applique au sous-total HT, avant TVA. Les deux se cumulent : le pourcentage d'abord, puis le montant fixe.
+            </p>
+          </div>
+
           {/* ── Récapitulatif TVA ── */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
+            {discount > 0 && (
+              <>
+                <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <span>Sous-total HT</span><span className="tabular-nums font-medium">{fmtCHF(subtotal)} {form.currency}</span>
+                </div>
+                <div className="flex justify-between text-sm mb-1" style={{ color: '#b91c1c' }}>
+                  <span>{form.discount_label || (form.discount_rate ? `Escompte ${form.discount_rate} %` : 'Escompte')}</span>
+                  <span className="tabular-nums font-medium">− {fmtCHF(discount)} {form.currency}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between text-sm text-gray-600 mb-1">
-              <span>Total HT</span><span className="tabular-nums font-medium">{fmtCHF(net)} {form.currency}</span>
+              <span>{discount > 0 ? 'Net HT' : 'Total HT'}</span><span className="tabular-nums font-medium">{fmtCHF(net)} {form.currency}</span>
             </div>
             <div className="flex justify-between text-sm text-gray-600 mb-2">
               <span>TVA {form.vat_rate} %</span><span className="tabular-nums font-medium">{fmtCHF(vat)} {form.currency}</span>

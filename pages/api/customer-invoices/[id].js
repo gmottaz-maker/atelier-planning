@@ -17,10 +17,11 @@ export default async function handler(req, res) {
     const allowed = ['client_name', 'client_address', 'amount', 'amount_net', 'vat_rate', 'vat_amount',
                      'currency', 'issue_date',
                      'due_date', 'iban_recipient', 'notes', 'status', 'quote_snapshot',
-                     'detail_level', 'sent_at', 'object']
+                     'detail_level', 'sent_at', 'object',
+                     'discount_label', 'discount_rate', 'discount_amount']
     const payload = { updated_at: new Date().toISOString() }
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
-    for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount']) {
+    for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount', 'discount_rate', 'discount_amount']) {
       if (payload[k] != null) payload[k] = parseFloat(payload[k])
     }
     const { data, error } = await supabase.from('customer_invoices').update(payload).eq('id', id).select().single()
