@@ -16,6 +16,7 @@ const MAIN_ITEMS = [
   { href: '/schedule',  label: 'Horaires', match: (p) => p === '/schedule' },
   { href: '/meeting',   label: 'Meeting',  match: (p) => p === '/meeting' },
   { href: '/activity',  label: 'Activité', match: (p) => p === '/activity' },
+  { href: '/peintures', label: 'Peintures', match: (p) => p === '/peintures' },
 ]
 
 // Zone finances (admin uniquement) : 2 items transverses + 2 groupes labellisés

@@ -17,45 +17,86 @@ URL production : https://mazeproject.amazinglab.ch
 
 ## Structure des fichiers
 
+Les pages marquées **(admin)** sont réservées à Guillaume : elles font
+`if (user && !isAdmin) router.replace('/')` et s'appuient sur `useIsAdmin`.
+
 ```
 pages/
-  _app.js              — Auth Supabase, contexte global (useAuth hook)
-  index.js             — Liste des projets logistiques (page principale)
-  home.js              — Dashboard accueil + Google Calendar
-  schedule.js          — Horaires + congés + frais (page principale utilisateurs)
-  tasks.js             — Tâches globales
-  activity.js          — Vue activité
+  _app.js              — Auth Supabase, contexte global (useAuth), injection du JWT dans fetch
+  login.js             — Connexion
+  index.js             — Projets : cartes / kanban / gantt / liste (page principale)
+  home.js              — Dashboard accueil + Google Agenda
+  schedule.js          — Horaires, congés et frais (page principale des non-admins)
+  tasks.js             — Tâches, toutes catégories
+  planning.js          — Planning d'atelier
+  meeting.js           — Vue réunion
+  activity.js          — Journal d'activité
+  display.js           — Affichage mural (route publique, sans chrome)
   settings.js          — Paramètres utilisateur
-  login.js             — Page de connexion
-  display.js           — Affichage mural (vue publique)
-  projects/[id].js     — Détail d'un projet logistique
+  peintures.js         — Sélecteur de peintures RUCO (voir section dédiée)
+  clients.js           — Contacts et entreprises
+  clients/[id].js      — Fiche contact
+  catalog.js           — Catalogue d'articles et d'heures
+  projects/[id].js     — Fiche projet : tâches, logistique, offre, fichiers
+  projects/[id]/devis.js — Aperçu imprimable de l'offre
 
-  api/
-    work-entries.js        — CRUD entrées horaires
-    work-settings.js       — Paramètres contrat (heures/sem, congés)
-    expenses/
-      index.js             — CRUD frais
-      scan.js              — OCR reçu via OpenAI Vision
-    projects/
-      index.js             — CRUD projets
-      [id].js              — Détail projet
-      files/               — Upload/download fichiers projet
-    tasks/
-      index.js             — CRUD tâches
-      [id]/                — Détail tâche
-    clients.js             — Sync clients Odoo
-    todoist-webhook.js     — Webhook Todoist → import projets
-    push/                  — Notifications push
-    activity/              — Données activité
-    clock-session.js       — Sessions de pointage
-    site-visit-summary.js  — Résumé visite chantier
+  finances.js          — (admin) Vue d'ensemble des finances
+  offres.js            — (admin) Suivi des offres
+  factures-emises.js   — (admin) Liste des factures clients
+  factures-emises/[id].js — (admin) Facture : création et édition (page complète)
+  factures-fournisseurs.js — (admin) Factures fournisseurs + scan
+  justificatifs.js     — (admin) Frais et tickets + scan
+  banque.js            — (admin) Import CAMT.053 et rapprochement
+  compta.js            — (admin) Journal, décompte TVA, plan comptable
+  stockage.js          — (admin) Inventaire de stockage et facturation trimestrielle
+
+  api/                 — ~50 routes ; toutes vérifient le JWT via requireUser/requireAdmin
+    projects/          — CRUD projets, fichiers, mises à jour, PDF de l'offre
+    tasks/             — CRUD tâches + suggestions
+    customer-invoices/ — Factures émises + PDF avec QR-bill
+    supplier-invoices/ — Factures fournisseurs + OCR (scan.js)
+    expenses/          — Frais (index, all pour l'admin, scan OCR)
+    bank/              — Import CAMT, rapprochement, transactions
+    compta/            — Journal comptable et export
+    storage-*.js       — Stockage : groupes, articles, factures, cron trimestriel
+    kdrive/            — Navigation, téléchargement et vignettes kDrive
+    push/              — Notifications push
+    send-document.js   — Envoi d'une offre ou facture par e-mail (Resend)
+    accounts.js, catalog.js, contacts.js, email-templates.js, work-*.js, …
 
 components/
-  NavBar.js              — Barre de navigation (sticky, mobile bottom nav)
+  Sidebar.js · BottomNav.js · NavBar.js  — Navigation (desktop / mobile / en-tête)
+  QuoteEditor.js         — Éditeur d'offre groupé, PARTAGÉ offre + facture
+  QtyInput.js            — Champ quantité (pas de 0.5, premier cran à 1)
+  CatalogPicker.js       — Insertion d'une ligne depuis le catalogue
+  ContactPicker.js · BillingContactSelect.js — Choix d'un contact / d'un destinataire
+  AddressInput.js · AutocompleteInput.js     — Saisie assistée
+  TaskFormDrawer.js      — Création et édition d'une tâche
+  SendDocumentModal.js   — Envoi d'un document par e-mail (modèles inclus)
+  KDriveFolderPicker.js  — Choix d'un dossier kDrive
 
 lib/
-  supabase.js            — Client Supabase côté browser
-  supabase-server.js     — Client Supabase côté serveur (service role)
+  supabase.js · supabase-server.js — Clients Supabase (navigateur / service-role)
+  requireAdmin.js        — Vérification du JWT (requireUser, requireAdmin, cache 5 min)
+  useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
+  swr.js                 — Cache SWR persisté en localStorage (voir /peintures)
+  theme.js               — Jetons de style (C, FONT, MONO)
+  devisHtml.js · factureHtml.js · htmlToPdf.js · pdfFilename.js — Génération des PDF
+  quoteTotals.js · invoiceTotals.js · quoteStatus.js — Calculs offre / facture
+  camt053.js · bankMatching.js · bankReconcile.js · reconcileRun.js — Banque
+  comptaJournal.js       — Journal en partie double et décompte TVA
+  supplierScan.js · receiptScan.js — Schémas et prompts OCR (Claude)
+  supplierFile.js · receiptFile.js · pdfSplit.js — Nommage, classement, découpage
+  merchantAccounts.js    — Apprentissage commerçant → compte comptable
+  storageInvoice.js · storageBilling.js · invoiceNumber.js — Facturation
+  kdrive.js · receipts.js — Stockage des fichiers
+  projectPhase.js · supplierStatus.js · taskCategories.js — Modèles de statut
+  todoist.js · googleCalendar.js · push-server.js · adminFetch.js
+
+tests/                   — Vitest (npm test) : calculs, parsing CAMT, nommage, rapprochement
+scripts/                 — Scripts ponctuels (imports, backfills), lancés à la main
+*.sql                    — Migrations, à exécuter dans l'éditeur SQL Supabase
+public/ruco/             — Données du sélecteur de peintures (voir section dédiée)
 ```
 
 ---
@@ -84,8 +125,12 @@ L'auth est gérée par Supabase. Le nom d'utilisateur est stocké dans `user_met
 
 ## Conventions de code
 
-- Couleur principale : `const PINK = '#FF4D6D'`
-- Pas de composants séparés par page — tout est dans le fichier de la page
+- Jetons de style dans `lib/theme.js` (`C`, `FONT`, `MONO`). Plusieurs pages
+  définissent encore un `const PINK = '#111827'` local (l'ancien rose `#FF4D6D`
+  n'est plus utilisé nulle part).
+- L'UI propre à une page reste dans son fichier ; ce qui sert à deux endroits ou
+  plus part dans `components/` (voir la liste plus haut). `QuoteEditor` en est
+  l'exemple : le même éditeur sert à l'offre et à la facture.
 - Les API routes utilisent `lib/supabase-server.js` (service role) pour bypasser RLS
 - Les pages client utilisent `lib/supabase.js`
 - Formatage dates : `dateStr(d)` → `YYYY-MM-DD`, `parseDate(s)` → Date object
@@ -123,6 +168,46 @@ supabase.auth.getSession().then(async ({ data: { session } }) => {
 ### Recherche d'adresse (index.js — AddressInput)
 Utilise la nouvelle API Google Maps Places (`AutocompleteSuggestion` + `importLibrary`).
 Fallback automatique sur Nominatim (OpenStreetMap) si pas de clé ou si Google échoue.
+
+---
+
+## Sélecteur de peintures (`/peintures`)
+
+Aide au choix d'une peinture ou d'un vernis RUCO selon le support, la brillance,
+le mode d'application et le délai de recouvrement. **Outil autonome** : aucun
+lien avec le catalogue ni les devis (choix explicite — le catalogue RUCO n'est
+pas prêt pour ça, et RUCO ne publie aucun prix hors connexion au shop).
+
+- Page : `pages/peintures.js` — lien dans `MAIN_ITEMS` de `components/Sidebar.js`.
+  Pas d'entrée dans `BottomNav` (nav mobile volontairement courte).
+- Données : `public/ruco/products.json` (271 produits, 1799 réf., ~960 Ko) et
+  `public/ruco/img/` (199 vignettes 90×90). Statique, pas de table Supabase.
+
+### Deux contraintes à ne pas casser
+
+**Ne pas charger ce JSON via SWR.** Le cache SWR est persisté en localStorage
+(`lib/swr.js`) et réécrit la map entière ; 1 Mo y ferait sauter le quota, et
+l'écriture étant dans un `try/catch` silencieux, cela casserait le cache de
+toutes les autres pages sans message. La page utilise un `fetch` dans un
+`useEffect`.
+
+**Ne pas embarquer les vignettes en base64.** Next les sert depuis `public/`
+avec cache CDN et lazy-loading ; en base64 elles entreraient dans le bundle.
+
+### Rafraîchir le catalogue
+
+Le pipeline d'extraction vit hors du repo, dans `~/ruco-selector` (Python 3,
+sans dépendance) :
+
+```bash
+cd ~/ruco-selector && python3 scrape_ruco.py --refresh \
+  && python3 normalize_ruco.py && python3 export_to_maze.py
+```
+
+`export_to_maze.py` réécrit `public/ruco/`. Voir `~/ruco-selector/README.md`
+pour la méthode de normalisation (le texte des fiches RUCO est libre, et les
+fiches se renvoient les unes aux autres — un lexique de marques neutralise ces
+renvois, sans quoi un vernis intérieur ressort comme extérieur).
 
 ---
 
