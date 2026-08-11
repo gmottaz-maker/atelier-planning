@@ -1,4 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { useAuth } from './_app'
+import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
 import { C, FONT, MONO } from '../lib/theme'
@@ -47,6 +50,13 @@ function parseCSV(text) {
 }
 
 export default function Catalog() {
+  // Réservé à l'admin : la barre latérale masque déjà l'entrée, mais la page
+  // restait atteignable par URL.
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  const gateRouter = useRouter()
+  useEffect(() => { if (user && !isAdmin) gateRouter.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const { data: items = [], isLoading, mutate } = useSWR('/api/catalog')
   const list = Array.isArray(items) ? items : []
   const [q, setQ] = useState('')

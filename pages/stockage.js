@@ -1,4 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { useAuth } from './_app'
+import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
 import { C, FONT, MONO } from '../lib/theme'
@@ -14,6 +17,13 @@ async function api(url, method, body) {
 }
 
 export default function Stockage() {
+  // Réservé à l'admin : la barre latérale masque déjà l'entrée, mais la page
+  // restait atteignable par URL.
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  const gateRouter = useRouter()
+  useEffect(() => { if (user && !isAdmin) gateRouter.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const { data: groups = [], mutate: mutGroups } = useSWR('/api/storage-groups')
   const { data: items = [], mutate: mutItems } = useSWR('/api/storage-items')
   const gList = Array.isArray(groups) ? groups : []

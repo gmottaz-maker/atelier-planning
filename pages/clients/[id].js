@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { useAuth } from '../_app'
+import useIsAdmin from '../../lib/useIsAdmin'
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import Head from 'next/head'
@@ -19,6 +21,12 @@ function Field({ label, children }) {
 }
 
 export default function ContactDetail() {
+  // Réservé à l'admin : la barre latérale masque déjà l'entrée, mais la page
+  // restait atteignable par URL.
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const router = useRouter()
   const { id } = router.query
   const { data: contacts = [], mutate } = useSWR('/api/contacts')

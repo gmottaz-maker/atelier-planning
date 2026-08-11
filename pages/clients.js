@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from './_app'
+import useIsAdmin from '../lib/useIsAdmin'
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import Head from 'next/head'
@@ -27,6 +29,12 @@ const catColor = t => t === 'Client' ? C.success : t === 'Fournisseur' ? C.warni
 const catBg    = t => t === 'Client' ? C.successBg : t === 'Fournisseur' ? C.warningBg : C.violetBg
 
 export default function Clients() {
+  // Réservé à l'admin : la barre latérale masque déjà l'entrée, mais la page
+  // restait atteignable par URL.
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const router = useRouter()
   const { data: contacts = [], isLoading, mutate } = useSWR('/api/contacts')
   const list = Array.isArray(contacts) ? contacts : []

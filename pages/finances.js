@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { useAuth } from './_app'
+import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
 import Link from 'next/link'
@@ -36,6 +39,13 @@ function dueBadge(inv) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function Finances() {
+  // Réservé à l'admin : la barre latérale masque déjà l'entrée, mais la page
+  // restait atteignable par URL.
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  const gateRouter = useRouter()
+  useEffect(() => { if (user && !isAdmin) gateRouter.replace('/') }, [user, isAdmin])
+  if (user && !isAdmin) return null
   const [year, setYear] = useState(new Date().getFullYear())
   const { data: projects = [] } = useSWR('/api/projects')
   const { data: invoices = [], isLoading } = useSWR(`/api/customer-invoices?year=${year}`)
