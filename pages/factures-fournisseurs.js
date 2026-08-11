@@ -218,16 +218,16 @@ export default function FacturesFournisseurs() {
   )
   // Un clic bascule le sens, un clic sur une autre colonne repart en ascendant
   const toggleSort = key => setSort(s => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))
+  // Trois chiffres seulement : ce qui reste à sortir (en attente, en retard ou
+  // déjà transmis à la banque) est regroupé sous « À payer ».
   const totals = invoices.reduce((acc, inv) => {
     const st = dueStatus(inv)
     const amt = parseFloat(inv.amount || 0)
     acc.total += amt
-    if (st === 'pending')      acc.pending += amt
-    if (st === 'overdue')      acc.overdue += amt
-    if (st === 'sent_to_bank') acc.sent    += amt
-    if (st === 'paid')         acc.paid    += amt
+    if (st === 'paid') acc.paid += amt
+    else if (st === 'pending' || st === 'overdue' || st === 'sent_to_bank') acc.toPay += amt
     return acc
-  }, { total: 0, pending: 0, overdue: 0, sent: 0, paid: 0 })
+  }, { total: 0, toPay: 0, paid: 0 })
 
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
@@ -303,13 +303,11 @@ export default function FacturesFournisseurs() {
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Total année', value: totals.total,   color: '#111827' },
-            { label: 'À payer',     value: totals.pending, color: '#f59e0b' },
-            { label: 'En retard',   value: totals.overdue, color: '#dc2626' },
-            { label: 'Transmis',    value: totals.sent,    color: '#3b82f6' },
-            { label: 'Payé',        value: totals.paid,    color: '#22c55e' },
+            { label: 'Total année', value: totals.total, color: '#111827' },
+            { label: 'À payer',     value: totals.toPay, color: '#f59e0b' },
+            { label: 'Payé',        value: totals.paid,  color: '#22c55e' },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
               <div className="text-xs text-gray-500 mb-1">{s.label}</div>
