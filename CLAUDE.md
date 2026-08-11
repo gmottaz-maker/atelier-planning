@@ -103,11 +103,39 @@ public/ruco/             — Données du sélecteur de peintures (voir section d
 
 ## Variables d'environnement (dans Vercel)
 
+Indispensables — sans elles l'app ne démarre pas :
+
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
-NEXT_PUBLIC_GOOGLE_MAPS_KEY   (optionnel — fallback Nominatim si absent)
+```
+
+Par fonctionnalité — l'app démarre sans, mais la fonction concernée est hors service :
+
+```
+ANTHROPIC_API_KEY          OCR des factures fournisseurs et des justificatifs
+RESEND_API_KEY             Envoi des offres et factures par e-mail
+MAIL_FROM, MAIL_BCC        Expéditeur et copie cachée (optionnels)
+KDRIVE_TOKEN               Fichiers sur kDrive (pièces, dossiers projet)
+KDRIVE_DRIVE_ID
+CRON_SECRET                Authentifie le cron des factures de stockage
+TODOIST_API_TOKEN          Synchronisation des tâches
+TODOIST_WEBHOOK_SECRET     Import de projets depuis Todoist
+ODOO_URL, ODOO_DB, ODOO_API_KEY        Synchro clients (hors service, clés à renouveler)
+VAPID_PRIVATE_KEY                      Notifications push
+NEXT_PUBLIC_VAPID_PUBLIC_KEY
+NEXT_PUBLIC_GOOGLE_MAPS_KEY            Adresses (repli Nominatim si absente)
+NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID  Google Agenda sur la page Accueil
+CHROME_PATH                Chemin de Chrome en local pour générer les PDF
+```
+
+Coordonnées imprimées sur les offres, factures et QR-bills :
+
+```
+AMAZING_LAB_NAME, AMAZING_LAB_ADDRESS, AMAZING_LAB_ZIP, AMAZING_LAB_CITY,
+AMAZING_LAB_COUNTRY, AMAZING_LAB_IBAN, AMAZING_LAB_VAT,
+AMAZING_LAB_EMAIL, AMAZING_LAB_PHONE, AMAZING_LAB_WEBSITE
 ```
 
 ---
@@ -119,7 +147,18 @@ const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
 const ADMIN_USER  = 'Guillaume'
 ```
 
-L'auth est gérée par Supabase. Le nom d'utilisateur est stocké dans `user_metadata.name`.
+L'auth est gérée par Supabase. **Le nom d'utilisateur vient de la table
+`profiles`, pas de `user_metadata`** — `user_metadata.name` est vide pour les
+trois comptes. C'est important : `profiles` est lu de façon asynchrone après
+l'ouverture de session, donc `user.name` vaut d'abord l'e-mail pendant un court
+instant.
+
+Conséquence, déjà à l'origine d'un bug : un test du type
+`user.name === 'Guillaume'` est momentanément faux au chargement, et le
+garde-fou des pages admin (`if (user && !isAdmin) router.replace('/')`)
+renvoyait à l'accueil. `lib/useIsAdmin.js` reconnaît donc aussi l'admin par son
+e-mail, disponible dès le premier rendu, et `_app.js` met le nom du profil en
+cache dans le localStorage.
 
 ---
 
@@ -232,7 +271,7 @@ Token GitHub : Personal Access Token, scope `repo`, à renouveler sur github.com
 Structure créée dans `ios/` mais setup CocoaPods non terminé.
 ```bash
 # Pour reprendre le setup iOS :
-cd ~/Documents/atelier-planning/ios/App
+cd ~/atelier-planning/ios/App
 sudo gem install cocoapods
 pod install
 open App.xcworkspace
