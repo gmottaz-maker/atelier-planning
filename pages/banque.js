@@ -365,6 +365,22 @@ export default function Banque() {
                   )
                 })}
               </tbody>
+              {/* Somme des lignes affichées — suit la recherche et les filtres */}
+              <tfoot>
+                <tr className="border-t-2 border-gray-200 bg-gray-50">
+                  <td colSpan={3} className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Total{visible.length !== stats.total ? ' filtré' : ''}
+                    <span className="ml-2 font-normal normal-case tracking-normal text-gray-400">
+                      {visible.length} transaction{visible.length > 1 ? 's' : ''}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold tabular-nums"
+                    style={{ fontSize: 15, color: sumVisible > 0 ? '#15803d' : sumVisible < 0 ? '#9f1239' : '#111827' }}>
+                    {sumVisible > 0 ? '+' : ''}{fmtCHF(sumVisible)} <span className="text-xs font-normal text-gray-400">CHF</span>
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
