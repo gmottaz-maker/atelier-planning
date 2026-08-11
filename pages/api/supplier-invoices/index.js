@@ -3,6 +3,7 @@ import { ensureSupplierInvoiceFolder, upload } from '../../../lib/kdrive'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { extractPages } from '../../../lib/pdfSplit'
 import { quarterOf, supplierInvoiceFilename } from '../../../lib/supplierFile'
+import { defaultDueDate } from '../../../lib/dueDate'
 
 const supabase = getSupabaseServer()
 
@@ -94,6 +95,10 @@ export default async function handler(req, res) {
       }
     }
 
+    // Échéance absente (fréquent : l'OCR ne la trouve pas, ou la facture n'en
+    // porte pas) → 30 jours après l'émission. Reste modifiable à la main.
+    const dueDate = due_date || defaultDueDate(issue_date)
+
     const { data, error } = await supabase.from('supplier_invoices').insert({
       supplier_name, invoice_number, amount: parseFloat(amount),
       amount_net:    amount_net    != null && amount_net    !== '' ? parseFloat(amount_net)  : null,
@@ -102,7 +107,7 @@ export default async function handler(req, res) {
       vat_breakdown: Array.isArray(vat_breakdown) && vat_breakdown.length > 0 ? vat_breakdown : null,
       currency: currency || 'CHF',
       issue_date: issue_date || null,
-      due_date: due_date || null,
+      due_date: dueDate,
       payment_reference, iban, category, notes,
       kdrive_file_id, kdrive_filename,
       created_by,
