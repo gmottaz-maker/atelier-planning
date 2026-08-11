@@ -304,7 +304,10 @@ export default function Peintures() {
         </button>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '290px minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
+      {/* Colonne des critères : elle suit la largeur de l'écran (bornée) au lieu
+          d'être figée, sinon les puces s'y empilent et la colonne paraît étriquée
+          à côté des résultats. */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'clamp(320px, 28%, 440px) minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
         {(!isMobile || showFilters) && (
           <div style={isMobile ? undefined : { position: 'sticky', top: 16 }}>{filtersPanel}</div>
         )}
@@ -471,7 +474,9 @@ function Shell({ children, right, count }) {
   return (
     <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head><title>Peintures — Maze Project</title></Head>
-      <main style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* maxWidth 1600 comme les autres pages : sans plafond, la colonne de
+          résultats s'étirait sur les grands écrans et écrasait les critères. */}
+      <main style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1600, margin: '0 auto', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <h1 style={{ font: `700 22px ${FONT}`, margin: 0 }}>Peintures</h1>
           {count && <span style={{ font: `12px ${MONO}`, color: C.muted }}>{count}</span>}
