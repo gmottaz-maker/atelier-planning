@@ -103,6 +103,8 @@ export default function Peintures() {
 
   const hasCriteria = sub.length || env.length || gloss.length || app.length ||
     med.length || comp.length || time !== null
+  const criteriaCount = sub.length + env.length + fam.length + gloss.length +
+    app.length + med.length + comp.length + (time !== null ? 1 : 0)
 
   const results = useMemo(() => {
     if (!db || !L) return []
@@ -212,10 +214,17 @@ export default function Peintures() {
     font: `700 10px ${MONO}`, letterSpacing: '.12em', color: C.inkTertiary,
     textTransform: 'uppercase', marginBottom: 6,
   }
+  // Puces de critère : toutes le même gabarit, quelle que soit la longueur du
+  // texte — la grille donne la largeur, la hauteur est fixe.
   const chipStyle = on => ({
     border: `1px solid ${on ? C.ink : C.border}`, background: on ? C.ink : C.surface,
-    color: on ? '#fff' : C.inkSecondary, borderRadius: 99, padding: '4px 10px',
-    font: `${on ? 600 : 400} 12px ${FONT}`, cursor: 'pointer', whiteSpace: 'nowrap',
+    color: on ? '#fff' : C.inkSecondary, borderRadius: 99, padding: '0 10px',
+    fontFamily: FONT, fontSize: 12, fontWeight: on ? 600 : 400, lineHeight: 1.15,
+    cursor: 'pointer',
+    // Hauteur fixe + largeur de la grille : gabarit identique pour toutes. Les
+    // libellés longs passent sur deux lignes au lieu d'être tronqués.
+    height: 38, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    textAlign: 'center', overflow: 'hidden',
   })
   const badgeStyle = kind => ({
     font: `${kind === 'hit' ? 600 : 400} 11px ${FONT}`, padding: '2px 7px', borderRadius: 99,
@@ -224,11 +233,11 @@ export default function Peintures() {
   })
 
   const Chips = ({ items, value, onChange }) => (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
       {items.map(it => {
         const on = value.includes(it.k)
         return (
-          <button key={it.k} type="button" aria-pressed={on} style={chipStyle(on)}
+          <button key={it.k} type="button" aria-pressed={on} style={chipStyle(on)} title={it.l}
             onClick={() => onChange(on ? value.filter(x => x !== it.k) : [...value, it.k])}>
             {it.l}
           </button>
@@ -308,8 +317,20 @@ export default function Peintures() {
           d'être figée, sinon les puces s'y empilent et la colonne paraît étriquée
           à côté des résultats. */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'clamp(320px, 28%, 440px) minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
+        {/* Les deux colonnes ont la même structure — une ligne d'en-tête puis le
+            contenu — pour que leurs cartes démarrent exactement à la même hauteur. */}
         {(!isMobile || showFilters) && (
-          <div style={isMobile ? undefined : { position: 'sticky', top: 16 }}>{filtersPanel}</div>
+          <div style={isMobile ? undefined : { position: 'sticky', top: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {!isMobile && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                <span style={{ font: `600 13px ${FONT}` }}>Critères</span>
+                <span style={{ font: `11px ${MONO}`, color: C.muted }}>
+                  {criteriaCount > 0 ? `${criteriaCount} actif${criteriaCount > 1 ? 's' : ''}` : 'aucun'}
+                </span>
+              </div>
+            )}
+            {filtersPanel}
+          </div>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -474,9 +495,9 @@ function Shell({ children, right, count }) {
   return (
     <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head><title>Peintures — Maze Project</title></Head>
-      {/* maxWidth 1600 comme les autres pages : sans plafond, la colonne de
-          résultats s'étirait sur les grands écrans et écrasait les critères. */}
-      <main style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1600, margin: '0 auto', width: '100%' }}>
+      {/* Plafonné en largeur, mais aligné à gauche : centrer (margin auto)
+          creusait un vide entre la barre latérale et le volet des critères. */}
+      <main style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1600, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <h1 style={{ font: `700 22px ${FONT}`, margin: 0 }}>Peintures</h1>
           {count && <span style={{ font: `12px ${MONO}`, color: C.muted }}>{count}</span>}
