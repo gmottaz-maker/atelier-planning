@@ -101,6 +101,7 @@ export default function FacturesEmises() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [createForProject, setCreateForProject] = useState(null)
+  const [pdfBusy, setPdfBusy] = useState(null)   // `${id}:${mode}` en cours de génération
 
   // ?from=projectId (ancien lien) → page complète de création pré-remplie
   useEffect(() => {
@@ -121,6 +122,10 @@ export default function FacturesEmises() {
   useEffect(() => { load() }, [year])
 
   async function downloadPdf(inv, mode) {
+    // Un seul PDF à la fois : deux générations simultanées se disputaient le
+    // binaire Chromium côté serveur (spawn ETXTBSY).
+    if (pdfBusy) return
+    setPdfBusy(`${inv.id}:${mode}`)
     try {
       const r = await fetch(`/api/customer-invoices/${inv.id}/pdf?mode=${mode}`)
       if (!r.ok) {
@@ -136,6 +141,7 @@ export default function FacturesEmises() {
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { alert('Téléchargement impossible : ' + e.message) }
+    finally { setPdfBusy(null) }
   }
   // Mise à jour d'une facture depuis la liste (statut, dates) — optimiste, avec
   // resynchronisation seulement en cas d'échec.
@@ -281,14 +287,17 @@ export default function FacturesEmises() {
                       <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-2 justify-end whitespace-nowrap">
                           {[
-                            { label: 'Détaillée', title: 'Télécharger le PDF détaillé (avec QR-bill)', icon: '⤓', act: () => downloadPdf(inv, 'detailed') },
-                            { label: 'Résumée',   title: 'Télécharger le PDF résumé (avec QR-bill)',   icon: '⤓', act: () => downloadPdf(inv, 'summary') },
+                            { label: 'Détaillée', title: 'Télécharger le PDF détaillé (avec QR-bill)', icon: '⤓', busy: pdfBusy === `${inv.id}:detailed`, act: () => downloadPdf(inv, 'detailed') },
+                            { label: 'Résumée',   title: 'Télécharger le PDF résumé (avec QR-bill)',   icon: '⤓', busy: pdfBusy === `${inv.id}:summary`,  act: () => downloadPdf(inv, 'summary') },
                             { label: 'Envoyer',   title: 'Envoyer la facture par e-mail',              icon: '✉', act: () => openSend(inv) },
                           ].map(b => (
                             <button key={b.label} title={b.title} onClick={b.act}
-                              className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:border-gray-500 hover:text-gray-900"
+                              disabled={!!pdfBusy && b.icon === '⤓'}
+                              className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:border-gray-500 hover:text-gray-900 disabled:opacity-50 disabled:cursor-wait"
                               style={{ width: 104, padding: '6px 0' }}>
-                              <span style={{ fontSize: 13 }}>{b.icon}</span>{b.label}
+                              {b.busy
+                                ? <><span className="inline-block w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: '#d1d5db', borderTopColor: '#111827' }} />Génération…</>
+                                : <><span style={{ fontSize: 13 }}>{b.icon}</span>{b.label}</>}
                             </button>
                           ))}
                         </div>

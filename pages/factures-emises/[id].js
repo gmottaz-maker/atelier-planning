@@ -48,6 +48,7 @@ export default function FactureEmisePage() {
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
   const [sendOpen, setSendOpen] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState('')     // mode en cours de génération
   const dueTouched = useRef(false)
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); setDirty(true) }
@@ -147,6 +148,8 @@ export default function FactureEmisePage() {
   }
 
   async function downloadPdf(mode) {
+    if (pdfBusy) return          // une seule génération à la fois (cf. lib/htmlToPdf)
+    setPdfBusy(mode)
     try {
       const r = await fetch(`/api/customer-invoices/${id}/pdf?mode=${mode}`)
       if (!r.ok) throw new Error(`Erreur ${r.status}`)
@@ -159,6 +162,7 @@ export default function FactureEmisePage() {
       a.click()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) { alert('Téléchargement impossible : ' + e.message) }
+    finally { setPdfBusy('') }
   }
 
   async function remove() {
@@ -360,14 +364,14 @@ export default function FactureEmisePage() {
             <div className="flex gap-2">
               {!isNew && (
                 <>
-                  <button onClick={() => downloadPdf('detailed')} disabled={dirty}
+                  <button onClick={() => downloadPdf('detailed')} disabled={dirty || !!pdfBusy}
                     title={dirty ? 'Enregistre d\'abord pour inclure les dernières modifications' : 'PDF détaillé avec QR-bill'}
                     className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400 disabled:opacity-40">
-                    PDF détaillé
+                    {pdfBusy === 'detailed' ? 'Génération…' : 'PDF détaillé'}
                   </button>
-                  <button onClick={() => downloadPdf('summary')} disabled={dirty}
+                  <button onClick={() => downloadPdf('summary')} disabled={dirty || !!pdfBusy}
                     className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400 disabled:opacity-40">
-                    PDF résumé
+                    {pdfBusy === 'summary' ? 'Génération…' : 'PDF résumé'}
                   </button>
                   <button onClick={() => setSendOpen(true)} disabled={dirty}
                     className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400 disabled:opacity-40">
