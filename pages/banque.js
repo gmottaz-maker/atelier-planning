@@ -5,6 +5,7 @@ import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
+import { matchesQuery, normalize } from '../lib/textSearch'
 
 const PINK = '#111827'
 
@@ -38,6 +39,9 @@ export default function Banque() {
   const [importResult, setImportResult] = useState(null)
   const [selected, setSelected] = useState(null)
   const [suggestions, setSuggestions] = useState(null)  // null = en cours, [] = aucune
+  const [q, setQ] = useState('')                        // recherche libre
+  const [dir, setDir] = useState('all')                 // all | credit | debit
+  const [sort, setSort] = useState({ key: 'booking_date', dir: 'desc' })
 
   async function load() {
     setLoading(true)
@@ -152,6 +156,43 @@ export default function Banque() {
     return acc
   }, { total: 0, matched: 0 })
 
+  // ── Recherche, sens et tri ────────────────────────────────────────────────
+  // La recherche porte sur la contrepartie, le libellé, la référence et l'IBAN :
+  // « OBI » retrouve les achats OBI même si le nom n'est que dans le libellé,
+  // sans ramener « automobile » (cf. lib/textSearch : début de mot).
+  const norm = normalize
+  const toggleSort = key => setSort(s => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))
+
+  const visible = transactions
+    .filter(t => {
+      const amt = parseFloat(t.amount)
+      if (dir === 'credit' && !(amt > 0)) return false
+      if (dir === 'debit'  && !(amt < 0)) return false
+      return matchesQuery([t.counterparty_name, t.description, t.reference, t.counterparty_iban], q)
+    })
+    .sort((a, b) => {
+      const k = sort.key
+      let va, vb
+      if (k === 'amount') { va = parseFloat(a.amount) || 0; vb = parseFloat(b.amount) || 0 }
+      else if (k === 'matched') { va = a.matched_to_type ? 1 : 0; vb = b.matched_to_type ? 1 : 0 }
+      else { va = norm(a[k]); vb = norm(b[k]) }
+      // Valeurs vides toujours en dernier, quel que soit le sens
+      const ea = va === '' || va == null, eb = vb === '' || vb == null
+      if (ea !== eb) return ea ? 1 : -1
+      const c = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))
+      return sort.dir === 'asc' ? c : -c
+    })
+
+  const sumVisible = visible.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
+  const th = (key, label, align = 'left') => (
+    <th onClick={() => toggleSort(key)} title="Trier"
+      className={`px-4 py-3 text-${align} font-semibold text-gray-700 cursor-pointer select-none hover:text-gray-900`}
+      style={{ fontSize: 11 }}>
+      {label}
+      <span className="ml-1 text-gray-400">{sort.key === key ? (sort.dir === 'asc' ? '↑' : '↓') : ''}</span>
+    </th>
+  )
+
   return (
     <div className="min-h-screen" style={{ background: '#fafafa' }}>
       <Head><title>Maze Project — Banque</title></Head>
@@ -217,9 +258,39 @@ export default function Banque() {
               </button>
             ))}
           </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Sens : crédits (entrées) / débits (sorties) */}
+            <div className="flex gap-1.5">
+              {[
+                { key: 'all',    label: 'Tout' },
+                { key: 'credit', label: 'Crédits' },
+                { key: 'debit',  label: 'Débits' },
+              ].map(d => (
+                <button key={d.key} onClick={() => setDir(d.key)}
+                  className="px-3 py-1.5 rounded-md text-xs font-medium"
+                  style={dir === d.key
+                    ? { background: '#e5e7eb', color: '#111827' }
+                    : { background: '#f3f4f6', color: '#6b7280' }}>
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            <div className="relative">
+              <input value={q} onChange={e => setQ(e.target.value)}
+                placeholder="Rechercher (OBI, IBAN, référence…)"
+                className="px-3 py-1.5 pr-7 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none"
+                style={{ width: 260 }} />
+              {q && (
+                <button onClick={() => setQ('')} title="Effacer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-sm">×</button>
+              )}
+            </div>
+          </div>
           {!loading && (
             <span className="text-xs text-gray-500">
-              {stats.matched}/{stats.total} matchées
+              {visible.length === stats.total
+                ? `${stats.matched}/${stats.total} matchées`
+                : `${visible.length} sur ${stats.total} · ${fmtCHF(sumVisible)} CHF`}
             </span>
           )}
         </div>
@@ -227,25 +298,31 @@ export default function Banque() {
         {/* Liste */}
         {loading ? (
           <p className="text-sm text-gray-400 py-12 text-center">Chargement…</p>
-        ) : transactions.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-            <p className="text-sm text-gray-400">Aucune transaction.</p>
-            <p className="text-xs text-gray-400 mt-2">Importe un fichier CAMT.053 depuis ton e-banking.</p>
+            <p className="text-sm text-gray-400">
+              {transactions.length === 0 ? 'Aucune transaction.' : 'Aucune transaction ne correspond à cette recherche.'}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              {transactions.length === 0
+                ? 'Importe un fichier CAMT.053 depuis ton e-banking.'
+                : 'Modifie la recherche, le sens ou l\'onglet.'}
+            </p>
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Date</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Contrepartie</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Libellé</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Montant</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Statut</th>
+                  {th('booking_date', 'Date')}
+                  {th('counterparty_name', 'Contrepartie')}
+                  {th('description', 'Libellé')}
+                  {th('amount', 'Montant', 'right')}
+                  {th('matched', 'Statut')}
                 </tr>
               </thead>
               <tbody>
-                {transactions.map(tx => {
+                {visible.map(tx => {
                   const matched = !!tx.matched_to_type
                   const isCredit = parseFloat(tx.amount) > 0
                   const topScore = tx.top_score || 0
