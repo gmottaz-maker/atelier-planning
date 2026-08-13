@@ -9,6 +9,7 @@ import ContactPicker from '../components/ContactPicker'
 import CatalogPicker, { toPurchaseRow, toRateRow } from '../components/CatalogPicker'
 import SendDocumentModal from '../components/SendDocumentModal'
 import { pdfFilename } from '../lib/pdfFilename'
+import { invoiceCopyBody } from '../lib/duplicateDoc'
 
 const PINK = '#111827'
 const STATUS_LABELS = { created: 'Créée', sent: 'Envoyée', pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
@@ -143,6 +144,20 @@ export default function FacturesEmises() {
     } catch (e) { alert('Téléchargement impossible : ' + e.message) }
     finally { setPdfBusy(null) }
   }
+  // Duplique une facture : nouveau numéro, dates du jour, statut « créée ».
+  async function duplicate(inv) {
+    if (!confirm(`Dupliquer la facture ${inv.invoice_number} ?\n\nUne nouvelle facture sera créée avec le même contenu, un nouveau numéro et la date du jour.`)) return
+    try {
+      const r = await adminFetch('/api/customer-invoices', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoiceCopyBody(inv)),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      router.push(`/factures-emises/${d.id}`)
+    } catch (e) { alert('Duplication impossible : ' + e.message) }
+  }
+
   // Mise à jour d'une facture depuis la liste (statut, dates) — optimiste, avec
   // resynchronisation seulement en cas d'échec.
   async function patchInvoice(inv, patch) {
@@ -290,6 +305,7 @@ export default function FacturesEmises() {
                             { label: 'Détaillée', title: 'Télécharger le PDF détaillé (avec QR-bill)', icon: '⤓', busy: pdfBusy === `${inv.id}:detailed`, act: () => downloadPdf(inv, 'detailed') },
                             { label: 'Résumée',   title: 'Télécharger le PDF résumé (avec QR-bill)',   icon: '⤓', busy: pdfBusy === `${inv.id}:summary`,  act: () => downloadPdf(inv, 'summary') },
                             { label: 'Envoyer',   title: 'Envoyer la facture par e-mail',              icon: '✉', act: () => openSend(inv) },
+                            { label: 'Dupliquer', title: 'Créer une nouvelle facture avec le même contenu', icon: '⧉', act: () => duplicate(inv) },
                           ].map(b => (
                             <button key={b.label} title={b.title} onClick={b.act}
                               disabled={!!pdfBusy && b.icon === '⤓'}

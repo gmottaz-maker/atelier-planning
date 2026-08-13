@@ -8,6 +8,7 @@ import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { QUOTE_STATUSES, quoteStatusMeta } from '../lib/quoteStatus'
 import { computeQuoteTotal } from '../lib/quoteTotals'
+import { offerCopy } from '../lib/duplicateDoc'
 import SendDocumentModal from '../components/SendDocumentModal'
 
 const INV_STATUSES = [
@@ -34,6 +35,7 @@ export default function Offres() {
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState('all')
+  const [dupSource, setDupSource] = useState(null)   // offre à recopier vers un projet
   const [sendDoc, setSendDoc]   = useState(null)   // { type, docId, mode, contactId, projectName, number }
 
   async function load() {
@@ -86,6 +88,25 @@ export default function Offres() {
   const totalAccepted = active.filter(o => o.status === 'accepte').reduce((s, o) => s + o.total, 0)
   const totalInvoiced = active.filter(o => o.invoice).reduce((s, o) => s + (o.invoice.amount || 0), 0)
   const totalPaid     = active.filter(o => o.invoice && o.invoice.status === 'paid').reduce((s, o) => s + (o.invoice.amount || 0), 0)
+
+  // Duplique une offre vers un AUTRE projet : une offre vit dans le projet
+  // (projects.quote_data), il n'y en a qu'une par projet.
+  async function duplicateOfferTo(source, targetProject) {
+    if (hasQuote(targetProject) &&
+        !confirm(`« ${targetProject.name} » a déjà une offre. La remplacer par une copie de celle de « ${source.p.name} » ?`)) return
+    const quote_data = offerCopy(source.p.quote_data)
+    setDupSource(null)
+    try {
+      const r = await adminFetch(`/api/projects/${targetProject.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...targetProject, quote_data }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      load()
+      router.push(`/projects/${targetProject.id}`)
+    } catch (e) { alert('Duplication impossible : ' + e.message) }
+  }
 
   async function changeOfferStatus(o, status) {
     setProjects(prev => prev.map(pr => pr.id === o.p.id ? { ...pr, quote_data: { ...pr.quote_data, status } } : pr))
@@ -267,7 +288,10 @@ export default function Offres() {
                           <span className="text-gray-300 text-sm">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button onClick={() => setDupSource(o)}
+                          title="Dupliquer cette offre vers un autre projet"
+                          className="mr-3 text-xs font-medium text-gray-500 hover:text-gray-900">⧉ Dupliquer</button>
                         <button onClick={() => changeOfferArchived(o, !o.archived)}
                           title={o.archived ? 'Désarchiver' : 'Archiver'}
                           className="text-gray-300 hover:text-gray-700 transition-colors">
@@ -286,6 +310,45 @@ export default function Offres() {
           </div>
         )}
       </main>
+
+      {/* Choix du projet vers lequel recopier l'offre */}
+      {dupSource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.35)' }}
+          onClick={e => e.target === e.currentTarget && setDupSource(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full flex flex-col" style={{ maxWidth: 520, maxHeight: '80vh' }}>
+            <div className="px-6 py-4 border-b border-gray-100">
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Dupliquer l'offre</p>
+              <h2 className="font-semibold text-gray-900" style={{ fontSize: 17 }}>{dupSource.p.name}</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Choisis le projet qui recevra une copie de cette offre. Elle y repartira en brouillon,
+                sans numéro ni date d'envoi.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+              {projects.filter(pr => String(pr.id) !== String(dupSource.p.id)).map(pr => (
+                <button key={pr.id} onClick={() => duplicateOfferTo(dupSource, pr)}
+                  className="w-full text-left px-6 py-3 hover:bg-gray-50 flex items-center gap-3">
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-gray-900 truncate">{pr.name}</span>
+                    <span className="block text-xs text-gray-500 truncate">{pr.client}</span>
+                  </span>
+                  {hasQuote(pr) && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{ background: '#fef3c7', color: '#92400e' }}>a déjà une offre</span>
+                  )}
+                </button>
+              ))}
+              {projects.filter(pr => String(pr.id) !== String(dupSource.p.id)).length === 0 && (
+                <p className="px-6 py-8 text-sm text-gray-400 text-center">Aucun autre projet actif.</p>
+              )}
+            </div>
+            <div className="px-6 py-3 border-t border-gray-100 text-right">
+              <button onClick={() => setDupSource(null)}
+                className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {sendDoc && (
         <SendDocumentModal
