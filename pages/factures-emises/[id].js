@@ -150,8 +150,10 @@ export default function FactureEmisePage() {
   async function downloadPdf(mode) {
     if (pdfBusy) return          // une seule génération à la fois (cf. lib/htmlToPdf)
     setPdfBusy(mode)
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 90000)
     try {
-      const r = await fetch(`/api/customer-invoices/${id}/pdf?mode=${mode}`)
+      const r = await fetch(`/api/customer-invoices/${id}/pdf?mode=${mode}`, { signal: ctrl.signal })
       if (!r.ok) throw new Error(`Erreur ${r.status}`)
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
@@ -161,8 +163,12 @@ export default function FactureEmisePage() {
         invoice?.projects?.name || invoice?.client_name, invoice?.issue_date)
       a.click()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } catch (e) { alert('Téléchargement impossible : ' + e.message) }
-    finally { setPdfBusy('') }
+    } catch (e) {
+      alert(e.name === 'AbortError'
+        ? 'La génération du PDF a pris trop de temps. Réessaie dans un instant.'
+        : 'Téléchargement impossible : ' + e.message)
+    }
+    finally { clearTimeout(timer); setPdfBusy('') }
   }
 
   async function remove() {

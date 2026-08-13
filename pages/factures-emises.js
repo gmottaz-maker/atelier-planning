@@ -123,12 +123,18 @@ export default function FacturesEmises() {
   useEffect(() => { load() }, [year])
 
   async function downloadPdf(inv, mode) {
-    // Un seul PDF à la fois : deux générations simultanées se disputaient le
-    // binaire Chromium côté serveur (spawn ETXTBSY).
-    if (pdfBusy) return
-    setPdfBusy(`${inv.id}:${mode}`)
+    // Verrou par bouton seulement : le serveur sérialise déjà les rendus
+    // (lib/htmlToPdf), inutile de bloquer toute la liste — sinon on ne peut plus
+    // rien télécharger tant qu'une génération est en cours.
+    const key = `${inv.id}:${mode}`
+    if (pdfBusy === key) return
+    setPdfBusy(key)
+    // Garde-fou : une requête qui resterait suspendue laisserait le bouton
+    // bloqué indéfiniment.
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 90000)
     try {
-      const r = await fetch(`/api/customer-invoices/${inv.id}/pdf?mode=${mode}`)
+      const r = await fetch(`/api/customer-invoices/${inv.id}/pdf?mode=${mode}`, { signal: ctrl.signal })
       if (!r.ok) {
         let msg = `Erreur ${r.status}`
         try { const j = await r.json(); if (j.error) msg = j.error } catch (_) {}
@@ -141,8 +147,12 @@ export default function FacturesEmises() {
       a.download = pdfFilename(mode === 'summary' ? 'facture-résumée' : 'facture-détaillée', inv.projects?.name || inv.object || inv.client_name)
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } catch (e) { alert('Téléchargement impossible : ' + e.message) }
-    finally { setPdfBusy(null) }
+    } catch (e) {
+      alert(e.name === 'AbortError'
+        ? 'La génération du PDF a pris trop de temps. Réessaie dans un instant.'
+        : 'Téléchargement impossible : ' + e.message)
+    }
+    finally { clearTimeout(timer); setPdfBusy(null) }
   }
   // Duplique une facture : nouveau numéro, dates du jour, statut « créée ».
   async function duplicate(inv) {
@@ -308,7 +318,7 @@ export default function FacturesEmises() {
                             { label: 'Dupliquer', title: 'Créer une nouvelle facture avec le même contenu', icon: '⧉', act: () => duplicate(inv) },
                           ].map(b => (
                             <button key={b.label} title={b.title} onClick={b.act}
-                              disabled={!!pdfBusy && b.icon === '⤓'}
+                              disabled={!!b.busy}
                               className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:border-gray-500 hover:text-gray-900 disabled:opacity-50 disabled:cursor-wait"
                               style={{ width: 104, padding: '6px 0' }}>
                               {b.busy

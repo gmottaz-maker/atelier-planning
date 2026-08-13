@@ -7,7 +7,9 @@ import { buildFactureHtml } from '../../../../lib/factureHtml'
 import { htmlToPdf } from '../../../../lib/htmlToPdf'
 import { pdfFilename } from '../../../../lib/pdfFilename'
 
-export const config = { maxDuration: 30 }
+// 60 s : les rendus sont sérialisés par conteneur (lib/htmlToPdf), une requête
+// peut donc attendre la fin d'un rendu précédent avant de démarrer le sien.
+export const config = { maxDuration: 60 }
 
 const supabase = getSupabaseServer()
 
