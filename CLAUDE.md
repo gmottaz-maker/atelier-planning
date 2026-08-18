@@ -80,6 +80,8 @@ lib/
   supabase.js · supabase-server.js — Clients Supabase (navigateur / service-role)
   requireAdmin.js        — JWT (requireUser, requireAdmin, requireCronOrAdmin, cache 5 min)
   taskAccess.js          — Visibilité des tâches privées (appliquée côté serveur)
+  invoiceCheck.js        — Validation et recalcul serveur des montants de facture
+  fetchTimeout.js        — fetch avec délai maximal, pour tous les appels sortants
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
@@ -345,6 +347,46 @@ serveur a un token très privilégié. Soit le fichier est référencé en base 
 navigation ne part que de la racine du projet. Les pièces comptables sont
 réservées à l'admin, les frais à leur auteur.
 
+**L'admin se reconnaît à son RÔLE** (`profiles.role`), jamais à son nom ni à
+son e-mail. `isAdminUser` côté serveur, `useIsAdmin` côté client. Renommer un
+profil ne doit pas changer ses droits.
+
+**Les montants d'une facture sont recalculés côté serveur** depuis
+`quote_snapshot` (`lib/invoiceCheck.js`), et refusés au-delà d'un centime
+d'écart. Le recalcul réutilise `computeQuoteTotal`, la fonction de l'éditeur :
+une seconde implémentation finirait par diverger et refuserait des factures
+justes. Une facture envoyée ou payée s'annule, ne se supprime pas.
+
+**Les opérations financières multi-tables passent par une fonction PostgreSQL**
+(`reconcile_match`, `next_invoice_number`). Deux UPDATE successifs depuis
+l'application ne sont pas atomiques, et un SELECT max + 1 n'est pas concurrent.
+Le code retombe sur l'ancien chemin si la fonction est absente, en le
+signalant dans les logs — c'est un filet de déploiement, pas un mode normal.
+
+**Tout appel sortant a un délai maximal** (`lib/fetchTimeout.js`). Sans lui,
+une dépendance muette immobilise la fonction serverless jusqu'à son plafond, et
+les rendus PDF, sérialisés par conteneur, attendent derrière.
+
 **Rien de sensible dans le localStorage.** Le cache SWR est en mémoire. Y
 remettre une persistance globale y replacerait factures, données bancaires,
 contacts et marges, qui survivraient à la déconnexion sur un poste partagé.
+
+---
+
+## Migrations SQL — ordre d'application
+
+Les fichiers `*.sql` s'exécutent à la main dans l'éditeur SQL Supabase. Ceux
+qui restent à jouer sont listés ici, dans l'ordre. Une migration doit être
+exécutée **avant** le déploiement du code correspondant : le code sait retomber
+sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
+
+| Fichier | Contenu | Rollback |
+|---|---|---|
+| `schema-profiles-role.sql` | colonne `profiles.role` | `ALTER TABLE profiles DROP COLUMN role;` |
+| `schema-integrite-financiere.sql` | `reconcile_match()`, `next_invoice_number()`, `storage_billing_key`, index d'unicité | en fin de fichier |
+
+`schema-integrite-financiere.sql` commence par deux requêtes de contrôle à
+passer d'abord : les index uniques échouent si des doublons existent déjà.
+
+`schema-security-lockdown.sql` reste à exécuter **en dernier** si l'ensemble est
+rejoué depuis zéro.
