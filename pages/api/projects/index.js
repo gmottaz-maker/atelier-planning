@@ -19,8 +19,12 @@ async function logActivity(actor, action, project) {
 export default async function handler(req, res) {
   const supabase = getSupabaseServer()
 
-  // GET laissé sans auth : l'écran mural /display (page publique, TV atelier)
-  // liste les projets sans session. Toutes les mutations exigent un JWT.
+  // Lecture réservée aux utilisateurs connectés : ce select renvoie les notes,
+  // adresses, contacts et `quote_data` (prix d'achat, marges). L'écran mural
+  // public passe par /api/display-projects, qui n'expose qu'un DTO réduit.
+  const user = await requireUser(req, res)
+  if (!user) return
+
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('projects')
@@ -30,8 +34,6 @@ export default async function handler(req, res) {
     return res.status(200).json(data)
   }
 
-  const user = await requireUser(req, res)
-  if (!user) return
   const actor = user.name
 
   if (req.method === 'POST') {

@@ -363,11 +363,11 @@ export default function Display() {
 
   const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch('/api/projects')
+      // DTO public réduit : cette page n'a pas de session (TV de l'atelier).
+      const res = await fetch('/api/display-projects')
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
       const active = (Array.isArray(data) ? data : [])
-        .filter(p => p.status === 'active')
         .sort((a, b) => {
           if (!a.deadline && !b.deadline) return 0
           if (!a.deadline) return 1
