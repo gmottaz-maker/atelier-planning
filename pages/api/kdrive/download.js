@@ -4,6 +4,7 @@ import { getSupabaseServer } from '../../../lib/supabase-server'
 import { downloadStream } from '../../../lib/kdrive'
 import { requireUser } from '../../../lib/requireAdmin'
 import { authorizeKdriveFile } from '../../../lib/kdriveAccess'
+import { entetesFichier } from '../../../lib/fileType'
 
 const supabase = getSupabaseServer()
 
@@ -18,11 +19,11 @@ export default async function handler(req, res) {
   const { filename, mime } = allowed
   try {
     const r = await downloadStream(Number(fileId))
-    res.setHeader('Content-Type', mime)
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`)
+    entetesFichier(res, { mime, filename })
     const buf = await r.arrayBuffer()
     res.send(Buffer.from(buf))
   } catch (e) {
-    res.status(500).json({ error: e.message })
+    console.error('kdrive download:', e.message)
+    res.status(500).json({ error: 'Téléchargement impossible' })
   }
 }

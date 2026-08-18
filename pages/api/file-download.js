@@ -3,6 +3,7 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 const supabase = getSupabaseServer()
 import { downloadStream } from '../../lib/kdrive'
 import { requireUser } from '../../lib/requireAdmin'
+import { entetesFichier } from '../../lib/fileType'
 
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
@@ -19,8 +20,9 @@ export default async function handler(req, res) {
 
   try {
     const r = await downloadStream(file.kdrive_file_id)
-    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream')
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.filename)}"`)
+    // Seules les images vérifiées repartent en inline ; le reste en pièce
+    // jointe, avec nosniff — un HTML servi inline s'exécuterait dans l'origine.
+    entetesFichier(res, { mime: file.mime_type, filename: file.filename })
     const buffer = await r.arrayBuffer()
     res.send(Buffer.from(buffer))
   } catch (e) {

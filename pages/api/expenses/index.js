@@ -6,6 +6,7 @@ import { extractPages } from '../../../lib/pdfSplit'
 import { quarterOf, receiptFilename } from '../../../lib/receiptFile'
 import { reconcileNewExpense } from '../../../lib/reconcileRun'
 import { learnMerchantAccount, lookupMerchantAccount } from '../../../lib/merchantAccounts'
+import { validerFichier } from '../../../lib/fileType'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -52,11 +53,13 @@ export default async function handler(req, res) {
     const {
       date, amount, amount_net, vat_rate, vat_amount, vat_breakdown,
       currency, category, account,
-      merchant, description, receiptBase64, receiptMimeType, receiptFilename: receiptOrigName,
+      merchant, description, receiptBase64, receiptFilename: receiptOrigName,
       page_from, page_to,
       payment_method, force,
     } = req.body
     const userName = ownName(req.body.userName)
+    // Type du justificatif : déterminé plus bas depuis le contenu réel.
+    let receiptMimeType = null
 
     if (!userName || !date) return res.status(400).json({ error: 'userName et date requis' })
     if (amount != null && !Number.isFinite(parseFloat(amount))) {
@@ -90,9 +93,14 @@ export default async function handler(req, res) {
     let kdrive_file_id = null
     let kdrive_filename = null
     let receipt_path = null
-    if (receiptBase64 && receiptMimeType) {
+    if (receiptBase64) {
       let buffer = Buffer.from(receiptBase64, 'base64')
-      if ((receiptMimeType || '').includes('pdf') && (page_from || page_to)) {
+      // Type déduit du contenu : le champ envoyé par le navigateur servait
+      // aussi bien à nommer le fichier qu'à le resservir plus tard en inline.
+      const check = validerFichier(buffer, { maxOctets: 20 * 1024 * 1024 })
+      if (!check.ok) return res.status(check.status).json({ error: check.error })
+      receiptMimeType = check.mime
+      if (check.mime === 'application/pdf' && (page_from || page_to)) {
         try { buffer = await extractPages(buffer, page_from, page_to) } catch {}
       }
       try {

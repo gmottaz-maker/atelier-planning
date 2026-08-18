@@ -2,6 +2,7 @@ import { getSupabaseServer } from '../../../../lib/supabase-server'
 
 const supabase = getSupabaseServer()
 import { ensureProjectFolder, upload, del } from '../../../../lib/kdrive'
+import { validerFichier, nomSur } from '../../../../lib/fileType'
 import { requireUser } from '../../../../lib/requireAdmin'
 
 const MAX_IMAGE_MB = 10
@@ -32,11 +33,12 @@ export default async function handler(req, res) {
     let image_filename  = null
     let image_mime_type = null
 
-    if (image && image.base64 && image.filename && image.mime_type) {
+    let check = null
+    if (image && image.base64 && image.filename) {
+      // Type et taille déduits du contenu, pas de ce qu'annonce le navigateur.
       const buffer = Buffer.from(image.base64, 'base64')
-      if (buffer.length > MAX_IMAGE_MB * 1024 * 1024) {
-        return res.status(413).json({ error: `Image trop grande (max ${MAX_IMAGE_MB}MB)` })
-      }
+      check = validerFichier(buffer, { maxOctets: MAX_IMAGE_MB * 1024 * 1024 })
+      if (!check.ok) return res.status(check.status).json({ error: check.error })
 
       // Récupérer / créer le dossier kDrive du projet
       const { data: project, error: projErr } = await supabase
@@ -54,10 +56,10 @@ export default async function handler(req, res) {
       }
 
       try {
-        const kfile = await upload(folderId, image.filename, buffer, image.mime_type)
+        const kfile = await upload(folderId, nomSur(image.filename, check.mime), buffer, check.mime)
         image_kdrive_id = kfile.id
         image_filename  = kfile.name
-        image_mime_type = image.mime_type
+        image_mime_type = check.mime
       } catch (e) {
         return res.status(500).json({ error: 'kDrive upload: ' + e.message })
       }

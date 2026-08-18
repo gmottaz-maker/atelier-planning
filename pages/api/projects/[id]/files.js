@@ -2,6 +2,7 @@ import { getSupabaseServer } from '../../../../lib/supabase-server'
 
 const supabase = getSupabaseServer()
 import { ensureProjectFolder, upload, del } from '../../../../lib/kdrive'
+import { validerFichier, nomSur } from '../../../../lib/fileType'
 import { requireUser } from '../../../../lib/requireAdmin'
 
 const MAX_SIZE_MB = 20
@@ -30,9 +31,16 @@ export default async function handler(req, res) {
 
   // ── POST: upload fichier ───────────────────────────────────────────────────
   if (req.method === 'POST') {
-    const { filename, mime_type, base64, size } = req.body
-    if (!filename || !mime_type || !base64) return res.status(400).json({ error: 'Missing fields' })
-    if (size > MAX_SIZE_MB * 1024 * 1024) return res.status(413).json({ error: `Fichier trop grand (max ${MAX_SIZE_MB}MB)` })
+    const { filename, base64 } = req.body
+    if (!filename || !base64) return res.status(400).json({ error: 'Missing fields' })
+
+    // Le type, l'extension et la taille sont déduits du contenu réel : ceux
+    // annoncés par le navigateur permettaient de déposer un HTML sous un type
+    // anodin, resservi ensuite en inline sur le domaine de Maze.
+    const buffer = Buffer.from(base64, 'base64')
+    const check = validerFichier(buffer, { maxOctets: MAX_SIZE_MB * 1024 * 1024 })
+    if (!check.ok) return res.status(check.status).json({ error: check.error })
+    const nom = nomSur(filename, check.mime)
 
     // Récupérer (ou créer) le dossier kDrive du projet
     const { data: project, error: projErr } = await supabase
@@ -50,10 +58,9 @@ export default async function handler(req, res) {
     }
 
     // Upload sur kDrive
-    const buffer = Buffer.from(base64, 'base64')
     let kdriveFile
     try {
-      kdriveFile = await upload(folderId, filename, buffer, mime_type)
+      kdriveFile = await upload(folderId, nom, buffer, check.mime)
     } catch (e) {
       return res.status(500).json({ error: 'kDrive upload: ' + e.message })
     }
@@ -64,8 +71,8 @@ export default async function handler(req, res) {
       .insert({
         project_id: id,
         filename: kdriveFile.name,
-        mime_type,
-        size,
+        mime_type: check.mime,
+        size: check.size,
         kdrive_file_id: kdriveFile.id,
       })
       .select()
