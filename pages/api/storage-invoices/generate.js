@@ -2,6 +2,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { createStorageInvoices } from '../../../lib/storageBilling'
+import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -18,6 +19,6 @@ export default async function handler(req, res) {
     const result = await createStorageInvoices(supabase, year, q, { dry })
     return res.status(200).json(result)
   } catch (e) {
-    return res.status(500).json({ error: e.message })
+    return erreurApi(req, res, 'internal', e, { route: 'storage-invoices/generate' })
   }
 }

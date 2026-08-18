@@ -1,6 +1,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { del as kdriveDel } from '../../../lib/kdrive'
 import { requireAdmin } from '../../../lib/requireAdmin'
+import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -10,7 +11,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('supplier_invoices').select('*').eq('id', id).single()
-    if (error) return res.status(404).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'not_found', error, { route: 'supplier-invoices/[id]' })
     return res.status(200).json(data)
   }
 
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
     }
 
     const { data, error } = await supabase.from('supplier_invoices').update(payload).eq('id', id).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'supplier-invoices/[id]' })
     return res.status(200).json(data)
   }
 
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
       try { await kdriveDel(row.kdrive_file_id) } catch (e) { console.warn('kdrive delete failed', e.message) }
     }
     const { error } = await supabase.from('supplier_invoices').delete().eq('id', id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'supplier-invoices/[id]' })
     return res.status(200).json({ success: true })
   }
 

@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
+import { erreurApi } from '../../../lib/apiError'
 
 async function logActivity(actor, action, project) {
   if (!actor) return
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
       .select('*')
       .eq('id', id)
       .single()
-    if (error) return res.status(404).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'not_found', error, { route: 'projects/[id]' })
     return res.status(200).json(data)
   }
 
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
       .eq('id', id)
       .select()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/[id]' })
     await logActivity(actor, 'project_updated', data[0])
     return res.status(200).json(data[0])
   }
@@ -111,7 +112,7 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     const { data: proj } = await supabase.from('projects').select('id, name, client').eq('id', id).single()
     const { error } = await supabase.from('projects').delete().eq('id', id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/[id]' })
     await logActivity(actor, 'project_deleted', proj)
     return res.status(200).json({ success: true })
   }

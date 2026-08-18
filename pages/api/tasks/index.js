@@ -2,6 +2,7 @@ import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
 import { visibleTasks, resolvePrivateOwner } from '../../../lib/taskAccess'
 import * as todoist from '../../../lib/todoist'
+import { erreurApi } from '../../../lib/apiError'
 
 async function logActivity(supabase, actor, action, task) {
   if (!actor) return
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
       .order('execution_date', { ascending: true })
       .order('created_at', { ascending: true })
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'tasks/index' })
     // Les tâches privées des autres ne sortent jamais de l'API : ni ici, ni
     // dans les compteurs, suggestions ou caches qui consomment cette réponse.
     return res.status(200).json(visibleTasks(data, user))
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
       status: 'active',
     }).select().single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'tasks/index' })
 
     await logActivity(supabase, actor, 'task_created', data)
 

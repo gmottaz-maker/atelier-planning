@@ -2,6 +2,7 @@ import { getSupabaseServer } from '../../../lib/supabase-server'
 import { findMatches } from '../../../lib/bankMatching'
 import { loadCandidates } from '../../../lib/reconcileRun'
 import { requireAdmin } from '../../../lib/requireAdmin'
+import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
   // Suggestions détaillées pour UNE transaction (à l'ouverture du tiroir).
   if (suggest_for) {
     const { data: tx, error } = await supabase.from('bank_transactions').select(COLS).eq('id', suggest_for).maybeSingle()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'bank/transactions' })
     if (!tx) return res.status(404).json({ error: 'Transaction introuvable' })
     if (tx.matched_to_type) return res.status(200).json({ suggestions: [] })
     const candidates = await loadCandidates(supabase)
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
   if (status === 'unmatched') q = q.is('matched_to_type', null)
 
   const { data: transactions, error } = await q
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return erreurApi(req, res, 'internal', error, { route: 'bank/transactions' })
 
   // Badge « suggéré » : uniquement le meilleur score (un nombre), pas les
   // candidats complets — le détail est chargé à la demande via suggest_for.

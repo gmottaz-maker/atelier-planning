@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
+import { erreurApi } from '../../../lib/apiError'
 
 const FIELDS = {
   vendor:        { category: 'commande',       jsonKey: 'vendor' },
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
     .not('category_data', 'is', null)
     .limit(2000)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return erreurApi(req, res, 'internal', error, { route: 'tasks/suggestions' })
 
   const seen = new Map()
   for (const row of data || []) {

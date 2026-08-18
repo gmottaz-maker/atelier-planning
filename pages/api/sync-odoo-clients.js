@@ -2,6 +2,7 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 const supabase = getSupabaseServer()
 import { requireCronOrAdmin } from '../../lib/requireAdmin'
 import { fetchTimeout } from '../../lib/fetchTimeout'
+import { erreurApi } from '../../lib/apiError'
 
 const ODOO_URL = process.env.ODOO_URL          // ex: https://amazing-lab.odoo.com
 const ODOO_DB  = process.env.ODOO_DB           // ex: amazing-lab
@@ -157,6 +158,6 @@ export default async function handler(req, res) {
 
   } catch (e) {
     console.error('sync-odoo-clients error:', e)
-    return res.status(500).json({ error: e.message })
+    return erreurApi(req, res, 'internal', e, { route: 'sync-odoo-clients' })
   }
 }

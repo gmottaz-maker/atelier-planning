@@ -4,6 +4,7 @@
 //   DELETE ?id=             → supprime une correspondance
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireAdmin } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabase.from('account_mappings')
       .upsert({ scope, category: category || '', account, updated_at: new Date().toISOString() }, { onConflict: 'scope,category' })
       .select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'accounts' })
     return res.status(200).json(data)
   }
 
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
     const { id } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
     const { error } = await supabase.from('account_mappings').delete().eq('id', id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'accounts' })
     return res.status(200).json({ ok: true })
   }
 

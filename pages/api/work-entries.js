@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireUser, isAdminUser } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 export default async function handler(req, res) {
   const authUser = await requireUser(req, res)
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
     if (to)   query = query.lte('date', to)
 
     const { data, error } = await query
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'work-entries' })
     return res.status(200).json(data)
   }
 
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'work-entries' })
     return res.status(200).json(data)
   }
 
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
       .eq('id', id)
       .eq('user_name', userName)
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'work-entries' })
     return res.status(200).json({ success: true })
   }
 

@@ -4,6 +4,7 @@ const supabase = getSupabaseServer()
 import { ensureProjectFolder, upload, del } from '../../../../lib/kdrive'
 import { validerFichier, nomSur } from '../../../../lib/fileType'
 import { requireUser } from '../../../../lib/requireAdmin'
+import { erreurApi } from '../../../../lib/apiError'
 
 const MAX_SIZE_MB = 20
 
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
       .select('id, filename, mime_type, size, created_at, kdrive_file_id')
       .eq('project_id', id)
       .order('created_at', { ascending: false })
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/[id]/files' })
 
     const files = data.map(f => ({
       ...f,
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
       })
       .select()
       .single()
-    if (dbError) return res.status(500).json({ error: dbError.message })
+    if (dbError) return erreurApi(req, res, 'internal', dbError, { route: 'projects/[id]/files' })
 
     return res.status(200).json({
       ...fileRecord,
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
     }
 
     const { error } = await supabase.from('project_files').delete().eq('id', fileId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/[id]/files' })
     return res.status(200).json({ success: true })
   }
 

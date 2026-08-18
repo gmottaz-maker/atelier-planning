@@ -2,6 +2,7 @@
 // pas par JWT utilisateur. Client service-role pour ne pas dépendre de RLS.
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { secretMatches } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 const getSupabase = getSupabaseServer
 
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
     })
     if (error) {
       console.error('Supabase insert error:', error)
-      return res.status(500).json({ error: error.message })
+      return erreurApi(req, res, 'internal', error, { route: 'todoist-webhook' })
     }
     console.log(`✅ Projet Todoist importé: "${event_data.name}"`)
     return res.status(200).json({ ok: true, imported: event_data.name })
@@ -75,7 +76,7 @@ export default async function handler(req, res) {
       completed_at: completed ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     }).eq('id', task.id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'todoist-webhook' })
 
     console.log(`✅ Tâche Maze ${completed ? 'complétée' : 'réactivée'} via Todoist (todoist_id ${todoistId})`)
     return res.status(200).json({ ok: true, synced: task.id })

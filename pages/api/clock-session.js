@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireUser, isAdminUser } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 /**
  * GET  /api/clock-session?userName=X  → session en cours ou null
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
       .upsert({ user_name: userName, clock_in_at, date }, { onConflict: 'user_name' })
       .select()
       .single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'clock-session' })
     return res.status(200).json(data)
   }
 
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
       .from('clock_sessions')
       .delete()
       .eq('user_name', userName)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'clock-session' })
     return res.status(200).json({ ok: true })
   }
 

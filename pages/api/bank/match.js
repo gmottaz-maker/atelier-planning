@@ -2,6 +2,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { paymentDateOf } from '../../../lib/bankReconcile'
+import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
   // La transaction doit exister (évite d'écrire un match orphelin)
   const { data: tx, error: txReadErr } = await supabase.from('bank_transactions')
     .select('id, amount, booking_date, value_date, matched_to_type, matched_to_id').eq('id', transaction_id).maybeSingle()
-  if (txReadErr) return res.status(500).json({ error: txReadErr.message })
+  if (txReadErr) return erreurApi(req, res, 'internal', txReadErr, { route: 'bank/match' })
   if (!tx) return res.status(404).json({ error: 'Transaction introuvable' })
 
   // Désassocier
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
     const { error } = await supabase.from('bank_transactions')
       .update({ matched_to_type: null, matched_to_id: null, matched_at: null, matched_by: null, match_confidence: null })
       .eq('id', transaction_id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'bank/match' })
     return res.status(200).json({ success: true, unmatched: true })
   }
 
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
     matched_by: admin.name,
     match_confidence: confidence || null,
   }).eq('id', transaction_id)
-  if (txErr) return res.status(500).json({ error: txErr.message })
+  if (txErr) return erreurApi(req, res, 'internal', txErr, { route: 'bank/match' })
 
   // Mettre à jour le statut de la facture liée.
   // paid_at = date réelle du paiement au relevé, pas l'instant du rapprochement.

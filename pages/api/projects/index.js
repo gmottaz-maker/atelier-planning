@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
+import { erreurApi } from '../../../lib/apiError'
 
 async function logActivity(actor, action, project) {
   if (!actor) return
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
       .from('projects')
       .select('*')
       .order('deadline', { ascending: true })
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/index' })
     return res.status(200).json(data)
   }
 
@@ -63,7 +64,7 @@ export default async function handler(req, res) {
       status: 'active',
     }]).select()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/index' })
     await logActivity(actor, 'project_created', data[0])
     return res.status(201).json(data[0])
   }

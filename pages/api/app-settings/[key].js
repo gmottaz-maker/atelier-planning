@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser, requireAdmin } from '../../../lib/requireAdmin'
+import { erreurApi } from '../../../lib/apiError'
 
 const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
       .eq('key', key)
       .maybeSingle()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'app-settings/[key]' })
     return res.status(200).json({ value: data?.value ?? DEFAULTS[key] ?? null })
   }
 
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
       .select('value')
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'app-settings/[key]' })
     return res.status(200).json({ value: data.value })
   }
 

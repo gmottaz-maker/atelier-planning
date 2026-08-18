@@ -4,6 +4,7 @@ const supabase = getSupabaseServer()
 import { ensureProjectFolder, upload, del } from '../../../../lib/kdrive'
 import { validerFichier, nomSur } from '../../../../lib/fileType'
 import { requireUser } from '../../../../lib/requireAdmin'
+import { erreurApi } from '../../../../lib/apiError'
 
 const MAX_IMAGE_MB = 10
 
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
       .select('id, author, content, image_kdrive_id, image_filename, image_mime_type, created_at')
       .eq('project_id', id)
       .order('created_at', { ascending: false })
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/[id]/updates' })
     return res.status(200).json(data)
   }
 
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
       .insert({ project_id: id, author, content, image_kdrive_id, image_filename, image_mime_type })
       .select()
       .single()
-    if (insErr) return res.status(500).json({ error: insErr.message })
+    if (insErr) return erreurApi(req, res, 'internal', insErr, { route: 'projects/[id]/updates' })
 
     return res.status(200).json(row)
   }
@@ -89,7 +90,7 @@ export default async function handler(req, res) {
     }
 
     const { error } = await supabase.from('project_updates').delete().eq('id', updateId)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/[id]/updates' })
     return res.status(200).json({ success: true })
   }
 

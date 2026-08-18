@@ -3,6 +3,7 @@ import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { withSignedReceipts } from '../../../lib/receipts'
 import { withExpenseMatches } from '../../../lib/reconcileRun'
+import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
   if (payment_method) q = q.eq('payment_method', payment_method)
 
   const { data, error } = await q
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return erreurApi(req, res, 'internal', error, { route: 'expenses/all' })
 
   // URLs signées (bucket privé) + statut de rapprochement bancaire
   const rows = await withExpenseMatches(supabase, await withSignedReceipts(supabase, data))

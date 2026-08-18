@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireAdmin } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 export const config = { api: { bodyParser: { sizeLimit: '12mb' } } }
 
@@ -25,6 +26,6 @@ export default async function handler(req, res) {
   await supabase.storage.createBucket(BUCKET, { public: true }).catch(() => {})
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, buffer, { contentType, upsert: false })
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return erreurApi(req, res, 'internal', error, { route: 'storage-photo' })
   return res.status(200).json({ path })
 }

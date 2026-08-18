@@ -5,6 +5,7 @@
 import { requireUser } from '../../../lib/requireAdmin'
 import { scanReceipts } from '../../../lib/receiptScan'
 import { PDFDocument } from 'pdf-lib'
+import { erreurApi } from '../../../lib/apiError'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -29,7 +30,10 @@ export default async function handler(req, res) {
     const receipts = await scanReceipts({ apiKey, image, mimeType })
     return res.status(200).json({ receipts, page_count })
   } catch (e) {
-    const claude = e.message.startsWith('Claude API:')
-    return res.status(claude ? 502 : 500).json({ error: e.message })
+    // L'utilisateur a besoin de savoir si c'est l'IA qui n'a pas répondu (il
+    // peut réessayer) ou si le document est en cause — mais pas du détail.
+    const amont = e.timeout || String(e.message).startsWith('Claude API:')
+    return erreurApi(req, res, amont ? 'upstream' : 'internal', e, { route: 'expenses/scan' },
+      amont ? "La lecture automatique n'a pas abouti. Réessaie dans un instant." : undefined)
   }
 }

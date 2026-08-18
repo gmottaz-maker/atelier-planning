@@ -37,6 +37,7 @@ function niveau({ chemin }) {
 const SANS_JWT = {
   '/display-projects.js': 'écran mural public — DTO réduit, cf. tests/displayProjects.test.js',
   '/warmup.js': 'réveil des fonctions serverless — ne renvoie aucune donnée',
+  '/health.js': 'sonde de santé — ne renvoie ni version, ni schéma, ni données',
 }
 
 // Routes qui doivent exiger l'admin ou le secret cron, jamais un simple membre.
@@ -81,6 +82,26 @@ describe('inventaire des autorisations API', () => {
     const fautives = toutes.filter(({ chemin }) => {
       const src = readFileSync(chemin, 'utf8')
       return /name\s*===\s*ADMIN_USER|ADMIN_USER\s*===\s*\w+\.name/.test(src)
+    }).map(r => r.route)
+    expect(fautives).toEqual([])
+  })
+
+  it('aucune route ne renvoie le message brut d\'un fournisseur', () => {
+    // Les messages de Supabase ou kDrive exposent colonnes, contraintes et
+    // parfois des valeurs. Le détail va dans les logs, pas au navigateur.
+    const fautives = toutes.filter(({ chemin }) => {
+      const src = readFileSync(chemin, 'utf8')
+      return /json\(\{\s*error:\s*[a-zA-Z_$][\w$]*\.message/.test(src)
+    }).map(r => r.route)
+    expect(fautives).toEqual([])
+  })
+
+  it('aucune route n\'écrit le corps de la requête en bloc', () => {
+    // `{ ...req.body }` accueille toute colonne, y compris celles ajoutées
+    // plus tard, et permet d'écrire id ou created_at.
+    const fautives = toutes.filter(({ chemin }) => {
+      const src = readFileSync(chemin, 'utf8')
+      return /\.(insert|update|upsert)\(\s*\{\s*\.\.\.(req\.body|body|cleanBody)/.test(src)
     }).map(r => r.route)
     expect(fautives).toEqual([])
   })

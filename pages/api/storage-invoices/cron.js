@@ -3,6 +3,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireCronOrAdmin } from '../../../lib/requireAdmin'
 import { createStorageInvoices, quarterEndOf } from '../../../lib/storageBilling'
+import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -26,6 +27,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ran: true, ...result })
   } catch (e) {
     console.error('storage cron:', e)
-    return res.status(500).json({ error: e.message })
+    return erreurApi(req, res, 'internal', e, { route: 'storage-invoices/cron' })
   }
 }

@@ -1,6 +1,7 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 const supabase = getSupabaseServer()
 import { requireUser } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
   }
 
   const { data, error } = await query
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return erreurApi(req, res, 'internal', error, { route: 'clients' })
 
   return res.status(200).json(data)
 }

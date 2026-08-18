@@ -1,8 +1,9 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
-import { canSeeTask } from '../../../lib/taskAccess'
+import { canSeeTask, resolvePrivateOwner } from '../../../lib/taskAccess'
 import { notifyTeam } from '../../../lib/push-server'
 import * as todoist from '../../../lib/todoist'
+import { erreurApi } from '../../../lib/apiError'
 
 async function maybeNotifyTransition(prev, next, actor) {
   if (!next?.category) return
@@ -62,14 +63,26 @@ export default async function handler(req, res) {
   // à l'admin ni à son responsable est traitée comme inexistante — un 403
   // confirmerait qu'elle existe.
   const { data: existing } = await supabase
-    .from('tasks').select('id, is_private, responsible').eq('id', id).maybeSingle()
+    .from('tasks').select('id, is_private, responsible, status').eq('id', id).maybeSingle()
   if (!existing) return res.status(404).json({ error: 'Tâche introuvable' })
   if (!canSeeTask(existing, user)) return res.status(404).json({ error: 'Tâche introuvable' })
 
   if (req.method === 'PUT') {
-    // Strip any nested join data (e.g. projects) sent from the client
-    const { projects: _p, prev_status, ...cleanBody } = req.body
-    const updates = { ...cleanBody, updated_at: new Date().toISOString() }
+    // Liste blanche plutôt que `{ ...req.body }` : un corps de requête arbitraire
+    // pouvait écrire n'importe quelle colonne, `id` et `created_at` compris, et
+    // aurait accueilli sans broncher toute colonne ajoutée plus tard.
+    const MODIFIABLES = [
+      'title', 'project_id', 'responsible', 'execution_date', 'due_date',
+      'is_private', 'status', 'completed_at', 'notes', 'category', 'category_data',
+    ]
+    const updates = { updated_at: new Date().toISOString() }
+    for (const k of MODIFIABLES) if (k in req.body) updates[k] = req.body[k]
+
+    // Une tâche privée ne se transfère pas à un collègue par un simple PUT :
+    // seul l'admin peut en désigner le responsable.
+    if ((updates.is_private ?? existing.is_private) && 'responsible' in updates) {
+      updates.responsible = resolvePrivateOwner(updates.responsible, user)
+    }
 
     // Si on complète la tâche, on note l'heure
     if (updates.status === 'completed' && !updates.completed_at) {
@@ -91,11 +104,13 @@ export default async function handler(req, res) {
       .select('*, projects(name)')
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'tasks/[id]' })
 
-    // Activity logging — use prev_status sent by client to distinguish actions
-    const wasCompleted = updates.status === 'completed' && prev_status !== 'completed'
-    const wasUncompleted = updates.status === 'active' && prev_status === 'completed'
+    // Statut précédent lu en base, pas dans le corps de la requête : le champ
+    // `prev_status` envoyé par le client est une déclaration, pas un fait.
+    const prevStatus = existing.status
+    const wasCompleted = updates.status === 'completed' && prevStatus !== 'completed'
+    const wasUncompleted = updates.status === 'active' && prevStatus === 'completed'
     if (wasCompleted) {
       await logActivity(supabase, actor, 'task_completed', data)
     } else if (wasUncompleted) {
@@ -141,7 +156,7 @@ export default async function handler(req, res) {
     const { data: taskData } = await supabase
       .from('tasks').select('id, title, responsible, todoist_id').eq('id', id).single()
     const { error } = await supabase.from('tasks').delete().eq('id', id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'tasks/[id]' })
     // Sync Todoist : supprimer la tâche liée
     if (taskData?.todoist_id) await todoist.deleteTask(taskData.todoist_id)
     await logActivity(supabase, actor, 'task_deleted', taskData)

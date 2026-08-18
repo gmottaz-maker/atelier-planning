@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireAdmin } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 const supabase = getSupabaseServer()
 const BUCKET = 'storage-photos'
@@ -27,14 +28,14 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('storage_items').select('*').order('client').order('brand').order('name')
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'storage-items' })
     return res.status(200).json((data || []).map(r => ({ ...r, photo_url: publicUrl(r.photo_path) })))
   }
   if (req.method === 'POST') {
     const payload = pick(req.body)
     if (!payload.name || !payload.client) return res.status(400).json({ error: 'client et name requis' })
     const { data, error } = await supabase.from('storage_items').insert(payload).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'storage-items' })
     return res.status(201).json({ ...data, photo_url: publicUrl(data.photo_path) })
   }
   if (req.method === 'PATCH') {
@@ -42,14 +43,14 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).json({ error: 'id requis' })
     const payload = { ...pick(req.body), updated_at: new Date().toISOString() }
     const { data, error } = await supabase.from('storage_items').update(payload).eq('id', id).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'storage-items' })
     return res.status(200).json({ ...data, photo_url: publicUrl(data.photo_path) })
   }
   if (req.method === 'DELETE') {
     const { id } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
     const { error } = await supabase.from('storage_items').delete().eq('id', id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'storage-items' })
     return res.status(200).json({ ok: true })
   }
   return res.status(405).json({ error: 'Method not allowed' })

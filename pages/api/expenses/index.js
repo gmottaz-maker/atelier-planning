@@ -7,6 +7,7 @@ import { quarterOf, receiptFilename } from '../../../lib/receiptFile'
 import { reconcileNewExpense } from '../../../lib/reconcileRun'
 import { learnMerchantAccount, lookupMerchantAccount } from '../../../lib/merchantAccounts'
 import { validerFichier } from '../../../lib/fileType'
+import { erreurApi } from '../../../lib/apiError'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
       .lte('date', to)
       .order('date', { ascending: false })
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'expenses/index' })
 
     // URLs signées (bucket privé) au lieu d'URLs publiques devinables
     const rows = await withSignedReceipts(supabase, data)
@@ -151,7 +152,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'expenses/index' })
 
     // Apprentissage : si un compte a été fourni explicitement, on le mémorise
     // pour ce commerçant (une pré-catégorisation issue de l'apprentissage ne
@@ -184,7 +185,7 @@ export default async function handler(req, res) {
     // L'admin peut éditer tous les frais ; les autres uniquement les leurs
     if (!isAdmin) q = q.eq('user_name', authUser.name)
     const { data, error } = await q.select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'expenses/index' })
 
     // Apprentissage : attribuer ou corriger le compte d'un ticket enseigne au
     // système le compte de ce commerçant pour la suite.
@@ -221,7 +222,7 @@ export default async function handler(req, res) {
       .eq('id', id)
       .eq('user_name', userName)
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'expenses/index' })
     return res.status(200).json({ ok: true })
   }
 

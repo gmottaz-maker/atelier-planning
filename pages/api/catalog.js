@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireAdmin } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('catalog_items').select('*').order('name', { ascending: true })
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
     return res.status(200).json(data)
   }
 
@@ -49,12 +50,12 @@ export default async function handler(req, res) {
       let updated = 0, inserted = 0
       if (toUpsert.length) {
         const { error } = await supabase.from('catalog_items').upsert(toUpsert, { onConflict: 'id' })
-        if (error) return res.status(500).json({ error: error.message })
+        if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
         updated = toUpsert.length
       }
       if (toInsert.length) {
         const { error } = await supabase.from('catalog_items').insert(toInsert)
-        if (error) return res.status(500).json({ error: error.message })
+        if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
         inserted = toInsert.length
       }
       return res.status(200).json({ ok: true, inserted, updated })
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
     const payload = pickPayload(req.body)
     if (!payload.name) return res.status(400).json({ error: 'name requis' })
     const { data, error } = await supabase.from('catalog_items').insert(payload).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
     return res.status(201).json(data)
   }
 
@@ -72,7 +73,7 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).json({ error: 'id requis' })
     const payload = { ...pickPayload(req.body), updated_at: new Date().toISOString() }
     const { data, error } = await supabase.from('catalog_items').update(payload).eq('id', id).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
     return res.status(200).json(data)
   }
 
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
     const { id } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
     const { error } = await supabase.from('catalog_items').delete().eq('id', id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
     return res.status(200).json({ ok: true })
   }
 

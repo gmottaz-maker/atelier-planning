@@ -4,6 +4,7 @@
 // Schéma, consigne et appel : lib/supplierScan.js
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { scanInvoices } from '../../../lib/supplierScan'
+import { erreurApi } from '../../../lib/apiError'
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
 
@@ -21,7 +22,10 @@ export default async function handler(req, res) {
     const invoices = await scanInvoices({ apiKey, image, mimeType })
     return res.status(200).json({ invoices })
   } catch (e) {
-    const claude = e.message.startsWith('Claude API:')
-    return res.status(claude ? 502 : 500).json({ error: e.message })
+    // L'utilisateur a besoin de savoir si c'est l'IA qui n'a pas répondu (il
+    // peut réessayer) ou si le document est en cause — mais pas du détail.
+    const amont = e.timeout || String(e.message).startsWith('Claude API:')
+    return erreurApi(req, res, amont ? 'upstream' : 'internal', e, { route: 'supplier-invoices/scan' },
+      amont ? "La lecture automatique n'a pas abouti. Réessaie dans un instant." : undefined)
   }
 }

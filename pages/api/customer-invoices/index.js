@@ -2,6 +2,7 @@ import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { nextInvoiceNumber, qrReference } from '../../../lib/invoiceNumber'
 import { validerFacture } from '../../../lib/invoiceCheck'
+import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
     if (status) q = q.eq('status', status)
     if (year) q = q.gte('issue_date', `${year}-01-01`).lte('issue_date', `${year}-12-31`)
     const { data, error } = await q
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'customer-invoices/index' })
     return res.status(200).json(data)
   }
 
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
       if (!error || error.code !== '23505') break
     }
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'customer-invoices/index' })
     return res.status(201).json(data)
   }
 

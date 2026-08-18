@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireAdmin } from '../../lib/requireAdmin'
+import { erreurApi } from '../../lib/apiError'
 
 const supabase = getSupabaseServer()
 const EDITABLE = ['name', 'scope', 'subject', 'body']
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('email_templates').select('*').order('name', { ascending: true })
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'email-templates' })
     return res.status(200).json(data)
   }
 
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
     const payload = pick(req.body)
     if (!payload.name) return res.status(400).json({ error: 'name requis' })
     const { data, error } = await supabase.from('email_templates').insert(payload).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'email-templates' })
     return res.status(201).json(data)
   }
 
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).json({ error: 'id requis' })
     const payload = { ...pick(req.body), updated_at: new Date().toISOString() }
     const { data, error } = await supabase.from('email_templates').update(payload).eq('id', id).select().single()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'email-templates' })
     return res.status(200).json(data)
   }
 
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
     const { id } = req.query
     if (!id) return res.status(400).json({ error: 'id requis' })
     const { error } = await supabase.from('email_templates').delete().eq('id', id)
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'email-templates' })
     return res.status(200).json({ ok: true })
   }
 
