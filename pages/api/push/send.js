@@ -1,7 +1,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 const supabase = getSupabaseServer()
 import webpush from 'web-push'
-import { getVerifiedUser } from '../../../lib/requireAdmin'
+import { requireCronOrAdmin } from '../../../lib/requireAdmin'
 
 webpush.setVapidDetails(
   'mailto:hello@amazinglab.ch',
@@ -10,13 +10,9 @@ webpush.setVapidDetails(
 )
 
 export default async function handler(req, res) {
-  // Sécurité : Vercel Cron (secret) ou utilisateur connecté (test manuel).
-  // L'ancien GET sans auth permettait à n'importe qui de spammer l'équipe.
-  const authHeader = req.headers.authorization
-  const isCron = !!process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`
-  if (!isCron && !(await getVerifiedUser(req))) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  // Vercel Cron (secret) ou ADMIN connecté. Un membre ne doit pas pouvoir
+  // notifier toute l'équipe : le contrôle acceptait tout compte vérifié.
+  if (!(await requireCronOrAdmin(req, res))) return
 
   const today = new Date().toISOString().split('T')[0]
 

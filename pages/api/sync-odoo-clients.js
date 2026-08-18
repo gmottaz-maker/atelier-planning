@@ -1,13 +1,12 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 const supabase = getSupabaseServer()
-import { getVerifiedUser } from '../../lib/requireAdmin'
+import { requireCronOrAdmin } from '../../lib/requireAdmin'
 
 const ODOO_URL = process.env.ODOO_URL          // ex: https://amazing-lab.odoo.com
 const ODOO_DB  = process.env.ODOO_DB           // ex: amazing-lab
 const ODOO_KEY = process.env.ODOO_API_KEY      // clé API persistante
 
 // Sécurité : endpoint appelable uniquement avec le bon secret
-const CRON_SECRET = process.env.CRON_SECRET
 
 async function odooCall(model, method, args = [], kwargs = {}) {
   const resp = await fetch(`${ODOO_URL}/web/dataset/call_kw`, {
@@ -55,12 +54,9 @@ async function authenticate() {
 }
 
 export default async function handler(req, res) {
-  // Vérifier le secret (Vercel Cron) ou un utilisateur connecté (déclenchement manuel)
-  const auth = req.headers.authorization
-  const isCron = !!CRON_SECRET && auth === `Bearer ${CRON_SECRET}`
-  if (!isCron && !(await getVerifiedUser(req))) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  // Vercel Cron (secret) ou ADMIN connecté. Un membre ne doit pas pouvoir
+  // déclencher une synchronisation qui réécrit le fichier clients.
+  if (!(await requireCronOrAdmin(req, res))) return
 
   // Ping Supabase d'abord pour garder le projet actif même si Odoo échoue
   try { await supabase.from('projects').select('id').limit(1) } catch (_) {}

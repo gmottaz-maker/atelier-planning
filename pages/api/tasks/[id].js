@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
+import { canSeeTask } from '../../../lib/taskAccess'
 import { notifyTeam } from '../../../lib/push-server'
 import * as todoist from '../../../lib/todoist'
 
@@ -56,6 +57,14 @@ export default async function handler(req, res) {
   const supabase = getSupabaseServer()
   const { id } = req.query
   const actor = user.name
+
+  // Garde-fou commun à toutes les méthodes : une tâche privée n'appartenant ni
+  // à l'admin ni à son responsable est traitée comme inexistante — un 403
+  // confirmerait qu'elle existe.
+  const { data: existing } = await supabase
+    .from('tasks').select('id, is_private, responsible').eq('id', id).maybeSingle()
+  if (!existing) return res.status(404).json({ error: 'Tâche introuvable' })
+  if (!canSeeTask(existing, user)) return res.status(404).json({ error: 'Tâche introuvable' })
 
   if (req.method === 'PUT') {
     // Strip any nested join data (e.g. projects) sent from the client

@@ -1363,11 +1363,13 @@ export default function ProjectPage() {
   // ── kDrive preview helpers ───────────────────────────────────────────────
   const KDRIVE_DRIVE_ID = 1936508 // pour bâtir les liens externes (drive Infomaniak)
 
-  async function loadKdrive(folderId) {
+  // La descente dans un sous-dossier se fait par jeton signé renvoyé par le
+  // listing : le serveur n'accepte plus un identifiant de dossier arbitraire.
+  async function loadKdrive(folderToken) {
     setKdriveLoading(true); setKdriveError('')
     try {
-      const url = folderId
-        ? `/api/projects/${id}/kdrive-listing?folderId=${folderId}`
+      const url = folderToken
+        ? `/api/projects/${id}/kdrive-listing?folderToken=${encodeURIComponent(folderToken)}`
         : `/api/projects/${id}/kdrive-listing`
       const r = await fetch(url)
       const data = await r.json()
@@ -1382,14 +1384,14 @@ export default function ProjectPage() {
   }
 
   function enterKdriveFolder(folder) {
-    setKdrivePath(p => [...p, { id: folder.id, name: folder.name }])
-    loadKdrive(folder.id)
+    setKdrivePath(p => [...p, { id: folder.id, name: folder.name, token: folder.token }])
+    loadKdrive(folder.token)
   }
 
   function kdriveGoTo(index) {
     const next = kdrivePath.slice(0, index + 1)
     setKdrivePath(next)
-    loadKdrive(next.length > 0 ? next[next.length - 1].id : null)
+    loadKdrive(next.length > 0 ? next[next.length - 1].token : null)
   }
 
   function fmtSize(b) {
@@ -2505,7 +2507,7 @@ export default function ProjectPage() {
                           <div className="w-full h-28 bg-gray-50 flex items-center justify-center overflow-hidden">
                             {item.has_thumbnail ? (
                               <img
-                                src={`/api/kdrive/thumbnail?fileId=${item.id}`}
+                                src={`/api/kdrive/thumbnail?fileId=${item.id}&token=${encodeURIComponent(item.token || '')}`}
                                 alt={item.name}
                                 loading="lazy"
                                 className="w-full h-full object-cover"

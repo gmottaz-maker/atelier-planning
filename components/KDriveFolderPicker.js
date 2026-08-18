@@ -6,17 +6,22 @@ import { useState, useEffect } from 'react'
  * Bouton "Sélectionner ce dossier" à chaque niveau.
  */
 export default function KDriveFolderPicker({ initialFolderId, onSelect, onClose }) {
-  const [path, setPath]       = useState([{ id: null, name: '02. Projets' }])
+  const [path, setPath]       = useState([{ id: null, name: '02. Projets', token: null }])
   const [folders, setFolders] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
 
   const currentId = path[path.length - 1].id
+  const currentToken = path[path.length - 1].token
 
-  async function load(parentId) {
+  // Descente par jeton signé : le serveur n'accepte plus d'identifiant de
+  // dossier arbitraire, sans quoi tout le drive serait navigable.
+  async function load(parentToken) {
     setLoading(true); setError('')
     try {
-      const url = parentId == null ? '/api/kdrive/browse' : `/api/kdrive/browse?parentId=${parentId}`
+      const url = parentToken == null
+        ? '/api/kdrive/browse'
+        : `/api/kdrive/browse?parentToken=${encodeURIComponent(parentToken)}`
       const r = await fetch(url)
       const data = await r.json()
       if (data.error) { setError(data.error); setFolders([]); return }
@@ -29,7 +34,7 @@ export default function KDriveFolderPicker({ initialFolderId, onSelect, onClose 
     }
   }
 
-  useEffect(() => { load(currentId) }, [currentId])
+  useEffect(() => { load(currentToken) }, [currentToken])
 
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose() }
@@ -38,7 +43,7 @@ export default function KDriveFolderPicker({ initialFolderId, onSelect, onClose 
   }, [onClose])
 
   function enter(folder) {
-    setPath(p => [...p, { id: folder.id, name: folder.name }])
+    setPath(p => [...p, { id: folder.id, name: folder.name, token: folder.token }])
   }
 
   function goTo(index) {

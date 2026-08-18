@@ -1,5 +1,5 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
-import { requireUser } from '../../../lib/requireAdmin'
+import { requireUser, requireAdmin } from '../../../lib/requireAdmin'
 
 const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
@@ -18,10 +18,24 @@ const DEFAULTS = {
   },
 }
 
+// Clés lisibles par un utilisateur connecté : l'interface en a besoin
+// (en-têtes de documents, listes déroulantes). Toute autre clé est refusée —
+// `app_settings` est un fourre-tout, on ne laisse pas lire une clé arbitraire.
+const CLES_LISIBLES = new Set(['company_info', 'responsibles'])
+
 export default async function handler(req, res) {
-  if (!(await requireUser(req, res))) return
   const { key } = req.query
   if (!key) return res.status(400).json({ error: 'key requis' })
+
+  // Écriture réservée à l'admin : cette table porte l'IBAN de l'entreprise, le
+  // nom imprimé sur les factures et les conditions de paiement. N'importe quel
+  // membre pouvait les modifier, donc détourner les virements des clients.
+  if (req.method === 'PUT') {
+    if (!(await requireAdmin(req, res))) return
+  } else {
+    if (!(await requireUser(req, res))) return
+    if (!CLES_LISIBLES.has(key)) return res.status(404).json({ error: 'Clé inconnue' })
+  }
 
   const supabase = getSupabaseServer()
 

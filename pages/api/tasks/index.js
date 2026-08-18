@@ -1,5 +1,6 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
+import { visibleTasks, resolvePrivateOwner } from '../../../lib/taskAccess'
 import * as todoist from '../../../lib/todoist'
 
 async function logActivity(supabase, actor, action, task) {
@@ -28,7 +29,9 @@ export default async function handler(req, res) {
       .order('created_at', { ascending: true })
 
     if (error) return res.status(500).json({ error: error.message })
-    return res.status(200).json(data)
+    // Les tâches privées des autres ne sortent jamais de l'API : ni ici, ni
+    // dans les compteurs, suggestions ou caches qui consomment cette réponse.
+    return res.status(200).json(visibleTasks(data, user))
   }
 
   if (req.method === 'POST') {
@@ -37,11 +40,14 @@ export default async function handler(req, res) {
     if (!title || !responsible) {
       return res.status(400).json({ error: 'Titre et responsable requis' })
     }
+    // Une tâche privée destinée à un tiers demande le rôle admin ; sinon elle
+    // revient à son auteur.
+    const owner = is_private ? resolvePrivateOwner(responsible, user) : responsible
 
     const { data, error } = await supabase.from('tasks').insert({
       title,
       project_id: project_id || null,
-      responsible,
+      responsible: owner,
       execution_date: execution_date || null,
       due_date: due_date || null,
       is_private: is_private || false,
