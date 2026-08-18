@@ -82,6 +82,7 @@ lib/
   taskAccess.js          — Visibilité des tâches privées (appliquée côté serveur)
   invoiceCheck.js        — Validation et recalcul serveur des montants de facture
   fetchTimeout.js        — fetch avec délai maximal, pour tous les appels sortants
+  apiError.js            — Réponses d'erreur normalisées + journalisation nettoyée
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
@@ -99,8 +100,9 @@ lib/
   projectPhase.js · supplierStatus.js · taskCategories.js — Modèles de statut
   todoist.js · googleCalendar.js · push-server.js · adminFetch.js
 
-tests/                   — Vitest (npm test) : calculs, parsing CAMT, nommage, rapprochement
-scripts/                 — Scripts ponctuels (imports, backfills), lancés à la main
+tests/                   — Vitest (npm test) : calculs, parsing, nommage, autorisations
+scripts/                 — Scripts ponctuels et contrôles :
+                           check-secrets.mjs (CI), check-db.mjs (état des migrations)
 *.sql                    — Migrations, à exécuter dans l'éditeur SQL Supabase
 public/ruco/             — Données du sélecteur de peintures (voir section dédiée)
 ```
@@ -367,6 +369,15 @@ signalant dans les logs — c'est un filet de déploiement, pas un mode normal.
 une dépendance muette immobilise la fonction serverless jusqu'à son plafond, et
 les rendus PDF, sérialisés par conteneur, attendent derrière.
 
+**Aucune route ne renvoie le message brut d'un fournisseur.** Les messages de
+Supabase et de kDrive exposent colonnes, contraintes et parfois des valeurs.
+Le détail va dans les logs via `erreurApi` (`lib/apiError.js`), le navigateur
+reçoit un code stable et un identifiant de requête.
+
+**Jamais `{ ...req.body }` dans un insert ou un update.** Une liste blanche
+explicite : sinon toute colonne devient inscriptible, y compris celles ajoutées
+plus tard.
+
 **Rien de sensible dans le localStorage.** Le cache SWR est en mémoire. Y
 remettre une persistance globale y replacerait factures, données bancaires,
 contacts et marges, qui survivraient à la déconnexion sur un poste partagé.
@@ -390,3 +401,25 @@ passer d'abord : les index uniques échouent si des doublons existent déjà.
 
 `schema-security-lockdown.sql` reste à exécuter **en dernier** si l'ensemble est
 rejoué depuis zéro.
+
+---
+
+## Contrôles automatiques
+
+```bash
+npm test                # 197 tests, dont l'inventaire des autorisations
+npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
+npm run check:db        # vérifie que les migrations attendues sont en base
+```
+
+`tests/rbac.test.js` mérite une mention : il ne teste pas un comportement mais
+tient l'**inventaire** des routes API et de leur niveau d'autorisation. Il
+échoue si une route apparaît sans contrôle, si une route sensible est
+rétrogradée, si un secret revient à une comparaison `===`, si l'admin est
+accordé sur un nom, si une route renvoie un message brut de fournisseur, ou si
+elle écrit le corps de la requête en bloc. Ajouter une route publique demande
+donc de l'inscrire explicitement dans `SANS_JWT`, avec sa raison.
+
+La CI (`.github/workflows/ci.yml`) exécute tests, build, audit des dépendances
+(bloquant sur « critical » seulement) et détection de secrets. Elle n'a accès
+ni à la base ni aux secrets de production.

@@ -1,21 +1,45 @@
-  name: CI
-  on:
-    push:
-      branches: [main]
-    pull_request:
-  jobs:
-    build-test:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4
-          with: 
-            node-version: 20
-            cache: npm
-        - run: npm ci
-        - run: npm test
-        - run: npm run build
-          env: 
-            NEXT_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
-            NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
-            SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Aucun secret de production n'est exposé ici : le build tourne avec des
+# valeurs factices, et rien ne se connecte à la vraie base.
+permissions:
+  contents: read
+
+jobs:
+  qualite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # nécessaire au balayage de secrets sur l'historique du diff
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Installation déterministe
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build de production
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
+
+      # Bloque sur « critical » seulement : une alerte « high » dans une
+      # dépendance imbriquée de Next ne doit pas empêcher de livrer un correctif.
+      - name: Audit des dépendances
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Détection de secrets
+        run: npm run check:secrets
