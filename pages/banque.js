@@ -6,12 +6,13 @@ import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { matchesQuery, normalize } from '../lib/textSearch'
+import { fmtCHF as fmtMontant } from '../lib/money'
 
 const PINK = '#111827'
 
 function fmtCHF(n) {
   if (n == null) return '—'
-  return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+  return fmtMontant(n)
 }
 function fmtDate(s) {
   if (!s) return '—'

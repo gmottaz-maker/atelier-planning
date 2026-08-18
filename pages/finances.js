@@ -8,14 +8,12 @@ import Link from 'next/link'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { quoteStatusMeta } from '../lib/quoteStatus'
 import { C, FONT, MONO } from '../lib/theme'
+import { fmtCHF0 as fmtCHF } from '../lib/money'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function todayStr() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-function fmtCHF(n) {
-  return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0))
 }
 function fmtDate(s) {
   if (!s) return '—'

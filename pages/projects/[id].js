@@ -20,6 +20,7 @@ import {
   getDaysRemaining, getProjectColor, ensureUid, initLogistics,
   parseTimeRange, combineTime, fmtTimeDisplay, fmtTaskDate,
 } from '../../lib/projectHelpers'
+import { fmtCHF } from '../../lib/money'
 
 const PINK = '#111827'
 
@@ -1183,7 +1184,6 @@ export default function ProjectPage() {
   function laborNet(r)      { return applyDiscount(serviceTotal(r), r) }
   function serviceNet(r)    { return applyDiscount(serviceBilled(r), r) }
   function logisticsNet(r)  { return applyDiscount(serviceBilledLogistics(r), r) }
-  function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
 
   const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
 

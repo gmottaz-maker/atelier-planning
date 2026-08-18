@@ -10,6 +10,7 @@ import { QUOTE_STATUSES, quoteStatusMeta } from '../lib/quoteStatus'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { offerCopy } from '../lib/duplicateDoc'
 import SendDocumentModal from '../components/SendDocumentModal'
+import { fmtCHF } from '../lib/money'
 
 const INV_STATUSES = [
   { key: 'pending',   label: 'En attente', color: '#b45309', bg: '#fffbeb' },
@@ -23,7 +24,6 @@ function invEffective(inv) {
   if (inv.due_date && new Date(inv.due_date) < new Date()) return 'overdue'
   return 'pending'
 }
-function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0) }
 
 export default function Offres() {
   const router = useRouter()

@@ -387,6 +387,12 @@ l'affiche avec l'identifiant de requête. Sans ça, un bouton peut répondre 405
 sans que rien ne bouge à l'écran — c'est arrivé. Les échecs de LECTURE ne
 déclenchent rien : l'écran les montre déjà par son état vide.
 
+**Les montants ne passent pas par `Intl`** (`lib/money.js`). Le séparateur de
+milliers de `fr-CH` dépend de la version d'ICU embarquée dans Node : la CI et
+le poste de développement ne produisaient pas le même texte, et surtout, le
+séparateur imprimé sur une facture dépendait de la version que Vercel
+exécutait ce jour-là. L'apostrophe suisse est écrite explicitement.
+
 **Rien de sensible dans le localStorage.** Le cache SWR est en mémoire. Y
 remettre une persistance globale y replacerait factures, données bancaires,
 contacts et marges, qui survivraient à la déconnexion sur un poste partagé.
@@ -416,7 +422,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 255 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 264 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```

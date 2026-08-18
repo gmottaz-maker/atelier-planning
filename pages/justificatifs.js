@@ -5,6 +5,7 @@ import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
+import { fmtCHF as fmtMontant } from '../lib/money'
 
 const PINK = '#111827'
 const PERSON_COLORS = { Arnaud: '#3b82f6', Gabin: '#8b5cf6', Guillaume: '#111827' }
@@ -13,7 +14,7 @@ const PAYMENT_COLORS  = { personal: '#f59e0b', company: '#0ea5e9' }
 
 function fmtCHF(n) {
   if (n == null) return '—'
-  return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+  return fmtMontant(n)
 }
 function fmtDate(s) {
   if (!s) return '—'

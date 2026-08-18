@@ -10,6 +10,7 @@ import CatalogPicker, { toPurchaseRow, toRateRow } from '../components/CatalogPi
 import SendDocumentModal from '../components/SendDocumentModal'
 import { pdfFilename } from '../lib/pdfFilename'
 import { invoiceCopyBody } from '../lib/duplicateDoc'
+import { fmtCHF as fmtMontant } from '../lib/money'
 
 const PINK = '#111827'
 const STATUS_LABELS = { created: 'Créée', sent: 'Envoyée', pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
@@ -17,7 +18,7 @@ const STATUS_COLORS = { created: '#6b7280', sent: '#1d4ed8', pending: '#f59e0b',
 
 function fmtCHF(n) {
   if (n == null) return '—'
-  return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+  return fmtMontant(n)
 }
 function fmtDate(s) {
   if (!s) return '—'

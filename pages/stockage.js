@@ -5,11 +5,11 @@ import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
 import { C, FONT, MONO } from '../lib/theme'
+import { fmtCHF as fmt } from '../lib/money'
 
 const RATE = 20            // CHF / palette (m²) / mois
 const QUARTER_MONTHS = 3
 const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
-const fmt = n => new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)
 
 async function api(url, method, body) {
   const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })

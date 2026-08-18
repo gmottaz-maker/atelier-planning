@@ -5,12 +5,9 @@ import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
+import { fmtCHF } from '../lib/money'
 
 const PINK = '#111827'
-
-function fmtCHF(n) {
-  return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)
-}
 
 export default function Compta() {
   const router = useRouter()

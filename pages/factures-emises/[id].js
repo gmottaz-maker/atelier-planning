@@ -18,8 +18,8 @@ import QuoteEditor, { defaultQuote } from '../../components/QuoteEditor'
 import { computeQuoteTotal } from '../../lib/quoteTotals'
 import { invoiceTotals } from '../../lib/invoiceTotals'
 import { pdfFilename } from '../../lib/pdfFilename'
+import { fmtCHF } from '../../lib/money'
 
-const fmtCHF = n => new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10) }
 const today = () => new Date().toISOString().slice(0, 10)
 

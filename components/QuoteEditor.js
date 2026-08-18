@@ -9,6 +9,7 @@
 import { useState } from 'react'
 import CatalogPicker, { toPurchaseRow, toRateRow } from './CatalogPicker'
 import QtyInput from './QtyInput'
+import { fmtCHF } from '../lib/money'
 
 const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
 
@@ -73,7 +74,6 @@ export default function QuoteEditor({ value, onChange }) {
   function laborNet(r)      { return applyDiscount(serviceTotal(r), r) }
   function serviceNet(r)    { return applyDiscount(serviceBilled(r), r) }
   function logisticsNet(r)  { return applyDiscount(serviceBilledLogistics(r), r) }
-  function fmtCHF(n) { return new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
   function itemTotal(it) {
     return (it.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
          + (it.labor     || []).reduce((s, r) => s + laborNet(r), 0)

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import useSWR from 'swr'
+import { fmtCHF } from '../lib/money'
 
 const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
 
@@ -84,7 +85,7 @@ export default function CatalogPicker({ kind = 'all', onPick, label = '+ Catalog
                   </span>
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                  {new Intl.NumberFormat('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(saleOf(it))}
+                  {fmtCHF(saleOf(it))}
                 </span>
               </button>
             ))}
