@@ -1,6 +1,7 @@
 // Webhook Todoist : authentifié par secret d'URL (TODOIST_WEBHOOK_SECRET),
 // pas par JWT utilisateur. Client service-role pour ne pas dépendre de RLS.
 import { getSupabaseServer } from '../../lib/supabase-server'
+import { secretMatches } from '../../lib/requireAdmin'
 
 const getSupabase = getSupabaseServer
 
@@ -9,9 +10,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // Vérification du secret dans l'URL
+  // Vérification du secret d'URL, à temps constant : une comparaison de
+  // chaînes s'arrête au premier caractère différent et fuit le bon préfixe.
   const { secret } = req.query
-  if (!process.env.TODOIST_WEBHOOK_SECRET || secret !== process.env.TODOIST_WEBHOOK_SECRET) {
+  if (!secretMatches(secret, process.env.TODOIST_WEBHOOK_SECRET)) {
     console.warn('Todoist webhook: secret invalide')
     return res.status(401).json({ error: 'Unauthorized' })
   }
