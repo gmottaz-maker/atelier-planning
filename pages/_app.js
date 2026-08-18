@@ -7,7 +7,7 @@ import { SWRConfig } from 'swr'
 import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar'
 import BottomNav, { BOTTOM_NAV_HEIGHT } from '../components/BottomNav'
 import useIsMobile from '../lib/useIsMobile'
-import { swrConfig } from '../lib/swr'
+import { swrConfig, purgeCachePersistant } from '../lib/swr'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -202,7 +202,7 @@ export default function App({ Component, pageProps }) {
   const showChrome = user && !NO_CHROME_ROUTES.includes(router.pathname)
 
   return (
-    <AuthContext.Provider value={{ user, signOut: () => supabase.auth.signOut() }}>
+    <AuthContext.Provider value={{ user, signOut: () => { purgeCachePersistant(); return supabase.auth.signOut() } }}>
       <SWRConfig value={swrConfig}>
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -9,6 +9,7 @@ import KDriveFolderPicker from '../components/KDriveFolderPicker'
 import BillingContactSelect from '../components/BillingContactSelect'
 import { PROJECT_PHASES, phaseMeta, isOngoing } from '../lib/projectPhase'
 import { C, FONT, MONO } from '../lib/theme'
+import useIsAdmin from '../lib/useIsAdmin'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
 const COLOR_OPTIONS  = [
@@ -735,7 +736,11 @@ export default function Admin() {
   // Données via SWR : affichage instantané depuis le cache + revalidation auto
   const { data: projects = [], isLoading: projectsLoading, mutate: mutateProjects } = useSWR('/api/projects')
   const { data: tasks = [], mutate: mutateTasks } = useSWR('/api/tasks')
-  const { data: invoices = [] } = useSWR('/api/customer-invoices')
+  // Les factures clients ne servent qu'à marquer les projets déjà facturés.
+  // Elles ne sont chargées que pour l'admin : la route les refuserait de toute
+  // façon à un membre, et rien ne justifie de les faire transiter.
+  const isAdmin = useIsAdmin()
+  const { data: invoices = [] } = useSWR(isAdmin ? '/api/customer-invoices' : null)
   const invoiceProjectIds = new Set((Array.isArray(invoices) ? invoices : []).map(i => String(i.project_id)))
   const fetchProjects = () => mutateProjects()
   const fetchTasks    = () => mutateTasks()
