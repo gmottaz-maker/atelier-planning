@@ -112,3 +112,25 @@ describe('buildDevisHtml', () => {
     expect(html).not.toContain('Néon 100cm')
   })
 })
+
+describe('format hérité', () => {
+  it('replie l\'ancien format plat { purchases, labor } sur un item unique', () => {
+    const rows = buildOfferRows({
+      purchases: [{ description: 'Bois', unit_price: 100, quantity: 2 }],
+      labor: [{ description: 'Pose', rate: 80, quantity: 1 }],
+      logistics: [{ trajet: 'Livraison', rate: 60, quantity: 1 }],
+    })
+    const s = sections(rows)
+    expect(s.map(r => r.label)).toEqual(['Fabrication', 'Logistique'])
+    expect(total(rows)).toBe(340)
+    expect(lines(rows).find(r => r.title === 'Général')).toBeTruthy()
+  })
+
+  it('renomme la section Fabrication quand on le demande (facture de stockage)', () => {
+    const rows = buildOfferRows(
+      { items: [{ name: 'Palette', purchases: [{ description: 'Trimestre', unit_price: 90, quantity: 1 }], labor: [] }] },
+      { itemsLabel: 'Stockage' },
+    )
+    expect(sections(rows)[0].label).toBe('Stockage')
+  })
+})
