@@ -15,6 +15,11 @@ import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/A
 import CatalogPicker, { toPurchaseRow, toRateRow } from '../../components/CatalogPicker'
 import QuoteEditor from '../../components/QuoteEditor'
 import { C, FONT, MONO, personChip, initials as themeInitials } from '../../lib/theme'
+import {
+  genLogUid, TYPES_WITH_DATE, today, toDateStr, isCompletedToday, fmtDate,
+  getDaysRemaining, getProjectColor, ensureUid, initLogistics,
+  parseTimeRange, combineTime, fmtTimeDisplay, fmtTaskDate,
+} from '../../lib/projectHelpers'
 
 const PINK = '#111827'
 
@@ -38,114 +43,6 @@ const LOGISTICS_TYPES = [
 ]
 const LOGISTICS_ASSIGNEES = ['Arnaud', 'Guillaume', 'Gabin', 'Coople']
 const VEHICLES = ['Vito', 'Master', 'Autre']
-
-function genLogUid() {
-  return `log_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
-}
-// Types that have a date field
-const TYPES_WITH_DATE = ['demontage', 'recuperation', 'livraison', 'envoi_dhl', 'envoi_ete', 'montage']
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function today() { const d = new Date(); d.setHours(0,0,0,0); return d }
-function toDateStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-function isCompletedToday(task) {
-  if (task.status !== 'completed' || !task.completed_at) return false
-  return task.completed_at.split('T')[0] === toDateStr(today())
-}
-function fmtDate(str) {
-  if (!str) return '—'
-  const [y, m, d] = str.split('-').map(Number)
-  return new Date(y, m-1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-function getDaysRemaining(deadline) {
-  if (!deadline) return null
-  const t = today()
-  const d = new Date(deadline); d.setHours(0,0,0,0)
-  return Math.ceil((d - t) / 86400000)
-}
-function getProjectColor(p) {
-  if (p.color_override) return p.color_override
-  const d = getDaysRemaining(p.deadline)
-  if (d === null) return '#94a3b8'
-  if (d < 0)   return '#dc2626'
-  if (d <= 7)  return '#f59e0b'
-  if (d <= 14) return '#eab308'
-  return '#22c55e'
-}
-
-function ensureUid(item) {
-  if (item?.uid) return item
-  return { ...item, uid: genLogUid() }
-}
-
-// Init logistics from project → returns an array of items (chaque item a un uid stable)
-function initLogistics(project) {
-  const existing = project.logistics_data || {}
-
-  // New format: already an array
-  if (Array.isArray(existing) && existing.length > 0) return existing.map(ensureUid)
-
-  // Old format: object keyed by type — migrate to array
-  if (!Array.isArray(existing)) {
-    const OLD_KEYS = ['montage', 'livraison', 'envoi_dhl', 'demontage', 'recuperation']
-    const items = []
-    for (const key of OLD_KEYS) {
-      const d = existing[key]
-      if (d && Object.values(d).some(v => v && String(v).trim())) {
-        items.push(ensureUid({ type: key, ...d }))
-      }
-    }
-    if (items.length > 0) return items
-  }
-
-  // Legacy columns fallback
-  const items = []
-  if (project.logistics_address || project.logistics_time) {
-    items.push(ensureUid({ type: 'montage', date: '', address: project.logistics_address || '', time: project.logistics_time || '', contact: project.logistics_contact || '', notes: project.logistics_notes || '' }))
-  }
-  if (project.disassembly_date || project.disassembly_address) {
-    items.push(ensureUid({ type: 'demontage', date: project.disassembly_date || '', address: project.disassembly_address || '', time: project.disassembly_time || '', contact: project.disassembly_contact || '', notes: project.disassembly_notes || '' }))
-  }
-  return items
-}
-
-// Parse / format time range "08:00 – 10:00"
-function parseTimeRange(value) {
-  if (!value) return { start: '', end: '' }
-  const parts = value.split(/\s*[–\-]\s*/)
-  function toInput(s) {
-    if (!s) return ''
-    s = s.trim().replace(/h/i, ':')
-    return /^\d{2}:\d{2}$/.test(s) ? s : ''
-  }
-  return { start: toInput(parts[0] || ''), end: toInput(parts[1] || '') }
-}
-function combineTime(start, end) {
-  if (!start && !end) return ''
-  if (start && end) return `${start} – ${end}`
-  return start || end
-}
-function fmtTimeDisplay(value) {
-  if (!value) return null
-  return value.replace(/(\d{2}):(\d{2})/g, '$1h$2')
-}
-
-// Format relatif court pour une date d'exécution (J-3, Auj., Demain, 15/05 etc.)
-function fmtTaskDate(dateStr) {
-  if (!dateStr) return null
-  const todayStr = toDateStr(today())
-  if (dateStr === todayStr) return { label: "Aujourd'hui", color: '#d97706' }
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const date = new Date(y, m-1, d); date.setHours(0,0,0,0)
-  const diff = Math.round((date - today()) / 86400000)
-  if (diff < 0) return { label: `${Math.abs(diff)}j en retard`, color: '#dc2626' }
-  if (diff === 1) return { label: 'Demain', color: '#d97706' }
-  if (diff <= 7) return { label: `Dans ${diff}j`, color: '#6b7280' }
-  return { label: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), color: '#9ca3af' }
-}
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 function Logo() {

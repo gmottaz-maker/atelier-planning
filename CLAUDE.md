@@ -67,6 +67,7 @@ pages/
 
 components/
   Sidebar.js · BottomNav.js · NavBar.js  — Navigation (desktop / mobile / en-tête)
+  ApiErrorBanner.js      — Bandeau des mutations API en échec (monté dans _app)
   QuoteEditor.js         — Éditeur d'offre groupé, PARTAGÉ offre + facture
   QtyInput.js            — Champ quantité (pas de 0.5, premier cran à 1)
   CatalogPicker.js       — Insertion d'une ligne depuis le catalogue
@@ -83,6 +84,8 @@ lib/
   invoiceCheck.js        — Validation et recalcul serveur des montants de facture
   fetchTimeout.js        — fetch avec délai maximal, pour tous les appels sortants
   apiError.js            — Réponses d'erreur normalisées + journalisation nettoyée
+  api.js                 — Client API : res.ok, erreurs typées, annulation
+  projectHelpers.js      — Calculs et formatage de la fiche projet
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
@@ -378,6 +381,12 @@ reçoit un code stable et un identifiant de requête.
 explicite : sinon toute colonne devient inscriptible, y compris celles ajoutées
 plus tard.
 
+**Une mutation qui échoue doit se voir.** L'intercepteur de `_app.js` signale
+toute mutation `/api/` dont la réponse n'est pas `ok`, et `ApiErrorBanner`
+l'affiche avec l'identifiant de requête. Sans ça, un bouton peut répondre 405
+sans que rien ne bouge à l'écran — c'est arrivé. Les échecs de LECTURE ne
+déclenchent rien : l'écran les montre déjà par son état vide.
+
 **Rien de sensible dans le localStorage.** Le cache SWR est en mémoire. Y
 remettre une persistance globale y replacerait factures, données bancaires,
 contacts et marges, qui survivraient à la déconnexion sur un poste partagé.
@@ -407,7 +416,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 219 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 255 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```
