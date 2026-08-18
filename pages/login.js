@@ -38,7 +38,6 @@ export default function Login() {
       <Head>
         <title>Connexion — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           input:focus { border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; outline: none; }
           input { font-size: 16px !important; }

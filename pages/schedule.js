@@ -716,7 +716,6 @@ export default function SchedulePage() {
       <Head>
         <title>Horaires — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
           body { margin: 0; }

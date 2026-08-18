@@ -31,7 +31,6 @@ export default function SettingsPage() {
       <Head>
         <title>Paramètres — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <style>{`
           input:focus { border-color: #9ca3af !important; box-shadow: 0 0 0 3px rgba(17,24,39,0.06) !important; outline: none; }
         `}</style>

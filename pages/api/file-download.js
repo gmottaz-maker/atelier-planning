@@ -3,7 +3,7 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 const supabase = getSupabaseServer()
 import { downloadStream } from '../../lib/kdrive'
 import { requireUser } from '../../lib/requireAdmin'
-import { entetesFichier } from '../../lib/fileType'
+import { entetesFichier, relayerFlux } from '../../lib/fileType'
 
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
@@ -23,8 +23,7 @@ export default async function handler(req, res) {
     // Seules les images vérifiées repartent en inline ; le reste en pièce
     // jointe, avec nosniff — un HTML servi inline s'exécuterait dans l'origine.
     entetesFichier(res, { mime: file.mime_type, filename: file.filename })
-    const buffer = await r.arrayBuffer()
-    res.send(Buffer.from(buffer))
+    await relayerFlux(r, res)
   } catch (e) {
     console.error('file-download error:', e)
     res.status(500).json({ error: 'Erreur kDrive: ' + e.message })

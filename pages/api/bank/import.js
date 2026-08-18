@@ -41,17 +41,43 @@ export default async function handler(req, res) {
     import_id:         importId,
   }))
 
-  let inserted = 0
-  let duplicates = 0
-  // Insertion ligne par ligne pour ne pas tout perdre sur un duplicate
-  for (const row of rows) {
-    const { error } = await supabase.from('bank_transactions').insert(row)
-    if (!error) inserted++
-    else if (error.code === '23505') duplicates++
-    else console.error('Insert error:', error.message)
+  // Insertion par lots. C'était une ligne à la fois pour ne pas tout perdre sur
+  // un doublon : un relevé de 200 écritures faisait donc 200 allers-retours.
+  // `ignoreDuplicates` laisse la base écarter les doublons, et le repli ligne
+  // par ligne ne sert plus qu'au lot qui échoue pour une autre raison.
+  const TAILLE_LOT = 100
+  let inserted = 0, duplicates = 0, errors = 0
+
+  for (let i = 0; i < rows.length; i += TAILLE_LOT) {
+    const lot = rows.slice(i, i + TAILLE_LOT)
+    const { data, error } = await supabase
+      .from('bank_transactions')
+      // Clé unique de schema-banking.sql : (account_iban, booking_date, amount, end_to_end_id)
+      .upsert(lot, { onConflict: 'account_iban,booking_date,amount,end_to_end_id', ignoreDuplicates: true })
+      .select('id')
+
+    if (!error) {
+      inserted += data?.length || 0
+      duplicates += lot.length - (data?.length || 0)
+      continue
+    }
+
+    // Le lot entier a échoué : on reprend ligne par ligne pour isoler la cause
+    // et sauver le reste. Une importation partielle doit rester visible.
+    logErreur(requestId(req), 'bank/import (lot)', error, { taille: lot.length })
+    for (const row of lot) {
+      const { error: e } = await supabase.from('bank_transactions').insert(row)
+      if (!e) inserted++
+      else if (e.code === '23505') duplicates++
+      else { errors++; logErreur(requestId(req), 'bank/import (ligne)', e) }
+    }
   }
 
   const reconciliation = await reconcileTransactions(supabase, admin?.name)
 
-  return res.status(200).json({ inserted, duplicates, total: rows.length, import_id: importId, ...reconciliation })
+  return res.status(200).json({
+    inserted, duplicates, errors, total: rows.length,
+    partiel: errors > 0,
+    import_id: importId, ...reconciliation,
+  })
 }

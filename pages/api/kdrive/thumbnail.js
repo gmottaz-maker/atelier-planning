@@ -7,6 +7,7 @@ import { requireUser } from '../../../lib/requireAdmin'
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { authorizeKdriveFile } from '../../../lib/kdriveAccess'
 import { verifyRef } from '../../../lib/signedRef'
+import { relayerFlux } from '../../../lib/fileType'
 
 const supabase = getSupabaseServer()
 
@@ -30,8 +31,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', r.headers.get('content-type') || 'image/jpeg')
     res.setHeader('Cache-Control', 'private, max-age=3600')
     res.setHeader('X-Content-Type-Options', 'nosniff')
-    const buf = await r.arrayBuffer()
-    res.send(Buffer.from(buf))
+    await relayerFlux(r, res)
   } catch (e) {
     res.status(500).end()
   }

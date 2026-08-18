@@ -3,7 +3,7 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 const supabase = getSupabaseServer()
 import { downloadStream } from '../../lib/kdrive'
 import { requireUser } from '../../lib/requireAdmin'
-import { entetesFichier } from '../../lib/fileType'
+import { entetesFichier, relayerFlux } from '../../lib/fileType'
 
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
@@ -21,8 +21,7 @@ export default async function handler(req, res) {
     const r = await downloadStream(row.image_kdrive_id)
     entetesFichier(res, { mime: row.image_mime_type, filename: row.image_filename })
     res.setHeader('Cache-Control', 'private, max-age=300')
-    const buffer = await r.arrayBuffer()
-    res.send(Buffer.from(buffer))
+    await relayerFlux(r, res)
   } catch (e) {
     console.error('update-image error:', e)
     res.status(500).json({ error: 'kDrive: ' + e.message })
