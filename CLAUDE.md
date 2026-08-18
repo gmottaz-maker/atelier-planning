@@ -407,7 +407,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 197 tests, dont l'inventaire des autorisations
+npm test                # 219 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```
@@ -419,6 +419,18 @@ rétrogradée, si un secret revient à une comparaison `===`, si l'admin est
 accordé sur un nom, si une route renvoie un message brut de fournisseur, ou si
 elle écrit le corps de la requête en bloc. Ajouter une route publique demande
 donc de l'inscrire explicitement dans `SANS_JWT`, avec sa raison.
+
+`tests/apiAuth.test.js` exerce les VRAIS handlers d'une vingtaine de routes,
+avec anonyme / membre / autre membre / admin. Seuls le client Supabase et les
+services externes sont simulés ; toute la chaîne d'autorisation est le code de
+production. Deux pièges à connaître si tu ajoutes des cas :
+
+- remplacer un export par `vi.mock` ne change PAS les appels internes au module
+  (`requireCronOrAdmin` appelle le vrai `requireAdmin`). C'est pourquoi la
+  simulation se fait au niveau de `auth.getUser`, sous toute la chaîne ;
+- plusieurs routes font `const supabase = getSupabaseServer()` au niveau module,
+  donc une seule fois à l'import. Le mock rend un proxy vers la base du test en
+  cours, sinon toutes les routes resteraient figées sur la première.
 
 La CI (`.github/workflows/ci.yml`) exécute tests, build, audit des dépendances
 (bloquant sur « critical » seulement) et détection de secrets. Elle n'a accès
