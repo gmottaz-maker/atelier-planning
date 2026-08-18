@@ -1,10 +1,10 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
-import { requireUser, ADMIN_USER } from '../../lib/requireAdmin'
+import { requireUser, isAdminUser } from '../../lib/requireAdmin'
 
 export default async function handler(req, res) {
   const authUser = await requireUser(req, res)
   if (!authUser) return
-  const isAdmin = authUser.name === ADMIN_USER
+  const isAdmin = isAdminUser(authUser)
   // Un non-admin ne peut lire/écrire que ses propres heures, quel que soit
   // le userName envoyé par le client.
   const ownName = (requested) => (isAdmin ? (requested || authUser.name) : authUser.name)

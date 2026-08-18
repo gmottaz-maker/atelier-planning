@@ -53,6 +53,10 @@ if (typeof window !== 'undefined' && !window.__mazeAuthFetchInstalled) {
 }
 
 async function fetchProfile(userId) {
+  // `role` peut manquer tant que schema-profiles-role.sql n'a pas été joué :
+  // on retombe alors sur le nom seul plutôt que de perdre le profil.
+  const avecRole = await supabase.from('profiles').select('name, role').eq('id', userId).single()
+  if (!avecRole.error) return avecRole.data
   const { data } = await supabase.from('profiles').select('name').eq('id', userId).single()
   return data
 }
@@ -60,7 +64,7 @@ async function fetchProfile(userId) {
 // ─── App ────────────────────────────────────────────────────────────────────
 
 export default function App({ Component, pageProps }) {
-  const [user, setUser]       = useState(null)   // { id, email, name }
+  const [user, setUser]       = useState(null)   // { id, email, name, role }
   const [authReady, setAuthReady] = useState(false)
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -89,19 +93,27 @@ export default function App({ Component, pageProps }) {
       // Nom du profil mis en cache au dernier passage : évite la fenêtre où
       // user.name vaut l'e-mail (le temps de relire `profiles`), fenêtre pendant
       // laquelle une page admin renverrait à l'accueil.
-      let cachedName = null
-      try { cachedName = localStorage.getItem('profileName:' + session.user.id) } catch {}
+      let cachedName = null, cachedRole = null
+      try {
+        cachedName = localStorage.getItem('profileName:' + session.user.id)
+        cachedRole = localStorage.getItem('profileRole:' + session.user.id)
+      } catch {}
       const fallbackName = cachedName || session.user.user_metadata?.name || session.user.email
       setUser(prev =>
         prev?.id === session.user.id
           ? prev
-          : { id: session.user.id, email: session.user.email, name: fallbackName }
+          : { id: session.user.id, email: session.user.email, name: fallbackName, role: cachedRole || null }
       )
       fetchProfile(session.user.id)
         .then(profile => {
           if (cancelled || !profile?.name) return
-          try { localStorage.setItem('profileName:' + session.user.id, profile.name) } catch {}
-          setUser(u => (u && u.id === session.user.id ? { ...u, name: profile.name } : u))
+          try {
+            localStorage.setItem('profileName:' + session.user.id, profile.name)
+            if (profile.role) localStorage.setItem('profileRole:' + session.user.id, profile.role)
+          } catch {}
+          setUser(u => (u && u.id === session.user.id
+            ? { ...u, name: profile.name, role: profile.role || u.role }
+            : u))
         })
         .catch(() => {})
     }

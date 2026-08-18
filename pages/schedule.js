@@ -3,9 +3,9 @@ import useSWR from 'swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import useIsAdmin from '../lib/useIsAdmin'
 
 const PINK = '#111827'
-const ADMIN_USER = 'Guillaume'
 const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
 const DEFAULT_PAUSE = 1.0
 
@@ -188,7 +188,7 @@ function exportCSV(entries, userName, year) {
 
 export default function SchedulePage() {
   const { user } = useAuth()
-  const isAdmin = user?.name === ADMIN_USER
+  const isAdmin = useIsAdmin()
 
   // View state
   const [view, setView]           = useState('week')

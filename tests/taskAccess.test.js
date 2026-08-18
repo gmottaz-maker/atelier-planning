@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { canSeeTask, visibleTasks, resolvePrivateOwner } from '../lib/taskAccess'
 
-const admin = { name: 'Guillaume' }
-const gabin = { name: 'Gabin' }
-const arnaud = { name: 'Arnaud' }
+// L'admin se reconnaît à son RÔLE, plus à son nom.
+const admin = { name: 'Guillaume', role: 'admin' }
+const gabin = { name: 'Gabin', role: 'member' }
+const arnaud = { name: 'Arnaud', role: 'member' }
 
 describe('accès aux tâches', () => {
   it('laisse passer les tâches non privées', () => {

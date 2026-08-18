@@ -1,5 +1,5 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
-import { requireUser, ADMIN_USER } from '../../../lib/requireAdmin'
+import { requireUser, isAdminUser } from '../../../lib/requireAdmin'
 import { withSignedReceipts, withSignedReceipt } from '../../../lib/receipts'
 import { ensureReceiptFolder, upload, del } from '../../../lib/kdrive'
 import { extractPages } from '../../../lib/pdfSplit'
@@ -15,7 +15,7 @@ const BUCKET = 'receipts'
 export default async function handler(req, res) {
   const authUser = await requireUser(req, res)
   if (!authUser) return
-  const isAdmin = authUser.name === ADMIN_USER
+  const isAdmin = isAdminUser(authUser)
   // Un non-admin ne peut agir que sur ses propres frais, quel que soit le
   // userName envoyé par le client.
   const ownName = (requested) => {

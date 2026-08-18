@@ -1,5 +1,5 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
-import { requireUser, ADMIN_USER } from '../../lib/requireAdmin'
+import { requireUser, isAdminUser } from '../../lib/requireAdmin'
 
 /**
  * GET  /api/clock-session?userName=X  → session en cours ou null
@@ -10,7 +10,7 @@ import { requireUser, ADMIN_USER } from '../../lib/requireAdmin'
 export default async function handler(req, res) {
   const authUser = await requireUser(req, res)
   if (!authUser) return
-  const isAdmin = authUser.name === ADMIN_USER
+  const isAdmin = isAdminUser(authUser)
   const ownName = (requested) => (isAdmin ? (requested || authUser.name) : authUser.name)
   const supabase = getSupabaseServer()
 
