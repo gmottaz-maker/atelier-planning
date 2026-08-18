@@ -31,7 +31,8 @@ pages/
   planning.js          — Planning d'atelier
   meeting.js           — Vue réunion
   activity.js          — Journal d'activité
-  display.js           — Affichage mural (route publique, sans chrome)
+  display.js           — Affichage mural (route publique, sans chrome ; lit
+                         /api/display-projects, DTO réduit — voir Sécurité)
   settings.js          — Paramètres utilisateur
   peintures.js         — Sélecteur de peintures RUCO (voir section dédiée)
   clients.js           — Contacts et entreprises
@@ -77,7 +78,10 @@ components/
 
 lib/
   supabase.js · supabase-server.js — Clients Supabase (navigateur / service-role)
-  requireAdmin.js        — Vérification du JWT (requireUser, requireAdmin, cache 5 min)
+  requireAdmin.js        — JWT (requireUser, requireAdmin, requireCronOrAdmin, cache 5 min)
+  taskAccess.js          — Visibilité des tâches privées (appliquée côté serveur)
+  fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
+  kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
   swr.js                 — Cache SWR persisté en localStorage (voir /peintures)
   theme.js               — Jetons de style (C, FONT, MONO)
@@ -252,17 +256,25 @@ renvois, sans quoi un vernis intérieur ressort comme extérieur).
 
 ## Git / déploiement
 
-```bash
-# Remote avec token GitHub
-git remote set-url origin https://gmottaz-maker:TOKEN@github.com/gmottaz-maker/atelier-planning.git
+**Ne jamais mettre de jeton dans l'URL du remote.** Un PAT écrit dans
+`.git/config` s'y trouve en clair, part dans toute copie du dépôt et n'expire
+pas. Utiliser SSH, ou le gestionnaire d'identifiants de git :
 
+```bash
+# SSH (recommandé)
+git remote set-url origin git@github.com:gmottaz-maker/atelier-planning.git
+
+# ou HTTPS + trousseau macOS, le jeton n'est saisi qu'une fois
+git config --global credential.helper osxkeychain
+git remote set-url origin https://github.com/gmottaz-maker/atelier-planning.git
+```
+
+```bash
 # Workflow standard
 git add .
 git commit -m "description"
 git push  # → déclenche déploiement Vercel automatiquement
 ```
-
-Token GitHub : Personal Access Token, scope `repo`, à renouveler sur github.com/settings/tokens.
 
 ---
 
@@ -287,3 +299,52 @@ npm run dev      # serveur local http://localhost:3000
 npm run build    # build production
 npx cap sync     # sync Capacitor après changements web
 ```
+
+---
+
+## Sécurité — invariants à ne pas casser
+
+Ces règles sont le résultat de correctifs, pas des préférences de style. Les
+casser rouvre une faille précise.
+
+**Une seule route publique : `/api/display-projects`.** Elle sert l'écran mural
+de l'atelier, qui n'a pas de session. Elle n'expose qu'une liste blanche de
+9 colonnes, gardée par un test. `GET /api/projects` fait un `select('*')` —
+notes, adresses, contacts, `quote_data` avec prix d'achat et marges — et exige
+donc un JWT.
+
+**Toute autorisation se vérifie côté serveur.** Masquer un bouton ou rediriger
+en React ne protège rien. `lib/requireAdmin.js` : `requireUser`,
+`requireAdmin`, `requireCronOrAdmin` (secret cron comparé à temps constant).
+Les routes cron et de configuration exigent l'admin, pas un simple compte
+vérifié.
+
+**L'identité vient du JWT, jamais du corps de la requête.** Un champ `user`,
+`author` ou `x-actor` envoyé par le navigateur est une déclaration, pas une
+identité.
+
+**`app_settings` est admin en écriture.** Cette table porte l'IBAN et la raison
+sociale imprimés sur les factures. La lecture est limitée aux clés dont
+l'interface a besoin.
+
+**Les tâches privées se filtrent côté serveur** (`lib/taskAccess.js`), en
+lecture comme en mutation. Une tâche interdite renvoie 404, pas 403 : un 403
+confirmerait son existence.
+
+**Les fichiers ne sont jamais crus sur parole** (`lib/fileType.js`). Type,
+extension et taille viennent du contenu binaire. HTML et SVG sont refusés — ils
+s'exécuteraient dans l'origine de Maze. Seules les images raster vérifiées
+partent en `inline` ; tout le reste en `attachment`, avec `nosniff`. Le HEIC est
+stocké mais jamais servi inline : `pages/schedule.js` envoie les photos iPhone
+telles quelles.
+
+**Un identifiant kDrive venant du navigateur n'est pas une autorisation.** Le
+serveur a un token très privilégié. Soit le fichier est référencé en base et
+`lib/kdriveAccess.js` tranche, soit il présente un jeton signé
+(`lib/signedRef.js`) que le serveur a lui-même émis en le listant. La
+navigation ne part que de la racine du projet. Les pièces comptables sont
+réservées à l'admin, les frais à leur auteur.
+
+**Rien de sensible dans le localStorage.** Le cache SWR est en mémoire. Y
+remettre une persistance globale y replacerait factures, données bancaires,
+contacts et marges, qui survivraient à la déconnexion sur un poste partagé.
