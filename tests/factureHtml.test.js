@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildFactureHtml } from '../lib/factureHtml'
+import { qrDocument } from '../lib/docLayout'
 
 const base = {
   invoice_number: '2026-013', issue_date: '2026-08-14', due_date: '2026-09-13',
@@ -45,10 +46,12 @@ describe('buildFactureHtml', () => {
     expect(buildFactureHtml(base, ci, 'detailed', '<svg id="qr"></svg>')).not.toContain('CH00 1234')
   })
 
-  it('place le QR-bill en pied de page', () => {
+  it('ne place plus le bulletin dans le corps de la facture', () => {
+    // Le bulletin est un DOCUMENT séparé, fusionné au moment du PDF : ses
+    // marges de page sont incompatibles avec celles du contenu, qui doivent
+    // se répéter d'une page à l'autre.
     const html = buildFactureHtml(base, {}, 'detailed', '<svg id="qr"></svg>')
-    expect(html).toContain('<div class="qr"><svg id="qr"></svg></div>')
-    expect(html.indexOf('class="qr"')).toBeGreaterThan(html.indexOf('Total à payer'))
+    expect(html).not.toContain('<svg id="qr">')
   })
 
   it('titre la section Stockage pour les factures de stockage', () => {
@@ -61,5 +64,18 @@ describe('buildFactureHtml', () => {
     const html = buildFactureHtml({ ...base, quote_snapshot: { purchases: [{ description: 'Bois', unit_price: 500, quantity: 2 }] } }, {}, 'detailed', null)
     expect(html).toContain('Bois')
     expect(html).toContain("1'000,00")
+  })
+})
+
+describe('qrDocument — page autonome du bulletin', () => {
+  it('produit un document A4 sans marges, bulletin collé au bord bas', () => {
+    const html = qrDocument('<svg id="qr"></svg>')
+    expect(html).toContain('@page { size: A4; margin: 0; }')
+    expect(html).toContain('margin-top:192mm')       // 297 − 105
+    expect(html).toContain('<svg id="qr">')
+  })
+
+  it('donne au bulletin la pleine largeur du papier', () => {
+    expect(qrDocument('<svg/>')).toContain('width:210mm')
   })
 })

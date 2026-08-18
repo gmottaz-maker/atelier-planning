@@ -387,6 +387,14 @@ l'affiche avec l'identifiant de requête. Sans ça, un bouton peut répondre 405
 sans que rien ne bouge à l'écran — c'est arrivé. Les échecs de LECTURE ne
 déclenchent rien : l'écran les montre déjà par son état vide.
 
+**Les marges d'un document PDF viennent de `@page`, jamais d'un `padding`.**
+Un padding ne s'applique qu'au début et à la fin du bloc : à partir de la
+page 2, le texte touchait le bord du papier. Corollaire : le bulletin QR d'une
+facture est un DOCUMENT SÉPARÉ (`qrDocument`), rendu avec ses propres marges
+puis concaténé par `htmlToPdf(html, annexe)`. Les pages CSS nommées
+(`@page bulletin { margin: 0 }`) auraient évité ça, mais Chrome ne les honore
+pas — vérifié, il insère une page blanche.
+
 **Les montants ne passent pas par `Intl`** (`lib/money.js`). Le séparateur de
 milliers de `fr-CH` dépend de la version d'ICU embarquée dans Node : la CI et
 le poste de développement ne produisaient pas le même texte, et surtout, le
@@ -422,7 +430,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 264 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 266 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```

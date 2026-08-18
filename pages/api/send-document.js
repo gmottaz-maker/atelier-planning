@@ -3,6 +3,7 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 import { requireAdmin } from '../../lib/requireAdmin'
 import { buildDevisHtml } from '../../lib/devisHtml'
 import { buildFactureHtml } from '../../lib/factureHtml'
+import { qrDocument } from '../../lib/docLayout'
 import { htmlToPdf } from '../../lib/htmlToPdf'
 import { pdfFilename } from '../../lib/pdfFilename'
 import { SwissQRBill } from 'swissqrbill/svg'
@@ -88,7 +89,8 @@ export default async function handler(req, res) {
       const { data: inv, error } = await supabase.from('customer_invoices').select('*, projects(name, client, reference)').eq('id', id).single()
       if (error || !inv) return res.status(404).json({ error: 'Facture introuvable' })
       const effectiveMode = mode || inv.detail_level || 'detailed'
-      pdf = await htmlToPdf(buildFactureHtml(inv, company, effectiveMode, invoiceQrSvg(inv, company)))
+      const qr = invoiceQrSvg(inv, company)
+      pdf = await htmlToPdf(buildFactureHtml(inv, company, effectiveMode, qr), qr ? qrDocument(qr) : null)
       filename = pdfFilename('facture', inv.projects?.name || inv.client_name)
       afterSend = async () => {
         const patch = { sent_at: inv.sent_at || new Date().toISOString() }

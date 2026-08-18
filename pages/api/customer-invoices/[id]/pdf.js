@@ -4,6 +4,7 @@ import { getSupabaseServer } from '../../../../lib/supabase-server'
 import { requireAdmin } from '../../../../lib/requireAdmin'
 import { SwissQRBill } from 'swissqrbill/svg'
 import { buildFactureHtml } from '../../../../lib/factureHtml'
+import { qrDocument } from '../../../../lib/docLayout'
 import { htmlToPdf } from '../../../../lib/htmlToPdf'
 import { pdfFilename } from '../../../../lib/pdfFilename'
 
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
 
   try {
     const html = buildFactureHtml(inv, company, effectiveMode, qrSvg)
-    const pdf = await htmlToPdf(html)
+    const pdf = await htmlToPdf(html, qrSvg ? qrDocument(qrSvg) : null)
     res.setHeader('Content-Type', 'application/pdf')
     const docType = effectiveMode === 'summary' ? 'facture-résumée' : 'facture-détaillée'
     res.setHeader('Content-Disposition', `inline; filename="${pdfFilename(docType, inv.projects?.name || inv.client_name)}"`)

@@ -67,7 +67,9 @@ export default function DevisPage() {
         body { background: #f1f5f9; margin: 0; }
         ${DEVIS_CSS}
         .devis-doc .page { margin: 24px auto; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
-        @page { size: A4; margin: 0; }
+        /* Mêmes marges qu'à la génération du PDF : elles se répètent sur
+           chaque page, contrairement à un padding. */
+        @page { size: A4; margin: 18mm 18mm 16mm; }
         @media print {
           body { background: white; }
           .no-print { display: none !important; }
