@@ -42,6 +42,100 @@ export function defaultQuote() {
   }
 }
 
+// Bascule de visibilité d'une ligne dans le document envoyé au client.
+// La ligne reste dans le devis et dans TOUS les totaux : c'est un filtre
+// d'affichage, pas une suppression. C'est ce qui permet de chiffrer au détail
+// sans imposer au client une offre longue comme le bras.
+function OeilVisibilite({ masquee, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={!masquee}
+      title={masquee ? 'Masquée sur le document — cliquer pour afficher' : 'Visible sur le document — cliquer pour masquer'}
+      className={`text-sm leading-none ${masquee ? 'text-gray-300 hover:text-gray-500' : 'text-emerald-600 hover:text-emerald-800'}`}
+    >
+      {masquee ? '☐' : '☑'}
+    </button>
+  )
+}
+
+
+// Composition d'un ÉLÉMENT : matériaux et heures qui le constituent.
+// Table volontairement plus compacte que celle d'un item — à ce niveau on
+// chiffre, on ne rédige pas l'offre. Les colonnes de calcul (marge, escompte)
+// restent présentes : c'est là que se fait le prix.
+function CompositionElement({
+  element, generalMargin, fmtCHF, purchaseNet, laborNet, th, td, tdRO, txtCell, numCell, QUOTE_UNITS,
+  onAdd, onUpdate, onRemove, onToggleHidden,
+}) {
+  const lignes = [
+    ...(element.purchases || []).map((r, i) => ({ r, i, kind: 'purchases' })),
+    ...(element.labor || []).map((r, i) => ({ r, i, kind: 'labor' })),
+  ]
+  return (
+    <div className="overflow-x-auto">
+      <div className="px-3 py-1.5 flex items-center justify-end gap-3 bg-gray-50">
+        <button onClick={() => onAdd('purchases')} className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Matériau</button>
+        <button onClick={() => onAdd('labor')} className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Main d'œuvre</button>
+      </div>
+      <table className="w-full" style={{ minWidth: 760, tableLayout: 'fixed' }}>
+        <thead>
+          <tr>
+            <th className={th} style={{ width: '30%' }}>Description</th>
+            <th className={th + ' text-right'} style={{ width: '12%' }}>Prix</th>
+            <th className={th + ' text-right'} style={{ width: '9%' }}>Qté</th>
+            <th className={th} style={{ width: '10%' }}>Unité</th>
+            <th className={th + ' text-right'} style={{ width: '9%' }}>Marge %</th>
+            <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
+            <th className={th + ' text-right'} style={{ width: '14%' }}>Total</th>
+            <th className={th} style={{ width: '7%' }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.length === 0 ? (
+            <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-3">Aucune composition.</td></tr>
+          ) : lignes.map(({ r, i, kind }) => {
+            const achat = kind === 'purchases'
+            return (
+              <tr key={`${kind}-${r._uid || i}`} className={'group hover:bg-gray-50' + (r.hidden ? ' opacity-60' : '')}>
+                <td className={td}>
+                  <input className={txtCell} placeholder={achat ? 'Matériau' : 'Main d\'œuvre'}
+                    value={r.description || ''} onChange={e => onUpdate(kind, i, 'description', e.target.value)} />
+                </td>
+                <td className={td}>
+                  <input type="number" step="0.01" className={numCell}
+                    value={(achat ? r.unit_price : r.rate) || ''}
+                    onChange={e => onUpdate(kind, i, achat ? 'unit_price' : 'rate', e.target.value)} />
+                </td>
+                <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => onUpdate(kind, i, 'quantity', v)} /></td>
+                <td className={td}>
+                  <select className={txtCell} value={r.unit || ''} onChange={e => onUpdate(kind, i, 'unit', e.target.value)}>
+                    <option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </td>
+                <td className={td}>
+                  {achat
+                    ? <input type="number" step="0.1" className={numCell} placeholder={generalMargin || ''} value={r.margin || ''} onChange={e => onUpdate(kind, i, 'margin', e.target.value)} />
+                    : <span className="block text-center text-gray-300">—</span>}
+                </td>
+                <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => onUpdate(kind, i, 'discount', e.target.value)} /></td>
+                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(achat ? purchaseNet(r) : laborNet(r))}</td>
+                <td className={td + ' text-center'}>
+                  <span className="inline-flex items-center gap-2">
+                    <OeilVisibilite masquee={!!r.hidden} onToggle={() => onToggleHidden(kind, i)} />
+                    <button onClick={() => onRemove(kind, i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                  </span>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function QuoteEditor({ value, onChange }) {
   // Le bloc JSX ci-dessous provient de la page projet : on lui redonne
   // exactement les noms qu'il utilisait (quote / setQuote / setQuoteDirty)
@@ -75,13 +169,18 @@ export default function QuoteEditor({ value, onChange }) {
   function serviceNet(r)    { return applyDiscount(serviceBilled(r), r) }
   function logisticsNet(r)  { return applyDiscount(serviceBilledLogistics(r), r) }
   function itemTotal(it) {
-    return (it.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
-         + (it.labor     || []).reduce((s, r) => s + laborNet(r), 0)
+    const compo = p => (p.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
+                     + (p.labor     || []).reduce((s, r) => s + laborNet(r), 0)
+    return compo(it) + (it.elements || []).reduce((s, el) => s + compo(el), 0)
   }
 
   // ── Gestion ──
   function addManagementRow()   { setQuote(q => ({ ...q, management: [...q.management, emptyLaborRow()] })); setQuoteDirty(true) }
   function updateManagementRow(idx, field, v) { setQuote(q => ({ ...q, management: q.management.map((r, i) => i === idx ? { ...r, [field]: v } : r) })); setQuoteDirty(true) }
+  const toggleRowHidden = (liste, idx) => {
+    setQuote(q => ({ ...q, [liste]: (q[liste] || []).map((r, i) => i === idx ? { ...r, hidden: !r.hidden } : r) }))
+    setQuoteDirty(true)
+  }
   function removeManagementRow(idx) { setQuote(q => ({ ...q, management: q.management.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
 
   // ── Logistique ──
@@ -99,13 +198,59 @@ export default function QuoteEditor({ value, onChange }) {
   function updateItemName(idx, name) { setQuote(q => ({ ...q, items: q.items.map((it, i) => i === idx ? { ...it, name } : it) })); setQuoteDirty(true) }
   function removeItem(idx) { setQuote(q => ({ ...q, items: q.items.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
   function addItemRow(itemIdx, kind) {
-    const empty = kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()
+    // La composition sert au chiffrage : elle part masquée, on l'affiche au cas
+    // par cas. Les lignes déjà en base n'ont pas ce marqueur et restent
+    // visibles — les offres existantes ne changent pas d'apparence.
+    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()), hidden: true }
     setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx ? { ...it, [kind]: [...(it[kind] || []), empty] } : it) }))
     setQuoteDirty(true)
   }
   function updateItemRow(itemIdx, kind, rowIdx, field, v) {
     setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx
       ? { ...it, [kind]: it[kind].map((r, j) => j === rowIdx ? { ...r, [field]: v } : r) } : it) }))
+    setQuoteDirty(true)
+  }
+  // ── Éléments (niveau intermédiaire entre l'item et sa composition) ────────
+  const majItem = (itemIdx, fn) => {
+    setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx ? fn(it) : it) }))
+    setQuoteDirty(true)
+  }
+  const majElement = (itemIdx, elIdx, fn) =>
+    majItem(itemIdx, it => ({ ...it, elements: (it.elements || []).map((el, j) => j === elIdx ? fn(el) : el) }))
+
+  function addElement(itemIdx) {
+    majItem(itemIdx, it => ({ ...it, elements: [...(it.elements || []), { _uid: genItemUid(), name: '', purchases: [], labor: [] }] }))
+  }
+  function removeElement(itemIdx, elIdx) {
+    majItem(itemIdx, it => ({ ...it, elements: (it.elements || []).filter((_, j) => j !== elIdx) }))
+  }
+  function addElementRow(itemIdx, elIdx, kind) {
+    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()), hidden: true }
+    majElement(itemIdx, elIdx, el => ({ ...el, [kind]: [...(el[kind] || []), empty] }))
+  }
+  function updateElementRow(itemIdx, elIdx, kind, rowIdx, field, v) {
+    majElement(itemIdx, elIdx, el => ({ ...el, [kind]: el[kind].map((r, k) => k === rowIdx ? { ...r, [field]: v } : r) }))
+  }
+  function removeElementRow(itemIdx, elIdx, kind, rowIdx) {
+    majElement(itemIdx, elIdx, el => ({ ...el, [kind]: el[kind].filter((_, k) => k !== rowIdx) }))
+  }
+  function toggleElementRowHidden(itemIdx, elIdx, kind, rowIdx) {
+    majElement(itemIdx, elIdx, el => ({ ...el, [kind]: el[kind].map((r, k) => k === rowIdx ? { ...r, hidden: !r.hidden } : r) }))
+  }
+
+  function toggleItemRowHidden(itemIdx, kind, rowIdx) {
+    setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx
+      ? { ...it, [kind]: it[kind].map((r, j) => j === rowIdx ? { ...r, hidden: !r.hidden } : r) }
+      : it) }))
+    setQuoteDirty(true)
+  }
+  /** Masque ou affiche toute la composition d'un item d'un seul geste. */
+  function toggleItemComposition(itemIdx, masquer) {
+    setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx ? {
+      ...it,
+      purchases: (it.purchases || []).map(r => ({ ...r, hidden: masquer })),
+      labor: (it.labor || []).map(r => ({ ...r, hidden: masquer })),
+    } : it) }))
     setQuoteDirty(true)
   }
   function removeItemRow(itemIdx, kind, rowIdx) {
@@ -119,7 +264,7 @@ export default function QuoteEditor({ value, onChange }) {
   function appendLogisticsRow(pre)      { setQuote(q => ({ ...q, logistics: [...q.logistics, { ...emptyLogisticsRow(), ...pre }] })); setQuoteDirty(true) }
   function appendSubcontractingRow(pre) { setQuote(q => ({ ...q, subcontracting: [...(q.subcontracting || []), { ...emptySubcontractingRow(), ...pre }] })); setQuoteDirty(true) }
   function appendItemRow(itemIdx, kind, pre) {
-    const base = kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()
+    const base = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()), hidden: true }
     setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx ? { ...it, [kind]: [...(it[kind] || []), { ...base, ...pre }] } : it) }))
     setQuoteDirty(true)
   }
@@ -202,7 +347,10 @@ export default function QuoteEditor({ value, onChange }) {
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateManagementRow(i, 'discount_amount', e.target.value)} /></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(laborNet(r))}</td>
                                 <td className={td + ' text-center'}>
-                                  <button onClick={() => removeManagementRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  <span className="inline-flex items-center gap-2">
+                                    <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('management', i)} />
+                                    <button onClick={() => removeManagementRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  </span>
                                 </td>
                               </tr>
                             ))}
@@ -306,7 +454,10 @@ export default function QuoteEditor({ value, onChange }) {
                                       <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'discount_amount', e.target.value)} /></td>
                                       <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseNet(r))}</td>
                                       <td className={td + ' text-center'}>
-                                        <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                        <span className="inline-flex items-center gap-2">
+                                          <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleItemRowHidden(itemIdx, 'purchases', i)} />
+                                          <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                        </span>
                                       </td>
                                     </tr>
                                   ))}
@@ -361,7 +512,10 @@ export default function QuoteEditor({ value, onChange }) {
                                       <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'discount_amount', e.target.value)} /></td>
                                       <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(laborNet(r))}</td>
                                       <td className={td + ' text-center'}>
-                                        <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                        <span className="inline-flex items-center gap-2">
+                                          <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleItemRowHidden(itemIdx, 'labor', i)} />
+                                          <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                        </span>
                                       </td>
                                     </tr>
                                   ))}
@@ -377,6 +531,51 @@ export default function QuoteEditor({ value, onChange }) {
                                 )}
                               </table>
                             </div>
+                          </div>
+
+                          {/* Éléments : niveau intermédiaire, avec leur propre composition */}
+                          <div className="border-t border-gray-100">
+                            <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#f0f9ff' }}>
+                              <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#075985' }}>● Éléments</h4>
+                              <button onClick={() => addElement(itemIdx)}
+                                className="text-xs font-medium text-sky-700 hover:text-sky-900">+ Élément</button>
+                            </div>
+                            {(it.elements || []).length === 0 ? (
+                              <p className="px-4 py-2 text-xs text-gray-400">
+                                Un élément regroupe une partie de l’item (Toiture, Structure…) et affiche son
+                                prix au client ; sa composition sert au chiffrage et reste masquée par défaut.
+                              </p>
+                            ) : it.elements.map((el, elIdx) => {
+                              const elTotal = (el.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
+                                            + (el.labor || []).reduce((s, r) => s + laborNet(r), 0)
+                              return (
+                                <div key={el._uid || elIdx} className="mx-3 mb-3 rounded-lg border border-sky-200 overflow-hidden">
+                                  <div className="px-3 py-2 flex items-center gap-3" style={{ background: '#e0f2fe' }}>
+                                    <input
+                                      className="flex-1 px-2 py-1 text-sm font-semibold bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 rounded"
+                                      style={{ color: '#075985' }}
+                                      placeholder="Nom de l’élément (ex : Toiture, Structure…)"
+                                      value={el.name || ''}
+                                      onChange={e => majElement(itemIdx, elIdx, x => ({ ...x, name: e.target.value }))}
+                                    />
+                                    <span className="text-sm font-semibold tabular-nums whitespace-nowrap" style={{ color: '#075985' }}>{fmtCHF(elTotal)} CHF</span>
+                                    <button onClick={() => { if (confirm(`Supprimer l’élément « ${el.name || 'sans nom'} » ?`)) removeElement(itemIdx, elIdx) }}
+                                      className="text-sky-600 hover:text-red-500 text-sm" title="Supprimer cet élément">✕</button>
+                                  </div>
+                                  <CompositionElement
+                                    element={el}
+                                    generalMargin={quote.general_margin}
+                                    fmtCHF={fmtCHF} purchaseNet={purchaseNet} laborNet={laborNet}
+                                    th={th} td={td} tdRO={tdRO} txtCell={txtCell} numCell={numCell}
+                                    QUOTE_UNITS={QUOTE_UNITS}
+                                    onAdd={kind => addElementRow(itemIdx, elIdx, kind)}
+                                    onUpdate={(kind, i, f, v) => updateElementRow(itemIdx, elIdx, kind, i, f, v)}
+                                    onRemove={(kind, i) => removeElementRow(itemIdx, elIdx, kind, i)}
+                                    onToggleHidden={(kind, i) => toggleElementRowHidden(itemIdx, elIdx, kind, i)}
+                                  />
+                                </div>
+                              )
+                            })}
                           </div>
                           </>
                           )}
@@ -444,7 +643,10 @@ export default function QuoteEditor({ value, onChange }) {
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateSubcontractingRow(i, 'discount_amount', e.target.value)} /></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceNet(r))}</td>
                                 <td className={td + ' text-center'}>
-                                  <button onClick={() => removeSubcontractingRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  <span className="inline-flex items-center gap-2">
+                                    <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('subcontracting', i)} />
+                                    <button onClick={() => removeSubcontractingRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  </span>
                                 </td>
                               </tr>
                             ))}
@@ -514,7 +716,10 @@ export default function QuoteEditor({ value, onChange }) {
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateLogisticsRow(i, 'discount_amount', e.target.value)} /></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(logisticsNet(r))}</td>
                                 <td className={td + ' text-center'}>
-                                  <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  <span className="inline-flex items-center gap-2">
+                                    <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('logistics', i)} />
+                                    <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                  </span>
                                 </td>
                               </tr>
                             ))}

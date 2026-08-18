@@ -2274,22 +2274,12 @@ export default function ProjectPage() {
                       </button>
                       <a href={`/projects/${id}/devis`} target="_blank" rel="noopener"
                         className="px-4 py-1.5 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors inline-flex items-center gap-1.5"
-                        title={quoteDirty ? 'Enregistre d\'abord pour inclure les dernières modifs' : 'Devis PDF détaillé'}>
+                        title={quoteDirty ? 'Enregistre d\'abord pour inclure les dernières modifs' : 'Aperçu et PDF de l\'offre'}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                           <polyline points="14 2 14 8 20 8" />
                         </svg>
-                        PDF détaillé
-                      </a>
-                      <a href={`/projects/${id}/devis?summary=1`} target="_blank" rel="noopener"
-                        className="px-4 py-1.5 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors inline-flex items-center gap-1.5"
-                        title={quoteDirty ? 'Enregistre d\'abord' : 'Devis PDF résumé (sections + sous-totaux seulement)'}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="4" y1="6" x2="20" y2="6" />
-                          <line x1="4" y1="12" x2="20" y2="12" />
-                          <line x1="4" y1="18" x2="14" y2="18" />
-                        </svg>
-                        PDF résumé
+                        Offre PDF
                       </a>
                       {isAdmin && (
                         <a href={`/factures-emises/new?from=${id}`}

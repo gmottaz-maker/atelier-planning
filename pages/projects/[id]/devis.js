@@ -10,9 +10,7 @@ import { buildDevisBody, DEVIS_CSS, DEVIS_FONTS } from '../../../lib/devisHtml'
 // les calculs en JSX, et les deux ont fini par diverger.
 export default function DevisPage() {
   const router = useRouter()
-  const { id, summary } = router.query
-  // level: 'detail' (toutes les lignes) | 'summary' (uniquement les sections avec sous-totaux)
-  const level = summary === '1' ? 'summary' : 'detail'
+  const { id } = router.query
   const [project, setProject] = useState(null)
   const [company, setCompany] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -34,7 +32,7 @@ export default function DevisPage() {
 
   async function downloadPdf() {
     try {
-      const r = await fetch(`/api/projects/${id}/devis-pdf?mode=${level === 'summary' ? 'summary' : 'detailed'}`)
+      const r = await fetch(`/api/projects/${id}/devis-pdf`)
       if (!r.ok) {
         let msg = `Erreur ${r.status}`
         try { const j = await r.json(); if (j.error) msg = j.error } catch (_) {}
@@ -80,25 +78,13 @@ export default function DevisPage() {
       {/* Boutons de contrôle (visibles à l'écran) */}
       <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 10, display: 'flex', gap: 8, alignItems: 'center', fontFamily: 'IBM Plex Sans, sans-serif' }}>
         <button onClick={() => router.back()} style={btn}>← Retour</button>
-        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', background: 'white' }}>
-          <button
-            onClick={() => router.replace({ pathname: router.pathname, query: { id } })}
-            style={{ ...btn, borderRadius: 0, border: 'none', background: level === 'detail' ? '#111827' : 'white', color: level === 'detail' ? 'white' : '#374151' }}>
-            Détaillé
-          </button>
-          <button
-            onClick={() => router.replace({ pathname: router.pathname, query: { id, summary: '1' } })}
-            style={{ ...btn, borderRadius: 0, border: 'none', borderLeft: '1px solid #e5e7eb', background: level === 'summary' ? '#111827' : 'white', color: level === 'summary' ? 'white' : '#374151' }}>
-            Résumé
-          </button>
-        </div>
         <button onClick={() => window.print()} style={btn}>Imprimer</button>
         <button onClick={downloadPdf} style={{ ...btn, background: '#111827', color: 'white', border: 'none', padding: '8px 16px' }}>
           Télécharger PDF
         </button>
       </div>
 
-      <div dangerouslySetInnerHTML={{ __html: buildDevisBody(project, company, level) }} />
+      <div dangerouslySetInnerHTML={{ __html: buildDevisBody(project, company) }} />
     </>
   )
 }

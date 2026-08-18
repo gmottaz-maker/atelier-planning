@@ -92,6 +92,7 @@ lib/
   swr.js                 — Cache SWR persisté en localStorage (voir /peintures)
   theme.js               — Jetons de style (C, FONT, MONO)
   devisHtml.js · factureHtml.js · htmlToPdf.js · pdfFilename.js — Génération des PDF
+  quoteLines.js          — Modèle des lignes d'offre : 3 niveaux, totaux, masquage
   quoteTotals.js · invoiceTotals.js · quoteStatus.js — Calculs offre / facture
   camt053.js · bankMatching.js · bankReconcile.js · reconcileRun.js — Banque
   comptaJournal.js       — Journal en partie double et décompte TVA
@@ -387,6 +388,19 @@ l'affiche avec l'identifiant de requête. Sans ça, un bouton peut répondre 405
 sans que rien ne bouge à l'écran — c'est arrivé. Les échecs de LECTURE ne
 déclenchent rien : l'écran les montre déjà par son état vide.
 
+**Une ligne masquée disparaît du document, jamais des totaux.** `hidden: true`
+est un filtre d'affichage : le montant remonte au parent, qui reste visible.
+C'est ce qui permet de chiffrer au détail sans imposer au client une offre
+longue comme le bras. `lib/quoteLines.js` est la seule source du barème et de
+la mise à plat — l'éditeur, le PDF et la validation serveur des factures
+doivent compter pareil, sinon une facture juste finit refusée.
+
+**Trois niveaux dans Fabrication** : item → élément (facultatif) → composition.
+Seule la composition porte des quantités et des prix ; un item et un élément
+valent la somme de ce qu'ils contiennent. La graisse suit le RÔLE de la ligne,
+pas sa profondeur : une composition n'est jamais en gras, qu'elle tienne sous
+un item ou sous un élément.
+
 **Les marges d'un document PDF viennent de `@page`, jamais d'un `padding`.**
 Un padding ne s'applique qu'au début et à la fin du bloc : à partir de la
 page 2, le texte touchait le bord du papier. Corollaire : le bulletin QR d'une
@@ -430,7 +444,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 266 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 274 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```

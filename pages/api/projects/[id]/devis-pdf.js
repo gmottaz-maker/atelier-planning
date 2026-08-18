@@ -1,5 +1,5 @@
 // PDF de devis (offre) — rendu identique à la page devis via HTML → PDF (Chromium).
-// ?mode=detail (défaut) | summary.
+// Un seul format : ce qui apparaît se règle ligne par ligne dans l'éditeur.
 import { getSupabaseServer } from '../../../../lib/supabase-server'
 import { requireUser } from '../../../../lib/requireAdmin'
 import { buildDevisHtml } from '../../../../lib/devisHtml'
@@ -13,7 +13,6 @@ const supabase = getSupabaseServer()
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
   const { id } = req.query
-  const mode = req.query.mode === 'summary' ? 'summary' : 'detail'
 
   const { data: project, error } = await supabase.from('projects').select('*').eq('id', id).single()
   if (error || !project) return res.status(404).end()
@@ -22,7 +21,7 @@ export default async function handler(req, res) {
   const company = settings?.value || {}
 
   try {
-    const pdf = await htmlToPdf(buildDevisHtml(project, company, mode))
+    const pdf = await htmlToPdf(buildDevisHtml(project, company))
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `inline; filename="${pdfFilename('devis', project.name)}"`)
     res.send(Buffer.from(pdf))
