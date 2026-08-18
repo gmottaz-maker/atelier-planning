@@ -8,6 +8,8 @@ import Sidebar, { SIDEBAR_WIDTH } from '../components/Sidebar'
 import BottomNav, { BOTTOM_NAV_HEIGHT } from '../components/BottomNav'
 import useIsMobile from '../lib/useIsMobile'
 import { swrConfig, purgeCachePersistant } from '../lib/swr'
+import { signalerErreur, ApiError } from '../lib/api'
+import ApiErrorBanner from '../components/ApiErrorBanner'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -48,7 +50,22 @@ if (typeof window !== 'undefined' && !window.__mazeAuthFetchInstalled) {
         }
       } catch (_) { /* pas de session → la route répondra 401 */ }
     }
-    return origFetch(input, init)
+    const reponse = await origFetch(input, init)
+
+    // Filet pour les appels qui ne passent pas par lib/api.js : une mutation
+    // qui échoue sans être signalée laisse croire que l'action a abouti. Les
+    // appels de apiFetch se signalent eux-mêmes et portent un marqueur.
+    if (url.startsWith('/api/') && !reponse.ok && !init?.__mazeApi) {
+      const methode = (init?.method || 'GET').toUpperCase()
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(methode)) {
+        let corps = null
+        try { corps = await reponse.clone().json() } catch {}
+        signalerErreur(new ApiError(corps?.error || `Erreur ${reponse.status}`, {
+          status: reponse.status, code: corps?.code, requestId: corps?.request_id, url,
+        }))
+      }
+    }
+    return reponse
   }
 }
 
@@ -216,6 +233,7 @@ export default function App({ Component, pageProps }) {
   return (
     <AuthContext.Provider value={{ user, signOut: () => { purgeCachePersistant(); return supabase.auth.signOut() } }}>
       <SWRConfig value={swrConfig}>
+      <ApiErrorBanner />
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
