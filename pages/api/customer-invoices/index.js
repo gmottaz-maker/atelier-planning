@@ -1,6 +1,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { nextInvoiceNumber, qrReference } from '../../../lib/invoiceNumber'
+import { validerFacture } from '../../../lib/invoiceCheck'
 
 const supabase = getSupabaseServer()
 
@@ -25,10 +26,12 @@ export default async function handler(req, res) {
     } = req.body
 
     if (!client_name || amount == null) return res.status(400).json({ error: 'client_name et amount requis' })
-    const amountNum = parseFloat(amount)
-    if (!Number.isFinite(amountNum) || amountNum < 0) {
-      return res.status(400).json({ error: 'Montant invalide' })
-    }
+
+    // Les montants sont recalculés depuis quote_snapshot : ceux du navigateur
+    // ne sont qu'une proposition, refusée si elle s'écarte de plus d'un centime.
+    const check = validerFacture(req.body)
+    if (!check.ok) return res.status(400).json({ error: check.error })
+    const { amount: amountNum, amount_net: netNum, vat_amount: vatNum, vat_rate: vatRateNum, currency: cur } = check.valeurs
 
     const year = (issue_date || new Date().toISOString().slice(0, 10)).slice(0, 4)
 
@@ -46,10 +49,10 @@ export default async function handler(req, res) {
         client_name,
         client_address,
         amount: amountNum,
-        amount_net: amount_net != null && amount_net !== '' ? parseFloat(amount_net) : null,
-        vat_rate:   vat_rate   != null && vat_rate   !== '' ? parseFloat(vat_rate)   : null,
-        vat_amount: vat_amount != null && vat_amount !== '' ? parseFloat(vat_amount) : null,
-        currency: currency || 'CHF',
+        amount_net: netNum,
+        vat_rate: vatRateNum,
+        vat_amount: vatNum,
+        currency: cur,
         issue_date: issue_date || new Date().toISOString().slice(0, 10),
         due_date: due_date || null,
         iban_recipient: iban_recipient || process.env.AMAZING_LAB_IBAN || null,

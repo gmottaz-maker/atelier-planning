@@ -6,6 +6,7 @@ import { buildFactureHtml } from '../../lib/factureHtml'
 import { htmlToPdf } from '../../lib/htmlToPdf'
 import { pdfFilename } from '../../lib/pdfFilename'
 import { SwissQRBill } from 'swissqrbill/svg'
+import { fetchTimeout } from '../../lib/fetchTimeout'
 
 export const config = { maxDuration: 30 }
 
@@ -107,7 +108,7 @@ export default async function handler(req, res) {
 
   // ── Envoi Resend ──
   try {
-    const r = await fetch('https://api.resend.com/emails', {
+    const r = await fetchTimeout('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({

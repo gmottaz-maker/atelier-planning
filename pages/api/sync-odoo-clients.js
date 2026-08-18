@@ -1,6 +1,7 @@
 import { getSupabaseServer } from '../../lib/supabase-server'
 const supabase = getSupabaseServer()
 import { requireCronOrAdmin } from '../../lib/requireAdmin'
+import { fetchTimeout } from '../../lib/fetchTimeout'
 
 const ODOO_URL = process.env.ODOO_URL          // ex: https://amazing-lab.odoo.com
 const ODOO_DB  = process.env.ODOO_DB           // ex: amazing-lab
@@ -9,7 +10,7 @@ const ODOO_KEY = process.env.ODOO_API_KEY      // clé API persistante
 // Sécurité : endpoint appelable uniquement avec le bon secret
 
 async function odooCall(model, method, args = [], kwargs = {}) {
-  const resp = await fetch(`${ODOO_URL}/web/dataset/call_kw`, {
+  const resp = await fetchTimeout(`${ODOO_URL}/web/dataset/call_kw`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -32,7 +33,7 @@ async function odooCall(model, method, args = [], kwargs = {}) {
 }
 
 async function authenticate() {
-  const resp = await fetch(`${ODOO_URL}/web/session/authenticate`, {
+  const resp = await fetchTimeout(`${ODOO_URL}/web/session/authenticate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -75,7 +76,7 @@ export default async function handler(req, res) {
     let allPartners = []
 
     while (true) {
-      const batch = await fetch(`${ODOO_URL}/web/dataset/call_kw`, {
+      const batch = await fetchTimeout(`${ODOO_URL}/web/dataset/call_kw`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

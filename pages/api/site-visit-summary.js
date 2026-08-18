@@ -1,4 +1,5 @@
 import { requireUser } from '../../lib/requireAdmin'
+import { fetchTimeout, DELAI_IA } from '../../lib/fetchTimeout'
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
   if (req.method !== 'POST') return res.status(405).end()
@@ -41,7 +42,7 @@ Données de la visite :
 ${visitText}`
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetchTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,7 +54,7 @@ ${visitText}`
         max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }],
       }),
-    })
+    }, DELAI_IA)
 
     if (!response.ok) {
       const err = await response.json()

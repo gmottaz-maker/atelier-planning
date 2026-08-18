@@ -1,10 +1,12 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
+import { validerFacture } from '../../../lib/invoiceCheck'
 
 const supabase = getSupabaseServer()
 
 export default async function handler(req, res) {
-  if (!(await requireAdmin(req, res))) return
+  const user = await requireAdmin(req, res)
+  if (!user) return
   const { id } = req.query
 
   if (req.method === 'GET') {
@@ -26,12 +28,51 @@ export default async function handler(req, res) {
     for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount', 'discount_rate', 'discount_amount']) {
       if (payload[k] != null) payload[k] = parseFloat(payload[k])
     }
+
+    // Mise à jour partielle : on ne peut valider les montants qu'en les
+    // fusionnant avec la facture existante. Un PATCH de statut ne déclenche
+    // donc aucun recalcul.
+    const TOUCHE_MONTANTS = ['amount', 'amount_net', 'vat_rate', 'vat_amount',
+                             'quote_snapshot', 'discount_rate', 'discount_amount', 'currency', 'status',
+                             'issue_date', 'due_date']
+    if (TOUCHE_MONTANTS.some(k => k in payload)) {
+      const { data: actuelle } = await supabase
+        .from('customer_invoices').select('*').eq('id', id).maybeSingle()
+      if (!actuelle) return res.status(404).json({ error: 'Facture introuvable' })
+      const check = validerFacture({ ...actuelle, ...payload })
+      if (!check.ok) return res.status(400).json({ error: check.error })
+      if ('amount' in payload || 'quote_snapshot' in payload ||
+          'discount_rate' in payload || 'discount_amount' in payload || 'vat_rate' in payload) {
+        Object.assign(payload, check.valeurs)
+      }
+    }
+
     const { data, error } = await supabase.from('customer_invoices').update(payload).eq('id', id).select().single()
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json(data)
   }
 
   if (req.method === 'DELETE') {
+    // Une facture partie chez le client, ou déjà payée, ne se supprime pas :
+    // elle s'annule. Effacer la ligne trouerait la numérotation et ferait
+    // disparaître une pièce comptable.
+    const { data: inv } = await supabase
+      .from('customer_invoices').select('id, status, invoice_number').eq('id', id).maybeSingle()
+    if (!inv) return res.status(404).json({ error: 'Facture introuvable' })
+
+    if (['sent', 'pending', 'paid'].includes(inv.status)) {
+      const { data, error } = await supabase.from('customer_invoices')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('id', id).select().single()
+      if (error) return res.status(500).json({ error: error.message })
+      await supabase.from('activity_log').insert({
+        actor: user.name, action: 'invoice_cancelled', entity_type: 'customer_invoice',
+        entity_id: String(id), entity_name: inv.invoice_number,
+        metadata: { previous_status: inv.status },
+      }).then(() => {}, () => {})
+      return res.status(200).json({ success: true, cancelled: true, invoice: data })
+    }
+
     const { error } = await supabase.from('customer_invoices').delete().eq('id', id)
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ success: true })
