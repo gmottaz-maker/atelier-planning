@@ -69,7 +69,10 @@ Règles :
 
 ## Déploiement
 
-Un push sur `main` déclenche Vercel. La CI (`.github/workflows/ci.yml`)
+Un push sur `main` déclenche Vercel. La version de Node y est fixée dans les
+réglages du projet Vercel, pas dans `package.json` : un champ `engines.node`
+contenant une PLAGE (`>=20`) fait échouer le déploiement — Vercel n'accepte
+qu'une version précise (`20.x`, `22.x`). `.nvmrc` ne sert qu'au local et à la CI. La CI (`.github/workflows/ci.yml`)
 exécute sur chaque pull request : `npm ci`, les tests, le build de production,
 l'audit des dépendances et la détection de secrets. Elle n'a accès ni à la base
 ni aux secrets de production — le build tourne avec des valeurs factices.
