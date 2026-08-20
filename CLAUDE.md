@@ -156,8 +156,18 @@ AMAZING_LAB_EMAIL, AMAZING_LAB_PHONE, AMAZING_LAB_WEBSITE
 
 ```js
 const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
-const ADMIN_USER  = 'Guillaume'
 ```
+
+**Les droits viennent de `profiles.role`**, pas d'un nom écrit dans le code.
+Au 18 août 2026 : Guillaume et Arnaud sont `admin`, Gabin est `member`.
+Pour changer, une seule requête — aucun déploiement :
+
+```sql
+UPDATE profiles SET role = 'admin' WHERE name = 'Arnaud';   -- ou 'member' pour retirer
+```
+
+`ADMIN_USER` subsiste dans `lib/requireAdmin.js` comme unique repli si la
+colonne `role` venait à manquer. Il ne doit servir à rien d'autre.
 
 L'auth est gérée par Supabase. **Le nom d'utilisateur vient de la table
 `profiles`, pas de `user_metadata`** — `user_metadata.name` est vide pour les

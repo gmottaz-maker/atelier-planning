@@ -4,11 +4,12 @@ import { useAuth } from './_app'
 import { supabase } from '../lib/supabase'
 import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
+import useIsAdmin from '../lib/useIsAdmin'
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth()
   const currentUser = user?.name || ''
-  const isAdmin = currentUser === 'Guillaume'
+  const isAdmin = useIsAdmin()
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')

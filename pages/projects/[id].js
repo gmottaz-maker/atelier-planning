@@ -1627,7 +1627,7 @@ export default function ProjectPage() {
                             <span className="font-semibold text-gray-900" style={{ fontSize: 14 }}>{u.author}</span>
                             <span className="text-xs text-gray-400">{fmtRelative(u.created_at)}</span>
                           </div>
-                          {currentUser === 'Guillaume' && (
+                          {isAdmin && (
                             <button onClick={() => deleteUpdate(u.id)}
                               className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">
                               Supprimer

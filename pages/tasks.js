@@ -5,6 +5,7 @@ import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
 import TaskFormDrawer from '../components/TaskFormDrawer'
 import { C, FONT, MONO, personChip } from '../lib/theme'
+import useIsAdmin from '../lib/useIsAdmin'
 
 const PINK = '#111827'
 const PEOPLE = ['Arnaud', 'Guillaume', 'Gabin', 'non défini']  // valeur par défaut, surchargée par useResponsibles()
@@ -148,11 +149,11 @@ function CountdownBadge({ task }) {
 
 // ─── Composant TaskCard ───────────────────────────────────────────────────
 
-function TaskCard({ task, currentUser, onToggle, onEdit, onDelete }) {
+function TaskCard({ task, currentUser, isAdmin, onToggle, onEdit, onDelete }) {
   const completed   = task.status === 'completed'
   const chip        = personChip(task.responsible)
   const projectName = task.projects?.name
-  const canDelete   = task.responsible === currentUser || currentUser === 'Guillaume'
+  const canDelete   = task.responsible === currentUser || isAdmin
   const badge       = !completed && dueBadge(task, daysRemaining(task))
 
   return (
@@ -256,6 +257,7 @@ export default function Tasks() {
   const { user, signOut } = useAuth()
   const { responsibles } = useResponsibles()
   const currentUser = user?.name || null
+  const isAdmin = useIsAdmin()
 
   // Données via SWR : cache instantané + revalidation au focus
   const { data: tasks = [], isLoading: tasksLoading, mutate: mutateTasks } = useSWR('/api/tasks')
@@ -603,7 +605,7 @@ export default function Tasks() {
                       <span style={{ font: `10px ${MONO}`, color: C.muted }}>{items.length}</span>
                     </div>
                     {items.map(task => (
-                      <TaskCard key={task.id} task={task} currentUser={currentUser}
+                      <TaskCard key={task.id} task={task} currentUser={currentUser} isAdmin={isAdmin}
                         onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
                     ))}
                   </section>
