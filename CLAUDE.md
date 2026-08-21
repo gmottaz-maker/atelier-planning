@@ -272,6 +272,14 @@ quitter la fiche produit. Un produit tarifé porte le badge « chiffrable ».
 3. `dilRetenue`, `tempsA0` et les coefficients A0–A4 sont des HYPOTHÈSES
    Amazing Lab, à recalibrer sur des essais réels — pas des données RUCO.
 
+**Deux facteurs de surconsommation, à ne pas confondre.** `quantite` (dans les
+niveaux de complexité) est la surconsommation due à la FORME de la pièce :
+chants, retours, recoins où le pistolet repasse et où le brouillard se perd.
+`pertes` (réglage du chiffrage) couvre l'amorçage, le réglage et le fond de
+godet, qui valent même sur un panneau plat. Les deux se multiplient et ne se
+remplacent pas. `quantite` s'appelait `matiere` ; `normaliserComplexites()`
+relit encore l'ancienne clé, et n'écrit que la nouvelle.
+
 **Les valeurs A0–A4 livrées ne reposent sur AUCUNE mesure.** Elles viennent du
 brief rédigé avec ChatGPT, qui les annonce lui-même comme « valeurs provisoires »
 et « hypothèses Amazing Lab, pas des données RUCO ». Ni facture, ni fiche
@@ -516,7 +524,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 323 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 328 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```

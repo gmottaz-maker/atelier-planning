@@ -75,7 +75,7 @@ describe('app-settings — IBAN et raison sociale imprimés sur les factures', (
 
   it('laisse un membre LIRE les coefficients de peinture', async () => {
     // Partagés par toute l'équipe : chacun doit chiffrer avec les mêmes.
-    sous(MEMBRE, { app_settings: [{ key: 'paint_coefficients', value: { A0: { matiere: 1 } } }] })
+    sous(MEMBRE, { app_settings: [{ key: 'paint_coefficients', value: { A0: { quantite: 1 } } }] })
     const res = await appeler(await charger(), { method: 'GET', query: { key: 'paint_coefficients' } })
     expect(res.statusCode).toBe(200)
   })
@@ -84,7 +84,7 @@ describe('app-settings — IBAN et raison sociale imprimés sur les factures', (
     // Ils entrent dans les chiffrages : le recalibrage reste une décision admin.
     sous(MEMBRE)
     const res = await appeler(await charger(), {
-      method: 'PUT', query: { key: 'paint_coefficients' }, body: { value: { A0: { matiere: 9 } } },
+      method: 'PUT', query: { key: 'paint_coefficients' }, body: { value: { A0: { quantite: 9 } } },
     })
     expect(res.statusCode).toBe(403)
   })

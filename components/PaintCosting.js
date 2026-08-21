@@ -184,7 +184,7 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
         <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
           {[
             ['margeMatiere', 'Marge matière (%)', 1],
-            ['pertes', 'Pertes préparation (%)', 1],
+            ['pertes', 'Pertes de pulvérisation (%)', 1],
             ['tempsA0', 'Temps A0 (min/m²/couche)', 0.5],
             ['tauxHoraire', 'Taux atelier (CHF/h)', 5],
           ].map(([k, label, pas]) => (
@@ -195,8 +195,11 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
             </label>
           ))}
           <p style={{ gridColumn: '1 / -1', margin: 0, font: `11.5px ${FONT}`, color: C.muted }}>
-            Le temps A0 et les coefficients de complexité sont des hypothèses
-            d’atelier, à recalibrer sur des essais réels. Ils ne viennent pas de RUCO.
+            Les pertes de pulvérisation — amorçage, réglage, fond de godet —
+            valent pour toute pièce. La surconsommation liée à la forme se règle
+            séparément, par le coefficient « quantité peinture » du niveau de
+            complexité. Comme le temps A0, ce sont des hypothèses d’atelier à
+            recalibrer sur des essais réels ; elles ne viennent pas de RUCO.
           </p>
         </div>
       )}

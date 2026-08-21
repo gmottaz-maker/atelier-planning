@@ -76,13 +76,18 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
   return (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: '14px 16px' }}>
       <p style={{ font: `12.5px ${FONT}`, color: C.inkTertiary, margin: '0 0 12px', maxWidth: '68ch', lineHeight: 1.6 }}>
-        Ces coefficients multiplient la surface (matière) et la durée (temps) selon
-        la difficulté de la pièce. Les valeurs livrées <strong>ne reposent sur aucune
-        mesure</strong> : ce sont des ordres de grandeur posés au départ pour que le
-        calcul tourne, ni RUCO ni un essai d’atelier ne les appuie. Ajuste-les dès
-        que tu auras des chantiers pour les confronter. Les niveaux sont libres —
-        ajoute les tiens si A0–A4 ne colle pas à ton travail.
-        Ils sont partagés par toute l’équipe.
+        <strong>Quantité peinture</strong> mesure la surconsommation due à la
+        <em>forme</em> de la pièce : chants, retours, recoins, angles où le pistolet
+        repasse et où le brouillard se perd. Elle ne recouvre pas les pertes
+        normales de pulvérisation — amorçage, réglage, fond de godet — qui valent
+        même pour un panneau plat et se règlent à part, dans les paramètres avancés
+        du chiffrage. <strong>Temps</strong> est le facteur de durée correspondant.
+        <br /><br />
+        Les valeurs livrées <strong>ne reposent sur aucune mesure</strong> : ce sont
+        des ordres de grandeur posés au départ pour que le calcul tourne, ni RUCO ni
+        un essai d’atelier ne les appuie. Ajuste-les dès que tu auras des chantiers
+        pour les confronter. Les niveaux sont libres — ajoute les tiens si A0–A4 ne
+        colle pas à ton travail. Ils sont partagés par toute l’équipe.
       </p>
 
       <div style={{ overflowX: 'auto' }}>
@@ -91,7 +96,7 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
             <tr>
               <th style={{ ...th, width: 92 }}>Niveau</th>
               <th style={th}>Description</th>
-              <th style={{ ...th, textAlign: 'right', width: 96 }}>Matière</th>
+              <th style={{ ...th, textAlign: 'right', width: 116 }}>Quantité peinture</th>
               <th style={{ ...th, textAlign: 'right', width: 96 }}>Temps</th>
               <th style={{ ...th, width: 36 }}></th>
             </tr>
@@ -125,8 +130,8 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
                 <td style={{ ...td, textAlign: 'right' }}>
                   <input disabled={!peutModifier} type="number" step="0.01" min="0.1" max="20"
                     style={{ ...champ, background: peutModifier ? '#fff' : '#f8fafc' }}
-                    value={brouillon[cle]?.matiere ?? ''}
-                    onChange={e => majCoef(cle, 'matiere', e.target.value)} />
+                    value={brouillon[cle]?.quantite ?? ''}
+                    onChange={e => majCoef(cle, 'quantite', e.target.value)} />
                 </td>
                 <td style={{ ...td, textAlign: 'right' }}>
                   <input disabled={!peutModifier} type="number" step="0.01" min="0.1" max="20"

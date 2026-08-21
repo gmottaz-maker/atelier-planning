@@ -138,11 +138,27 @@ describe('chiffrage', () => {
     expect(r.total).toBeCloseTo(r.coutMatiereMarge + r.coutTemps, 6)
   })
 
-  it('fait varier le temps avec la complexité, pas avec la matière seule', () => {
+  it('distingue la surconsommation de forme des pertes de pulvérisation', () => {
+    // Deux facteurs distincts, qui se multiplient : la forme de la pièce
+    // (complexité) et les pertes valables même sur un panneau plat.
+    const plat = chiffrer({ ...base, complexite: COMPLEXITES_DEFAUT.A0, pertes: 0 })
+    const platAvecPertes = chiffrer({ ...base, complexite: COMPLEXITES_DEFAUT.A0, pertes: 10 })
+    const decoupe = chiffrer({ ...base, complexite: COMPLEXITES_DEFAUT.A4, pertes: 0 })
+
+    // Un panneau plat n'a AUCUNE surconsommation de forme, mais garde ses pertes.
+    expect(platAvecPertes.melange / plat.melange).toBeCloseTo(1.10, 6)
+    // Une pièce très découpée surconsomme, même sans pertes.
+    expect(decoupe.melange / plat.melange).toBeCloseTo(1.60, 6)
+    // Les deux se cumulent.
+    const cumul = chiffrer({ ...base, complexite: COMPLEXITES_DEFAUT.A4, pertes: 10 })
+    expect(cumul.melange / plat.melange).toBeCloseTo(1.60 * 1.10, 6)
+  })
+
+  it('sépare le facteur de quantité du facteur de temps', () => {
     const a0 = chiffrer({ ...base, complexite: COMPLEXITES_DEFAUT.A0 })
     const a4 = chiffrer({ ...base, complexite: COMPLEXITES_DEFAUT.A4 })
     expect(a4.tempsMin / a0.tempsMin).toBeCloseTo(3, 6)      // coefficient temps
-    expect(a4.melange / a0.melange).toBeCloseTo(1.6, 6)      // coefficient matière
+    expect(a4.melange / a0.melange).toBeCloseTo(1.6, 6)      // coefficient quantité peinture
   })
 
   it('ne casse pas sans produit ni surface', () => {
@@ -196,13 +212,13 @@ describe('durées en heures', () => {
 
 describe('coefficients modifiables', () => {
   it('accepte un jeu complet', () => {
-    const r = normaliserComplexites({ A0: { label: 'Plat', matiere: 1, temps: 1 } })
-    expect(r.A0).toMatchObject({ label: 'Plat', matiere: 1, temps: 1 })
+    const r = normaliserComplexites({ A0: { label: 'Plat', quantite: 1, temps: 1 } })
+    expect(r.A0).toMatchObject({ label: 'Plat', quantite: 1, temps: 1 })
   })
 
   it('complète les champs manquants d’un niveau connu', () => {
-    const r = normaliserComplexites({ A2: { matiere: 1.14 } })
-    expect(r.A2.matiere).toBe(1.14)
+    const r = normaliserComplexites({ A2: { quantite: 1.14 } })
+    expect(r.A2.quantite).toBe(1.14)
     expect(r.A2.temps).toBe(COMPLEXITES_DEFAUT.A2.temps)
     expect(r.A2.label).toBe(COMPLEXITES_DEFAUT.A2.label)
   })
@@ -210,32 +226,32 @@ describe('coefficients modifiables', () => {
   it('prend le jeu enregistré pour ce qu’il est — un niveau supprimé le reste', () => {
     // Sans ça, on ne pourrait jamais s’écarter de A0–A4 : les niveaux effacés
     // reviendraient au chargement suivant.
-    const r = normaliserComplexites({ A2: { matiere: 1.14 } })
+    const r = normaliserComplexites({ A2: { quantite: 1.14 } })
     expect(Object.keys(r)).toEqual(['A2'])
   })
 
   it('refuse les valeurs aberrantes plutôt que de casser un chiffrage', () => {
-    const r = normaliserComplexites({ A1: { matiere: 0, temps: -3 }, A3: { matiere: 999 } })
+    const r = normaliserComplexites({ A1: { quantite: 0, temps: -3 }, A3: { quantite: 999 } })
     expect(r.A1).toEqual(COMPLEXITES_DEFAUT.A1)
-    expect(r.A3.matiere).toBe(COMPLEXITES_DEFAUT.A3.matiere)
+    expect(r.A3.quantite).toBe(COMPLEXITES_DEFAUT.A3.quantite)
   })
 
   it('accepte des niveaux inventés, hors A0–A4', () => {
     const r = normaliserComplexites({
-      PLAT: { label: 'Panneau brut', matiere: 1, temps: 1 },
-      'LETTRAGE-3D': { label: 'Lettrage volume', matiere: 2.1, temps: 4 },
+      PLAT: { label: 'Panneau brut', quantite: 1, temps: 1 },
+      'LETTRAGE-3D': { label: 'Lettrage volume', quantite: 2.1, temps: 4 },
     })
     expect(Object.keys(r)).toEqual(['PLAT', 'LETTRAGE-3D'])
-    expect(r['LETTRAGE-3D'].matiere).toBe(2.1)
+    expect(r['LETTRAGE-3D'].quantite).toBe(2.1)
   })
 
   it('garde l’ordre d’enregistrement — c’est celui du menu', () => {
-    const r = normaliserComplexites({ Z: { matiere: 1 }, A: { matiere: 1 }, M: { matiere: 1 } })
+    const r = normaliserComplexites({ Z: { quantite: 1 }, A: { quantite: 1 }, M: { quantite: 1 } })
     expect(Object.keys(r)).toEqual(['Z', 'A', 'M'])
   })
 
   it('écarte un code inutilisable sans perdre le reste', () => {
-    const r = normaliserComplexites({ '': { matiere: 1 }, 'a b c': { matiere: 1 }, OK: { matiere: 1.5 } })
+    const r = normaliserComplexites({ '': { quantite: 1 }, 'a b c': { quantite: 1 }, OK: { quantite: 1.5 } })
     expect(Object.keys(r)).toEqual(['OK'])
   })
 
@@ -287,5 +303,31 @@ describe('gestion des niveaux', () => {
   it('refuse un renommage qui écraserait un autre niveau', () => {
     expect(renommerComplexite(COMPLEXITES_DEFAUT, 'A2', 'A3')).toEqual(COMPLEXITES_DEFAUT)
     expect(renommerComplexite(COMPLEXITES_DEFAUT, 'A2', 'a b')).toEqual(COMPLEXITES_DEFAUT)
+  })
+})
+
+describe('renommage matière → quantité peinture', () => {
+  it('relit un réglage enregistré sous l’ancienne clé', () => {
+    // `matiere` était le nom d’origine. Un réglage sauvegardé avant le
+    // renommage ne doit pas retomber silencieusement sur la valeur d’usine.
+    const r = normaliserComplexites({ A2: { matiere: 1.42, temps: 1.5 } })
+    expect(r.A2.quantite).toBe(1.42)
+  })
+
+  it('la nouvelle clé l’emporte si les deux sont là', () => {
+    const r = normaliserComplexites({ A2: { quantite: 1.11, matiere: 9 } })
+    expect(r.A2.quantite).toBe(1.11)
+  })
+
+  it('n’écrit plus que la nouvelle clé', () => {
+    const r = normaliserComplexites({ A2: { matiere: 1.42 } })
+    expect(r.A2).not.toHaveProperty('matiere')
+  })
+
+  it('chiffre pareil quel que soit le nom de la clé', () => {
+    const p = chercherPrix('126040000-056')
+    const ancien = chiffrer({ produit: p, surface: 10, couches: 1, pertes: 0, complexite: { matiere: 1.5, temps: 1 } })
+    const nouveau = chiffrer({ produit: p, surface: 10, couches: 1, pertes: 0, complexite: { quantite: 1.5, temps: 1 } })
+    expect(ancien.melange).toBeCloseTo(nouveau.melange, 9)
   })
 })
