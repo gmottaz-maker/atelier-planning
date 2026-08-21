@@ -24,6 +24,8 @@ import Head from 'next/head'
 import { C, FONT, MONO } from '../../lib/theme'
 import useIsMobile from '../../lib/useIsMobile'
 import PaintCosting, { articlesChiffrables } from '../../components/PaintCosting'
+import PaintCoefficients, { useCoefficients } from '../../components/PaintCoefficients'
+import useIsAdmin from '../../lib/useIsAdmin'
 
 const DATA_URL = '/ruco/products.json'
 const IMG_BASE = '/ruco/img/'
@@ -72,6 +74,9 @@ export default function Peintures() {
   const [error, setError] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [open, setOpen] = useState(null)          // id du produit déplié
+  const [reglagesOuverts, setReglagesOuverts] = useState(false)
+  const { coefficients, setCoefficients } = useCoefficients()
+  const isAdmin = useIsAdmin()
 
   const [q, setQ] = useState('')
   const [sub, setSub] = useState([])
@@ -311,11 +316,26 @@ export default function Peintures() {
   return (
     <Shell
       right={
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
-          style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface, minWidth: isMobile ? 140 : 220 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
+            style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface, minWidth: isMobile ? 140 : 220 }} />
+          <button type="button" onClick={() => setReglagesOuverts(o => !o)}
+            aria-expanded={reglagesOuverts}
+            style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${reglagesOuverts ? C.ink : C.border}`, background: reglagesOuverts ? C.ink : C.surface, color: reglagesOuverts ? '#fff' : C.ink, font: `500 13px ${FONT}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Coefficients
+          </button>
+        </div>
       }
       count={`${db.meta.count} produits · ${db.meta.skuCount} réf.`}
     >
+      {reglagesOuverts && (
+        <PaintCoefficients
+          coefficients={coefficients}
+          onChange={setCoefficients}
+          peutModifier={isAdmin}
+        />
+      )}
+
       {isMobile && (
         <button type="button" onClick={() => setShowFilters(s => !s)}
           style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: C.ink, font: `600 13px ${FONT}`, cursor: 'pointer', alignSelf: 'flex-start' }}>
@@ -423,7 +443,7 @@ export default function Peintures() {
                   )}
                 </div>
 
-                {isOpen && <Detail p={p} />}
+                {isOpen && <Detail p={p} complexites={coefficients} />}
               </article>
             )
           })}
@@ -434,7 +454,7 @@ export default function Peintures() {
 }
 
 // ── détail produit ────────────────────────────────────────────────────────
-function Detail({ p }) {
+function Detail({ p, complexites }) {
   const h4 = { font: `700 10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textTransform: 'uppercase', margin: '12px 0 3px' }
   const txt = { font: `13px ${FONT}`, color: C.inkTertiary, margin: 0, whiteSpace: 'pre-line' }
   const rows = [
@@ -446,7 +466,7 @@ function Detail({ p }) {
 
   return (
     <div style={{ borderTop: `1px solid ${C.border}`, padding: '0 12px 14px' }}>
-      <PaintCosting produit={p} />
+      <PaintCosting produit={p} complexites={complexites} />
 
       {p.definition && <><div style={h4}>Définition</div><p style={txt}>{p.definition}</p></>}
       {!!p.claims?.length && (

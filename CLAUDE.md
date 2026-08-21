@@ -272,6 +272,14 @@ quitter la fiche produit. Un produit tarifé porte le badge « chiffrable ».
 3. `dilRetenue`, `tempsA0` et les coefficients A0–A4 sont des HYPOTHÈSES
    Amazing Lab, à recalibrer sur des essais réels — pas des données RUCO.
 
+**Les coefficients A0–A4 sont PARTAGÉS**, rangés dans `app_settings` sous la clé
+`paint_coefficients` — pas dans le localStorage. Si quelqu'un les recalibre
+après des essais, les chiffrages de toute l'équipe doivent en profiter : c'est
+tout l'intérêt de les mesurer. Lecture pour tous, écriture admin, comme le reste
+de cette table ; un test le garde. `normaliserComplexites()` fait retomber toute
+valeur absente ou aberrante sur la valeur d'origine — un réglage corrompu ne
+doit pas casser un chiffrage.
+
 `lib/paintCalc.js` ne renvoie jamais de valeur inventée : ce qui n'est pas
 calculable vaut `null` et sort avec un avertissement. Le `total` reste `null`
 tant que la matière n'est pas chiffrable — afficher le seul coût du temps
@@ -487,7 +495,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 299 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 307 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```

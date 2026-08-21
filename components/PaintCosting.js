@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { C, FONT, MONO } from '../lib/theme'
 import { fmtCHF, fmtNombre } from '../lib/money'
 import { chercherPrix } from '../lib/paintPrices'
-import { chiffrer, prixMelange, rendement, COMPLEXITES_DEFAUT, REGLAGES_DEFAUT } from '../lib/paintCalc'
+import { chiffrer, prixMelange, rendement, fmtDuree, COMPLEXITES_DEFAUT, REGLAGES_DEFAUT } from '../lib/paintCalc'
 
 // Chiffrage d'un travail de peinture, greffé sur la fiche d'un produit RUCO.
 //
@@ -21,7 +21,7 @@ export function articlesChiffrables(produitCatalogue) {
 const nb = (v, d = 2) => (Number.isFinite(v) ? fmtNombre(v, d) : '—')
 const chf = v => (Number.isFinite(v) ? `${fmtCHF(v)} CHF` : '—')
 
-export default function PaintCosting({ produit }) {
+export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT }) {
   const chiffrables = useMemo(() => articlesChiffrables(produit), [produit])
   const [refChoisie, setRefChoisie] = useState(null)
   const [surface, setSurface] = useState(15)
@@ -40,10 +40,10 @@ export default function PaintCosting({ produit }) {
 
   const r = useMemo(() => chiffrer({
     produit: tarif, surface, couches,
-    complexite: COMPLEXITES_DEFAUT[cle],
+    complexite: complexites[cle],
     modeRendement, modeDilution,
     ...reglages,
-  }), [tarif, surface, couches, cle, modeRendement, modeDilution, reglages])
+  }), [tarif, surface, couches, cle, complexites, modeRendement, modeDilution, reglages])
 
   const h4 = { font: `700 10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textTransform: 'uppercase', margin: '14px 0 6px' }
   const champ = { width: '100%', padding: '6px 8px', border: `1px solid ${C.border}`, borderRadius: 6, font: `13px ${FONT}`, color: C.ink, background: '#fff' }
@@ -93,7 +93,7 @@ export default function PaintCosting({ produit }) {
         <label style={{ gridColumn: '1 / -1' }}>
           <span style={etiq}>Complexité</span>
           <select style={champ} value={cle} onChange={e => setCle(e.target.value)}>
-            {Object.entries(COMPLEXITES_DEFAUT).map(([k, v]) => (
+            {Object.entries(complexites).map(([k, v]) => (
               <option key={k} value={k}>{k} — {v.label}</option>
             ))}
           </select>
@@ -137,7 +137,7 @@ export default function PaintCosting({ produit }) {
         <Chiffre label="Matière + marge" valeur={chf(r.coutMatiereMarge)} fort />
         <Chiffre label="Total indicatif" valeur={chf(r.total)} fort />
         <Chiffre label="Prêt à gicler" valeur={r.masseAGicler != null ? `${nb(r.masseAGicler)} kg` : '—'} />
-        <Chiffre label="Temps estimé" valeur={r.tempsMin ? `${nb(r.tempsMin, 0)} min` : '—'} />
+        <Chiffre label="Temps estimé" valeur={fmtDuree(r.tempsMin)} />
       </div>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12, font: `12.5px ${FONT}` }}>

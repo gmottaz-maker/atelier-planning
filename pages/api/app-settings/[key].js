@@ -4,6 +4,8 @@ import { erreurApi } from '../../../lib/apiError'
 
 const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
+  // Repris de lib/paintCalc.js — hypothèses d'atelier, pas des données RUCO.
+  paint_coefficients: null,
   company_info: {
     name:    process.env.AMAZING_LAB_NAME    || 'Amazing Lab Sàrl',
     address: process.env.AMAZING_LAB_ADDRESS || "Rue de l'Ecluse 30",
@@ -22,7 +24,11 @@ const DEFAULTS = {
 // Clés lisibles par un utilisateur connecté : l'interface en a besoin
 // (en-têtes de documents, listes déroulantes). Toute autre clé est refusée —
 // `app_settings` est un fourre-tout, on ne laisse pas lire une clé arbitraire.
-const CLES_LISIBLES = new Set(['company_info', 'responsibles'])
+// `paint_coefficients` : coefficients de complexité A0–A4 du chiffrage
+// peinture. Partagés volontairement — si quelqu'un les recalibre après des
+// essais d'atelier, les chiffrages de toute l'équipe doivent en profiter.
+// Lecture pour tous, écriture admin, comme le reste de cette table.
+const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficients'])
 
 export default async function handler(req, res) {
   const { key } = req.query
