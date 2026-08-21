@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:secrets": "node scripts/check-secrets.mjs",
-    "check:db": "node scripts/check-db.mjs"
+    "check:db": "node scripts/check-db.mjs",
+    "check:style": "node scripts/check-style.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^6.0.0",
