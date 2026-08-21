@@ -64,14 +64,33 @@ export default function DevisPage() {
       <style jsx global>{`
         body { background: #f1f5f9; margin: 0; }
         ${DEVIS_CSS}
-        .devis-doc .page { margin: 24px auto; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
-        /* Mêmes marges qu'à la génération du PDF : elles se répètent sur
-           chaque page, contrairement à un padding. */
+
+        /* À l'écran : on dessine une feuille posée sur un fond. */
+        .doc .page { margin: 24px auto; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+
+        /* Mêmes marges qu'à la génération du PDF : @page les répète sur chaque
+           page, contrairement à un padding. */
         @page { size: A4; margin: 18mm 18mm 16mm; }
+
+        /* Les règles d'impression sont RÉÉCRITES ICI plutôt que laissées à
+           celles de DEVIS_CSS : ce bloc passe par styled-jsx, et faire dépendre
+           un rendu papier du bon acheminement d'une media query à travers un
+           préprocesseur est trop fragile. Elles sont donc explicites et
+           prioritaires.
+           La largeur est le point critique : la feuille dessinée à l'écran fait
+           210 mm, or la zone imprimable n'en fait que 174 une fois les marges
+           @page retirées. Si cette largeur survit à l'impression, le navigateur
+           déborde ou met à l'échelle — le document sort agrandi et rogné. */
         @media print {
-          body { background: white; }
+          body { background: #fff !important; }
           .no-print { display: none !important; }
-          .devis-doc .page { margin: 0 !important; box-shadow: none !important; }
+          .doc .page {
+            width: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
+          .doc .content { padding: 0 !important; }
         }
       `}</style>
 
