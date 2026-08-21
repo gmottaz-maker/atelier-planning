@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react'
 import { C, FONT, MONO } from '../lib/theme'
 import { apiGet, apiPut } from '../lib/api'
-import { COMPLEXITES_DEFAUT, normaliserComplexites } from '../lib/paintCalc'
+import {
+  COMPLEXITES_DEFAUT, normaliserComplexites,
+  ajouterComplexite, retirerComplexite, renommerComplexite,
+} from '../lib/paintCalc'
 
-// Réglage des coefficients de complexité A0–A4.
+// Réglage des niveaux de complexité du chiffrage peinture.
+//
+// A0–A4 ne sont qu'un point de départ : les niveaux se créent, se renomment et
+// se suppriment. Il en faut toujours au moins un, sans quoi le calculateur
+// n'aurait aucun coefficient à appliquer.
 //
 // Ils sont PARTAGÉS, pas propres à chaque poste : rangés dans `app_settings`
 // sous la clé `paint_coefficients`. Si quelqu'un les recalibre après des essais
@@ -70,8 +77,11 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: '14px 16px' }}>
       <p style={{ font: `12.5px ${FONT}`, color: C.inkTertiary, margin: '0 0 12px', maxWidth: '68ch', lineHeight: 1.6 }}>
         Ces coefficients multiplient la surface (matière) et la durée (temps) selon
-        la difficulté de la pièce. Ce sont des <strong>hypothèses d’atelier</strong>,
-        pas des données RUCO : ils sont faits pour être ajustés au fil des essais.
+        la difficulté de la pièce. Les valeurs livrées <strong>ne reposent sur aucune
+        mesure</strong> : ce sont des ordres de grandeur posés au départ pour que le
+        calcul tourne, ni RUCO ni un essai d’atelier ne les appuie. Ajuste-les dès
+        que tu auras des chantiers pour les confronter. Les niveaux sont libres —
+        ajoute les tiens si A0–A4 ne colle pas à ton travail.
         Ils sont partagés par toute l’équipe.
       </p>
 
@@ -79,16 +89,31 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
         <table style={{ width: '100%', minWidth: 480, borderCollapse: 'collapse', font: `13px ${FONT}` }}>
           <thead>
             <tr>
-              <th style={{ ...th, width: 48 }}>Niv.</th>
+              <th style={{ ...th, width: 92 }}>Niveau</th>
               <th style={th}>Description</th>
               <th style={{ ...th, textAlign: 'right', width: 96 }}>Matière</th>
               <th style={{ ...th, textAlign: 'right', width: 96 }}>Temps</th>
+              <th style={{ ...th, width: 36 }}></th>
             </tr>
           </thead>
           <tbody>
-            {Object.keys(COMPLEXITES_DEFAUT).map(cle => (
+            {Object.keys(brouillon).map(cle => (
               <tr key={cle}>
-                <td style={{ ...td, fontFamily: MONO, fontWeight: 600 }}>{cle}</td>
+                <td style={{ ...td, padding: '6px 4px 6px 8px' }}>
+                  <input
+                    disabled={!peutModifier}
+                    aria-label={`Code du niveau ${cle}`}
+                    style={{ width: 76, padding: '5px 6px', border: `1px solid ${C.border}`, borderRadius: 6, font: `600 12px ${MONO}`, color: C.ink, background: peutModifier ? '#fff' : '#f8fafc' }}
+                    defaultValue={cle}
+                    onBlur={e => {
+                      const nouveau = e.target.value.trim()
+                      if (nouveau === cle) return
+                      const suite = renommerComplexite(brouillon, cle, nouveau)
+                      if (suite === brouillon) e.target.value = cle   // refusé : on remet
+                      else setBrouillon(suite)
+                    }}
+                  />
+                </td>
                 <td style={td}>
                   <input
                     disabled={!peutModifier}
@@ -109,6 +134,13 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
                     value={brouillon[cle]?.temps ?? ''}
                     onChange={e => majCoef(cle, 'temps', e.target.value)} />
                 </td>
+                <td style={{ ...td, textAlign: 'center', width: 36 }}>
+                  {peutModifier && Object.keys(brouillon).length > 1 && (
+                    <button onClick={() => setBrouillon(b => retirerComplexite(b, cle))}
+                      aria-label={`Supprimer le niveau ${cle}`} title="Supprimer ce niveau"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, font: `15px ${FONT}`, padding: 2 }}>×</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -124,6 +156,10 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
               font: `500 13px ${FONT}`,
             }}>
             {etat === 'enregistrement' ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+          <button onClick={() => setBrouillon(b => ajouterComplexite(b))}
+            style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.ink, cursor: 'pointer', font: `500 13px ${FONT}` }}>
+            + Niveau
           </button>
           <button onClick={() => setBrouillon(COMPLEXITES_DEFAUT)}
             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: `13px ${FONT}`, color: C.muted, textDecoration: 'underline' }}>

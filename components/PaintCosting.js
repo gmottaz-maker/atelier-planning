@@ -26,11 +26,17 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
   const [refChoisie, setRefChoisie] = useState(null)
   const [surface, setSurface] = useState(15)
   const [couches, setCouches] = useState(2)
-  const [cle, setCle] = useState('A2')
+  const [cleVoulue, setCleVoulue] = useState('A2')
   const [modeRendement, setModeRendement] = useState('moyen')
   const [modeDilution, setModeDilution] = useState('retenue')
   const [avance, setAvance] = useState(false)
   const [reglages, setReglages] = useState(REGLAGES_DEFAUT)
+
+  // Les niveaux sont configurables : celui qu'on a choisi peut avoir été
+  // renommé ou supprimé entre-temps. On retombe alors sur le premier existant
+  // plutôt que de chiffrer avec un coefficient absent.
+  const cles = Object.keys(complexites)
+  const cle = complexites[cleVoulue] ? cleVoulue : (cles[0] || null)
 
   const tarif = useMemo(() => {
     if (!chiffrables.length) return null
@@ -92,7 +98,7 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
 
         <label style={{ gridColumn: '1 / -1' }}>
           <span style={etiq}>Complexité</span>
-          <select style={champ} value={cle} onChange={e => setCle(e.target.value)}>
+          <select style={champ} value={cle || ''} onChange={e => setCleVoulue(e.target.value)}>
             {Object.entries(complexites).map(([k, v]) => (
               <option key={k} value={k}>{k} — {v.label}</option>
             ))}

@@ -272,13 +272,22 @@ quitter la fiche produit. Un produit tarifé porte le badge « chiffrable ».
 3. `dilRetenue`, `tempsA0` et les coefficients A0–A4 sont des HYPOTHÈSES
    Amazing Lab, à recalibrer sur des essais réels — pas des données RUCO.
 
-**Les coefficients A0–A4 sont PARTAGÉS**, rangés dans `app_settings` sous la clé
+**Les valeurs A0–A4 livrées ne reposent sur AUCUNE mesure.** Elles viennent du
+brief rédigé avec ChatGPT, qui les annonce lui-même comme « valeurs provisoires »
+et « hypothèses Amazing Lab, pas des données RUCO ». Ni facture, ni fiche
+technique, ni essai d'atelier derrière : ce sont des ordres de grandeur posés
+pour que le calcul tourne. Le panneau le dit à l'écran, et les niveaux sont
+librement créables, renommables et supprimables — A0–A4 n'est qu'un départ.
+
+**Les coefficients sont PARTAGÉS**, rangés dans `app_settings` sous la clé
 `paint_coefficients` — pas dans le localStorage. Si quelqu'un les recalibre
 après des essais, les chiffrages de toute l'équipe doivent en profiter : c'est
 tout l'intérêt de les mesurer. Lecture pour tous, écriture admin, comme le reste
-de cette table ; un test le garde. `normaliserComplexites()` fait retomber toute
-valeur absente ou aberrante sur la valeur d'origine — un réglage corrompu ne
-doit pas casser un chiffrage.
+de cette table ; un test le garde. `normaliserComplexites()` fait retomber une
+valeur absente ou aberrante sur celle d'origine — un réglage corrompu ne doit
+pas casser un chiffrage. En revanche un jeu enregistré fait foi POUR SA LISTE
+de niveaux : sans ça, un niveau supprimé réapparaîtrait au chargement suivant
+et on ne pourrait jamais s'écarter de A0–A4.
 
 `lib/paintCalc.js` ne renvoie jamais de valeur inventée : ce qui n'est pas
 calculable vaut `null` et sort avec un avertissement. Le `total` reste `null`
@@ -495,7 +504,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 307 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 320 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```

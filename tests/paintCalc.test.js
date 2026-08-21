@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { chiffrer, prixMelange, rendement, dilution, coutParM2, fmtDuree,
-         normaliserComplexites, COMPLEXITES_DEFAUT } from '../lib/paintCalc'
+         normaliserComplexites, codeValide, ajouterComplexite, retirerComplexite,
+         renommerComplexite, COMPLEXITES_DEFAUT } from '../lib/paintCalc'
 import { PEINTURES, chercherPrix } from '../lib/paintPrices'
 
 const atapur = chercherPrix('126040000-056')     // 2K solvant, ratio 10:1
@@ -199,12 +200,18 @@ describe('coefficients modifiables', () => {
     expect(r.A0).toMatchObject({ label: 'Plat', matiere: 1, temps: 1 })
   })
 
-  it('retombe sur les valeurs par défaut pour ce qui manque', () => {
+  it('complète les champs manquants d’un niveau connu', () => {
     const r = normaliserComplexites({ A2: { matiere: 1.14 } })
     expect(r.A2.matiere).toBe(1.14)
     expect(r.A2.temps).toBe(COMPLEXITES_DEFAUT.A2.temps)
     expect(r.A2.label).toBe(COMPLEXITES_DEFAUT.A2.label)
-    expect(r.A4).toEqual(COMPLEXITES_DEFAUT.A4)
+  })
+
+  it('prend le jeu enregistré pour ce qu’il est — un niveau supprimé le reste', () => {
+    // Sans ça, on ne pourrait jamais s’écarter de A0–A4 : les niveaux effacés
+    // reviendraient au chargement suivant.
+    const r = normaliserComplexites({ A2: { matiere: 1.14 } })
+    expect(Object.keys(r)).toEqual(['A2'])
   })
 
   it('refuse les valeurs aberrantes plutôt que de casser un chiffrage', () => {
@@ -213,9 +220,72 @@ describe('coefficients modifiables', () => {
     expect(r.A3.matiere).toBe(COMPLEXITES_DEFAUT.A3.matiere)
   })
 
+  it('accepte des niveaux inventés, hors A0–A4', () => {
+    const r = normaliserComplexites({
+      PLAT: { label: 'Panneau brut', matiere: 1, temps: 1 },
+      'LETTRAGE-3D': { label: 'Lettrage volume', matiere: 2.1, temps: 4 },
+    })
+    expect(Object.keys(r)).toEqual(['PLAT', 'LETTRAGE-3D'])
+    expect(r['LETTRAGE-3D'].matiere).toBe(2.1)
+  })
+
+  it('garde l’ordre d’enregistrement — c’est celui du menu', () => {
+    const r = normaliserComplexites({ Z: { matiere: 1 }, A: { matiere: 1 }, M: { matiere: 1 } })
+    expect(Object.keys(r)).toEqual(['Z', 'A', 'M'])
+  })
+
+  it('écarte un code inutilisable sans perdre le reste', () => {
+    const r = normaliserComplexites({ '': { matiere: 1 }, 'a b c': { matiere: 1 }, OK: { matiere: 1.5 } })
+    expect(Object.keys(r)).toEqual(['OK'])
+  })
+
   it('survit à une valeur absente ou corrompue', () => {
     expect(normaliserComplexites(null)).toEqual(COMPLEXITES_DEFAUT)
     expect(normaliserComplexites('nimporte quoi')).toEqual(COMPLEXITES_DEFAUT)
     expect(Object.keys(normaliserComplexites({}))).toEqual(['A0', 'A1', 'A2', 'A3', 'A4'])
+  })
+})
+
+describe('gestion des niveaux', () => {
+  it('valide un code de niveau', () => {
+    expect(codeValide('A0')).toBe(true)
+    expect(codeValide('LETTRAGE-3D')).toBe(true)
+    expect(codeValide('')).toBe(false)
+    expect(codeValide('avec espace')).toBe(false)
+    expect(codeValide('beaucoup-trop-long-pour-un-code')).toBe(false)
+    expect(codeValide(null)).toBe(false)
+  })
+
+  it('ajoute un niveau avec un code libre', () => {
+    const r = ajouterComplexite(COMPLEXITES_DEFAUT)
+    expect(Object.keys(r)).toHaveLength(6)
+    expect(Object.keys(COMPLEXITES_DEFAUT)).toHaveLength(5)   // l’original n’est pas touché
+  })
+
+  it('n’écrase jamais un code existant', () => {
+    const r = ajouterComplexite(COMPLEXITES_DEFAUT, 'A2')
+    expect(r.A2).toEqual(COMPLEXITES_DEFAUT.A2)
+    expect(Object.keys(r)).toHaveLength(6)
+  })
+
+  it('accepte un code choisi', () => {
+    expect(ajouterComplexite({ A0: {} }, 'VOLUME').VOLUME).toBeTruthy()
+  })
+
+  it('retire un niveau, mais jamais le dernier', () => {
+    expect(Object.keys(retirerComplexite(COMPLEXITES_DEFAUT, 'A3'))).not.toContain('A3')
+    const seul = { A0: COMPLEXITES_DEFAUT.A0 }
+    expect(retirerComplexite(seul, 'A0')).toEqual(seul)   // le calculateur en exige un
+  })
+
+  it('renomme en gardant la place dans l’ordre', () => {
+    const r = renommerComplexite(COMPLEXITES_DEFAUT, 'A2', 'NICHES')
+    expect(Object.keys(r)).toEqual(['A0', 'A1', 'NICHES', 'A3', 'A4'])
+    expect(r.NICHES).toEqual(COMPLEXITES_DEFAUT.A2)
+  })
+
+  it('refuse un renommage qui écraserait un autre niveau', () => {
+    expect(renommerComplexite(COMPLEXITES_DEFAUT, 'A2', 'A3')).toEqual(COMPLEXITES_DEFAUT)
+    expect(renommerComplexite(COMPLEXITES_DEFAUT, 'A2', 'a b')).toEqual(COMPLEXITES_DEFAUT)
   })
 })
