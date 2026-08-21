@@ -34,7 +34,9 @@ pages/
   display.js           — Affichage mural (route publique, sans chrome ; lit
                          /api/display-projects, DTO réduit — voir Sécurité)
   settings.js          — Paramètres utilisateur
-  peintures.js         — Sélecteur de peintures RUCO (voir section dédiée)
+  outils/index.js      — Index des outils d'atelier
+  outils/peintures.js  — Peintures RUCO : sélecteur + chiffrage (section dédiée)
+  peintures.js         — Redirection vers /outils/peintures (anciens signets)
   clients.js           — Contacts et entreprises
   clients/[id].js      — Fiche contact
   catalog.js           — Catalogue d'articles et d'heures
@@ -86,6 +88,8 @@ lib/
   apiError.js            — Réponses d'erreur normalisées + journalisation nettoyée
   api.js                 — Client API : res.ok, erreurs typées, annulation
   projectHelpers.js      — Calculs et formatage de la fiche projet
+  paintPrices.js         — Tarif RUCO d'atelier (20 produits, prix facturés)
+  paintCalc.js           — Chiffrage peinture : quantités, coût matière, temps
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
@@ -232,17 +236,46 @@ Fallback automatique sur Nominatim (OpenStreetMap) si pas de clé ou si Google �
 
 ---
 
-## Sélecteur de peintures (`/peintures`)
+## Outils (`/outils`)
 
-Aide au choix d'une peinture ou d'un vernis RUCO selon le support, la brillance,
-le mode d'application et le délai de recouvrement. **Outil autonome** : aucun
-lien avec le catalogue ni les devis (choix explicite — le catalogue RUCO n'est
-pas prêt pour ça, et RUCO ne publie aucun prix hors connexion au shop).
+Aides au travail d'atelier, sans lien avec les projets, les devis ou la
+comptabilité. Chaque outil est autonome. Pour en ajouter un : une page sous
+`pages/outils/`, une entrée dans la liste de `pages/outils/index.js`, et le
+calcul dans `lib/` pour qu'il soit testable.
 
-- Page : `pages/peintures.js` — lien dans `MAIN_ITEMS` de `components/Sidebar.js`.
-  Pas d'entrée dans `BottomNav` (nav mobile volontairement courte).
-- Données : `public/ruco/products.json` (271 produits, 1799 réf., ~960 Ko) et
-  `public/ruco/img/` (199 vignettes 90×90). Statique, pas de table Supabase.
+Entrée `Outils` dans `MAIN_ITEMS` de `components/Sidebar.js`. Pas d'entrée dans
+`BottomNav` (nav mobile volontairement courte).
+
+### Peintures RUCO (`/outils/peintures`)
+
+Choix du produit ET chiffrage du travail, dans une seule page. `/peintures`
+redirige vers cette adresse — les signets d'avant le regroupement restent bons.
+
+**Deux jeux de données que le SKU relie :**
+
+- le CATALOGUE technique, `public/ruco/products.json` (271 produits, 1799 réf.,
+  ~960 Ko) et `public/ruco/img/` (199 vignettes) : quel produit pour quel
+  support, quelle brillance, quel mode d'application. Statique, pas de Supabase ;
+- le TARIF d'atelier, `lib/paintPrices.js` (20 produits) : prix HT réellement
+  facturés par RUCO, ratios 2K, dilutions, rendements, densités.
+
+`articles[].sku` du catalogue = `ref` du tarif. Les 19 références du tarif se
+retrouvent toutes dans le catalogue — c'est ce qui permet de chiffrer sans
+quitter la fiche produit. Un produit tarifé porte le badge « chiffrable ».
+
+**Trois règles héritées du dépouillement des factures, à ne pas défaire :**
+
+1. Un prix inconnu vaut `null`, jamais 0. Un produit facturé à 100 % de rabais
+   n'a pas un prix catalogue nul : il a un prix qu'on ignore.
+2. Les données de pulvérisation sont celles du GODET GRAVITÉ (pistolet HVLP de
+   l'atelier). Les valeurs Airmix et Airless des fiches techniques n'entrent pas.
+3. `dilRetenue`, `tempsA0` et les coefficients A0–A4 sont des HYPOTHÈSES
+   Amazing Lab, à recalibrer sur des essais réels — pas des données RUCO.
+
+`lib/paintCalc.js` ne renvoie jamais de valeur inventée : ce qui n'est pas
+calculable vaut `null` et sort avec un avertissement. Le `total` reste `null`
+tant que la matière n'est pas chiffrable — afficher le seul coût du temps
+donnerait une fausse impression de chiffrage complet.
 
 ### Deux contraintes à ne pas casser
 
@@ -454,7 +487,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 274 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 299 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```
