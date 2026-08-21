@@ -253,3 +253,37 @@ describe('identité des abonnements push', () => {
     expect(res.statusCode).toBe(400)
   })
 })
+
+describe('liste des projets — poids de la réponse', () => {
+  const projets = [{
+    id: 'p1', name: 'Folklor', client: 'Red Bull',
+    quote_data: { status: 'envoye', number: '2026-042', items: [{ name: 'Néon', purchases: [{ unit_price: 1800, margin: 35 }] }] },
+  }]
+
+  it('retire les prix d’achat et les marges de la version allégée', async () => {
+    // La barre latérale charge cette route sur CHAQUE page : y faire voyager
+    // le devis complet expose marges et prix d'achat sans aucun besoin.
+    sous(MEMBRE, { projects: projets })
+    const res = await appeler(await import('../pages/api/projects/index'), {
+      method: 'GET', query: { light: '1' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.body[0].quote_data).toEqual({ status: 'envoye' })
+    expect(JSON.stringify(res.body)).not.toContain('1800')
+    expect(JSON.stringify(res.body)).not.toContain('margin')
+  })
+
+  it('garde le devis entier sans le paramètre — /offres en a besoin', async () => {
+    sous(MEMBRE, { projects: projets })
+    const res = await appeler(await import('../pages/api/projects/index'), { method: 'GET' })
+    expect(res.body[0].quote_data.items).toHaveLength(1)
+  })
+
+  it('supporte un projet sans devis', async () => {
+    sous(MEMBRE, { projects: [{ id: 'p2', name: 'Sans devis' }] })
+    const res = await appeler(await import('../pages/api/projects/index'), {
+      method: 'GET', query: { light: '1' },
+    })
+    expect(res.body[0].quote_data).toBeNull()
+  })
+})

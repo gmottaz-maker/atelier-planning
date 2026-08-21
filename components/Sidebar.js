@@ -63,7 +63,7 @@ export default function Sidebar() {
 
   // Compteurs live (SWR dédupliqué avec les pages qui chargent déjà ces données)
   const { data: tasks = [] } = useSWR('/api/tasks')
-  const { data: projects = [] } = useSWR('/api/projects')
+  const { data: projects = [] } = useSWR('/api/projects?light=1')
   const counts = {
     tasks: Array.isArray(tasks) ? tasks.filter(t => t.status === 'active').length : 0,
     projects: Array.isArray(projects) ? projects.filter(pr => pr.status === 'active').length : 0,

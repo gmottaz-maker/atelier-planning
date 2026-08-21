@@ -45,7 +45,7 @@ export default function Finances() {
   useEffect(() => { if (user && !isAdmin) gateRouter.replace('/') }, [user, isAdmin])
   if (user && !isAdmin) return null
   const [year, setYear] = useState(new Date().getFullYear())
-  const { data: projects = [] } = useSWR('/api/projects')
+  const { data: projects = [] } = useSWR('/api/projects?light=1')
   const { data: invoices = [], isLoading } = useSWR(`/api/customer-invoices?year=${year}`)
   const { data: suppliers = [] } = useSWR('/api/supplier-invoices')
 

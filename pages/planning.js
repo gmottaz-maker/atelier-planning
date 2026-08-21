@@ -39,7 +39,7 @@ function weekLabel(monday) {
 export default function Planning() {
   const { responsibles } = useResponsibles()
   const { data: tasks = [], isLoading } = useSWR('/api/tasks')
-  const { data: projects = [] } = useSWR('/api/projects')
+  const { data: projects = [] } = useSWR('/api/projects?light=1')
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
 
   const today = new Date(); today.setHours(0, 0, 0, 0)

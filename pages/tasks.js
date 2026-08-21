@@ -261,7 +261,7 @@ export default function Tasks() {
 
   // Données via SWR : cache instantané + revalidation au focus
   const { data: tasks = [], isLoading: tasksLoading, mutate: mutateTasks } = useSWR('/api/tasks')
-  const { data: allProjects = [], mutate: mutateProjects } = useSWR('/api/projects')
+  const { data: allProjects = [], mutate: mutateProjects } = useSWR('/api/projects?light=1')
   const projects = allProjects.filter(p => p.status === 'active')
   const loading = tasksLoading && tasks.length === 0
   const [view, setView] = useState('week')       // 'today' | 'week' | 'twoweeks' | 'all'

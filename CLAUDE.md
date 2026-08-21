@@ -475,9 +475,21 @@ le poste de développement ne produisaient pas le même texte, et surtout, le
 séparateur imprimé sur une facture dépendait de la version que Vercel
 exécutait ce jour-là. L'apostrophe suisse est écrite explicitement.
 
-**Rien de sensible dans le localStorage.** Le cache SWR est en mémoire. Y
-remettre une persistance globale y replacerait factures, données bancaires,
-contacts et marges, qui survivraient à la déconnexion sur un poste partagé.
+**Le cache SWR vit dans le `sessionStorage`, jamais le `localStorage`.** Il a
+été persisté dans le localStorage : factures, données bancaires, contacts et
+marges y survivaient à la déconnexion, sur des postes partagés. Il a ensuite été
+passé en mémoire seule — ce qui a rendu chaque rechargement lent, l'écran
+attendant le réseau avant d'afficher quoi que ce soit. Le sessionStorage tient
+les deux bouts : propre à l'onglet, effacé à sa fermeture, et purgé à la
+déconnexion. Une entrée de plus de 512 Ko n'est pas persistée, pour qu'une
+grosse réponse ne remplisse pas le quota à elle seule.
+
+**Les listes de projets se chargent avec `?light=1`.** `quote_data` pèse 60 %
+de `/api/projects` et porte les prix d'achat et les marges, alors que les listes
+n'en affichent qu'un mot — et la barre latérale charge cette route sur CHAQUE
+page. Le paramètre ne laisse que `quote_data.status`, sans changer le format.
+`/offres` et les pages de facture gardent la réponse entière : elles recalculent
+les totaux.
 
 ---
 
@@ -504,7 +516,7 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 320 tests, dont l'inventaire et la matrice d'autorisation
+npm test                # 323 tests, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```

@@ -32,6 +32,18 @@ export default async function handler(req, res) {
       .select('*')
       .order('deadline', { ascending: true })
     if (error) return erreurApi(req, res, 'internal', error, { route: 'projects/index' })
+
+    // `?light=1` : le devis complet est retiré, seul son statut reste.
+    // `quote_data` pèse 60 % de cette réponse et porte les prix d'achat et les
+    // marges. Les listes n'en affichent qu'un mot — et la barre latérale
+    // charge cette route sur CHAQUE page. Le format est conservé
+    // (`quote_data.status`) pour que les appelants n'aient rien à changer.
+    if (req.query.light === '1') {
+      return res.status(200).json((data || []).map(({ quote_data, ...p }) => ({
+        ...p,
+        quote_data: quote_data?.status ? { status: quote_data.status } : null,
+      })))
+    }
     return res.status(200).json(data)
   }
 

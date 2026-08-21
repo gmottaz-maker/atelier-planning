@@ -734,7 +734,7 @@ export default function Admin() {
   const { responsibles } = useResponsibles()
 
   // Données via SWR : affichage instantané depuis le cache + revalidation auto
-  const { data: projects = [], isLoading: projectsLoading, mutate: mutateProjects } = useSWR('/api/projects')
+  const { data: projects = [], isLoading: projectsLoading, mutate: mutateProjects } = useSWR('/api/projects?light=1')
   const { data: tasks = [], mutate: mutateTasks } = useSWR('/api/tasks')
   // Les factures clients ne servent qu'à marquer les projets déjà facturés.
   // Elles ne sont chargées que pour l'admin : la route les refuserait de toute
