@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Writable } from 'stream'
+import { readdirSync, readFileSync } from 'fs'
+import { join } from 'path'
 import { relayerFlux } from '../lib/fileType'
 
 // Réponse HTTP factice qui se comporte comme un flux inscriptible : c'est ce
@@ -51,5 +53,46 @@ describe('relais en flux des téléchargements', () => {
     const res = faireRes()
     const cassee = new ReadableStream({ start(c) { c.error(new Error('coupure kDrive')) } })
     await expect(relayerFlux({ body: cassee, headers: { get: () => null } }, res)).rejects.toThrow()
+  })
+})
+
+// Régression : `const { Readable } = await import('stream')` marchait sous
+// vitest et sous Node, mais pas dans le bundle serveur de Next. Webpack range
+// les exports d'un builtin CJS chargé dynamiquement sous `.default`, donc
+// `Readable` valait `undefined` et `Readable.fromWeb` faisait tomber en 500
+// TOUTES les routes qui servent un fichier — téléchargement kDrive, vignettes,
+// pièces jointes. Les tests unitaires ne peuvent pas voir la différence : on
+// interdit donc la forme fautive à la source.
+describe('les builtins Node ne sont pas chargés dynamiquement', () => {
+  const racine = new URL('..', import.meta.url).pathname
+  const BUILTINS = 'assert|buffer|child_process|crypto|events|fs|http|https|net|os|path|stream|string_decoder|timers|tls|url|util|zlib'
+  const FAUTIF = new RegExp(`import\\s*\\(\\s*['"\`](node:)?(${BUILTINS})(/[\\w/]+)?['"\`]\\s*\\)`)
+
+  const sources = []
+  const parcourir = (dossier) => {
+    for (const entree of readdirSync(dossier, { withFileTypes: true })) {
+      const chemin = join(dossier, entree.name)
+      if (entree.isDirectory()) {
+        if (['node_modules', '.next', '.git'].includes(entree.name)) continue
+        parcourir(chemin)
+      } else if (entree.name.endsWith('.js')) sources.push(chemin)
+    }
+  }
+  for (const d of ['lib', 'pages', 'components']) parcourir(join(racine, d))
+
+  // Les commentaires sont retirés : ce fichier-ci comme lib/fileType.js citent
+  // la forme fautive pour l'expliquer, et une prose ne casse pas un bundle.
+  const sansCommentaires = (code) => code
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+
+  it('aucun fichier de lib/, pages/ ou components/ ne le fait', () => {
+    const coupables = sources.filter((f) => FAUTIF.test(sansCommentaires(readFileSync(f, 'utf8'))))
+    expect(coupables.map((f) => f.slice(racine.length))).toEqual([])
+  })
+
+  it('le relais de flux importe bien Readable statiquement', () => {
+    const source = readFileSync(join(racine, 'lib/fileType.js'), 'utf8')
+    expect(source).toMatch(/^import \{ Readable \} from 'node:stream'$/m)
   })
 })
