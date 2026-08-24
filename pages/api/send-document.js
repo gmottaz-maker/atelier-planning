@@ -76,7 +76,6 @@ export default async function handler(req, res) {
     if (type === 'devis') {
       const { data: project, error } = await supabase.from('projects').select('*').eq('id', id).single()
       if (error || !project) return res.status(404).json({ error: 'Projet introuvable' })
-      const level = mode === 'summary' ? 'summary' : 'detail'
       pdf = await htmlToPdf(buildDevisHtml(project, company, level))
       filename = pdfFilename('devis', project.name)
       afterSend = async () => {
@@ -88,9 +87,8 @@ export default async function handler(req, res) {
     } else {
       const { data: inv, error } = await supabase.from('customer_invoices').select('*, projects(name, client, reference)').eq('id', id).single()
       if (error || !inv) return res.status(404).json({ error: 'Facture introuvable' })
-      const effectiveMode = mode || inv.detail_level || 'detailed'
       const qr = invoiceQrSvg(inv, company)
-      pdf = await htmlToPdf(buildFactureHtml(inv, company, effectiveMode, qr), qr ? qrDocument(qr) : null)
+      pdf = await htmlToPdf(buildFactureHtml(inv, company, qr), qr ? qrDocument(qr) : null)
       filename = pdfFilename('facture', inv.projects?.name || inv.client_name)
       afterSend = async () => {
         const patch = { sent_at: inv.sent_at || new Date().toISOString() }
