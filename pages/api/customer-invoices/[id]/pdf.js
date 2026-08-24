@@ -17,7 +17,6 @@ const supabase = getSupabaseServer()
 export default async function handler(req, res) {
   if (!(await requireAdmin(req, res))) return
   const { id } = req.query
-  const mode = req.query.mode || 'detailed'
 
   const { data: inv, error } = await supabase
     .from('customer_invoices').select('*, projects(name, client, reference)').eq('id', id).single()
@@ -30,7 +29,6 @@ export default async function handler(req, res) {
     country: 'CH', iban: process.env.AMAZING_LAB_IBAN || '', email: 'hello@amazinglab.ch',
     website: 'amazinglab.ch', vat_number: '', payment_terms: 'Paiement à 30 jours net.',
   }
-  const effectiveMode = req.query.mode || inv.detail_level || 'detailed'
 
   // ── QR-bill (SVG) ──
   let qrSvg = ''
@@ -60,10 +58,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const html = buildFactureHtml(inv, company, effectiveMode, qrSvg)
+    const html = buildFactureHtml(inv, company, qrSvg)
     const pdf = await htmlToPdf(html, qrSvg ? qrDocument(qrSvg) : null)
     res.setHeader('Content-Type', 'application/pdf')
-    const docType = effectiveMode === 'summary' ? 'facture-résumée' : 'facture-détaillée'
+    const docType = 'facture'
     res.setHeader('Content-Disposition', `inline; filename="${pdfFilename(docType, inv.projects?.name || inv.client_name)}"`)
     res.send(Buffer.from(pdf))
   } catch (e) {

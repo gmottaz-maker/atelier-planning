@@ -469,6 +469,15 @@ valent la somme de ce qu'ils contiennent. La graisse suit le RÔLE de la ligne,
 pas sa profondeur : une composition n'est jamais en gras, qu'elle tienne sous
 un item ou sous un élément.
 
+**Un seul format de PDF, pour l'offre comme pour la facture.** Ce qui apparaît
+se règle ligne par ligne (`hidden`), plus par un couple détaillé/résumé. La
+colonne `customer_invoices.detail_level` subsiste en base mais n'est plus lue.
+
+**Le second rendu du bulletin QR n'attend pas le réseau.** `qrDocument()` ne
+contient qu'un SVG inliné : `waitUntil: 'domcontentloaded'` suffit. Avec
+`networkidle0`, la génération d'une facture passait de 2 à 8,5 secondes — pour
+attendre des ressources qui n'existent pas.
+
 **Les marges d'un document PDF viennent de `@page`, jamais d'un `padding`.**
 Un padding ne s'applique qu'au début et à la fin du bloc : à partir de la
 page 2, le texte touchait le bord du papier. Corollaire : le bulletin QR d'une

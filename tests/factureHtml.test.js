@@ -12,7 +12,7 @@ const base = {
 
 describe('buildFactureHtml', () => {
   it('reprend le gabarit de l\'offre', () => {
-    const html = buildFactureHtml(base, {}, 'detailed', null)
+    const html = buildFactureHtml(base, {}, null)
     expect(html).toContain('IBM+Plex+Sans')
     expect(html).toContain('class="doc"')
     expect(html).toContain('N° de facture')
@@ -22,46 +22,46 @@ describe('buildFactureHtml', () => {
 
   it('affiche les totaux de la facture, pas un recalcul des lignes', () => {
     // Le montant stocké prime : une facture émise ne bouge plus.
-    const html = buildFactureHtml({ ...base, amount: 9999 }, {}, 'detailed', null)
+    const html = buildFactureHtml({ ...base, amount: 9999 }, {}, null)
     expect(html).toContain("9'999,00 CHF")
     expect(html).toContain('Total à payer')
   })
 
   it('détaille l\'escompte global', () => {
-    const html = buildFactureHtml({ ...base, discount_rate: 10, amount_net: 900, vat_amount: 72.9, amount: 972.9 }, {}, 'detailed', null)
+    const html = buildFactureHtml({ ...base, discount_rate: 10, amount_net: 900, vat_amount: 72.9, amount: 972.9 }, {}, null)
     expect(html).toContain('Escompte 10 %')
     expect(html).toContain("1'000,00 CHF")   // sous-total reconstitué
     expect(html).toContain('Net HT')
   })
 
   it('n\'affiche ni sous-total ni TVA quand la facture n\'en porte pas', () => {
-    const html = buildFactureHtml({ ...base, amount_net: null, vat_amount: null }, {}, 'detailed', null)
+    const html = buildFactureHtml({ ...base, amount_net: null, vat_amount: null }, {}, null)
     expect(html).not.toContain('Sous-total HT')
     expect(html).toContain('Total à payer')
   })
 
   it('rappelle l\'IBAN seulement en l\'absence de QR-bill', () => {
     const ci = { iban: 'CH00 1234' }
-    expect(buildFactureHtml(base, ci, 'detailed', null)).toContain('CH00 1234')
-    expect(buildFactureHtml(base, ci, 'detailed', '<svg id="qr"></svg>')).not.toContain('CH00 1234')
+    expect(buildFactureHtml(base, ci, null)).toContain('CH00 1234')
+    expect(buildFactureHtml(base, ci, '<svg id="qr"></svg>')).not.toContain('CH00 1234')
   })
 
   it('ne place plus le bulletin dans le corps de la facture', () => {
     // Le bulletin est un DOCUMENT séparé, fusionné au moment du PDF : ses
     // marges de page sont incompatibles avec celles du contenu, qui doivent
     // se répéter d'une page à l'autre.
-    const html = buildFactureHtml(base, {}, 'detailed', '<svg id="qr"></svg>')
+    const html = buildFactureHtml(base, {}, '<svg id="qr"></svg>')
     expect(html).not.toContain('<svg id="qr">')
   })
 
   it('titre la section Stockage pour les factures de stockage', () => {
-    const html = buildFactureHtml({ ...base, object: 'Stockage T3 2026' }, {}, 'detailed', null)
+    const html = buildFactureHtml({ ...base, object: 'Stockage T3 2026' }, {}, null)
     expect(html).toContain('Stockage')
     expect(html).not.toContain('Fabrication')
   })
 
   it('rend les instantanés à l\'ancien format', () => {
-    const html = buildFactureHtml({ ...base, quote_snapshot: { purchases: [{ description: 'Bois', unit_price: 500, quantity: 2 }] } }, {}, 'detailed', null)
+    const html = buildFactureHtml({ ...base, quote_snapshot: { purchases: [{ description: 'Bois', unit_price: 500, quantity: 2 }] } }, {}, null)
     expect(html).toContain('Bois')
     expect(html).toContain("1'000,00")
   })

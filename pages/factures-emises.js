@@ -135,7 +135,7 @@ export default function FacturesEmises() {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), 90000)
     try {
-      const r = await fetch(`/api/customer-invoices/${inv.id}/pdf?mode=${mode}`, { signal: ctrl.signal })
+      const r = await fetch(`/api/customer-invoices/${inv.id}/pdf`, { signal: ctrl.signal })
       if (!r.ok) {
         let msg = `Erreur ${r.status}`
         try { const j = await r.json(); if (j.error) msg = j.error } catch (_) {}
@@ -145,7 +145,7 @@ export default function FacturesEmises() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = pdfFilename(mode === 'summary' ? 'facture-résumée' : 'facture-détaillée', inv.projects?.name || inv.object || inv.client_name)
+      a.download = pdfFilename('facture', inv.projects?.name || inv.object || inv.client_name)
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (e) {
@@ -313,8 +313,7 @@ export default function FacturesEmises() {
                       <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-2 justify-end whitespace-nowrap">
                           {[
-                            { label: 'Détaillée', title: 'Télécharger le PDF détaillé (avec QR-bill)', icon: '⤓', busy: pdfBusy === `${inv.id}:detailed`, act: () => downloadPdf(inv, 'detailed') },
-                            { label: 'Résumée',   title: 'Télécharger le PDF résumé (avec QR-bill)',   icon: '⤓', busy: pdfBusy === `${inv.id}:summary`,  act: () => downloadPdf(inv, 'summary') },
+                            { label: 'PDF', title: 'Télécharger le PDF (avec QR-bill)', icon: '⤓', busy: pdfBusy === String(inv.id), act: () => downloadPdf(inv) },
                             { label: 'Envoyer',   title: 'Envoyer la facture par e-mail',              icon: '✉', act: () => openSend(inv) },
                             { label: 'Dupliquer', title: 'Créer une nouvelle facture avec le même contenu', icon: '⧉', act: () => duplicate(inv) },
                           ].map(b => (

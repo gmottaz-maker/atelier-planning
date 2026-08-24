@@ -40,7 +40,7 @@ export default function FactureEmisePage() {
   const [form, setForm]         = useState({
     project_id: '', client_name: '', client_address: '', currency: 'CHF',
     vat_rate: '8.1', issue_date: today(), due_date: addDays(today(), 30),
-    iban_recipient: '', notes: '', status: 'created', detail_level: 'detailed',
+    iban_recipient: '', notes: '', status: 'created',
     object: '', discount_label: '', discount_rate: '', discount_amount: '',
   })
   const [loading, setLoading] = useState(true)
@@ -79,7 +79,7 @@ export default function FactureEmisePage() {
           issue_date: inv.issue_date || today(),
           due_date: inv.due_date || addDays(inv.issue_date || today(), 30),
           iban_recipient: inv.iban_recipient || '', notes: inv.notes || '',
-          status: inv.status || 'created', detail_level: inv.detail_level || 'detailed',
+          status: inv.status || 'created',
           object: inv.object || '',
           discount_label: inv.discount_label || '',
           discount_rate: inv.discount_rate ?? '',
@@ -153,7 +153,7 @@ export default function FactureEmisePage() {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), 90000)
     try {
-      const r = await fetch(`/api/customer-invoices/${id}/pdf?mode=${mode}`, { signal: ctrl.signal })
+      const r = await fetch(`/api/customer-invoices/${id}/pdf`, { signal: ctrl.signal })
       if (!r.ok) throw new Error(`Erreur ${r.status}`)
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
@@ -279,17 +279,6 @@ export default function FactureEmisePage() {
               <div className="md:col-span-2">
                 <label className={label}>IBAN bénéficiaire <span className="text-gray-400">(vide = celui par défaut)</span></label>
                 <input className={input} value={form.iban_recipient} onChange={e => set('iban_recipient', e.target.value)} placeholder="CH…" />
-              </div>
-              <div>
-                <label className={label}>PDF</label>
-                <div className="inline-flex rounded-md border border-gray-200 overflow-hidden text-sm w-full">
-                  {[{ k: 'detailed', l: 'Détaillée' }, { k: 'summary', l: 'Résumée' }].map(o => (
-                    <button key={o.k} type="button" onClick={() => set('detail_level', o.k)} className="flex-1 px-3 py-1.5 font-medium"
-                      style={form.detail_level === o.k ? { background: '#111827', color: '#fff' } : { background: '#fff', color: '#6b7280' }}>
-                      {o.l}
-                    </button>
-                  ))}
-                </div>
               </div>
               {!isNew && (
                 <div>
