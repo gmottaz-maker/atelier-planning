@@ -7,7 +7,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { quoteStatusMeta } from '../lib/quoteStatus'
-import { C, FONT, MONO, R } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { fmtCHF0 as fmtCHF } from '../lib/money'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

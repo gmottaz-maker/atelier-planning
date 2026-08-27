@@ -4,7 +4,7 @@ import { useAuth } from './_app'
 import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
-import { C, FONT, MONO, R } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
 
 const UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'm³', 'km', 'PAN', 'pce', 'forfait', 'kg', 'l']
 const CSV_COLS = ['id', 'type', 'name', 'unit', 'vat_rate', 'purchase_price', 'margin', 'sale_price', 'vendor', 'notes']

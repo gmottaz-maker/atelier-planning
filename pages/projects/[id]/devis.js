@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { buildDevisBody, DEVIS_CSS, DEVIS_FONTS } from '../../../lib/devisHtml'
-import { AL, R } from '../../../lib/theme'
+import { AL, C, R } from '../../../lib/theme'
 
 // Aperçu écran de l'offre. Le document lui-même vient de `buildDevisBody`,
 // le même code que le PDF (lib/devisHtml.js) : cette page ne fait que

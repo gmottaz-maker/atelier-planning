@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { surErreurApi } from '../lib/api'
-import { C, FONT, R } from '../lib/theme'
+import { AL, C, FONT, R } from '../lib/theme'
 
 // Bandeau d'erreur des mutations API.
 //
