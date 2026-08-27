@@ -8,7 +8,7 @@ import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
 import { DISPLAY_STATUSES, STATUS_ORDER, effectiveStatus } from '../lib/supplierStatus'
 import { fmtCHF as fmtMontant } from '../lib/money'
-import { AL, C } from '../lib/theme'
+import { AL, C, FONT } from '../lib/theme'
 
 const PINK = AL.black
 
@@ -581,7 +581,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
       <div className="fixed inset-0 z-50" style={{ background: 'rgba(15,23,42,0.35)', animation: 'drawerFade 0.15s ease-out both' }}
         onClick={e => e.target === e.currentTarget && onClose()}>
         <div className="fixed top-0 right-0 bottom-0 u-surface flex flex-col shadow-2xl"
-          style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s cubic-bezier(0.4,0,0.2,1) both', fontFamily: 'Inter, sans-serif' }}>
+          style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s cubic-bezier(0.4,0,0.2,1) both', fontFamily: FONT }}>
 
           <div className="flex items-center justify-between px-8 py-5 border-b u-line">
             <div>

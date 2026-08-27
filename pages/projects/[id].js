@@ -2499,7 +2499,7 @@ export default function ProjectPage() {
         </div>
 
         {/* ── Print form (hidden on screen, shown on print) ── */}
-        <div className="print-form" style={{ padding: '2cm', fontFamily: 'Inter, sans-serif' }}>
+        <div className="print-form" style={{ padding: '2cm', fontFamily: FONT }}>
           {/* Header */}
           <div style={{ borderBottom: `2px solid ${AL.black}`, paddingBottom: '12px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

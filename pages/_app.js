@@ -10,7 +10,7 @@ import useIsMobile from '../lib/useIsMobile'
 import { swrConfig, purgeCachePersistant } from '../lib/swr'
 import { signalerErreur, ApiError } from '../lib/api'
 import ApiErrorBanner from '../components/ApiErrorBanner'
-import { AL, C, R } from '../lib/theme'
+import { AL, C, FONT, R } from '../lib/theme'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -213,7 +213,7 @@ export default function App({ Component, pageProps }) {
         </div>
         <div style={{
           fontSize: 12, fontWeight: 700, letterSpacing: '0.3em', color: PINK,
-          textTransform: 'uppercase', fontFamily: 'Inter, system-ui, sans-serif',
+          textTransform: 'uppercase', fontFamily: FONT,
           animation: 'maze-fade .7s ease both',
         }}>Maze Project</div>
         <div style={{
@@ -241,15 +241,10 @@ export default function App({ Component, pageProps }) {
             sidebar et les titres — pour éviter le saut de police au chargement. */}
         <link rel="preload" href="/fonts/apercu-pro-400.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preload" href="/fonts/apercu-pro-500.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Inter reste chargée le temps que les cinq écrans non encore repris
-            (schedule, activity, display, justificatifs, factures-fournisseurs)
-            passent aux jetons v2 : ils la fixent en dur et tomberaient sinon sur
-            la police système. Ce lien disparaît avec la dernière occurrence.
-            Les gabarits PDF gardent le leur : ils sont rendus hors de
-            l'application, par Chrome headless, et restent en IBM Plex. */}
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {/* Plus aucune police distante : Apercu Pro est servie depuis
+            /public/fonts. Les gabarits PDF gardent leur propre lien — ils sont
+            rendus hors de l'application, par Chrome headless, et restent en
+            IBM Plex tant que la chaîne documentaire n'est pas reprise. */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="mobile-web-app-capable" content="yes" />

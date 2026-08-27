@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../lib/supabase'
-import { AL, C } from '../lib/theme'
+import { AL, C, FONT } from '../lib/theme'
 
 const PINK = AL.black
 
@@ -35,7 +35,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6"
-      style={{ background: AL.white, fontFamily: 'Inter, sans-serif' }}>
+      style={{ background: AL.white, fontFamily: FONT }}>
       <Head>
         <title>Connexion — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />

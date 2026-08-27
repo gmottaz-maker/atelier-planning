@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useResponsibles } from '../lib/useResponsibles'
 import { TASK_CATEGORIES } from '../lib/taskCategories'
-import { AL, C } from '../lib/theme'
+import { AL, C, FONT } from '../lib/theme'
 
 const PERSON_COLORS = { Arnaud: C.info, Gabin: C.violet, Guillaume: AL.black }
 
@@ -76,7 +76,7 @@ export default function TaskFormDrawer({
         onClick={e => e.target === e.currentTarget && onClose()}>
         <div
           className="fixed top-0 right-0 bottom-0 u-surface flex flex-col shadow-2xl"
-          style={{ width: '100%', maxWidth: 520, animation: 'drawerSlide 0.2s cubic-bezier(0.4,0,0.2,1) both', fontFamily: 'Inter, sans-serif' }}>
+          style={{ width: '100%', maxWidth: 520, animation: 'drawerSlide 0.2s cubic-bezier(0.4,0,0.2,1) both', fontFamily: FONT }}>
 
           {/* Header */}
           <div className="flex items-center justify-between px-8 py-5 border-b u-line">

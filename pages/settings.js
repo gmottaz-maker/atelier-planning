@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
 import useIsAdmin from '../lib/useIsAdmin'
-import { AL, C } from '../lib/theme'
+import { AL, C, FONT } from '../lib/theme'
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth()
@@ -29,7 +29,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: AL.white, fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: AL.white, fontFamily: FONT }}>
       <Head>
         <title>Paramètres — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />

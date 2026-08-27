@@ -6,7 +6,7 @@ import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { fmtCHF as fmtMontant } from '../lib/money'
-import { AL, C } from '../lib/theme'
+import { AL, C, FONT } from '../lib/theme'
 
 const PINK = AL.black
 const PERSON_COLORS = { Arnaud: C.info, Gabin: C.violet, Guillaume: AL.black }
@@ -643,7 +643,7 @@ function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
       <div className="fixed inset-0 z-50" style={{ background: 'rgba(15,23,42,0.35)' }}
         onClick={e => e.target === e.currentTarget && onClose()}>
         <div className="fixed top-0 right-0 bottom-0 u-surface flex flex-col shadow-2xl"
-          style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s ease both', fontFamily: 'Inter, sans-serif' }}>
+          style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s ease both', fontFamily: FONT }}>
 
           <div className="flex items-center justify-between px-8 py-5 border-b u-line">
             <div>

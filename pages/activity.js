@@ -3,7 +3,7 @@ import useSWR from 'swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
-import { AL, C } from '../lib/theme'
+import { AL, C, FONT } from '../lib/theme'
 
 const PINK = AL.black
 const PERSON_COLORS = {
@@ -64,11 +64,11 @@ export default function Activity() {
   const grouped  = groupByDay(filtered)
 
   return (
-    <div className="min-h-screen" style={{ background: AL.white, fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: AL.white, fontFamily: FONT }}>
       <Head>
         <title>Activité — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <style>{`body { font-family: 'Inter', sans-serif; } * { -webkit-tap-highlight-color: transparent; }`}</style>
+        <style>{`body { font-family: ${FONT}; } * { -webkit-tap-highlight-color: transparent; }`}</style>
       </Head>
 
       <NavBar title="activité" />

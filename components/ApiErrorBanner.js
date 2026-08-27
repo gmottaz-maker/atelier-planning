@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { surErreurApi } from '../lib/api'
-import { C, R } from '../lib/theme'
+import { C, FONT, R } from '../lib/theme'
 
 // Bandeau d'erreur des mutations API.
 //
@@ -35,7 +35,7 @@ export default function ApiErrorBanner() {
       style={{
         position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
         zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8,
-        width: 'min(560px, calc(100vw - 32px))', fontFamily: 'Inter, system-ui, sans-serif',
+        width: 'min(560px, calc(100vw - 32px))', fontFamily: FONT,
       }}
     >
       {erreurs.map(e => (
