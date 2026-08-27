@@ -925,7 +925,6 @@ export default function Admin() {
       kdrive_folder_path: '',
     })
     setShowForm(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function resetForm() {
@@ -1142,9 +1141,14 @@ export default function Admin() {
 
       <main className="w-full" style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-        {/* Formulaire Add/Edit */}
+        {/* Formulaire Add/Edit — en SURCOUCHE, pas en tête de page.
+            Inséré dans le flux, il repoussait la liste des projets vers le bas :
+            on cliquait sur « + nouveau projet » et le contenu sautait. */}
         {showForm && (
-          <div className="u-surface u-panel border u-line overflow-hidden">
+          <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(12,12,12,.35)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 24, overflowY: 'auto' }}
+            onClick={e => { if (e.target === e.currentTarget) resetForm() }}>
+          <div className="u-surface u-panel" style={{ width: '100%', maxWidth: 1100, marginTop: 24, border: `1.5px solid ${C.outline}`, overflow: 'hidden' }}>
             <div className="px-5 md:px-8 py-4 md:py-5 border-b u-line flex items-center justify-between">
               <h2 className="font-semibold u-ink text-base">
                 {editingProject ? `Modifier — ${editingProject.name}` : 'Nouveau projet'}
@@ -1277,6 +1281,7 @@ export default function Admin() {
               </div>
             </form>
           </div>
+          </div>
         )}
 
         {/* Projets actifs */}
@@ -1361,9 +1366,15 @@ export default function Admin() {
               {(() => {
                 const kanbanCols = buildKanbanColumns()
                 return kanbanCols.map(col => {
+                  // Le rangement se fait sur la liste COMPLÈTE des colonnes :
+                  // `kanbanColumnKey` renvoie « Plus tard » quand le mois d'une
+                  // échéance n'est pas dans la liste. Filtrer avant de ranger
+                  // déplacerait des projets d'une colonne à l'autre.
                   const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase, p.suspended) === col.key)
-                  // Masque « En retard », « En cours / livré » et « En pause » quand vides
-                  if (['overdue', 'ongoing', 'suspended'].includes(col.key) && colProjects.length === 0) return null
+                  // Une colonne vide ne montre plus « Aucun projet » : elle
+                  // disparaît. Le calcul est refait à chaque rendu, donc elle
+                  // revient d'elle-même dès qu'un projet tombe dans ce mois.
+                  if (colProjects.length === 0) return null
                   return (
                     <div key={col.key} className="flex-shrink-0 w-80">
                       <div className="flex items-center gap-2 mb-4 px-1">
@@ -1372,11 +1383,7 @@ export default function Admin() {
                         <span className="text-xs u-muted tabular-nums">{colProjects.length}</span>
                       </div>
                       <div className="space-y-4">
-                        {colProjects.length === 0 ? (
-                          <div className="text-center py-10 u-panel border border-dashed u-line u-muted text-xs">
-                            Aucun projet
-                          </div>
-                        ) : colProjects.map(renderProjectCard)}
+                        {colProjects.map(renderProjectCard)}
                       </div>
                     </div>
                   )

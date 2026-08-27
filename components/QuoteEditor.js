@@ -422,7 +422,6 @@ export default function QuoteEditor({ value, onChange }) {
                                 
                                 <input
                                   style={{ flex: 1, minWidth: 0, padding: '4px 8px', border: 'none', background: 'transparent', outline: 'none', fontFamily: FONT, fontSize: 15, fontWeight: 500, color: AL.black }}
-                                  style={{ color: AL.black }}
                                   placeholder="Nom de l'item (ex: Bar, Backbar…)"
                                   value={it.name || ''}
                                   onChange={e => updateItemName(itemIdx, e.target.value)}
