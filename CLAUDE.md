@@ -521,6 +521,13 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 |---|---|---|
 | `schema-profiles-role.sql` | colonne `profiles.role` | `ALTER TABLE profiles DROP COLUMN role;` |
 | `schema-integrite-financiere.sql` | `reconcile_match()`, `next_invoice_number()`, `storage_billing_key`, index d'unicité | en fin de fichier |
+| `schema-work-slots.sql` | table `work_slots` (planning par demi-journée) | `DROP TABLE work_slots;` |
+
+**Toute migration ajoutée ici doit aussi recevoir une sonde dans
+`scripts/check-db.mjs`.** `schema-work-slots.sql` est resté six semaines hors
+des deux listes : `/planning` renvoyait 500 en production et `check:db`
+annonçait « base à jour ». Une migration qu'aucune sonde ne couvre est une
+migration qu'on oubliera.
 
 `schema-integrite-financiere.sql` commence par deux requêtes de contrôle à
 passer d'abord : les index uniques échouent si des doublons existent déjà.

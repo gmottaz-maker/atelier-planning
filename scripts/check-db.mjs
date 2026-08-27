@@ -60,6 +60,14 @@ const CONTROLES = [
     migration: 'schema-integrite-financiere.sql',
     sonde: async () => !(await sb.from('customer_invoices').select('storage_billing_key').limit(1)).error,
   },
+  {
+    // Absente de ce script pendant six semaines : le planning renvoyait 500 en
+    // production sans que `check:db` n'y voie rien à redire. Une migration qui
+    // n'est pas sondée ici est une migration qu'on oubliera.
+    nom: 'work_slots',
+    migration: 'schema-work-slots.sql',
+    sonde: async () => !(await sb.from('work_slots').select('id').limit(1)).error,
+  },
 ]
 
 let manquants = 0
