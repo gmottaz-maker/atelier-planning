@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import useSWR from 'swr'
 import { fmtCHF } from '../lib/money'
-import { AL, C, R } from '../lib/theme'
+import { AL, C, FONT, R } from '../lib/theme'
 
 const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
 
@@ -62,7 +62,7 @@ export default function CatalogPicker({ kind = 'all', onPick, label = '+ Catalog
   return (
     <div ref={boxRef} style={{ position: 'relative', display: 'inline-block' }}>
       <button type="button" onClick={() => setOpen(o => !o)}
-        style={{ font: '600 11px system-ui', padding: '3px 8px', borderRadius: R.pill, cursor: 'pointer', border: `1px solid ${C.muted}`, background: AL.white, color: AL.black }}>
+        style={{ font: `500 11px ${FONT}`, padding: '3px 8px', borderRadius: R.pill, cursor: 'pointer', border: `1px solid ${C.muted}`, background: AL.white, color: AL.black }}>
         {label}
       </button>
       {open && (

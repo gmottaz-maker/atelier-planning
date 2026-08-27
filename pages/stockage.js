@@ -94,8 +94,10 @@ export default function Stockage() {
   const inpR = { ...inp, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
   const th = { font: `500 10px ${MONO}`, letterSpacing: '.05em', color: C.muted, textTransform: 'uppercase', padding: '6px 8px', textAlign: 'left', whiteSpace: 'nowrap' }
   const cell = { padding: '1px 4px', borderTop: `1px solid ${C.divider}` }
+  // `key` : ce champ est rendu dans un `.map()` pour les dimensions (L × l × h),
+  // et React réclamait une clé. kind + id + champ est stable et unique.
   const field = (kind, row, k, style, t = 'text', ph) => (
-    <input type={t} step={t === 'number' ? '0.5' : undefined} placeholder={ph} value={val(kind, row, k)}
+    <input key={`${kind}-${row.id}-${k}`} type={t} step={t === 'number' ? '0.5' : undefined} placeholder={ph} value={val(kind, row, k)}
       onChange={e => setD(kind, row.id, k, e.target.value)}
       onFocus={e => { e.target.style.background = C.surface; e.target.style.borderColor = C.border }}
       onBlur={e => { e.target.style.background = 'transparent'; e.target.style.borderColor = 'transparent'; commit(kind, row, k) }}
