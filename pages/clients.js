@@ -5,7 +5,8 @@ import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import Head from 'next/head'
 import Link from 'next/link'
-import { C, FONT, MONO, initials } from '../lib/theme'
+import { AL, C, FONT, MONO, R, initials } from '../lib/theme'
+import ButtonPill from '../components/ButtonPill'
 
 const Icon = ({ d, ...p }) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>{d}</svg>
 const EditIcon = <Icon d={<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" /></>} />
@@ -16,8 +17,8 @@ const ArchiveIcon = <Icon d={<><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /
 function ActionBtn({ children, title, onClick, danger }) {
   return (
     <button title={title} onClick={onClick}
-      style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', flex: 'none' }}
-      onMouseEnter={e => { e.currentTarget.style.background = danger ? C.dangerBg : C.divider; e.currentTarget.style.color = danger ? C.danger : C.ink }}
+      style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: R.pill, border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', flex: 'none' }}
+      onMouseEnter={e => { e.currentTarget.style.background = danger ? C.dangerBg : C.hover; e.currentTarget.style.color = danger ? C.danger : AL.black }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.muted }}>
       {children}
     </button>
@@ -110,30 +111,55 @@ export default function Clients() {
   const categories = [...ROLE_TAGS, ...customTags]
   const nArchived = list.filter(c => c.archived).length
 
-  const railItem = (active) => ({
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-    padding: '7px 10px', borderRadius: 6, fontSize: 13, textAlign: 'left', border: 'none', width: '100%',
-    cursor: 'pointer', marginBottom: 2, fontFamily: FONT,
-    background: active ? C.divider : 'transparent', color: active ? C.ink : C.inkSecondary, fontWeight: active ? 600 : 400,
-  })
-
-  function Card({ it }) {
+  function Ligne({ it }) {
     const c = it.c, co = it.company
     const isPerson = c.kind !== 'company'
     const sub = isPerson ? (co?.name || 'Sans société') : (c.city || '—')
-    const contact = [c.email, c.phone].filter(Boolean).join('  ·  ')
+    const nPersons = isPerson ? 0 : (personsByParent[String(c.id)] || []).length
     const editing = tagEditId === c.id
     return (
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, display: 'flex', flexDirection: 'column', gap: 9 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <Link href={`/clients/${c.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: C.ink }}>
-            <div style={{ width: 34, height: 34, borderRadius: isPerson ? '50%' : 9, background: C.ink, color: C.accentOnDark, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `11px ${MONO}`, fontWeight: 700, flex: 'none' }}>{initials(c.name)}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
-              <div style={{ font: `10.5px ${MONO}`, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
+      <div className="group" style={{ display: 'flex', flexDirection: 'column', borderTop: `1px solid ${C.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 4px' }}>
+          <Link href={`/clients/${c.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: AL.black }}>
+            {/* Rond pour une personne, carré adouci pour une société : la forme
+                dit le type, sans avoir à l'écrire. */}
+            <div style={{ width: 28, height: 28, borderRadius: isPerson ? '50%' : 6, background: C.neutralBg, color: C.muted,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>{initials(c.name)}</div>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: 15, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+              <span style={{ fontSize: 12.5, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</span>
             </div>
           </Link>
-          <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
+
+          <div style={{ display: 'flex', gap: 6, flex: 'none', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {/* Un rôle attribué est toujours visible ; un rôle NON attribué
+                n'apparaît qu'au survol de la ligne. Sinon chaque ligne porte
+                deux chips dont une inutile, et la colonne devient du bruit —
+                le prototype ne montre que les catégories réellement posées. */}
+            {ROLE_TAGS.map(rt => {
+              const active = hasTag(c, rt)
+              return (
+                <button key={rt} onClick={e => toggleTag(e, c, rt)}
+                  className={active ? undefined : 'opacity-0 group-hover:opacity-100 transition-opacity'}
+                  style={{ fontSize: 11, fontWeight: 500, letterSpacing: '.04em', padding: '3px 10px', borderRadius: R.pill, cursor: 'pointer', flex: 'none',
+                    fontFamily: FONT,
+                    color: active ? catColor(rt) : C.muted, background: active ? catBg(rt) : 'transparent',
+                    border: `1px solid ${active ? 'transparent' : C.border}` }}>{rt}</button>
+              )
+            })}
+            {(c.tags || []).filter(t => !ROLE_TAGS.includes(t)).map(t => (
+              <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 500, letterSpacing: '.04em',
+                color: C.violet, background: C.violetBg, padding: '3px 6px 3px 10px', borderRadius: R.pill }}>
+                {t}<button onClick={() => removeTag(c, t)} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+              </span>
+            ))}
+          </div>
+
+          <span style={{ font: `11px ${MONO}`, color: C.muted, width: 32, textAlign: 'right', flex: 'none' }}>
+            {nPersons > 0 ? nPersons : ''}
+          </span>
+
+          <div style={{ display: 'flex', gap: 2, flex: 'none' }} className="opacity-0 group-hover:opacity-100 transition-opacity">
             <ActionBtn title="Tagguer" onClick={e => openTag(e, c)}>{TagIcon}</ActionBtn>
             <ActionBtn title="Modifier" onClick={() => router.push(`/clients/${c.id}`)}>{EditIcon}</ActionBtn>
             <ActionBtn title={c.archived ? 'Désarchiver' : 'Archiver'} onClick={e => archive(e, c)}>{ArchiveIcon}</ActionBtn>
@@ -141,32 +167,13 @@ export default function Clients() {
           </div>
         </div>
 
-        <div style={{ font: `11px ${MONO}`, color: contact ? C.inkTertiary : C.faint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contact || 'pas de coordonnées'}</div>
-
-        {/* Catégories (plus visibles) : rôles togglables + tags */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          {ROLE_TAGS.map(rt => {
-            const active = hasTag(c, rt)
-            return (
-              <button key={rt} onClick={e => toggleTag(e, c, rt)}
-                style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99, cursor: 'pointer', flex: 'none',
-                  color: active ? catColor(rt) : C.faint, background: active ? catBg(rt) : 'transparent', border: `1px solid ${active ? 'transparent' : C.border}` }}>{rt}</button>
-            )
-          })}
-          {(c.tags || []).filter(t => !ROLE_TAGS.includes(t)).map(t => (
-            <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '3px 6px 3px 10px', borderRadius: 99 }}>
-              {t}<button onClick={() => removeTag(c, t)} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
-            </span>
-          ))}
-        </div>
-
         {editing && (
-          <div style={{ borderTop: `1px solid ${C.divider}`, paddingTop: 8 }}>
+          <div style={{ padding: '0 4px 12px' }}>
             <input autoFocus list="tag-suggestions" value={tagInput}
               onChange={e => setTagInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') addTag(c, tagInput); if (e.key === 'Escape') setTagEditId(null) }}
               placeholder="Ajouter une catégorie (Entrée)…"
-              style={{ width: '100%', padding: '6px 9px', borderRadius: 6, border: `1px solid ${C.border}`, font: `12px ${FONT}`, background: C.surface }} />
+              style={{ width: 280, padding: '6px 14px', borderRadius: R.pill, border: `1.5px dashed ${C.outline}`, font: `12px ${FONT}`, background: C.surface, outline: 'none' }} />
           </div>
         )}
       </div>
@@ -178,56 +185,56 @@ export default function Clients() {
       <Head><title>Contacts — Maze Project</title></Head>
       <datalist id="tag-suggestions">{[...new Set(list.flatMap(c => c.tags || []))].sort().map(t => <option key={t} value={t} />)}</datalist>
 
-      <main style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, borderBottom: `1px solid ${C.border}`, paddingBottom: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 23, fontWeight: 700, letterSpacing: '-.4px' }}>Contacts</span>
-            <span style={{ font: `11.5px ${MONO}`, color: C.muted }}>{companies.length} SOCIÉTÉS · {persons.length} PERSONNES{cat ? ` · ${cat.toUpperCase()}` : ''}</span>
-          </div>
-          <div style={{ flex: 1 }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
-            style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface, minWidth: 200 }} />
-          <button onClick={() => setShowArchived(v => !v)}
-            style={{ font: `600 12px ${FONT}`, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`,
-              background: showArchived ? C.ink : C.surface, color: showArchived ? '#fff' : C.inkSecondary }}>
-            {showArchived ? '← Actifs' : `Archivés${nArchived ? ` · ${nArchived}` : ''}`}
-          </button>
-          <button onClick={nouveau} style={{ border: 'none', background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>+ NOUVEAU</button>
+      <main style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 38, fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>Contacts</h1>
+          <p style={{ fontSize: 18, color: C.muted, margin: '12px 0 0' }}>
+            {companies.length} société{companies.length > 1 ? 's' : ''} · {persons.length} personne{persons.length > 1 ? 's' : ''}
+            {cat ? ` · ${cat.toLowerCase()}` : ''}
+          </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
-          {/* Rail catégories */}
-          <aside className="hidden md:flex" style={{ width: 190, flex: 'none', flexDirection: 'column', position: 'sticky', top: 20 }}>
-            <div style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', color: C.muted, padding: '0 10px 6px' }}>CATÉGORIES</div>
-            <button onClick={() => setCat(null)} style={railItem(cat === null)}>
-              <span>Toutes</span>
-              <span style={{ font: `10.5px ${MONO}`, color: C.faint }}>{activeContacts.length}</span>
+        {/* Recherche + catégories.
+            Le rail de 190px de la v1 disparaît : le prototype v2 met les
+            catégories en chips, ce qui rend la largeur au contenu. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
+              style={{ width: 220, padding: '9px 16px', borderRadius: R.pill, border: `1.5px solid ${C.outline}`,
+                fontFamily: FONT, fontSize: 13.5, background: C.surface, color: AL.black, outline: 'none' }} />
+
+            {[{ t: null, label: 'toutes', n: activeContacts.length }, ...categories.map(t => ({ t, label: t, n: tagCount(t) }))].map(item => {
+              const actif = cat === item.t
+              return (
+                <button key={item.label} onClick={() => setCat(actif && item.t ? null : item.t)}
+                  style={{ fontFamily: FONT, fontSize: 12, fontWeight: actif ? 500 : 400, padding: '6px 13px', borderRadius: R.pill,
+                    border: 'none', cursor: 'pointer',
+                    background: actif ? AL.black : C.neutralBg, color: actif ? AL.white : C.muted }}>
+                  {item.label}{item.n ? ` ${item.n}` : ''}
+                </button>
+              )
+            })}
+
+            <button onClick={() => setShowArchived(v => !v)}
+              style={{ fontFamily: FONT, fontSize: 12, padding: '6px 13px', borderRadius: R.pill, cursor: 'pointer',
+                border: `1.5px dashed ${C.outline}`, background: 'transparent',
+                color: showArchived ? AL.black : C.muted }}>
+              {showArchived ? '← actifs' : `archivés${nArchived ? ` ${nArchived}` : ''}`}
             </button>
-            {categories.map(t => (
-              <button key={t} onClick={() => setCat(cat === t ? null : t)} style={railItem(cat === t)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: catColor(t), flex: 'none' }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t}</span>
-                </span>
-                <span style={{ font: `10.5px ${MONO}`, color: C.faint, flex: 'none' }}>{tagCount(t)}</span>
-              </button>
-            ))}
-          </aside>
-
-          {/* Grille */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {isLoading ? (
-              <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Chargement…</p>
-            ) : visible.length === 0 ? (
-              <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Aucun contact.</p>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-                {visible.map(it => <Card key={it.c.id} it={it} />)}
-              </div>
-            )}
           </div>
+
+          <ButtonPill onClick={nouveau}>+ nouveau contact</ButtonPill>
         </div>
+
+        {isLoading ? (
+          <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Chargement…</p>
+        ) : visible.length === 0 ? (
+          <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Aucun contact.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {visible.map(it => <Ligne key={it.c.id} it={it} />)}
+          </div>
+        )}
       </main>
     </div>
   )

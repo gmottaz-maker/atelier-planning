@@ -1,53 +1,61 @@
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
 
 const REFRESH_INTERVAL = 60 * 1000
 
 // ─── Thèmes ────────────────────────────────────────────────────────────────
 
+// L'écran mural est le cas d'école du système : sa profondeur vient
+// entièrement de l'inversion de fond, jamais d'une ombre. Les deux thèmes
+// partagent donc les mêmes jetons, avec les rôles échangés.
+//
+// Une contrainte propre à cet écran : il se lit à plusieurs mètres, dans un
+// atelier. Le gris secondaire sur noir reste C.muted (≈6.1:1) — les alphas
+// blancs plus faibles, lisibles sur un portable, disparaissent sur un mur.
 const DARK = {
-  bg:           '#0a0a0a',
-  headerBg:     '#111111',
-  headerBorder: '#262626',
-  cardBg:       '#171717',
-  textPrimary:  '#ffffff',
-  textSecondary:'#d4d4d8',
-  textMuted:    '#71717a',
-  accent:       '#ffffff',
-  gridLine:     '#262626',
-  todayLine:    '#ffffff55',
-  todayBg:      '#ffffff0a',
-  weekendBg:    '#141414',
-  scrollbar:    '#333 #111',
-  toggleBg:     '#1f1f1f',
-  btnBg:        '#1f1f1f',
-  btnText:      '#a3a3a3',
-  legendText:   '#a3a3a3',
-  overdueBg:    '#1a0508',
-  overdueBorder:'#7f1d1d',
+  bg:           AL.black,
+  headerBg:     AL.black,
+  headerBorder: 'rgba(255,255,255,.12)',
+  cardBg:       'rgba(255,255,255,.05)',
+  textPrimary:  AL.white,
+  textSecondary:'rgba(255,255,255,.68)',
+  textMuted:    C.muted,
+  accent:       AL.white,
+  gridLine:     'rgba(255,255,255,.12)',
+  todayLine:    C.accent,
+  todayBg:      'rgba(255,77,109,.10)',
+  weekendBg:    'rgba(255,255,255,.03)',
+  scrollbar:    'rgba(255,255,255,.2) rgba(255,255,255,.06)',
+  toggleBg:     'rgba(255,255,255,.08)',
+  btnBg:        'rgba(255,255,255,.08)',
+  btnText:      C.muted,
+  legendText:   C.muted,
+  overdueBg:    'rgba(196,0,43,.22)',
+  overdueBorder: C.danger,
 }
 
 const LIGHT = {
-  bg:           '#ffffff',
-  headerBg:     '#ffffff',
-  headerBorder: '#e5e7eb',
-  cardBg:       '#ffffff',
-  textPrimary:  '#0a0a0a',
-  textSecondary:'#374151',
-  textMuted:    '#6b7280',
-  accent:       '#111827',
-  gridLine:     '#e5e7eb',
-  todayLine:    '#11182766',
-  todayBg:      '#11182710',
-  weekendBg:    '#f9fafb',
-  scrollbar:    '#ccc #f0f0f0',
-  toggleBg:     '#f3f4f6',
-  btnBg:        '#f3f4f6',
-  btnText:      '#374151',
-  legendText:   '#6b7280',
-  overdueBg:    '#fff1f2',
-  overdueBorder:'#fca5a5',
+  bg:           AL.white,
+  headerBg:     AL.white,
+  headerBorder: C.border,
+  cardBg:       AL.white,
+  textPrimary:  AL.black,
+  textSecondary:AL.black,
+  textMuted:    C.muted,
+  accent:       AL.black,
+  gridLine:     C.border,
+  todayLine:    C.accent,
+  todayBg:      'rgba(255,77,109,.07)',
+  weekendBg:    C.hover,
+  scrollbar:    'rgba(12,12,12,.2) rgba(12,12,12,.06)',
+  toggleBg:     C.neutralBg,
+  btnBg:        C.neutralBg,
+  btnText:      C.muted,
+  legendText:   C.muted,
+  overdueBg:    C.dangerBg,
+  overdueBorder: C.danger,
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -61,28 +69,41 @@ function getDaysRemaining(deadline) {
   return Math.ceil((d - today) / (1000 * 60 * 60 * 24))
 }
 
+// Feu d'échéance. Sur fond noir, un aplat sombre teinté ne se distingue plus à
+// trois mètres : c'est la BORDURE colorée et le texte qui portent l'information,
+// le fond restant une simple élévation neutre. En clair, l'inverse — le fond
+// teinté suffit, la bordure s'efface.
 function getAutoColor(deadline, dark) {
   const days = getDaysRemaining(deadline)
+  const niveau =
+    days === null ? { role: 'muted',   fg: C.muted }
+    : days < 0    ? { role: 'danger',  fg: C.danger }
+    : days < 7    ? { role: 'danger',  fg: C.danger }
+    : days < 14   ? { role: 'warning', fg: C.warning }
+    :               { role: 'success', fg: C.success }
+
   if (dark) {
-    if (days === null) return { bg: '#0f1115', border: '#374151', text: '#9ca3af', badge: '#6b7280' }
-    if (days < 0)  return { bg: '#2d0a10', border: '#7f1d1d', text: '#fca5a5', badge: '#ef4444' }
-    if (days < 7)  return { bg: '#1f0a0a', border: '#991b1b', text: '#fca5a5', badge: '#ef4444' }
-    if (days < 14) return { bg: '#1c1000', border: '#92400e', text: '#fcd34d', badge: '#f59e0b' }
-    return          { bg: '#071a10', border: '#166534', text: '#86efac', badge: '#22c55e' }
-  } else {
-    if (days === null) return { bg: '#f9fafb', border: '#e5e7eb', text: '#6b7280', badge: '#9ca3af' }
-    if (days < 0)  return { bg: '#fff1f2', border: '#fca5a5', text: '#9f1239', badge: '#ef4444' }
-    if (days < 7)  return { bg: '#fff1f2', border: '#fca5a5', text: '#b91c1c', badge: '#ef4444' }
-    if (days < 14) return { bg: '#fffbeb', border: '#fde68a', text: '#92400e', badge: '#f59e0b' }
-    return          { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534', badge: '#22c55e' }
+    const fondSombre = {
+      muted:   'rgba(255,255,255,.05)',
+      danger:  'rgba(196,0,43,.22)',
+      warning: 'rgba(166,99,0,.22)',
+      success: 'rgba(27,122,90,.22)',
+    }[niveau.role]
+    // Texte clair : la couleur de rôle est trop sombre sur noir, on garde le
+    // blanc pour le libellé et on laisse la bordure dire l'urgence.
+    return { bg: fondSombre, border: niveau.fg, text: AL.white, badge: niveau.fg }
   }
+  const fondClair = {
+    muted: C.hover, danger: C.dangerBg, warning: C.warningBg, success: C.successBg,
+  }[niveau.role]
+  return { bg: fondClair, border: fondClair, text: niveau.fg, badge: niveau.fg }
 }
 
 function getProjectColors(project, dark) {
   if (!project.color_override) return getAutoColor(project.deadline, dark)
   const c = project.color_override
   return dark
-    ? { bg: c + '18', border: c, text: '#ffffff', badge: c }
+    ? { bg: c + '18', border: c, text: AL.white, badge: c }
     : { bg: c + '18', border: c, text: c, badge: c }
 }
 
@@ -136,13 +157,13 @@ function Timeline({ projects, viewMode, dark, theme }) {
       {/* Projets en retard */}
       {overdueProjects.length > 0 && (
         <div className="px-10 pt-6 pb-4">
-          <div className="rounded-xl p-5 border" style={{ background: theme.overdueBg, borderColor: theme.overdueBorder }}>
-            <div className="font-bold uppercase tracking-wider mb-4" style={{ color: '#ef4444', fontSize: 17 }}>⚠ En retard</div>
+          <div className="u-panel p-5 border" style={{ background: theme.overdueBg, borderColor: theme.overdueBorder }}>
+            <div className="font-bold uppercase tracking-wider mb-4" style={{ color: C.danger, fontSize: 17 }}>⚠ En retard</div>
             <div className="flex flex-wrap gap-3">
               {overdueProjects.map(p => {
                 const colors = getAutoColor(p.deadline, dark)
                 return (
-                  <div key={p.id} className="rounded-lg px-5 py-3.5 border" style={{ background: colors.bg, borderColor: colors.border }}>
+                  <div key={p.id} className="u-panel px-5 py-3.5 border" style={{ background: colors.bg, borderColor: colors.border }}>
                     <div className="font-bold" style={{ color: theme.textPrimary, fontSize: 18 }}>{p.client}</div>
                     <div className="mt-0.5" style={{ color: colors.text, fontSize: 15 }}>{p.name}</div>
                     <div className="mt-1" style={{ color: theme.textMuted, fontSize: 14 }}>Prévu: {formatDate(p.deadline)}</div>
@@ -233,7 +254,7 @@ function Timeline({ projects, viewMode, dark, theme }) {
 
                     {/* Barre colorée — description seule */}
                     <div
-                      className="absolute rounded-lg flex items-center px-5 overflow-hidden"
+                      className="absolute u-panel flex items-center px-5 overflow-hidden"
                       style={{
                         top: 8, bottom: 8,
                         left: 0,
@@ -261,11 +282,11 @@ function Timeline({ projects, viewMode, dark, theme }) {
 
 function CardView({ projects, dark, theme }) {
   const groups = [
-    { label: 'En retard',            color: '#ef4444', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d < 0 }) },
-    { label: 'Cette semaine',        color: '#ef4444', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 0 && d < 7 }) },
-    { label: '2 prochaines semaines',color: '#f59e0b', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 7 && d < 14 }) },
-    { label: 'Plus tard',            color: '#22c55e', items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 14 }) },
-    { label: 'Sans date',            color: '#9ca3af', items: projects.filter(p => !p.deadline) },
+    { label: 'En retard',            color: C.danger, items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d < 0 }) },
+    { label: 'Cette semaine',        color: C.danger, items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 0 && d < 7 }) },
+    { label: '2 prochaines semaines',color: C.warning, items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 7 && d < 14 }) },
+    { label: 'Plus tard',            color: C.success, items: projects.filter(p => { const d = getDaysRemaining(p.deadline); return d !== null && d >= 14 }) },
+    { label: 'Sans date',            color: C.muted, items: projects.filter(p => !p.deadline) },
   ].filter(g => g.items.length > 0)
 
   if (groups.length === 0) {
@@ -292,12 +313,12 @@ function CardView({ projects, dark, theme }) {
             return (
               <div
                 key={project.id}
-                className="rounded-xl p-7 border"
+                className="u-panel p-7 border"
                 style={{ backgroundColor: colors.bg, borderColor: colors.border }}
               >
                 <div className="flex items-start justify-between mb-4 gap-3">
                   <div
-                    className="font-bold px-4 py-1.5 rounded-md"
+                    className="font-bold px-4 py-1.5 u-pill"
                     style={{ background: colors.badge + '22', color: colors.badge, fontSize: 16 }}
                   >
                     {daysLeft === null ? 'Sans date' :
@@ -406,7 +427,7 @@ export default function Display() {
       <Head>
         <title>Maze Project — Planning</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <style>{`body { font-family: 'Inter', sans-serif; } * { transition: background-color .2s, border-color .2s, color .15s; }`}</style>
+        <style>{`body { font-family: ${FONT}; } * { transition: background-color .2s, border-color .2s, color .15s; }`}</style>
       </Head>
 
       {/* ── Header ── */}
@@ -436,7 +457,7 @@ export default function Display() {
           <div className="flex items-center gap-3">
 
             {/* Sélecteur de vue */}
-            <div className="flex rounded-lg p-1 gap-1" style={{ background: theme.toggleBg }}>
+            <div className="flex u-panel p-1 gap-1" style={{ background: theme.toggleBg }}>
               {[
                 { key: 'weeks', label: '2 sem.' },
                 { key: 'month', label: 'Mois' },
@@ -445,9 +466,9 @@ export default function Display() {
                 <button
                   key={v.key}
                   onClick={() => setViewMode(v.key)}
-                  className="px-4 py-2 rounded-md font-semibold transition-all"
+                  className="px-4 py-2 u-pill font-semibold transition-all"
                   style={viewMode === v.key
-                    ? { background: theme.accent, color: dark ? '#000' : '#fff', fontSize: 16 }
+                    ? { background: theme.accent, color: dark ? AL.black : AL.white, fontSize: 16 }
                     : { color: theme.btnText, background: 'transparent', fontSize: 16 }
                   }
                 >
@@ -459,7 +480,7 @@ export default function Display() {
             {/* Toggle jour/nuit */}
             <button
               onClick={toggleTheme}
-              className="w-12 h-12 flex items-center justify-center rounded-lg transition-colors"
+              className="w-12 h-12 flex items-center justify-center u-panel transition-colors"
               style={{ background: theme.btnBg, color: theme.btnText, fontSize: 22 }}
               title={dark ? 'Passer en mode jour' : 'Passer en mode nuit'}
             >
@@ -469,7 +490,7 @@ export default function Display() {
             {/* Refresh */}
             <button
               onClick={fetchProjects}
-              className="flex items-center gap-2 px-4 py-3 rounded-lg font-semibold transition-colors"
+              className="flex items-center gap-2 px-4 py-3 u-panel font-semibold transition-colors"
               style={{ background: theme.btnBg, color: theme.btnText, fontSize: 16 }}
               title="Actualiser maintenant"
             >
@@ -480,7 +501,7 @@ export default function Display() {
             {/* Admin */}
             <Link
               href="/"
-              className="w-12 h-12 flex items-center justify-center rounded-lg transition-colors"
+              className="w-12 h-12 flex items-center justify-center u-panel transition-colors"
               style={{ background: theme.btnBg, color: theme.btnText, fontSize: 20 }}
               title="Interface admin"
             >
@@ -503,8 +524,8 @@ export default function Display() {
             <div className="mb-6" style={{ color: theme.textSecondary, fontSize: 17 }}>{fetchError}</div>
             <button
               onClick={fetchProjects}
-              className="px-6 py-3 rounded-lg font-semibold"
-              style={{ background: theme.accent, color: dark ? '#000' : '#fff', fontSize: 16 }}
+              className="px-6 py-3 u-panel font-semibold"
+              style={{ background: theme.accent, color: dark ? AL.black : AL.white, fontSize: 16 }}
             >
               Réessayer
             </button>
@@ -526,19 +547,19 @@ export default function Display() {
         </div>
         <div className="flex items-center gap-6" style={{ color: theme.legendText, fontSize: 15 }}>
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#22c55e' }} />
+            <span className="w-3 h-3 u-pill inline-block" style={{ background: C.success }} />
             &gt; 2 semaines
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#f59e0b' }} />
+            <span className="w-3 h-3 u-pill inline-block" style={{ background: C.warning }} />
             &lt; 2 semaines
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#ef4444' }} />
+            <span className="w-3 h-3 u-pill inline-block" style={{ background: C.danger }} />
             &lt; 1 semaine
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full inline-block" style={{ background: '#7f1d1d' }} />
+            <span className="w-3 h-3 u-pill inline-block" style={{ background: C.danger }} />
             En retard
           </span>
         </div>

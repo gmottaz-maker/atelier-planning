@@ -3,7 +3,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
-import { C, FONT, MONO, personChip } from '../lib/theme'
+import { C, FONT, MONO, R, personChip } from '../lib/theme'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ function EmptyState({ onGenerate, loading }) {
         Génère un brief instantané : projets en cours, commandes en attente, sous-traitances, livraisons à venir et tâches en retard.
       </p>
       <button onClick={onGenerate} disabled={loading}
-        style={{ padding: '11px 22px', borderRadius: 5, font: `600 13px ${FONT}`, color: C.accentOnDark, background: C.ink, border: 'none', cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
+        style={{ padding: '11px 22px', borderRadius: R.pill, font: `600 13px ${FONT}`, color: C.accentOnDark, background: C.ink, border: 'none', cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
         {loading ? 'Génération…' : 'Générer une structure de meeting'}
       </button>
     </div>
@@ -169,9 +169,9 @@ function MeetingBrief({ projects, tasks, generatedAt, participants, allResponsib
         </div>
         <div style={{ flex: 1 }} />
         <button onClick={() => window.print()} className="no-print"
-          style={{ border: `1px solid ${C.border}`, background: C.surface, color: C.inkSecondary, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>IMPRIMER</button>
+          style={{ border: `1px solid ${C.border}`, background: C.surface, color: C.inkSecondary, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: R.pill, cursor: 'pointer' }}>IMPRIMER</button>
         <button onClick={onRegenerate} disabled={loading} className="no-print"
-          style={{ border: `1px solid ${C.ink}`, background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>↻ RÉGÉNÉRER</button>
+          style={{ border: `1px solid ${C.ink}`, background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: R.pill, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>↻ RÉGÉNÉRER</button>
       </div>
 
       {/* Participants */}
@@ -182,7 +182,7 @@ function MeetingBrief({ projects, tasks, generatedAt, participants, allResponsib
           const chip = personChip(name)
           return (
             <button key={name} onClick={() => onToggleParticipant(name)} className="no-print"
-              style={{ fontSize: 11.5, fontWeight: 600, padding: '3px 12px', borderRadius: 99, cursor: 'pointer',
+              style={{ fontSize: 11.5, fontWeight: 600, padding: '3px 12px', borderRadius: R.pill, cursor: 'pointer',
                 color: active ? chip.fg : C.muted, background: active ? chip.bg : C.surface,
                 border: `1px solid ${active ? chip.fg + '33' : C.border}` }}>
               {name}
@@ -194,7 +194,7 @@ function MeetingBrief({ projects, tasks, generatedAt, participants, allResponsib
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
         {stats.map(s => (
-          <div key={s.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div key={s.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 3 }}>
             <span style={{ font: `600 22px ${MONO}`, color: s.danger && s.value > 0 ? C.danger : C.ink }}>{s.value}</span>
             <span style={{ fontSize: 11.5, color: C.muted }}>{s.label}</span>
           </div>
@@ -262,7 +262,7 @@ function Section({ title, meta, danger, children }) {
         <span style={{ fontSize: 16, fontWeight: 700, color: danger ? C.danger : C.ink }}>{title}</span>
         {meta && <span style={{ font: `11px ${MONO}`, color: C.muted }}>{meta}</span>}
       </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 16px' }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '6px 16px' }}>
         {children}
       </div>
     </section>

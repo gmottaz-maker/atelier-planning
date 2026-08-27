@@ -6,11 +6,12 @@ import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { fmtCHF as fmtMontant } from '../lib/money'
+import { AL, C } from '../lib/theme'
 
-const PINK = '#111827'
-const PERSON_COLORS = { Arnaud: '#3b82f6', Gabin: '#8b5cf6', Guillaume: '#111827' }
+const PINK = AL.black
+const PERSON_COLORS = { Arnaud: C.info, Gabin: C.violet, Guillaume: AL.black }
 const PAYMENT_LABELS  = { personal: 'Perso (à rembourser)', company: 'Société (carte)' }
-const PAYMENT_COLORS  = { personal: '#f59e0b', company: '#0ea5e9' }
+const PAYMENT_COLORS  = { personal: C.warning, company: C.info }
 
 function fmtCHF(n) {
   if (n == null) return '—'
@@ -277,26 +278,26 @@ export default function Justificatifs() {
   const allPeople = Array.from(new Set(rows.map(r => r.user_name))).sort()
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: AL.white }}>
       <Head><title>Maze Project — Justificatifs</title></Head>
       <NavBar title="Justificatifs de dépense">
-        <div className="flex items-center gap-1.5 bg-gray-100 rounded-md p-0.5 mr-2">
+        <div className="flex items-center gap-1.5 u-fill u-pill p-0.5 mr-2">
           <button onClick={() => setDropMode('personal')}
             className="px-2.5 py-1 rounded text-xs font-semibold transition-colors"
             style={dropMode === 'personal'
-              ? { background: 'white', color: '#92400e', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
-              : { background: 'transparent', color: '#6b7280' }}>
+              ? { background: 'white', color: C.warning, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+              : { background: 'transparent', color: C.muted }}>
             💳 Perso
           </button>
           <button onClick={() => setDropMode('company')}
             className="px-2.5 py-1 rounded text-xs font-semibold transition-colors"
             style={dropMode === 'company'
-              ? { background: 'white', color: '#075985', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
-              : { background: 'transparent', color: '#6b7280' }}>
+              ? { background: 'white', color: C.info, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+              : { background: 'transparent', color: C.muted }}>
             🏢 Société
           </button>
         </div>
-        <label className="px-4 py-2 text-sm font-medium rounded-md text-white cursor-pointer" style={{ background: PINK }}>
+        <label className="px-4 py-2 text-sm font-medium u-pill text-white cursor-pointer" style={{ background: PINK }}>
           📁 Importer
           <input type="file" multiple accept="image/*,application/pdf,.heic,.heif" className="hidden"
             onChange={e => { handleFiles(e.target.files); e.target.value = '' }} />
@@ -307,15 +308,15 @@ export default function Justificatifs() {
       {dragging && (
         <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
           style={{ background: 'rgba(17, 24, 39, 0.55)' }}>
-          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed" style={{ borderColor: '#111827' }}>
+          <div className="u-surface u-panel px-10 py-8 text-center shadow-2xl border-2 border-dashed" style={{ borderColor: AL.black }}>
             <div className="text-5xl mb-3">📥</div>
-            <p className="font-semibold text-gray-900" style={{ fontSize: 18 }}>
+            <p className="font-semibold u-ink" style={{ fontSize: 18 }}>
               Déposez votre justificatif ici
             </p>
-            <p className="text-sm mt-1" style={{ color: dropMode === 'personal' ? '#92400e' : '#075985' }}>
+            <p className="text-sm mt-1" style={{ color: dropMode === 'personal' ? C.warning : C.info }}>
               Mode : {dropMode === 'personal' ? '💳 Perso (à rembourser)' : '🏢 Société (carte)'}
             </p>
-            <p className="text-xs text-gray-400 mt-2">JPG · PNG · PDF — l'IA va l'analyser</p>
+            <p className="text-xs u-muted mt-2">JPG · PNG · PDF — l'IA va l'analyser</p>
           </div>
         </div>
       )}
@@ -331,31 +332,31 @@ export default function Justificatifs() {
         const warns  = processing.filter(p => p.status === 'warning').length
         const attention = errors + skipped + dups + warns
         return (
-          <div className="fixed bottom-5 right-5 z-30 w-96 max-w-[92vw] bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col" style={{ maxHeight: '72vh' }}>
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-gray-900">
+          <div className="fixed bottom-5 right-5 z-30 w-96 max-w-[92vw] u-surface u-panel shadow-xl border u-line flex flex-col" style={{ maxHeight: '72vh' }}>
+            <div className="px-4 py-3 border-b u-line flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold u-ink">
                 {busy > 0 ? `Import en cours… ${done}/${processing.length - warns}` : 'Import terminé'}
-                <span className="ml-2 font-normal text-gray-500 text-xs">
+                <span className="ml-2 font-normal u-muted text-xs">
                   {done} importé{done > 1 ? 's' : ''}
                   {attention > 0 && ` · ${attention} à vérifier`}
                 </span>
               </div>
               {busy === 0 && (
                 <button onClick={() => setProcessing([])}
-                  className="text-xs font-medium text-gray-500 hover:text-gray-900">Tout effacer</button>
+                  className="text-xs font-medium u-muted hover:u-ink">Tout effacer</button>
               )}
             </div>
-            <div className="overflow-y-auto divide-y divide-gray-50">
+            <div className="overflow-y-auto divide-y u-divide">
               {processing.map(p => (
                 <div key={p.id} className="px-4 py-2.5 flex items-start gap-3">
-                  {p.status === 'done' ? <span className="text-green-600 mt-0.5">✓</span>
-                    : p.status === 'error' ? <span className="text-red-500 mt-0.5">✕</span>
-                    : p.status === 'skipped' ? <span className="text-gray-400 mt-0.5">⨯</span>
-                    : (p.status === 'duplicate' || p.status === 'warning') ? <span className="text-amber-600 mt-0.5">⚠</span>
-                    : <div className="w-4 h-4 mt-0.5 rounded-full border-2 animate-spin flex-shrink-0" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />}
+                  {p.status === 'done' ? <span className="u-ok mt-0.5">✓</span>
+                    : p.status === 'error' ? <span className="u-ko mt-0.5">✕</span>
+                    : p.status === 'skipped' ? <span className="u-muted mt-0.5">⨯</span>
+                    : (p.status === 'duplicate' || p.status === 'warning') ? <span className="u-warn mt-0.5">⚠</span>
+                    : <div className="w-4 h-4 mt-0.5 u-pill border-2 animate-spin flex-shrink-0" style={{ borderColor: C.border, borderTopColor: AL.black }} />}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-medium u-ink truncate">{p.name}</p>
+                    <p className="text-xs u-muted">
                       {p.status === 'reading'    && 'Lecture…'}
                       {p.status === 'converting' && 'Conversion HEIC…'}
                       {p.status === 'scanning'   && 'Analyse IA…'}
@@ -363,29 +364,29 @@ export default function Justificatifs() {
                       {p.status === 'done' && (
                         <>
                           {p.multiVat ? (
-                            <span className="text-amber-700">Importé ✓ — ⚠ Plusieurs taux TVA ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})</span>
+                            <span className="u-warn">Importé ✓ — ⚠ Plusieurs taux TVA ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})</span>
                           ) : 'Importé ✓'}
-                          {p.reconcile?.status === 'matched'   && <span className="text-green-700"> · rapproché à un débit</span>}
-                          {p.reconcile?.status === 'ambiguous' && <span className="text-blue-700"> · paiement probable, à valider</span>}
+                          {p.reconcile?.status === 'matched'   && <span className="u-ok"> · rapproché à un débit</span>}
+                          {p.reconcile?.status === 'ambiguous' && <span className="u-info"> · paiement probable, à valider</span>}
                         </>
                       )}
-                      {p.status === 'error'   && <span className="text-red-600">Erreur : {p.error}</span>}
-                      {p.status === 'skipped' && <span className="text-gray-500">{p.error}</span>}
-                      {p.status === 'warning' && <span className="text-amber-700">{p.warning}</span>}
+                      {p.status === 'error'   && <span className="u-ko">Erreur : {p.error}</span>}
+                      {p.status === 'skipped' && <span className="u-muted">{p.error}</span>}
+                      {p.status === 'warning' && <span className="u-warn">{p.warning}</span>}
                       {p.status === 'duplicate' && (
                         <>
                           Doublon détecté ({p.duplicate?.amount} CHF, {p.duplicate?.date}){' '}
-                          <button onClick={p.retry} className="ml-1 underline text-amber-700 hover:text-amber-900">Importer quand même</button>
+                          <button onClick={p.retry} className="ml-1 underline u-warn hover:u-warn">Importer quand même</button>
                           {' · '}
                           <button onClick={() => setProcessing(pp => pp.filter(xx => xx.id !== p.id))}
-                            className="underline text-gray-500 hover:text-gray-700">Ignorer</button>
+                            className="underline u-muted hover:u-ink">Ignorer</button>
                         </>
                       )}
                     </p>
                   </div>
                   {['error', 'skipped', 'warning'].includes(p.status) && (
                     <button onClick={() => setProcessing(pp => pp.filter(xx => xx.id !== p.id))}
-                      className="text-gray-300 hover:text-gray-500 text-sm flex-shrink-0" title="Retirer">×</button>
+                      className="u-muted hover:u-muted text-sm flex-shrink-0" title="Retirer">×</button>
                   )}
                 </div>
               ))}
@@ -398,39 +399,39 @@ export default function Justificatifs() {
 
         {/* Stats globales */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
-            <div className="text-xs text-gray-500 mb-1">Total année</div>
-            <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: '#111827', letterSpacing: '-0.02em' }}>
-              {fmtCHF(totals.total)} <span className="text-xs font-normal text-gray-400">CHF</span>
+          <div className="u-surface u-panel border u-line px-4 py-3">
+            <div className="text-xs u-muted mb-1">Total année</div>
+            <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: AL.black, letterSpacing: '-0.02em' }}>
+              {fmtCHF(totals.total)} <span className="text-xs font-normal u-muted">CHF</span>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-amber-200 px-4 py-3">
-            <div className="text-xs text-amber-700 mb-1">À rembourser (perso)</div>
-            <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: '#92400e', letterSpacing: '-0.02em' }}>
-              {fmtCHF(totals.toReimburse)} <span className="text-xs font-normal text-gray-400">CHF</span>
+          <div className="u-surface u-panel border u-line px-4 py-3">
+            <div className="text-xs u-warn mb-1">À rembourser (perso)</div>
+            <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: C.warning, letterSpacing: '-0.02em' }}>
+              {fmtCHF(totals.toReimburse)} <span className="text-xs font-normal u-muted">CHF</span>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-sky-200 px-4 py-3">
-            <div className="text-xs text-sky-700 mb-1">Carte société</div>
-            <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: '#075985', letterSpacing: '-0.02em' }}>
-              {fmtCHF(totals.company)} <span className="text-xs font-normal text-gray-400">CHF</span>
+          <div className="u-surface u-panel border u-line px-4 py-3">
+            <div className="text-xs u-info mb-1">Carte société</div>
+            <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: C.info, letterSpacing: '-0.02em' }}>
+              {fmtCHF(totals.company)} <span className="text-xs font-normal u-muted">CHF</span>
             </div>
           </div>
         </div>
 
         {/* Récap remboursements par personne */}
         {Object.keys(reimbursementsByPerson).length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Remboursements dûs ({year})</div>
+          <div className="u-surface u-panel border u-line p-4">
+            <div className="text-xs font-semibold uppercase tracking-wider u-muted mb-2">Remboursements dûs ({year})</div>
             <div className="flex flex-wrap gap-3">
               {Object.entries(reimbursementsByPerson).map(([name, amt]) => (
-                <div key={name} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold"
-                    style={{ background: PERSON_COLORS[name] || '#9ca3af' }}>
+                <div key={name} className="flex items-center gap-2 px-3 py-1.5 u-warn-bg border u-line u-pill">
+                  <div className="w-6 h-6 u-pill flex items-center justify-center text-white text-xs font-semibold"
+                    style={{ background: PERSON_COLORS[name] || C.muted }}>
                     {name?.[0]}
                   </div>
-                  <span className="text-sm font-medium text-gray-900">{name}</span>
-                  <span className="text-sm font-bold tabular-nums" style={{ color: '#92400e' }}>{fmtCHF(amt)} CHF</span>
+                  <span className="text-sm font-medium u-ink">{name}</span>
+                  <span className="text-sm font-bold tabular-nums" style={{ color: C.warning }}>{fmtCHF(amt)} CHF</span>
                 </div>
               ))}
             </div>
@@ -440,7 +441,7 @@ export default function Justificatifs() {
         {/* Filtres */}
         <div className="flex items-center gap-2 flex-wrap">
           <select value={year} onChange={e => setYear(Number(e.target.value))}
-            className="px-3 py-1.5 border border-gray-200 rounded-md text-sm bg-white">
+            className="px-3 py-1.5 border u-line u-pill text-sm u-surface">
             {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           {[
@@ -449,14 +450,14 @@ export default function Justificatifs() {
             { k: 'company',  label: 'Carte société' },
           ].map(f => (
             <button key={f.k} onClick={() => setFilter(f.k)}
-              className="px-3 py-1.5 rounded-md text-xs font-medium"
-              style={filter === f.k ? { background: '#111827', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+              className="px-3 py-1.5 u-pill text-xs font-medium"
+              style={filter === f.k ? { background: AL.black, color: 'white' } : { background: C.neutralBg, color: C.muted }}>
               {f.label}
             </button>
           ))}
           {allPeople.length > 1 && (
             <select value={person} onChange={e => setPerson(e.target.value)}
-              className="px-3 py-1.5 border border-gray-200 rounded-md text-sm bg-white">
+              className="px-3 py-1.5 border u-line u-pill text-sm u-surface">
               <option value="all">Toutes personnes</option>
               {allPeople.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -465,81 +466,81 @@ export default function Justificatifs() {
 
         {/* Liste */}
         {loading ? (
-          <p className="text-sm text-gray-400 py-12 text-center">Chargement…</p>
+          <p className="text-sm u-muted py-12 text-center">Chargement…</p>
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-            <p className="text-sm text-gray-400">Aucun justificatif.</p>
-            <p className="text-xs text-gray-400 mt-1">Les frais sont saisis depuis la page Horaires par chaque utilisateur.</p>
+          <div className="u-surface u-panel border u-line p-12 text-center">
+            <p className="text-sm u-muted">Aucun justificatif.</p>
+            <p className="text-xs u-muted mt-1">Les frais sont saisis depuis la page Horaires par chaque utilisateur.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="u-surface u-panel border u-line overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Date</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Personne</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Commerçant</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Catégorie</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Mode</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Montant</th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700" style={{ fontSize: 11 }}>Rapproché</th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700" style={{ fontSize: 11 }}>Reçu</th>
+                <tr className="u-fill border-b u-line">
+                  <th className="px-4 py-3 text-left font-semibold u-ink" style={{ fontSize: 11 }}>Date</th>
+                  <th className="px-4 py-3 text-left font-semibold u-ink" style={{ fontSize: 11 }}>Personne</th>
+                  <th className="px-4 py-3 text-left font-semibold u-ink" style={{ fontSize: 11 }}>Commerçant</th>
+                  <th className="px-4 py-3 text-left font-semibold u-ink" style={{ fontSize: 11 }}>Catégorie</th>
+                  <th className="px-4 py-3 text-left font-semibold u-ink" style={{ fontSize: 11 }}>Mode</th>
+                  <th className="px-4 py-3 text-right font-semibold u-ink" style={{ fontSize: 11 }}>Montant</th>
+                  <th className="px-4 py-3 text-center font-semibold u-ink" style={{ fontSize: 11 }}>Rapproché</th>
+                  <th className="px-4 py-3 text-center font-semibold u-ink" style={{ fontSize: 11 }}>Reçu</th>
                 </tr>
               </thead>
               <tbody>
                 {visible.map(r => (
                   <tr key={r.id} onClick={() => setEditing(r)}
-                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer">
-                    <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(r.date)}</td>
+                    className="border-t u-line hover:u-fill cursor-pointer">
+                    <td className="px-4 py-3 u-ink tabular-nums">{fmtDate(r.date)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
-                          style={{ background: PERSON_COLORS[r.user_name] || '#9ca3af' }}>
+                        <div className="w-6 h-6 u-pill flex items-center justify-center text-white text-xs font-semibold flex-shrink-0"
+                          style={{ background: PERSON_COLORS[r.user_name] || C.muted }}>
                           {r.user_name?.[0]}
                         </div>
                         <span className="text-sm">{r.user_name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{r.merchant || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
+                    <td className="px-4 py-3 font-medium u-ink">{r.merchant || '—'}</td>
+                    <td className="px-4 py-3 u-ink text-xs">
                       <div>{r.category}</div>
                       {r.account
-                        ? <div className="text-gray-400 tabular-nums">{r.account}</div>
-                        : r.payment_method === 'company' && <div className="text-amber-500">compte à définir</div>}
+                        ? <div className="u-muted tabular-nums">{r.account}</div>
+                        : r.payment_method === 'company' && <div className="u-warn">compte à définir</div>}
                     </td>
                     <td className="px-4 py-3">
                       <button onClick={e => { e.stopPropagation(); togglePaymentMethod(r) }}
-                        className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block hover:opacity-80 transition-opacity"
+                        className="px-2 py-0.5 u-pill text-xs font-semibold inline-block hover:opacity-80 transition-opacity"
                         title="Cliquer pour basculer perso ↔ société"
                         style={{ background: (PAYMENT_COLORS[r.payment_method || 'personal']) + '18',
                                  color: PAYMENT_COLORS[r.payment_method || 'personal'] }}>
                         {PAYMENT_LABELS[r.payment_method || 'personal']}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-gray-900">
-                      {fmtCHF(r.amount)} <span className="text-xs font-normal text-gray-400">{r.currency || 'CHF'}</span>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums u-ink">
+                      {fmtCHF(r.amount)} <span className="text-xs font-normal u-muted">{r.currency || 'CHF'}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {r.matched_transaction ? (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
-                          style={{ background: '#22c55e18', color: '#16a34a' }}
+                        <span className="px-2 py-0.5 u-pill text-xs font-semibold inline-block"
+                          style={{ background: C.successBg, color: C.success }}
                           title={`Débit du ${fmtDate(String(r.matched_transaction.date).slice(0,10))}`}>
                           ✓ payé
                         </span>
                       ) : r.payment_method === 'company' ? (
-                        <span className="text-xs text-gray-400">à rapprocher</span>
-                      ) : <span className="text-xs text-gray-300">—</span>}
+                        <span className="text-xs u-muted">à rapprocher</span>
+                      ) : <span className="text-xs u-muted">—</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {r.receipt_url ? (
                         <a href={r.receipt_url} target="_blank" rel="noopener"
                           onClick={e => e.stopPropagation()}
-                          className="text-xs text-gray-500 hover:text-gray-900 underline">voir</a>
+                          className="text-xs u-muted hover:u-ink underline">voir</a>
                       ) : r.kdrive_file_id ? (
                         <a href={`/api/kdrive/download?fileId=${r.kdrive_file_id}`} target="_blank" rel="noopener"
                           onClick={e => e.stopPropagation()}
-                          className="text-xs text-gray-500 hover:text-gray-900 underline">voir</a>
-                      ) : <span className="text-xs text-gray-300">—</span>}
+                          className="text-xs u-muted hover:u-ink underline">voir</a>
+                      ) : <span className="text-xs u-muted">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -634,55 +635,55 @@ function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
     onSaved()
   }
 
-  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none"
+  const inputCls = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none"
 
   return (
     <>
       <style>{`@keyframes drawerSlide { from { transform: translateX(100%);} to { transform: translateX(0);} }`}</style>
       <div className="fixed inset-0 z-50" style={{ background: 'rgba(15,23,42,0.35)' }}
         onClick={e => e.target === e.currentTarget && onClose()}>
-        <div className="fixed top-0 right-0 bottom-0 bg-white flex flex-col shadow-2xl"
+        <div className="fixed top-0 right-0 bottom-0 u-surface flex flex-col shadow-2xl"
           style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s ease both', fontFamily: 'Inter, sans-serif' }}>
 
-          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+          <div className="flex items-center justify-between px-8 py-5 border-b u-line">
             <div>
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Justificatif · {form.user_name}</p>
-              <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>{form.merchant || 'Sans commerçant'}</h2>
+              <p className="text-xs uppercase tracking-wider u-muted mb-0.5">Justificatif · {form.user_name}</p>
+              <h2 className="font-semibold u-ink" style={{ fontSize: 20 }}>{form.merchant || 'Sans commerçant'}</h2>
             </div>
-            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100" style={{ fontSize: 22 }}>×</button>
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center u-pill u-muted hover:u-fill" style={{ fontSize: 22 }}>×</button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
             {row.receipt_url ? (
-              <div className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+              <div className="u-panel overflow-hidden border u-line u-fill">
                 <a href={row.receipt_url} target="_blank" rel="noopener" className="block">
                   <img src={row.receipt_url} alt="reçu" style={{ maxHeight: 280, width: '100%', objectFit: 'contain' }}
                     onError={e => { e.currentTarget.style.display = 'none' }} />
                 </a>
-                <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Reçu attaché</span>
-                  <a href={row.receipt_url} target="_blank" rel="noopener" className="text-xs text-gray-700 underline">Ouvrir en grand</a>
+                <div className="px-3 py-2 border-t u-line flex items-center justify-between">
+                  <span className="text-xs u-muted">Reçu attaché</span>
+                  <a href={row.receipt_url} target="_blank" rel="noopener" className="text-xs u-ink underline">Ouvrir en grand</a>
                 </div>
               </div>
             ) : row.kdrive_file_id ? (
               <a href={`/api/kdrive/download?fileId=${row.kdrive_file_id}`} target="_blank" rel="noopener"
-                className="block w-full text-center px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400">
+                className="block w-full text-center px-4 py-2 u-pill text-sm font-medium border u-line u-ink hover:u-line">
                 📎 Ouvrir le justificatif ({row.kdrive_filename || 'kDrive'})
               </a>
             ) : null}
             {row.matched_transaction && (
-              <div className="rounded-md px-3 py-2 text-xs" style={{ background: '#f0fdf4', color: '#15803d' }}>
+              <div className="u-pill px-3 py-2 text-xs" style={{ background: C.successBg, color: C.success }}>
                 ✓ Rapproché à un débit du {fmtDate(String(row.matched_transaction.date).slice(0,10))} ({fmtCHF(Math.abs(row.matched_transaction.amount))} CHF)
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                <label className="block text-xs font-medium u-muted mb-1">Date</label>
                 <input type="date" className={inputCls} value={form.date} onChange={e => set('date', e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Total TTC</label>
+                <label className="block text-xs font-medium u-muted mb-1">Total TTC</label>
                 <input type="number" step="0.01" className={inputCls} value={form.amount}
                   onChange={e => {
                     set('amount', e.target.value)
@@ -690,7 +691,7 @@ function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
                   }} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">TVA</label>
+                <label className="block text-xs font-medium u-muted mb-1">TVA</label>
                 <select className={inputCls} value={form.vat_rate}
                   onChange={e => {
                     set('vat_rate', e.target.value)
@@ -704,61 +705,61 @@ function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Montant HT</label>
+                <label className="block text-xs font-medium u-muted mb-1">Montant HT</label>
                 <input type="number" step="0.01" className={inputCls} value={form.amount_net}
                   onChange={e => set('amount_net', e.target.value)}
                   placeholder="auto si TTC + taux" />
               </div>
               <div className="col-span-2 -mt-1">
-                <p className="text-xs text-gray-400">
-                  TVA : <span className="font-semibold text-gray-700 tabular-nums">{form.vat_amount ? `${form.vat_amount} ${form.currency}` : '—'}</span>
+                <p className="text-xs u-muted">
+                  TVA : <span className="font-semibold u-ink tabular-nums">{form.vat_amount ? `${form.vat_amount} ${form.currency}` : '—'}</span>
                 </p>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Commerçant</label>
+                <label className="block text-xs font-medium u-muted mb-1">Commerçant</label>
                 <input className={inputCls} value={form.merchant} onChange={e => set('merchant', e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
+                <label className="block text-xs font-medium u-muted mb-1">Catégorie</label>
                 <select className={inputCls} value={form.category} onChange={e => set('category', e.target.value)}>
                   {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
+                <label className="block text-xs font-medium u-muted mb-1">
                   Catégorie comptable
-                  {row.account && !form.account && <span className="text-gray-400 font-normal"> · apprise</span>}
+                  {row.account && !form.account && <span className="u-muted font-normal"> · apprise</span>}
                 </label>
                 <select className={inputCls} value={form.account} onChange={e => set('account', e.target.value)}>
                   <option value="">— à définir —</option>
                   {accounts.map(a => <option key={a.number} value={a.number}>{a.number} · {a.label}</option>)}
                 </select>
                 {form.merchant && (
-                  <p className="text-xs text-gray-400 mt-1">Retenu pour « {form.merchant} » aux prochains tickets.</p>
+                  <p className="text-xs u-muted mt-1">Retenu pour « {form.merchant} » aux prochains tickets.</p>
                 )}
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                <label className="block text-xs font-medium u-muted mb-1">Description</label>
                 <textarea rows={2} className={inputCls} value={form.description} onChange={e => set('description', e.target.value)} />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-2">Mode de paiement</label>
+                <label className="block text-xs font-medium u-muted mb-2">Mode de paiement</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button"
                     onClick={() => set('payment_method', 'personal')}
-                    className="py-2.5 rounded-md text-sm font-medium border"
+                    className="py-2.5 u-pill text-sm font-medium border"
                     style={form.payment_method === 'personal'
-                      ? { borderColor: '#f59e0b', background: '#fef3c7', color: '#92400e' }
-                      : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                      ? { borderColor: C.warning, background: C.warningBg, color: C.warning }
+                      : { borderColor: C.border, background: 'white', color: C.muted }}>
                     💳 Compte perso
                     <span className="block text-[10px] opacity-75 font-normal">à rembourser</span>
                   </button>
                   <button type="button"
                     onClick={() => set('payment_method', 'company')}
-                    className="py-2.5 rounded-md text-sm font-medium border"
+                    className="py-2.5 u-pill text-sm font-medium border"
                     style={form.payment_method === 'company'
-                      ? { borderColor: '#0ea5e9', background: '#e0f2fe', color: '#075985' }
-                      : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                      ? { borderColor: C.info, background: C.infoBg, color: C.info }
+                      : { borderColor: C.border, background: 'white', color: C.muted }}>
                     🏢 Carte société
                     <span className="block text-[10px] opacity-75 font-normal">déjà payé</span>
                   </button>
@@ -766,16 +767,16 @@ function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
               </div>
             </div>
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs u-ko">{error}</p>}
           </div>
 
-          <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
-            <button onClick={del} className="text-sm font-medium text-red-500 hover:text-red-700">Supprimer</button>
+          <div className="px-8 py-4 border-t u-line flex items-center justify-between gap-3">
+            <button onClick={del} className="text-sm font-medium u-ko hover:u-ko">Supprimer</button>
             <div className="flex gap-2">
-              <button onClick={onClose} className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Annuler</button>
+              <button onClick={onClose} className="px-4 py-2 u-pill text-sm font-medium u-ink hover:u-fill">Annuler</button>
               <button onClick={save} disabled={saving}
-                className="px-5 py-2 rounded-md text-white font-medium text-sm disabled:opacity-50"
-                style={{ background: '#111827' }}>
+                className="px-5 py-2 u-pill text-white font-medium text-sm disabled:opacity-50"
+                style={{ background: AL.black }}>
                 {saving ? 'Enregistrement…' : 'Enregistrer'}
               </button>
             </div>

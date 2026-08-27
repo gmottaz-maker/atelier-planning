@@ -10,6 +10,7 @@ import useIsMobile from '../lib/useIsMobile'
 import { swrConfig, purgeCachePersistant } from '../lib/swr'
 import { signalerErreur, ApiError } from '../lib/api'
 import ApiErrorBanner from '../components/ApiErrorBanner'
+import { AL, C, R } from '../lib/theme'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ export function useAuth() { return useContext(AuthContext) }
 
 const PUBLIC_ROUTES = ['/login', '/display']
 const NO_CHROME_ROUTES = ['/login', '/display', '/projects/[id]/devis']
-const PINK = '#111827'
+const PINK = AL.black
 
 // ─── Auth des appels API ─────────────────────────────────────────────────────
 // Toutes les routes /api/* vérifient désormais le JWT Supabase côté serveur.
@@ -187,7 +188,7 @@ export default function App({ Component, pageProps }) {
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: 24,
-        background: 'radial-gradient(circle at 50% 38%, #ffffff 0%, #f3f4f6 100%)',
+        background: `radial-gradient(circle at 50% 38%, ${AL.white} 0%, ${C.neutralBg} 100%)`,
       }}>
         <style>{`
           @keyframes maze-spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
@@ -216,10 +217,10 @@ export default function App({ Component, pageProps }) {
           animation: 'maze-fade .7s ease both',
         }}>Maze Project</div>
         <div style={{
-          width: 132, height: 3, borderRadius: 99, background: '#e5e7eb',
+          width: 132, height: 3, borderRadius: R.pill, background: C.border,
           overflow: 'hidden', animation: 'maze-fade .7s ease both',
         }}>
-          <div style={{ width: '40%', height: '100%', borderRadius: 99, background: PINK, animation: 'maze-bar 1.2s ease-in-out infinite' }} />
+          <div style={{ width: '40%', height: '100%', borderRadius: R.pill, background: PINK, animation: 'maze-bar 1.2s ease-in-out infinite' }} />
         </div>
       </div>
     )
@@ -235,13 +236,20 @@ export default function App({ Component, pageProps }) {
       <SWRConfig value={swrConfig}>
       <ApiErrorBanner />
       <Head>
+        {/* Apercu Pro est servie en local (@font-face dans styles/globals.css).
+            On précharge les deux graisses présentes dès le premier écran — la
+            sidebar et les titres — pour éviter le saut de police au chargement. */}
+        <link rel="preload" href="/fonts/apercu-pro-400.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/apercu-pro-500.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Une seule requête pour les trois familles de l'application. Cinq pages
-            chargeaient Inter séparément, ce qui ajoutait autant de requêtes
-            bloquantes au rendu. Les gabarits PDF gardent leur propre lien :
-            ils sont rendus hors de l'application, par Chrome headless. */}
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+        {/* Inter reste chargée le temps que les cinq écrans non encore repris
+            (schedule, activity, display, justificatifs, factures-fournisseurs)
+            passent aux jetons v2 : ils la fixent en dur et tomberaient sinon sur
+            la police système. Ce lien disparaît avec la dernière occurrence.
+            Les gabarits PDF gardent le leur : ils sont rendus hors de
+            l'application, par Chrome headless, et restent en IBM Plex. */}
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -251,7 +259,7 @@ export default function App({ Component, pageProps }) {
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" href="/favicon.svg" sizes="any" />
         <link rel="apple-touch-icon" href="/icon.svg" />
-        <meta name="theme-color" content="#111827" />
+        <meta name="theme-color" content={AL.black} />
       </Head>
       {showChrome ? (
         <>

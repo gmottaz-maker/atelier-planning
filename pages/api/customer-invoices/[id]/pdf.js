@@ -62,7 +62,15 @@ export default async function handler(req, res) {
     const pdf = await htmlToPdf(html, qrSvg ? qrDocument(qrSvg) : null)
     res.setHeader('Content-Type', 'application/pdf')
     const docType = 'facture'
-    res.setHeader('Content-Disposition', `inline; filename="${pdfFilename(docType, inv.projects?.name || inv.client_name)}"`)
+    // `?download=1` force le téléchargement plutôt que l'ouverture dans le
+    // visualiseur : c'est ce que demande le lien « pdf » de la liste, qui doit
+    // se comporter comme un téléchargement demandé par l'utilisateur.
+    const disposition = req.query.download ? 'attachment' : 'inline'
+    const nom = pdfFilename(docType, inv.projects?.name || inv.client_name)
+    res.setHeader('Content-Disposition', `${disposition}; filename="${nom}"`)
+    // Chaque génération est unique : rien à mettre en cache, et un PDF servi
+    // depuis le cache masquerait une correction de facture.
+    res.setHeader('Cache-Control', 'no-store')
     res.send(Buffer.from(pdf))
   } catch (e) {
     console.error('facture-pdf:', e)

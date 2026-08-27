@@ -7,8 +7,9 @@ import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { matchesQuery, normalize } from '../lib/textSearch'
 import { fmtCHF as fmtMontant } from '../lib/money'
+import { AL, C } from '../lib/theme'
 
-const PINK = '#111827'
+const PINK = AL.black
 
 function fmtCHF(n) {
   if (n == null) return '—'
@@ -187,19 +188,19 @@ export default function Banque() {
   const sumVisible = visible.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
   const th = (key, label, align = 'left') => (
     <th onClick={() => toggleSort(key)} title="Trier"
-      className={`px-4 py-3 text-${align} font-semibold text-gray-700 cursor-pointer select-none hover:text-gray-900`}
+      className={`px-4 py-3 text-${align} font-semibold u-ink cursor-pointer select-none hover:u-ink`}
       style={{ fontSize: 11 }}>
       {label}
-      <span className="ml-1 text-gray-400">{sort.key === key ? (sort.dir === 'asc' ? '↑' : '↓') : ''}</span>
+      <span className="ml-1 u-muted">{sort.key === key ? (sort.dir === 'asc' ? '↑' : '↓') : ''}</span>
     </th>
   )
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: AL.white }}>
       <Head><title>Maze Project — Banque</title></Head>
 
       <NavBar title="Banque">
-        <label className="px-4 py-2 text-sm font-medium rounded-md text-white cursor-pointer"
+        <label className="px-4 py-2 text-sm font-medium u-pill text-white cursor-pointer"
           style={{ background: PINK }}>
           {importing ? 'Import…' : 'Importer relevé (CAMT.053)'}
           <input type="file" accept=".xml,.txt,application/xml,text/xml" className="hidden"
@@ -210,16 +211,16 @@ export default function Banque() {
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
 
         {importResult && (
-          <div className="rounded-md px-4 py-3 text-sm space-y-2"
-            style={{ background: importResult.error ? '#fee2e2' : '#f0fdf4',
-                     color:      importResult.error ? '#991b1b' : '#15803d' }}>
+          <div className="u-pill px-4 py-3 text-sm space-y-2"
+            style={{ background: importResult.error ? 'rgba(196,0,43,.10)' : 'rgba(27,122,90,.10)',
+                     color:      importResult.error ? C.danger : C.success }}>
             {importResult.error ? (
               `Erreur : ${importResult.error}`
             ) : (
               <>
                 <div>{`${importResult.inserted} transaction(s) importée(s) · ${importResult.duplicates} doublon(s) ignoré(s) · ${importResult.total} total`}</div>
                 {importResult.reconciled?.length > 0 && (
-                  <div className="pt-1 border-t border-green-200/60">
+                  <div className="pt-1 border-t u-line/60">
                     <div className="font-semibold mb-1">
                       {importResult.reconciled.length} facture(s) fournisseur passée(s) en payée :
                     </div>
@@ -233,7 +234,7 @@ export default function Banque() {
                   </div>
                 )}
                 {importResult.ambiguous > 0 && (
-                  <div className="text-xs text-amber-700">
+                  <div className="text-xs u-warn">
                     ⚠ {importResult.ambiguous} paiement(s) probable(s) mais ambigu(s) — à rapprocher à la main dans « À matcher ».
                   </div>
                 )}
@@ -251,10 +252,10 @@ export default function Banque() {
               { key: 'all',       label: 'Toutes' },
             ].map(f => (
               <button key={f.key} onClick={() => setFilter(f.key)}
-                className="px-3 py-1.5 rounded-md text-xs font-medium"
+                className="px-3 py-1.5 u-pill text-xs font-medium"
                 style={filter === f.key
-                  ? { background: '#111827', color: 'white' }
-                  : { background: '#f3f4f6', color: '#6b7280' }}>
+                  ? { background: AL.black, color: 'white' }
+                  : { background: 'rgba(12,12,12,.06)', color: C.muted }}>
                 {f.label}
               </button>
             ))}
@@ -268,10 +269,10 @@ export default function Banque() {
                 { key: 'debit',  label: 'Débits' },
               ].map(d => (
                 <button key={d.key} onClick={() => setDir(d.key)}
-                  className="px-3 py-1.5 rounded-md text-xs font-medium"
+                  className="px-3 py-1.5 u-pill text-xs font-medium"
                   style={dir === d.key
-                    ? { background: '#e5e7eb', color: '#111827' }
-                    : { background: '#f3f4f6', color: '#6b7280' }}>
+                    ? { background: 'rgba(12,12,12,.08)', color: AL.black }
+                    : { background: 'rgba(12,12,12,.06)', color: C.muted }}>
                   {d.label}
                 </button>
               ))}
@@ -279,16 +280,16 @@ export default function Banque() {
             <div className="relative">
               <input value={q} onChange={e => setQ(e.target.value)}
                 placeholder="Rechercher (OBI, IBAN, référence…)"
-                className="px-3 py-1.5 pr-7 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none"
+                className="px-3 py-1.5 pr-7 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none"
                 style={{ width: 260 }} />
               {q && (
                 <button onClick={() => setQ('')} title="Effacer"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-sm">×</button>
+                  className="absolute right-2 top-1/2 -translate-y-1/2 u-muted hover:u-ink text-sm">×</button>
               )}
             </div>
           </div>
           {!loading && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs u-muted">
               {visible.length === stats.total
                 ? `${stats.matched}/${stats.total} matchées`
                 : `${visible.length} sur ${stats.total} · ${fmtCHF(sumVisible)} CHF`}
@@ -298,23 +299,23 @@ export default function Banque() {
 
         {/* Liste */}
         {loading ? (
-          <p className="text-sm text-gray-400 py-12 text-center">Chargement…</p>
+          <p className="text-sm u-muted py-12 text-center">Chargement…</p>
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-            <p className="text-sm text-gray-400">
+          <div className="u-surface u-panel border u-line p-12 text-center">
+            <p className="text-sm u-muted">
               {transactions.length === 0 ? 'Aucune transaction.' : 'Aucune transaction ne correspond à cette recherche.'}
             </p>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs u-muted mt-2">
               {transactions.length === 0
                 ? 'Importe un fichier CAMT.053 depuis ton e-banking.'
                 : 'Modifie la recherche, le sens ou l\'onglet.'}
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="u-surface u-panel border u-line overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
+                <tr className="u-fill border-b u-line">
                   {th('booking_date', 'Date')}
                   {th('counterparty_name', 'Contrepartie')}
                   {th('description', 'Libellé')}
@@ -330,34 +331,34 @@ export default function Banque() {
                   return (
                     <tr key={tx.id}
                       onClick={() => openTx(tx)}
-                      className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer">
-                      <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(tx.booking_date)}</td>
+                      className="border-t u-line hover:u-fill cursor-pointer">
+                      <td className="px-4 py-3 u-ink tabular-nums">{fmtDate(tx.booking_date)}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 truncate" style={{ maxWidth: 260 }}>
+                        <div className="font-medium u-ink truncate" style={{ maxWidth: 260 }}>
                           {tx.counterparty_name || '—'}
                         </div>
-                        {tx.counterparty_iban && <div className="text-xs text-gray-400 truncate" style={{ maxWidth: 260 }}>{tx.counterparty_iban}</div>}
+                        {tx.counterparty_iban && <div className="text-xs u-muted truncate" style={{ maxWidth: 260 }}>{tx.counterparty_iban}</div>}
                       </td>
-                      <td className="px-4 py-3 text-gray-600 truncate" style={{ maxWidth: 320 }}>
+                      <td className="px-4 py-3 u-ink truncate" style={{ maxWidth: 320 }}>
                         {tx.description || tx.reference || '—'}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: isCredit ? '#15803d' : '#9f1239' }}>
-                        {isCredit ? '+' : ''}{fmtCHF(tx.amount)} <span className="text-xs font-normal text-gray-400">{tx.currency}</span>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: isCredit ? C.success : C.danger }}>
+                        {isCredit ? '+' : ''}{fmtCHF(tx.amount)} <span className="text-xs font-normal u-muted">{tx.currency}</span>
                       </td>
                       <td className="px-4 py-3">
                         {matched ? (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
-                            style={{ background: '#dcfce7', color: '#15803d' }}>
+                          <span className="px-2 py-0.5 u-pill text-xs font-semibold inline-block"
+                            style={{ background: 'rgba(27,122,90,.10)', color: C.success }}>
                             ✓ {TYPE_LABELS[tx.matched_to_type]}
                           </span>
                         ) : topScore >= 7 ? (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
-                            style={{ background: '#fef3c7', color: '#92400e' }}>
+                          <span className="px-2 py-0.5 u-pill text-xs font-semibold inline-block"
+                            style={{ background: 'rgba(166,99,0,.12)', color: C.warning }}>
                             Suggéré ({topScore.toFixed(0)}/10)
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
-                            style={{ background: '#f3f4f6', color: '#6b7280' }}>
+                          <span className="px-2 py-0.5 u-pill text-xs font-semibold inline-block"
+                            style={{ background: 'rgba(12,12,12,.06)', color: C.muted }}>
                             À matcher
                           </span>
                         )}
@@ -368,16 +369,16 @@ export default function Banque() {
               </tbody>
               {/* Somme des lignes affichées — suit la recherche et les filtres */}
               <tfoot>
-                <tr className="border-t-2 border-gray-200 bg-gray-50">
-                  <td colSpan={3} className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <tr className="border-t-2 u-line u-fill">
+                  <td colSpan={3} className="px-4 py-3 text-xs font-semibold u-muted uppercase tracking-wide">
                     Total{visible.length !== stats.total ? ' filtré' : ''}
-                    <span className="ml-2 font-normal normal-case tracking-normal text-gray-400">
+                    <span className="ml-2 font-normal normal-case tracking-normal u-muted">
                       {visible.length} transaction{visible.length > 1 ? 's' : ''}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right font-bold tabular-nums"
-                    style={{ fontSize: 15, color: sumVisible > 0 ? '#15803d' : sumVisible < 0 ? '#9f1239' : '#111827' }}>
-                    {sumVisible > 0 ? '+' : ''}{fmtCHF(sumVisible)} <span className="text-xs font-normal text-gray-400">CHF</span>
+                    style={{ fontSize: 15, color: sumVisible > 0 ? C.success : sumVisible < 0 ? C.danger : AL.black }}>
+                    {sumVisible > 0 ? '+' : ''}{fmtCHF(sumVisible)} <span className="text-xs font-normal u-muted">CHF</span>
                   </td>
                   <td></td>
                 </tr>
@@ -415,32 +416,32 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
       `}</style>
       <div className="fixed inset-0 z-50" style={{ background: 'rgba(15,23,42,0.35)' }}
         onClick={e => e.target === e.currentTarget && onClose()}>
-        <div className="fixed top-0 right-0 bottom-0 bg-white flex flex-col shadow-2xl overflow-y-auto"
+        <div className="fixed top-0 right-0 bottom-0 u-surface flex flex-col shadow-2xl overflow-y-auto"
           style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s ease both', fontFamily: 'Inter, sans-serif' }}>
 
-          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+          <div className="flex items-center justify-between px-8 py-5 border-b u-line">
             <div>
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Transaction</p>
-              <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>
+              <p className="text-xs uppercase tracking-wider u-muted mb-0.5">Transaction</p>
+              <h2 className="font-semibold u-ink" style={{ fontSize: 20 }}>
                 {tx.counterparty_name || 'Sans contrepartie'}
               </h2>
             </div>
-            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100" style={{ fontSize: 22 }}>×</button>
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center u-pill u-muted hover:u-fill" style={{ fontSize: 22 }}>×</button>
           </div>
 
-          <div className="px-8 py-5 space-y-4 border-b border-gray-100">
+          <div className="px-8 py-5 space-y-4 border-b u-line">
             <div className="flex justify-between items-baseline">
-              <span className="text-xs uppercase tracking-wider text-gray-400">Montant</span>
-              <span className="font-bold tabular-nums" style={{ fontSize: 24, color: isCredit ? '#15803d' : '#9f1239' }}>
-                {isCredit ? '+' : ''}{fmtCHF(tx.amount)} <span className="text-xs font-normal text-gray-400">{tx.currency}</span>
+              <span className="text-xs uppercase tracking-wider u-muted">Montant</span>
+              <span className="font-bold tabular-nums" style={{ fontSize: 24, color: isCredit ? C.success : C.danger }}>
+                {isCredit ? '+' : ''}{fmtCHF(tx.amount)} <span className="text-xs font-normal u-muted">{tx.currency}</span>
               </span>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-400 text-xs block">Date</span>{fmtDate(tx.booking_date)}</div>
-              <div><span className="text-gray-400 text-xs block">Compte</span><span className="text-xs">{tx.account_iban || '—'}</span></div>
-              {tx.counterparty_iban && <div className="col-span-2"><span className="text-gray-400 text-xs block">IBAN contrepartie</span><span className="text-xs">{tx.counterparty_iban}</span></div>}
-              {tx.reference && <div className="col-span-2"><span className="text-gray-400 text-xs block">Référence</span><span className="text-xs break-all">{tx.reference}</span></div>}
-              {tx.description && <div className="col-span-2"><span className="text-gray-400 text-xs block">Libellé</span>{tx.description}</div>}
+              <div><span className="u-muted text-xs block">Date</span>{fmtDate(tx.booking_date)}</div>
+              <div><span className="u-muted text-xs block">Compte</span><span className="text-xs">{tx.account_iban || '—'}</span></div>
+              {tx.counterparty_iban && <div className="col-span-2"><span className="u-muted text-xs block">IBAN contrepartie</span><span className="text-xs">{tx.counterparty_iban}</span></div>}
+              {tx.reference && <div className="col-span-2"><span className="u-muted text-xs block">Référence</span><span className="text-xs break-all">{tx.reference}</span></div>}
+              {tx.description && <div className="col-span-2"><span className="u-muted text-xs block">Libellé</span>{tx.description}</div>}
             </div>
           </div>
 
@@ -448,21 +449,21 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
           <div className="px-8 py-5 flex-1">
             {matched ? (
               <div>
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Matchée à</p>
-                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-4">
-                  <p className="text-sm font-semibold text-green-900">{TYPE_LABELS[tx.matched_to_type]} #{tx.matched_to_id}</p>
-                  <p className="text-xs text-green-700 mt-1">Matché le {tx.matched_at?.slice(0, 10)}</p>
+                <p className="text-xs uppercase tracking-wider u-muted mb-2">Matchée à</p>
+                <div className="u-ok-bg border u-line u-panel px-4 py-3 mb-4">
+                  <p className="text-sm font-semibold u-ok">{TYPE_LABELS[tx.matched_to_type]} #{tx.matched_to_id}</p>
+                  <p className="text-xs u-ok mt-1">Matché le {tx.matched_at?.slice(0, 10)}</p>
                 </div>
                 <button onClick={() => onUnmatch(tx)}
-                  className="text-xs font-medium text-red-500 hover:text-red-700">Annuler ce matching</button>
+                  className="text-xs font-medium u-ko hover:u-ko">Annuler ce matching</button>
               </div>
             ) : (
               <>
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-3">Suggestions</p>
+                <p className="text-xs uppercase tracking-wider u-muted mb-3">Suggestions</p>
                 {suggestions === null ? (
-                  <p className="text-sm text-gray-400">Recherche de correspondances…</p>
+                  <p className="text-sm u-muted">Recherche de correspondances…</p>
                 ) : suggestions.length === 0 ? (
-                  <p className="text-sm text-gray-400">Aucune suggestion automatique. Vérifie que la facture correspondante existe.</p>
+                  <p className="text-sm u-muted">Aucune suggestion automatique. Vérifie que la facture correspondante existe.</p>
                 ) : (
                   <ul className="space-y-2">
                     {suggestions.map((s, i) => {
@@ -470,21 +471,21 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
                       const name = c.supplier_name || c.client_name || c.merchant || 'Sans nom'
                       const amt = c.amount
                       return (
-                        <li key={i} className="border border-gray-200 rounded-lg p-3 hover:border-gray-400 cursor-pointer"
+                        <li key={i} className="border u-line u-panel p-3 hover:u-line cursor-pointer"
                           onClick={() => onConfirm(tx, s)}>
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-semibold text-gray-500 uppercase">{TYPE_LABELS[s.type]}</span>
+                            <span className="text-xs font-semibold u-muted uppercase">{TYPE_LABELS[s.type]}</span>
                             <span className="text-xs font-bold tabular-nums"
-                              style={{ color: s.score >= 7 ? '#15803d' : '#92400e' }}>{s.score.toFixed(0)}/10</span>
+                              style={{ color: s.score >= 7 ? C.success : C.warning }}>{s.score.toFixed(0)}/10</span>
                           </div>
-                          <div className="font-medium text-gray-900 text-sm">{name}</div>
+                          <div className="font-medium u-ink text-sm">{name}</div>
                           <div className="flex items-center justify-between mt-1">
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs u-muted">
                               {c.invoice_number ? `N° ${c.invoice_number} · ` : ''}{fmtDate(c.issue_date || c.date || c.due_date)}
                             </span>
                             <span className="text-sm font-semibold tabular-nums">{fmtCHF(amt)} CHF</span>
                           </div>
-                          <div className="text-[10px] text-gray-400 mt-1">{s.reasons?.join(' · ')}</div>
+                          <div className="text-[10px] u-muted mt-1">{s.reasons?.join(' · ')}</div>
                         </li>
                       )
                     })}

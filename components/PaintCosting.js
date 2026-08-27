@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { C, FONT, MONO } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { fmtCHF, fmtNombre } from '../lib/money'
 import { chercherPrix } from '../lib/paintPrices'
 import { chiffrer, prixMelange, rendement, fmtDuree, COMPLEXITES_DEFAUT, REGLAGES_DEFAUT } from '../lib/paintCalc'
@@ -52,12 +52,12 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
   }), [tarif, surface, couches, cle, complexites, modeRendement, modeDilution, reglages])
 
   const h4 = { font: `700 10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textTransform: 'uppercase', margin: '14px 0 6px' }
-  const champ = { width: '100%', padding: '6px 8px', border: `1px solid ${C.border}`, borderRadius: 6, font: `13px ${FONT}`, color: C.ink, background: '#fff' }
+  const champ = { width: '100%', padding: '6px 8px', border: `1px solid ${C.border}`, borderRadius: 6, font: `13px ${FONT}`, color: C.ink, background: AL.white }
   const etiq = { font: `12px ${FONT}`, color: C.muted, display: 'block', marginBottom: 3 }
 
   if (!chiffrables.length) {
     return (
-      <div style={{ padding: '10px 12px', background: '#f8fafc', border: `1px solid ${C.border}`, borderRadius: 8, font: `12.5px ${FONT}`, color: C.inkTertiary }}>
+      <div style={{ padding: '10px 12px', background: C.hover, border: `1px solid ${C.border}`, borderRadius: R.panel, font: `12.5px ${FONT}`, color: C.inkTertiary }}>
         Pas de prix d’atelier pour ce produit — il ne figure pas encore dans les
         factures RUCO dépouillées. Le choix technique reste valable, seul le
         chiffrage manque.
@@ -125,7 +125,7 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
       </div>
 
       {/* Repères techniques du produit chiffré */}
-      <div style={{ marginTop: 12, padding: '8px 10px', background: '#f8fafc', borderRadius: 6, font: `12px ${FONT}`, color: C.inkTertiary, lineHeight: 1.7 }}>
+      <div style={{ marginTop: 12, padding: '8px 10px', background: C.hover, borderRadius: 6, font: `12px ${FONT}`, color: C.inkTertiary, lineHeight: 1.7 }}>
         <strong style={{ color: C.ink }}>{tarif.nom}</strong> · {tarif.type}
         {tarif.durcisseur && <> · durcisseur {tarif.durcisseur} ({tarif.ratioA}:{tarif.ratioB})</>}
         {tarif.diluant && <> · diluant {tarif.diluant}</>}
@@ -170,7 +170,7 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
       </table>
 
       {!!r.avertissements.length && (
-        <ul style={{ marginTop: 10, paddingLeft: 16, font: `12px ${FONT}`, color: '#9a3412' }}>
+        <ul style={{ marginTop: 10, paddingLeft: 16, font: `12px ${FONT}`, color: C.warning }}>
           {r.avertissements.map((a, i) => <li key={i}>{a}</li>)}
         </ul>
       )}
@@ -210,11 +210,11 @@ export default function PaintCosting({ produit, complexites = COMPLEXITES_DEFAUT
 function Chiffre({ label, valeur, fort }) {
   return (
     <div style={{
-      padding: '8px 10px', borderRadius: 8,
-      background: fort ? C.ink : '#f8fafc',
-      color: fort ? '#fff' : C.ink,
+      padding: '8px 10px', borderRadius: R.panel,
+      background: fort ? C.ink : C.hover,
+      color: fort ? AL.white : C.ink,
     }}>
-      <div style={{ font: `10px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', opacity: fort ? .75 : 1, color: fort ? '#fff' : C.muted }}>{label}</div>
+      <div style={{ font: `10px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', opacity: fort ? .75 : 1, color: fort ? AL.white : C.muted }}>{label}</div>
       <div style={{ font: `600 15px ${MONO}`, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{valeur}</div>
     </div>
   )

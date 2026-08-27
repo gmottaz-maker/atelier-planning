@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { C, FONT } from '../lib/theme'
+import { AL, C, FONT } from '../lib/theme'
 
 export const BOTTOM_NAV_HEIGHT = 64
 
 const ITEMS = [
   {
     href: '/home',
-    label: 'Accueil',
+    label: 'accueil',
     match: (p) => p === '/home',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -17,7 +17,7 @@ const ITEMS = [
   },
   {
     href: '/',
-    label: 'Projets',
+    label: 'projets',
     match: (p) => p === '/' || p.startsWith('/projects'),
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -27,7 +27,7 @@ const ITEMS = [
   },
   {
     href: '/tasks',
-    label: 'Tâches',
+    label: 'tâches',
     match: (p) => p === '/tasks',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -38,7 +38,7 @@ const ITEMS = [
   },
   {
     href: '/planning',
-    label: 'Planning',
+    label: 'planning',
     match: (p) => p === '/planning',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,7 +49,7 @@ const ITEMS = [
   },
   {
     href: '/schedule',
-    label: 'Horaires',
+    label: 'horaires',
     match: (p) => p === '/schedule',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -60,7 +60,7 @@ const ITEMS = [
   },
   {
     href: '/meeting',
-    label: 'Meeting',
+    label: 'meeting',
     match: (p) => p === '/meeting',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -70,7 +70,7 @@ const ITEMS = [
   },
   {
     href: '/settings',
-    label: 'Réglages',
+    label: 'réglages',
     match: (p) => p === '/settings' || p === '/activity',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -91,8 +91,9 @@ export default function BottomNav() {
         right: 0,
         bottom: 0,
         zIndex: 40,
-        background: C.surface,
-        borderTop: `1px solid ${C.border}`,
+        // Mêmes jetons que la sidebar : fond noir, pas de bordure — la
+        // séparation d'avec le contenu vient de l'inversion de fond.
+        background: AL.black,
         display: 'flex',
         paddingBottom: 'env(safe-area-inset-bottom)',
         fontFamily: FONT,
@@ -113,10 +114,10 @@ export default function BottomNav() {
               gap: 3,
               padding: '8px 4px',
               height: BOTTOM_NAV_HEIGHT,
-              color: active ? C.ink : C.muted,
+              color: active ? AL.white : C.navInactive,
               textDecoration: 'none',
               fontSize: 11,
-              fontWeight: active ? 600 : 500,
+              fontWeight: active ? 500 : 400,
             }}
           >
             {item.icon}

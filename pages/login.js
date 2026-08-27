@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import Head from 'next/head'
 import { supabase } from '../lib/supabase'
+import { AL, C } from '../lib/theme'
 
-const PINK = '#111827'
+const PINK = AL.black
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -34,7 +35,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6"
-      style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
+      style={{ background: AL.white, fontFamily: 'Inter, sans-serif' }}>
       <Head>
         <title>Connexion — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -54,14 +55,14 @@ export default function Login() {
             <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
             <circle cx="20" cy="20" r="3" fill={PINK} />
           </svg>
-          <p className="font-bold text-gray-900 text-xl">amazing lab</p>
-          <p className="text-gray-400 text-sm mt-1">Connexion</p>
+          <p className="font-bold u-ink text-xl">amazing lab</p>
+          <p className="u-muted text-sm mt-1">Connexion</p>
         </div>
 
         {/* Formulaire */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Email</label>
+            <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Email</label>
             <input
               type="email"
               required
@@ -69,19 +70,19 @@ export default function Login() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="ton@email.com"
-              className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm bg-white transition-all"
+              className="w-full px-4 py-3 border u-line u-panel text-sm u-surface transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Mot de passe</label>
+            <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Mot de passe</label>
             <input
               type="password"
               required
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm bg-white transition-all"
+              className="w-full px-4 py-3 border u-line u-panel text-sm u-surface transition-all"
             />
           </div>
 
@@ -95,9 +96,9 @@ export default function Login() {
                 className="sr-only"
               />
               <div
-                className="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+                className="w-5 h-5 u-pill border-2 flex items-center justify-center transition-all"
                 style={{
-                  borderColor: rememberMe ? PINK : '#d1d5db',
+                  borderColor: rememberMe ? PINK : C.muted,
                   background: rememberMe ? PINK : 'white',
                 }}
               >
@@ -108,17 +109,17 @@ export default function Login() {
                 )}
               </div>
             </div>
-            <span className="text-sm text-gray-500">Rester connecté</span>
+            <span className="text-sm u-muted">Rester connecté</span>
           </label>
 
           {error && (
-            <p className="text-sm text-red-500 text-center py-1">{error}</p>
+            <p className="text-sm u-ko text-center py-1">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-2xl text-white font-semibold text-base transition-opacity disabled:opacity-50 mt-2"
+            className="w-full py-3.5 u-panel text-white font-semibold text-base transition-opacity disabled:opacity-50 mt-2"
             style={{ background: PINK }}
           >
             {loading ? 'Connexion...' : 'Se connecter'}

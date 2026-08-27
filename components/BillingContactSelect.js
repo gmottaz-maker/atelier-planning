@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
+import { AL, C } from '../lib/theme'
 
 // Compose l'adresse postale à partir d'une société et/ou d'une personne.
 function composeAddress(company, person) {
@@ -55,7 +56,7 @@ export default function BillingContactSelect({ initialContactId, onChange }) {
   function onCompany(v) { setCompanyId(v); setPersonId(''); emit(v, '') }
   function onPerson(v) { setPersonId(v); emit(companyId, v) }
 
-  const sel = { width: '100%', padding: '9px 10px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 14, background: '#fff', color: '#111827' }
+  const sel = { width: '100%', padding: '9px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 14, background: AL.white, color: AL.black }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

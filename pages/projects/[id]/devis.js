@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { pdfFilename } from '../../../lib/pdfFilename'
 import { buildDevisBody, DEVIS_CSS, DEVIS_FONTS } from '../../../lib/devisHtml'
+import { AL, R } from '../../../lib/theme'
 
 // Aperçu écran de l'offre. Le document lui-même vient de `buildDevisBody`,
 // le même code que le PDF (lib/devisHtml.js) : cette page ne fait que
@@ -30,28 +30,15 @@ export default function DevisPage() {
       .catch(() => {})
   }, [])
 
-  async function downloadPdf() {
-    try {
-      const r = await fetch(`/api/projects/${id}/devis-pdf`)
-      if (!r.ok) {
-        let msg = `Erreur ${r.status}`
-        try { const j = await r.json(); if (j.error) msg = j.error } catch (_) {}
-        throw new Error(msg)
-      }
-      const blob = await r.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = pdfFilename('devis', project?.name)
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } catch (e) { alert('Génération du PDF impossible : ' + e.message) }
-  }
+  // Lien réel : voir pages/factures-emises.js. Un clic programmatique déclenché
+  // après plusieurs secondes de génération est classé « téléchargement
+  // automatique » par Chrome, qui bloque ensuite les suivants.
+  const pdfHref = `/api/projects/${id}/devis-pdf?download=1`
 
   if (loading) return <div style={{ padding: 40, fontFamily: 'IBM Plex Sans, sans-serif' }}>Chargement…</div>
   if (!project) return <div style={{ padding: 40, fontFamily: 'IBM Plex Sans, sans-serif' }}>Projet introuvable</div>
 
-  const btn = { padding: '8px 14px', borderRadius: 8, background: 'white', border: '1px solid #e5e7eb', fontSize: 13, fontWeight: 500, cursor: 'pointer' }
+  const btn = { padding: '8px 14px', borderRadius: R.panel, background: 'white', border: '1px solid ${C.border}', fontSize: 13, fontWeight: 500, cursor: 'pointer' }
 
   return (
     <>
@@ -62,7 +49,7 @@ export default function DevisPage() {
       </Head>
 
       <style jsx global>{`
-        body { background: #f1f5f9; margin: 0; }
+        body { background: ${C.neutralBg}; margin: 0; }
         ${DEVIS_CSS}
 
         /* À l'écran : on dessine une feuille posée sur un fond. */
@@ -82,7 +69,7 @@ export default function DevisPage() {
            @page retirées. Si cette largeur survit à l'impression, le navigateur
            déborde ou met à l'échelle — le document sort agrandi et rogné. */
         @media print {
-          body { background: #fff !important; }
+          body { background: ${AL.white} !important; }
           .no-print { display: none !important; }
           .doc .page {
             width: auto !important;
@@ -98,9 +85,9 @@ export default function DevisPage() {
       <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 10, display: 'flex', gap: 8, alignItems: 'center', fontFamily: 'IBM Plex Sans, sans-serif' }}>
         <button onClick={() => router.back()} style={btn}>← Retour</button>
         <button onClick={() => window.print()} style={btn}>Imprimer</button>
-        <button onClick={downloadPdf} style={{ ...btn, background: '#111827', color: 'white', border: 'none', padding: '8px 16px' }}>
+        <a href={pdfHref} style={{ ...btn, background: AL.black, color: 'white', border: 'none', padding: '8px 16px', textDecoration: 'none', display: 'inline-block' }}>
           Télécharger PDF
-        </button>
+        </a>
       </div>
 
       <div dangerouslySetInnerHTML={{ __html: buildDevisBody(project, company) }} />

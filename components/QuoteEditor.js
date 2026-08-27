@@ -10,6 +10,18 @@ import { useState } from 'react'
 import CatalogPicker, { toPurchaseRow, toRateRow } from './CatalogPicker'
 import QtyInput from './QtyInput'
 import { fmtCHF } from '../lib/money'
+import { AL, C, FONT, R } from '../lib/theme'
+
+// Styles partagés — le système n'a qu'une bordure (le filet outline 1.5px) et
+// deux radius. Les sections de l'offre étaient chacune d'une couleur pastel
+// différente ; elles se distinguent maintenant par le titre et l'espacement.
+const sectionBox    = { background: C.surface, border: `1.5px solid ${C.outline}`, borderRadius: R.panel, overflow: 'hidden' }
+const sectionHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px' }
+const sectionTitle  = { fontSize: 16, fontWeight: 500, color: AL.black }
+const sectionTotal  = { fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums' }
+const chevron       = (ouvert) => ({ fontSize: 12, color: C.muted, display: 'inline-block', transform: ouvert ? 'none' : 'rotate(-90deg)', transition: 'transform .15s ease' })
+const subHeader     = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 16px', borderTop: `1px solid ${C.border}` }
+const subTitle      = { fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', color: C.muted }
 
 const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
 
@@ -53,7 +65,7 @@ function OeilVisibilite({ masquee, onToggle }) {
       onClick={onToggle}
       aria-pressed={!masquee}
       title={masquee ? 'Masquée sur le document — cliquer pour afficher' : 'Visible sur le document — cliquer pour masquer'}
-      className={`text-sm leading-none ${masquee ? 'text-gray-300 hover:text-gray-500' : 'text-emerald-600 hover:text-emerald-800'}`}
+      className="quote-action" style={{ fontSize: 13, lineHeight: 1, opacity: masquee ? .45 : 1 }}
     >
       {masquee ? '☐' : '☑'}
     </button>
@@ -75,9 +87,9 @@ function CompositionElement({
   ]
   return (
     <div className="overflow-x-auto">
-      <div className="px-3 py-1.5 flex items-center justify-end gap-3 bg-gray-50">
-        <button onClick={() => onAdd('purchases')} className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Matériau</button>
-        <button onClick={() => onAdd('labor')} className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Main d'œuvre</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, padding: '8px 14px', borderTop: `1px solid ${C.border}` }}>
+        <button onClick={() => onAdd('purchases')} className="quote-action">+ Matériau</button>
+        <button onClick={() => onAdd('labor')} className="text-xs font-medium u-info hover:u-info">+ Main d'œuvre</button>
       </div>
       <table className="w-full" style={{ minWidth: 760, tableLayout: 'fixed' }}>
         <thead>
@@ -94,11 +106,11 @@ function CompositionElement({
         </thead>
         <tbody>
           {lignes.length === 0 ? (
-            <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-3">Aucune composition.</td></tr>
+            <tr><td colSpan={8} className="text-center text-sm u-muted py-3">Aucune composition.</td></tr>
           ) : lignes.map(({ r, i, kind }) => {
             const achat = kind === 'purchases'
             return (
-              <tr key={`${kind}-${r._uid || i}`} className={'group hover:bg-gray-50' + (r.hidden ? ' opacity-60' : '')}>
+              <tr key={`${kind}-${r._uid || i}`} className={'group quote-row' + (r.hidden ? ' opacity-60' : '')}>
                 <td className={td}>
                   <input className={txtCell} placeholder={achat ? 'Matériau' : 'Main d\'œuvre'}
                     value={r.description || ''} onChange={e => onUpdate(kind, i, 'description', e.target.value)} />
@@ -117,14 +129,14 @@ function CompositionElement({
                 <td className={td}>
                   {achat
                     ? <input type="number" step="0.1" className={numCell} placeholder={generalMargin || ''} value={r.margin || ''} onChange={e => onUpdate(kind, i, 'margin', e.target.value)} />
-                    : <span className="block text-center text-gray-300">—</span>}
+                    : <span className="block text-center u-muted">—</span>}
                 </td>
                 <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => onUpdate(kind, i, 'discount', e.target.value)} /></td>
-                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(achat ? purchaseNet(r) : laborNet(r))}</td>
+                <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(achat ? purchaseNet(r) : laborNet(r))}</td>
                 <td className={td + ' text-center'}>
                   <span className="inline-flex items-center gap-2">
                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => onToggleHidden(kind, i)} />
-                    <button onClick={() => onRemove(kind, i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                    <button onClick={() => onRemove(kind, i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
                   </span>
                 </td>
               </tr>
@@ -275,44 +287,55 @@ export default function QuoteEditor({ value, onChange }) {
   const logisticsTotal      = (quote.logistics || []).reduce((s, r) => s + logisticsNet(r), 0)
   const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
-  const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
-  const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
-  const th = "px-3 py-2 text-left text-xs font-semibold text-gray-700 bg-gray-100"
-  const td = "border-t border-gray-100 align-middle"
-  const tdRO = "px-3 py-1.5 text-sm text-right text-gray-600 tabular-nums"
+  const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full quote-cell focus:outline-none"
+  const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full quote-cell focus:outline-none"
+  const th = "quote-th px-3 py-2 text-left align-middle"
+  const td = "quote-td align-middle"
+  // Une seule feuille locale : les états de survol et de focus des cellules ne
+  // sont pas exprimables en style inline.
+  const styleLocal = `
+    .quote-action { font-size: 12px; font-weight: 500; color: ${C.muted}; background: none; border: none; padding: 0; cursor: pointer; transition: color .15s ease; }
+    .quote-action:hover { color: ${AL.black}; }
+    .quote-td { border-top: 1px solid ${C.border}; }
+    .quote-row:hover { background: ${C.hover}; }
+    .quote-th { font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: ${C.muted}; border-bottom: 1.5px solid ${C.outline}; }
+    .quote-cell:focus { background: ${C.surface}; outline: 1.5px solid ${C.outline}; border-radius: 6px; }
+  `
+  const tdRO = "px-3 py-1.5 text-sm text-right u-ink tabular-nums"
 
   return (
     <>
+      <style>{styleLocal}</style>
                     {/* ── Marge générale ── */}
-                    <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-                      <span className="text-sm font-medium text-amber-900">Marge générale</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', border: `1.5px solid ${C.outline}`, borderRadius: R.panel, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>Marge générale</span>
                       <input
                         type="number"
                         step="0.1"
-                        className="px-3 py-1.5 border border-amber-300 rounded-md text-sm w-24 text-right bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        style={{ width: 88, padding: '6px 12px', textAlign: 'right', borderRadius: R.pill, border: `1.5px solid ${C.border}`, fontFamily: FONT, fontSize: 14, color: C.accent, fontVariantNumeric: 'tabular-nums', outline: 'none' }}
                         placeholder="0"
                         value={quote.general_margin ?? ''}
                         onChange={e => { setQuote(q => ({ ...q, general_margin: e.target.value })); setQuoteDirty(true) }}
                       />
-                      <span className="text-sm text-amber-900">%</span>
-                      <span className="text-xs text-amber-800/80 ml-2">S'applique aux achats et à la sous-traitance. Une marge spécifique sur une ligne prend le dessus.</span>
+                      <span style={{ fontSize: 14, color: C.accent }}>%</span>
+                      <span style={{ fontSize: 12.5, color: C.muted, marginLeft: 8 }}>S'applique aux achats et à la sous-traitance. Une marge spécifique sur une ligne prend le dessus.</span>
                     </div>
 
                     {/* ── Gestion projet ── */}
-                    <div className="bg-white rounded-2xl border border-indigo-200 overflow-hidden">
-                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#eef2ff', borderBottom: collapsedSections.management ? 'none' : '1px solid #e0e7ff' }}>
+                    <div style={sectionBox}>
+                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.management ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('management')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
-                          <span style={{ color: '#3730a3', fontSize: 12 }}>{collapsedSections.management ? '▸' : '▾'}</span>
-                          <span className="font-semibold" style={{ fontSize: 17, color: '#3730a3' }}>● Gestion projet</span>
+                          <span style={chevron(!collapsedSections.management)}>▾</span>
+                          <span style={sectionTitle}>Gestion projet</span>
                         </button>
                         <div className="flex items-center gap-4">
-                          <span className="text-sm font-semibold tabular-nums" style={{ color: '#3730a3' }}>{fmtCHF(managementTotal)} CHF</span>
+                          <span style={sectionTotal}>{fmtCHF(managementTotal)} CHF</span>
                           {!collapsedSections.management && (
                             <>
                               <CatalogPicker kind="heure" onPick={it => appendManagementRow(toRateRow(it))} />
                               <button onClick={addManagementRow}
-                                className="text-xs font-medium text-indigo-700 hover:text-indigo-900">+ Ligne</button>
+                                className="quote-action">+ Ligne</button>
                             </>
                           )}
                         </div>
@@ -335,21 +358,21 @@ export default function QuoteEditor({ value, onChange }) {
                           </thead>
                           <tbody>
                             {quote.management.length === 0 ? (
-                              <tr><td colSpan={9} className="text-center text-sm text-gray-400 py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
+                              <tr><td colSpan={9} className="text-center text-sm u-muted py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
                             ) : quote.management.map((r, i) => (
-                              <tr key={r._uid || i} className="group hover:bg-gray-50">
-                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} /></td>
+                              <tr key={r._uid || i} className="group quote-row">
+                                <td className={td}><input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateManagementRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateManagementRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateManagementRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateManagementRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateManagementRow(i, 'discount', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateManagementRow(i, 'discount_amount', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(laborNet(r))}</td>
+                                <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(laborNet(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <span className="inline-flex items-center gap-2">
                                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('management', i)} />
-                                    <button onClick={() => removeManagementRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                    <button onClick={() => removeManagementRow(i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
                                   </span>
                                 </td>
                               </tr>
@@ -358,9 +381,9 @@ export default function QuoteEditor({ value, onChange }) {
                           {quote.management.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={7} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total gestion</td>
-                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(managementTotal)}</td>
-                                <td className="bg-gray-50"></td>
+                                <td colSpan={7} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total gestion</td>
+                                <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${C.border}` }}>{fmtCHF(managementTotal)}</td>
+                                <td style={{ borderTop: `1px solid ${C.border}` }}></td>
                               </tr>
                             </tfoot>
                           )}
@@ -370,55 +393,55 @@ export default function QuoteEditor({ value, onChange }) {
                     </div>
 
                     {/* ── Fabrication (groupe d'items: Bar, Pergola, etc.) ── */}
-                    <div className="bg-white rounded-2xl border border-emerald-300 overflow-hidden">
-                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#d1fae5', borderBottom: collapsedSections.fabrication ? 'none' : '1px solid #a7f3d0' }}>
+                    <div style={sectionBox}>
+                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.fabrication ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('fabrication')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
-                          <span style={{ color: '#065f46', fontSize: 12 }}>{collapsedSections.fabrication ? '▸' : '▾'}</span>
-                          <span className="font-bold" style={{ fontSize: 17, color: '#065f46' }}>● Fabrication</span>
+                          <span style={chevron(!collapsedSections.fabrication)}>▾</span>
+                          <span style={sectionTitle}>Fabrication</span>
                         </button>
-                        <span className="text-sm font-semibold tabular-nums" style={{ color: '#065f46' }}>{fmtCHF(itemsTotal)} CHF</span>
+                        <span style={sectionTotal}>{fmtCHF(itemsTotal)} CHF</span>
                       </div>
 
                       {!collapsedSections.fabrication && (
-                      <div className="p-4 space-y-3" style={{ background: '#f0fdf4' }}>
+                      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {quote.items.length === 0 && (
-                          <div className="text-center text-sm text-emerald-700/70 py-6">Aucun item pour l'instant. Ajoute Bar, Pergola, etc.</div>
+                          <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: C.muted }}>Aucun item pour l'instant. Ajoute Bar, Pergola, etc.</div>
                         )}
                         {quote.items.map((it, itemIdx) => {
                           const purchSub = (it.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
                           const laborSub = (it.labor || []).reduce((s, r) => s + laborNet(r), 0)
                           const subTotal = purchSub + laborSub
                           return (
-                            <div key={it._uid || itemIdx} className="bg-white rounded-xl border border-emerald-200 overflow-hidden shadow-sm">
-                              <div className="px-4 py-2.5 flex items-center justify-between gap-3" style={{ background: '#ecfdf5', borderBottom: collapsedItems[it._uid] ? 'none' : '1px solid #d1fae5' }}>
+                            <div key={it._uid || itemIdx} style={sectionBox}>
+                              <div style={{ ...sectionHeader, padding: '12px 16px', borderBottom: collapsedItems[it._uid] ? 'none' : `1px solid ${C.border}` }}>
                                 <button type="button" onClick={() => toggleCollapsedItem(it._uid)}
                                   className="hover:opacity-70" title={collapsedItems[it._uid] ? 'Déplier' : 'Replier'}>
-                                  <span className="text-emerald-700" style={{ fontSize: 12 }}>{collapsedItems[it._uid] ? '▸' : '▾'}</span>
+                                  <span style={chevron(!collapsedItems[it._uid])}>▾</span>
                                 </button>
-                                <span className="text-emerald-700">●</span>
+                                
                                 <input
-                                  className="flex-1 px-2 py-1 text-base font-semibold bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-emerald-400 rounded"
-                                  style={{ color: '#065f46' }}
+                                  style={{ flex: 1, minWidth: 0, padding: '4px 8px', border: 'none', background: 'transparent', outline: 'none', fontFamily: FONT, fontSize: 15, fontWeight: 500, color: AL.black }}
+                                  style={{ color: AL.black }}
                                   placeholder="Nom de l'item (ex: Bar, Backbar…)"
                                   value={it.name || ''}
                                   onChange={e => updateItemName(itemIdx, e.target.value)}
                                 />
-                                <span className="text-sm font-semibold tabular-nums whitespace-nowrap" style={{ color: '#065f46' }}>{fmtCHF(subTotal)} CHF</span>
+                                <span style={{ ...sectionTotal, whiteSpace: 'nowrap' }}>{fmtCHF(subTotal)} CHF</span>
                                 <button onClick={() => { if (confirm(`Supprimer l'item "${it.name || 'sans nom'}" ?`)) removeItem(itemIdx) }}
-                                  className="text-emerald-600 hover:text-red-500 text-sm" title="Supprimer cet item">✕</button>
+                                  className="quote-action" style={{ fontSize: 13 }} title="Supprimer cet item">✕</button>
                               </div>
 
                               {!collapsedItems[it._uid] && (
                               <>
                               {/* Achats de l'item */}
-                              <div className="border-b border-gray-100">
-                                <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#fffbeb' }}>
-                                  <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#92400e' }}>● Achats (matériaux)</h4>
+                              <div className="border-b u-line">
+                                <div style={subHeader}>
+                                  <h4 style={subTitle}>Achats (matériaux)</h4>
                                   <span className="flex items-center gap-2">
                                     <CatalogPicker kind="article" onPick={it => appendItemRow(itemIdx, 'purchases', toPurchaseRow(it))} />
                                     <button onClick={() => addItemRow(itemIdx, 'purchases')}
-                                      className="text-xs font-medium text-amber-700 hover:text-amber-900">+ Ligne</button>
+                                      className="quote-action">+ Ligne</button>
                                   </span>
                                 </div>
                             <div className="overflow-x-auto">
@@ -440,9 +463,9 @@ export default function QuoteEditor({ value, onChange }) {
                                 </thead>
                                 <tbody>
                                   {(it.purchases || []).length === 0 ? (
-                                    <tr><td colSpan={11} className="text-center text-sm text-gray-400 py-4">Aucun achat.</td></tr>
+                                    <tr><td colSpan={11} className="text-center text-sm u-muted py-4">Aucun achat.</td></tr>
                                   ) : it.purchases.map((r, i) => (
-                                    <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                    <tr key={r._uid || i} className="group quote-row">
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'description', e.target.value)} /></td>
                                       <td className={td}><input className={txtCell} placeholder="ex: 200×120×40" value={r.dimension || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'dimension', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit_price', e.target.value)} /></td>
@@ -452,11 +475,11 @@ export default function QuoteEditor({ value, onChange }) {
                                       <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'margin', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'discount', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'discount_amount', e.target.value)} /></td>
-                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(purchaseNet(r))}</td>
+                                      <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(purchaseNet(r))}</td>
                                       <td className={td + ' text-center'}>
                                         <span className="inline-flex items-center gap-2">
                                           <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleItemRowHidden(itemIdx, 'purchases', i)} />
-                                          <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                          <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
                                         </span>
                                       </td>
                                     </tr>
@@ -465,9 +488,9 @@ export default function QuoteEditor({ value, onChange }) {
                                 {(it.purchases || []).length > 0 && (
                                   <tfoot>
                                     <tr>
-                                      <td colSpan={9} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total achats</td>
-                                      <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(purchSub)}</td>
-                                      <td className="bg-gray-50"></td>
+                                      <td colSpan={9} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total achats</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${C.border}` }}>{fmtCHF(purchSub)}</td>
+                                      <td style={{ borderTop: `1px solid ${C.border}` }}></td>
                                     </tr>
                                   </tfoot>
                                 )}
@@ -477,12 +500,12 @@ export default function QuoteEditor({ value, onChange }) {
 
                           {/* Main d'œuvre de l'item */}
                           <div>
-                            <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#faf5ff' }}>
-                              <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#6b21a8' }}>● Main d'œuvre (découpe, peinture…)</h4>
+                            <div style={subHeader}>
+                              <h4 style={subTitle}>Main d'œuvre (découpe, peinture…)</h4>
                               <span className="flex items-center gap-2">
                                 <CatalogPicker kind="heure" onPick={it => appendItemRow(itemIdx, 'labor', toRateRow(it))} />
                                 <button onClick={() => addItemRow(itemIdx, 'labor')}
-                                  className="text-xs font-medium text-purple-700 hover:text-purple-900">+ Ligne</button>
+                                  className="text-xs font-medium u-info hover:u-info">+ Ligne</button>
                               </span>
                             </div>
                             <div className="overflow-x-auto">
@@ -501,20 +524,20 @@ export default function QuoteEditor({ value, onChange }) {
                                 </thead>
                                 <tbody>
                                   {(it.labor || []).length === 0 ? (
-                                    <tr><td colSpan={8} className="text-center text-sm text-gray-400 py-4">Aucune main d'œuvre.</td></tr>
+                                    <tr><td colSpan={8} className="text-center text-sm u-muted py-4">Aucune main d'œuvre.</td></tr>
                                   ) : it.labor.map((r, i) => (
-                                    <tr key={r._uid || i} className="group hover:bg-gray-50">
+                                    <tr key={r._uid || i} className="group quote-row">
                                       <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'rate', e.target.value)} /></td>
                                       <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateItemRow(itemIdx, 'labor', i, 'quantity', v)} /></td>
                                       <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
                                       <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'discount', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'discount_amount', e.target.value)} /></td>
-                                      <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(laborNet(r))}</td>
+                                      <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(laborNet(r))}</td>
                                       <td className={td + ' text-center'}>
                                         <span className="inline-flex items-center gap-2">
                                           <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleItemRowHidden(itemIdx, 'labor', i)} />
-                                          <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                          <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
                                         </span>
                                       </td>
                                     </tr>
@@ -523,9 +546,9 @@ export default function QuoteEditor({ value, onChange }) {
                                 {(it.labor || []).length > 0 && (
                                   <tfoot>
                                     <tr>
-                                      <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total main d'œuvre</td>
-                                      <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(laborSub)}</td>
-                                      <td className="bg-gray-50"></td>
+                                      <td colSpan={6} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total main d'œuvre</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${C.border}` }}>{fmtCHF(laborSub)}</td>
+                                      <td style={{ borderTop: `1px solid ${C.border}` }}></td>
                                     </tr>
                                   </tfoot>
                                 )}
@@ -534,14 +557,14 @@ export default function QuoteEditor({ value, onChange }) {
                           </div>
 
                           {/* Éléments : niveau intermédiaire, avec leur propre composition */}
-                          <div className="border-t border-gray-100">
-                            <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#f0f9ff' }}>
-                              <h4 className="font-semibold text-xs uppercase tracking-wider" style={{ color: '#075985' }}>● Éléments</h4>
+                          <div className="border-t u-line">
+                            <div style={subHeader}>
+                              <h4 style={subTitle}>Éléments</h4>
                               <button onClick={() => addElement(itemIdx)}
-                                className="text-xs font-medium text-sky-700 hover:text-sky-900">+ Élément</button>
+                                className="text-xs font-medium u-info hover:u-info">+ Élément</button>
                             </div>
                             {(it.elements || []).length === 0 ? (
-                              <p className="px-4 py-2 text-xs text-gray-400">
+                              <p className="px-4 py-2 text-xs u-muted">
                                 Un élément regroupe une partie de l’item (Toiture, Structure…) et affiche son
                                 prix au client ; sa composition sert au chiffrage et reste masquée par défaut.
                               </p>
@@ -549,18 +572,18 @@ export default function QuoteEditor({ value, onChange }) {
                               const elTotal = (el.purchases || []).reduce((s, r) => s + purchaseNet(r), 0)
                                             + (el.labor || []).reduce((s, r) => s + laborNet(r), 0)
                               return (
-                                <div key={el._uid || elIdx} className="mx-3 mb-3 rounded-lg border border-sky-200 overflow-hidden">
-                                  <div className="px-3 py-2 flex items-center gap-3" style={{ background: '#e0f2fe' }}>
+                                <div key={el._uid || elIdx} className="mx-3 mb-3 u-panel border u-line overflow-hidden">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: `1px solid ${C.border}` }}>
                                     <input
-                                      className="flex-1 px-2 py-1 text-sm font-semibold bg-transparent focus:outline-none focus:bg-white focus:ring-1 focus:ring-sky-400 rounded"
-                                      style={{ color: '#075985' }}
+                                      className="flex-1 px-2 py-1 text-sm font-semibold bg-transparent focus:outline-none focus:u-surface focus:u-line rounded"
+                                      style={{ color: AL.black }}
                                       placeholder="Nom de l’élément (ex : Toiture, Structure…)"
                                       value={el.name || ''}
                                       onChange={e => majElement(itemIdx, elIdx, x => ({ ...x, name: e.target.value }))}
                                     />
-                                    <span className="text-sm font-semibold tabular-nums whitespace-nowrap" style={{ color: '#075985' }}>{fmtCHF(elTotal)} CHF</span>
+                                    <span style={{ ...sectionTotal, whiteSpace: 'nowrap' }}>{fmtCHF(elTotal)} CHF</span>
                                     <button onClick={() => { if (confirm(`Supprimer l’élément « ${el.name || 'sans nom'} » ?`)) removeElement(itemIdx, elIdx) }}
-                                      className="text-sky-600 hover:text-red-500 text-sm" title="Supprimer cet élément">✕</button>
+                                      className="u-info hover:u-ko text-sm" title="Supprimer cet élément">✕</button>
                                   </div>
                                   <CompositionElement
                                     element={el}
@@ -585,7 +608,9 @@ export default function QuoteEditor({ value, onChange }) {
 
                         {/* Bouton ajouter un item (à l'intérieur de Fabrication) */}
                         <button onClick={addItem}
-                          className="w-full py-2.5 rounded-xl border-2 border-dashed border-emerald-300 text-sm font-medium text-emerald-700 hover:border-emerald-600 hover:bg-white transition-colors">
+                          style={{ width: '100%', padding: 14, borderRadius: R.panel, border: `1.5px dashed ${C.outline}`, background: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 13, color: C.muted }}
+                          onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                          onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
                           + Ajouter un item
                         </button>
                       </div>
@@ -593,20 +618,20 @@ export default function QuoteEditor({ value, onChange }) {
                     </div>
 
                     {/* ── Sous-traitance ── */}
-                    <div className="bg-white rounded-2xl border border-orange-200 overflow-hidden">
-                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#fff7ed', borderBottom: collapsedSections.subcontracting ? 'none' : '1px solid #fed7aa' }}>
+                    <div style={sectionBox}>
+                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.subcontracting ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('subcontracting')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
-                          <span style={{ color: '#9a3412', fontSize: 12 }}>{collapsedSections.subcontracting ? '▸' : '▾'}</span>
-                          <span className="font-bold" style={{ fontSize: 17, color: '#9a3412' }}>● Sous-traitance</span>
+                          <span style={chevron(!collapsedSections.subcontracting)}>▾</span>
+                          <span style={sectionTitle}>Sous-traitance</span>
                         </button>
                         <div className="flex items-center gap-4">
-                          <span className="text-sm font-semibold tabular-nums" style={{ color: '#9a3412' }}>{fmtCHF(subcontractingTotal)} CHF</span>
+                          <span style={sectionTotal}>{fmtCHF(subcontractingTotal)} CHF</span>
                           {!collapsedSections.subcontracting && (
                             <>
                               <CatalogPicker kind="all" onPick={it => appendSubcontractingRow(toRateRow(it))} />
                               <button onClick={addSubcontractingRow}
-                                className="text-xs font-medium text-orange-700 hover:text-orange-900">+ Ligne</button>
+                                className="text-xs font-medium u-warn hover:u-warn">+ Ligne</button>
                             </>
                           )}
                         </div>
@@ -630,10 +655,10 @@ export default function QuoteEditor({ value, onChange }) {
                           </thead>
                           <tbody>
                             {(quote.subcontracting || []).length === 0 ? (
-                              <tr><td colSpan={10} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={10} className="text-center text-sm u-muted py-6">Aucune ligne.</td></tr>
                             ) : quote.subcontracting.map((r, i) => (
-                              <tr key={r._uid || i} className="group hover:bg-gray-50">
-                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.item || ''} onChange={e => updateSubcontractingRow(i, 'item', e.target.value)} /></td>
+                              <tr key={r._uid || i} className="group quote-row">
+                                <td className={td}><input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.item || ''} onChange={e => updateSubcontractingRow(i, 'item', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateSubcontractingRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateSubcontractingRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateSubcontractingRow(i, 'quantity', v)} /></td>
@@ -641,11 +666,11 @@ export default function QuoteEditor({ value, onChange }) {
                                 <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateSubcontractingRow(i, 'margin', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateSubcontractingRow(i, 'discount', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateSubcontractingRow(i, 'discount_amount', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(serviceNet(r))}</td>
+                                <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(serviceNet(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <span className="inline-flex items-center gap-2">
                                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('subcontracting', i)} />
-                                    <button onClick={() => removeSubcontractingRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                    <button onClick={() => removeSubcontractingRow(i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
                                   </span>
                                 </td>
                               </tr>
@@ -654,9 +679,9 @@ export default function QuoteEditor({ value, onChange }) {
                           {(quote.subcontracting || []).length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={8} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total sous-traitance</td>
-                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(subcontractingTotal)}</td>
-                                <td className="bg-gray-50"></td>
+                                <td colSpan={8} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total sous-traitance</td>
+                                <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${C.border}` }}>{fmtCHF(subcontractingTotal)}</td>
+                                <td style={{ borderTop: `1px solid ${C.border}` }}></td>
                               </tr>
                             </tfoot>
                           )}
@@ -666,20 +691,20 @@ export default function QuoteEditor({ value, onChange }) {
                     </div>
 
                     {/* ── Logistique ── */}
-                    <div className="bg-white rounded-2xl border border-cyan-200 overflow-hidden">
-                      <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ background: '#ecfeff', borderBottom: collapsedSections.logistics ? 'none' : '1px solid #cffafe' }}>
+                    <div style={sectionBox}>
+                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.logistics ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('logistics')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
-                          <span style={{ color: '#155e75', fontSize: 12 }}>{collapsedSections.logistics ? '▸' : '▾'}</span>
-                          <span className="font-bold" style={{ fontSize: 17, color: '#155e75' }}>● Logistique</span>
+                          <span style={chevron(!collapsedSections.logistics)}>▾</span>
+                          <span style={sectionTitle}>Logistique</span>
                         </button>
                         <div className="flex items-center gap-4">
-                          <span className="text-sm font-semibold tabular-nums" style={{ color: '#155e75' }}>{fmtCHF(logisticsTotal)} CHF</span>
+                          <span style={sectionTotal}>{fmtCHF(logisticsTotal)} CHF</span>
                           {!collapsedSections.logistics && (
                             <>
                               <CatalogPicker kind="all" onPick={it => appendLogisticsRow(toRateRow(it))} />
                               <button onClick={addLogisticsRow}
-                                className="text-xs font-medium text-cyan-700 hover:text-cyan-900">+ Ligne</button>
+                                className="text-xs font-medium u-info hover:u-info">+ Ligne</button>
                             </>
                           )}
                         </div>
@@ -703,10 +728,10 @@ export default function QuoteEditor({ value, onChange }) {
                           </thead>
                           <tbody>
                             {quote.logistics.length === 0 ? (
-                              <tr><td colSpan={10} className="text-center text-sm text-gray-400 py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={10} className="text-center text-sm u-muted py-6">Aucune ligne.</td></tr>
                             ) : quote.logistics.map((r, i) => (
-                              <tr key={r._uid || i} className="group hover:bg-gray-50">
-                                <td className={td}><input className={txtCell} style={{ background: '#f3f4f6', fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
+                              <tr key={r._uid || i} className="group quote-row">
+                                <td className={td}><input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateLogisticsRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(i, 'quantity', v)} /></td>
@@ -714,11 +739,11 @@ export default function QuoteEditor({ value, onChange }) {
                                 <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder="0" onChange={e => updateLogisticsRow(i, 'margin', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateLogisticsRow(i, 'discount', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateLogisticsRow(i, 'discount_amount', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold text-gray-900'}>{fmtCHF(logisticsNet(r))}</td>
+                                <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(logisticsNet(r))}</td>
                                 <td className={td + ' text-center'}>
                                   <span className="inline-flex items-center gap-2">
                                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('logistics', i)} />
-                                    <button onClick={() => removeLogisticsRow(i)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                    <button onClick={() => removeLogisticsRow(i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
                                   </span>
                                 </td>
                               </tr>
@@ -727,9 +752,9 @@ export default function QuoteEditor({ value, onChange }) {
                           {quote.logistics.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={8} className="px-3 py-2 text-right text-xs font-medium text-gray-500 bg-gray-50">Sous-total logistique</td>
-                                <td className="px-3 py-2 text-right text-sm font-bold text-gray-900 tabular-nums bg-gray-50">{fmtCHF(logisticsTotal)}</td>
-                                <td className="bg-gray-50"></td>
+                                <td colSpan={8} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total logistique</td>
+                                <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${C.border}` }}>{fmtCHF(logisticsTotal)}</td>
+                                <td style={{ borderTop: `1px solid ${C.border}` }}></td>
                               </tr>
                             </tfoot>
                           )}
@@ -739,7 +764,7 @@ export default function QuoteEditor({ value, onChange }) {
                     </div>
 
                     {/* ── Total général ── */}
-                    <div className="rounded-2xl px-5 py-4 flex items-center justify-between" style={{ background: '#111827', color: 'white' }}>
+                    <div className="u-panel px-5 py-4 flex items-center justify-between" style={{ background: AL.black, color: 'white' }}>
                       <span className="text-sm font-medium uppercase tracking-wider opacity-80">Total général</span>
                       <span className="font-bold tabular-nums" style={{ fontSize: 24, letterSpacing: '-0.02em' }}>
                         {fmtCHF(grandTotal)} <span className="text-sm opacity-70 ml-1">CHF</span>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/router'
 import useSWR from 'swr'
 import Head from 'next/head'
 import Link from 'next/link'
-import { C, FONT, MONO, initials } from '../../lib/theme'
+import { C, FONT, MONO, R, initials } from '../../lib/theme'
 
 const inputStyle = {
   width: '100%', padding: '8px 10px', borderRadius: 6, border: `1px solid ${C.border}`,
@@ -123,20 +123,20 @@ export default function ContactDetail() {
             {parent && <Link href={`/clients/${parent.id}`} style={{ font: `11px ${MONO}`, color: C.muted, textDecoration: 'none' }}>↳ {parent.name}</Link>}
           </div>
           <button onClick={save} disabled={saving}
-            style={{ background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 18px', borderRadius: 5, border: 'none', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
+            style={{ background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 18px', borderRadius: R.pill, border: 'none', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
             {saving ? 'Enregistrement…' : saved ? '✓ Enregistré' : 'Enregistrer'}
           </button>
         </div>
 
         {/* Rôles + tags */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {['Client', 'Fournisseur'].map(rt => {
               const active = form.tags.includes(rt)
               const on = rt === 'Client' ? { fg: C.success, bg: C.successBg } : { fg: C.warning, bg: C.warningBg }
               return (
                 <button key={rt} onClick={() => active ? removeTag(rt) : addTag(rt)}
-                  style={{ font: `11px ${MONO}`, padding: '4px 12px', borderRadius: 99, cursor: 'pointer', textTransform: 'uppercase',
+                  style={{ font: `11px ${MONO}`, padding: '4px 12px', borderRadius: R.pill, cursor: 'pointer', textTransform: 'uppercase',
                     color: active ? on.fg : C.faint, background: active ? on.bg : 'transparent', border: `1px solid ${active ? 'transparent' : C.border}` }}>{rt}</button>
               )
             })}
@@ -146,7 +146,7 @@ export default function ContactDetail() {
             <span style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>TAGS</span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               {form.tags.filter(t => t !== 'Client' && t !== 'Fournisseur').map(t => (
-                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '3px 6px 3px 10px', borderRadius: 99 }}>
+                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '3px 6px 3px 10px', borderRadius: R.pill }}>
                   {t}
                   <button onClick={() => removeTag(t)} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
                 </span>
@@ -163,7 +163,7 @@ export default function ContactDetail() {
         </div>
 
         {/* Coordonnées */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: 16, marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
             <Field label="E-MAIL"><input style={inputStyle} value={form.email} onChange={e => set('email', e.target.value)} /></Field>
             <Field label="TÉLÉPHONE"><input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} /></Field>
@@ -186,7 +186,7 @@ export default function ContactDetail() {
         </div>
 
         {/* Notes */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: 16, marginBottom: 16 }}>
           <Field label="NOTES">
             <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical', lineHeight: 1.5 }} value={form.notes} onChange={e => set('notes', e.target.value)}
               placeholder="Conditions, interlocuteur clé, historique…" />
@@ -200,9 +200,9 @@ export default function ContactDetail() {
               <span style={{ fontSize: 16, fontWeight: 700 }}>Contacts</span>
               <span style={{ font: `11px ${MONO}`, color: C.muted }}>{people.length}</span>
               <div style={{ flex: 1 }} />
-              <button onClick={addPerson} style={{ font: `600 11.5px ${FONT}`, color: C.inkSecondary, background: 'none', border: `1px solid ${C.border}`, borderRadius: 5, padding: '6px 12px', cursor: 'pointer' }}>+ Ajouter une personne</button>
+              <button onClick={addPerson} style={{ font: `600 11.5px ${FONT}`, color: C.inkSecondary, background: 'none', border: `1px solid ${C.border}`, borderRadius: R.pill, padding: '6px 12px', cursor: 'pointer' }}>+ Ajouter une personne</button>
             </div>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 16px' }}>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '4px 16px' }}>
               {people.length === 0 ? (
                 <p style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>Aucune personne rattachée.</p>
               ) : people.map((p, i) => (

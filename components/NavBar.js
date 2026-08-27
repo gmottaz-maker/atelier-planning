@@ -6,20 +6,22 @@
  *   title    – nom de la page (ex: "projets", "horaires")
  *   children – boutons d'action à droite
  */
+import { AL, C, FONT } from '../lib/theme'
+
 export default function NavBar({ title, children }) {
   return (
     <header
       className="sticky top-0 z-20"
       style={{
-        background: '#fff',
-        borderBottom: '1px solid #e5e7eb',
-        fontFamily: 'Inter, sans-serif',
+        background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
+        fontFamily: FONT,
       }}
     >
       <div className="w-full px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {title && (
-            <h1 style={{ fontSize: 15, fontWeight: 600, color: '#111827', textTransform: 'capitalize', margin: 0 }}>
+            <h1 style={{ fontSize: 15, fontWeight: 500, color: AL.black, textTransform: 'lowercase', margin: 0 }}>
               {title}
             </h1>
           )}

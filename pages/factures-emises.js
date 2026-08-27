@@ -11,10 +11,24 @@ import SendDocumentModal from '../components/SendDocumentModal'
 import { pdfFilename } from '../lib/pdfFilename'
 import { invoiceCopyBody } from '../lib/duplicateDoc'
 import { fmtCHF as fmtMontant } from '../lib/money'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
+import { factureArchivee } from '../lib/autoArchive'
+import ButtonPill from '../components/ButtonPill'
 
-const PINK = '#111827'
+const PINK = AL.black
 const STATUS_LABELS = { created: 'Créée', sent: 'Envoyée', pending: 'En attente', paid: 'Payée', overdue: 'En retard', cancelled: 'Annulée' }
-const STATUS_COLORS = { created: '#6b7280', sent: '#1d4ed8', pending: '#f59e0b', paid: '#22c55e', overdue: '#dc2626', cancelled: '#9ca3af' }
+// Un statut, une couleur, partout dans l'application.
+// « Envoyée » est BLEUE — c'est le même bleu que la chip d'Arnaud et que le
+// groupe « cette semaine » des tâches, le seul rôle catégoriel du système.
+// Surlignage d'une facture en retard : toute la ligne, en rouge très clair.
+// Assez pour la repérer d'un coup d'œil dans la liste, assez faible pour que le
+// texte noir garde son contraste.
+const RETARD_BG        = 'rgba(196,0,43,.06)'
+const RETARD_BG_SURVOL = 'rgba(196,0,43,.11)'
+export const SENT_BLUE    = C.info 
+export const SENT_BLUE_BG = C.infoBg
+const STATUS_COLORS = { created: C.muted, sent: SENT_BLUE, pending: C.warning, paid: C.success, overdue: C.danger, cancelled: C.muted }
+const STATUS_BG     = { created: C.neutralBg, sent: SENT_BLUE_BG, pending: C.warningBg, paid: C.successBg, overdue: C.dangerBg, cancelled: C.neutralBg }
 
 function fmtCHF(n) {
   if (n == null) return '—'
@@ -103,7 +117,6 @@ export default function FacturesEmises() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing]   = useState(null)
   const [createForProject, setCreateForProject] = useState(null)
-  const [pdfBusy, setPdfBusy] = useState(null)   // `${id}:${mode}` en cours de génération
 
   // ?from=projectId (ancien lien) → page complète de création pré-remplie
   useEffect(() => {
@@ -123,38 +136,22 @@ export default function FacturesEmises() {
 
   useEffect(() => { load() }, [year])
 
-  async function downloadPdf(inv, mode) {
-    // Verrou par bouton seulement : le serveur sérialise déjà les rendus
-    // (lib/htmlToPdf), inutile de bloquer toute la liste — sinon on ne peut plus
-    // rien télécharger tant qu'une génération est en cours.
-    const key = `${inv.id}:${mode}`
-    if (pdfBusy === key) return
-    setPdfBusy(key)
-    // Garde-fou : une requête qui resterait suspendue laisserait le bouton
-    // bloqué indéfiniment.
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 90000)
-    try {
-      const r = await fetch(`/api/customer-invoices/${inv.id}/pdf`, { signal: ctrl.signal })
-      if (!r.ok) {
-        let msg = `Erreur ${r.status}`
-        try { const j = await r.json(); if (j.error) msg = j.error } catch (_) {}
-        throw new Error(msg)
-      }
-      const blob = await r.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = pdfFilename('facture', inv.projects?.name || inv.object || inv.client_name)
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } catch (e) {
-      alert(e.name === 'AbortError'
-        ? 'La génération du PDF a pris trop de temps. Réessaie dans un instant.'
-        : 'Téléchargement impossible : ' + e.message)
-    }
-    finally { clearTimeout(timer); setPdfBusy(null) }
-  }
+  // Le PDF se télécharge par un LIEN, pas par un fetch suivi d'un clic
+  // programmatique sur un <a download>.
+  //
+  // Pourquoi : la génération prend plusieurs secondes. Quand le clic simulé
+  // finit par partir, le geste utilisateur a expiré et Chrome classe le
+  // téléchargement comme « automatique ». Au deuxième, il demande l'autorisation
+  // « Télécharger plusieurs fichiers ? » — et tant qu'elle n'est pas accordée,
+  // il bloque SILENCIEUSEMENT tous les suivants pour cette origine. D'où le
+  // symptôme : le premier PDF passe, aucun autre ensuite, et seule une purge
+  // des données du site débloque.
+  //
+  // Une navigation vers l'URL, elle, est un téléchargement demandé par
+  // l'utilisateur : pas de permission, pas de blocage, et rien à révoquer.
+  const pdfHref = (inv) =>
+    `/api/customer-invoices/${inv.id}/pdf?download=1&n=${encodeURIComponent(pdfFilename('facture', inv.projects?.name || inv.object || inv.client_name))}`
+
   // Duplique une facture : nouveau numéro, dates du jour, statut « créée ».
   async function duplicate(inv) {
     if (!confirm(`Dupliquer la facture ${inv.invoice_number} ?\n\nUne nouvelle facture sera créée avec le même contenu, un nouveau numéro et la date du jour.`)) return
@@ -203,136 +200,155 @@ export default function FacturesEmises() {
     setSendDoc({ type: 'facture', docId: inv.id, contactId: proj?.client_contact_id, projectName: proj?.name || inv.object || inv.client_name, number: inv.invoice_number })
   }
 
-  const visible = invoices.filter(inv => filter === 'all' ? true : effectiveStatus(inv) === filter)
+  // Archivage automatique de fin de mois (cf. lib/autoArchive.js) : une facture
+  // payée quitte la liste courante le premier jour du mois suivant.
+  const archivees = invoices.filter(inv => factureArchivee(inv))
+  const courantes = invoices.filter(inv => !factureArchivee(inv))
+
+  const visible = filter === 'archived' ? archivees
+    : filter === 'all' ? courantes
+    : courantes.filter(inv => effectiveStatus(inv) === filter)
+
+  // « En attente » et « en retard » répondaient à la même question — combien
+  // reste-t-il à rentrer ? — en la coupant en deux. Un seul champ, « à
+  // encaisser », et le retard se lit sur les lignes concernées.
   const totals = invoices.reduce((acc, inv) => {
     const st = effectiveStatus(inv)
     acc.total += parseFloat(inv.amount || 0)
-    if (st === 'pending') acc.pending += parseFloat(inv.amount || 0)
+    if (st === 'pending' || st === 'overdue' || st === 'sent') acc.aEncaisser += parseFloat(inv.amount || 0)
     if (st === 'overdue') acc.overdue += parseFloat(inv.amount || 0)
     if (st === 'paid')    acc.paid    += parseFloat(inv.amount || 0)
     return acc
-  }, { total: 0, pending: 0, overdue: 0, paid: 0 })
+  }, { total: 0, aEncaisser: 0, overdue: 0, paid: 0 })
+
+  // Grille de colonnes du handoff : n° · client · projet · émise le · échéance
+  // · montant · statut · actions.
+  const COLS = '.8fr 1.3fr 1.7fr .9fr .9fr 1fr 1.1fr 1.4fr'
+  const enTete = { display: 'grid', gridTemplateColumns: COLS, gap: 14, padding: '0 4px 10px',
+    fontSize: 10.5, fontWeight: 500, fontFamily: MONO, letterSpacing: '.08em',
+    textTransform: 'uppercase', color: C.muted }
+  const ligne = { display: 'grid', gridTemplateColumns: COLS, gap: 14, alignItems: 'center',
+    padding: '13px 4px', borderTop: `1px solid ${C.border}`, transition: 'background .15s ease' }
+  const lienAction = { background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+    fontFamily: FONT, fontSize: 12, color: C.muted, transition: 'color .15s ease' }
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: AL.black }}>
       <Head><title>Maze Project — Factures émises</title></Head>
 
-      <NavBar title="Factures émises">
-        <button onClick={() => router.push('/factures-emises/new')}
-          className="px-4 py-2 text-sm font-medium rounded-md text-white"
-          style={{ background: PINK }}>+ Nouvelle facture</button>
-      </NavBar>
+      <NavBar title="Factures émises" />
 
-      <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1600, margin: '0 auto' }}>
+      <main className="w-full" style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ fontSize: 38, fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>Factures sortantes</h1>
+            <p style={{ fontSize: 18, color: C.muted, margin: '12px 0 0' }}>{visible.length} facture{visible.length > 1 ? 's' : ''} · {year}</p>
+          </div>
+          <ButtonPill onClick={() => router.push('/factures-emises/new')}>+ nouvelle facture</ButtonPill>
+        </div>
+
+        {/* Quatre totaux en cartes outline */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {[
-            { label: 'Total année', value: totals.total,   color: '#111827' },
-            { label: 'En attente',  value: totals.pending, color: '#f59e0b' },
-            { label: 'En retard',   value: totals.overdue, color: '#dc2626' },
-            { label: 'Encaissé',    value: totals.paid,    color: '#22c55e' },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
-              <div className="text-xs text-gray-500 mb-1">{s.label}</div>
-              <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: s.color, letterSpacing: '-0.02em' }}>
-                {fmtCHF(s.value)} <span className="text-xs font-normal text-gray-400">CHF</span>
-              </div>
+            { label: 'total année', value: totals.total,      color: AL.black },
+            { label: 'à encaisser', value: totals.aEncaisser, color: C.warning,
+              sub: totals.overdue > 0 ? `dont ${fmtCHF(totals.overdue)} en retard` : null },
+            { label: 'encaissé',    value: totals.paid,       color: C.success },
+          ].map(st => (
+            <div key={st.label} style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10.5, fontWeight: 500, fontFamily: MONO, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>{st.label}</span>
+              <span style={{ fontSize: 24, fontWeight: 500, lineHeight: 1.1, color: st.color, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtCHF(st.value)} <span style={{ fontSize: 12, fontWeight: 400, color: C.muted }}>CHF</span>
+              </span>
+              {st.sub && <span style={{ fontSize: 12, color: C.danger }}>{st.sub}</span>}
             </div>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Année + filtres de statut */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <select value={year} onChange={e => setYear(Number(e.target.value))}
-            className="px-3 py-1.5 border border-gray-200 rounded-md text-sm bg-white">
+            style={{ fontFamily: FONT, fontSize: 13, padding: '8px 16px', borderRadius: R.pill,
+              border: `1.5px solid ${C.outline}`, background: C.surface, color: AL.black, cursor: 'pointer' }}>
             {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          {['all', 'pending', 'overdue', 'paid', 'cancelled'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className="px-3 py-1.5 rounded-md text-xs font-medium"
-              style={filter === f ? { background: '#111827', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
-              {f === 'all' ? 'Toutes' : STATUS_LABELS[f]}
-            </button>
-          ))}
+          {['all', 'created', 'sent', 'pending', 'overdue', 'paid', 'cancelled', 'archived'].map(f2 => {
+            const actif = filter === f2
+            return (
+              <button key={f2} onClick={() => setFilter(f2)}
+                style={{ fontFamily: FONT, fontSize: 13, fontWeight: actif ? 500 : 400, padding: '8px 16px', borderRadius: R.pill,
+                  cursor: 'pointer', border: actif ? '1.5px solid transparent' : `1.5px solid ${C.outline}`,
+                  background: actif ? AL.black : C.surface, color: actif ? AL.white : C.muted }}>
+                {f2 === 'all' ? 'toutes' : f2 === 'archived' ? `archivées ${archivees.length}` : STATUS_LABELS[f2].toLowerCase()}
+              </button>
+            )
+          })}
         </div>
 
         {loading ? (
-          <p className="text-sm text-gray-400 py-12 text-center">Chargement…</p>
+          <p style={{ fontSize: 13, color: C.muted, padding: '48px 0', textAlign: 'center' }}>Chargement…</p>
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-            <p className="text-sm text-gray-400">Aucune facture.</p>
-          </div>
+          <p style={{ fontSize: 13, color: C.muted, padding: '48px 0', textAlign: 'center' }}>Aucune facture.</p>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>N°</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Client</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Projet</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Émise le</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Échéance</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Montant</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700" style={{ fontSize: 11 }}>Statut</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700" style={{ fontSize: 11 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map(inv => {
-                  const st = effectiveStatus(inv)
-                  return (
-                    <tr key={inv.id} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => router.push(`/factures-emises/${inv.id}`)}>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-700">{inv.invoice_number}</td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{inv.client_name}</td>
-                      <td className="px-4 py-3 text-gray-600 text-xs truncate" style={{ maxWidth: 200 }}>{inv.projects?.name || inv.object || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(inv.issue_date)}</td>
-                      <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(inv.due_date)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                        {fmtCHF(inv.amount)} <span className="text-xs font-normal text-gray-400">{inv.currency}</span>
-                      </td>
-                      {/* Statut modifiable + date correspondante (envoi, ou paiement si payée) */}
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          <select value={inv.status || 'created'} onChange={e => changeStatus(inv, e.target.value)}
-                            title="Changer le statut"
-                            className="text-xs font-semibold rounded-full border px-2 py-1 cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-300"
-                            style={{ background: STATUS_COLORS[st] + '18', color: STATUS_COLORS[st], borderColor: STATUS_COLORS[st] + '40' }}>
-                            {['created', 'sent', 'pending', 'paid', 'cancelled'].map(k => (
-                              <option key={k} value={k} style={{ color: '#111827', background: '#fff' }}>{STATUS_LABELS[k]}</option>
-                            ))}
-                          </select>
-                          <input type="date"
-                            value={inv[dateFieldOf(inv)] ? String(inv[dateFieldOf(inv)]).slice(0, 10) : ''}
-                            onChange={e => patchInvoice(inv, { [dateFieldOf(inv)]: e.target.value || null })}
-                            title={inv.status === 'paid' ? 'Date de paiement' : 'Date d\'envoi'}
-                            className="text-xs text-gray-500 rounded-md border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-300"
-                            style={{ width: 124 }} />
-                        </div>
-                      </td>
-                      {/* Actions : trois boutons de même gabarit */}
-                      <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-2 justify-end whitespace-nowrap">
-                          {[
-                            { label: 'PDF', title: 'Télécharger le PDF (avec QR-bill)', icon: '⤓', busy: pdfBusy === String(inv.id), act: () => downloadPdf(inv) },
-                            { label: 'Envoyer',   title: 'Envoyer la facture par e-mail',              icon: '✉', act: () => openSend(inv) },
-                            { label: 'Dupliquer', title: 'Créer une nouvelle facture avec le même contenu', icon: '⧉', act: () => duplicate(inv) },
-                          ].map(b => (
-                            <button key={b.label} title={b.title} onClick={b.act}
-                              disabled={!!b.busy}
-                              className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:border-gray-500 hover:text-gray-900 disabled:opacity-50 disabled:cursor-wait"
-                              style={{ width: 104, padding: '6px 0' }}>
-                              {b.busy
-                                ? <><span className="inline-block w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: '#d1d5db', borderTopColor: '#111827' }} />Génération…</>
-                                : <><span style={{ fontSize: 13 }}>{b.icon}</span>{b.label}</>}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', flexDirection: 'column', overflowX: 'auto' }}>
+            <div style={{ ...enTete, minWidth: 1080 }}>
+              <span>n°</span><span>client</span><span>projet</span><span>émise le</span><span>échéance</span>
+              <span style={{ textAlign: 'right' }}>montant</span><span>statut</span><span style={{ textAlign: 'right' }}>actions</span>
+            </div>
+            {visible.map(inv => {
+              const st = effectiveStatus(inv)
+              return (
+                <div key={inv.id} style={{ ...ligne, minWidth: 1080, cursor: 'pointer', background: st === 'overdue' ? RETARD_BG : 'transparent' }}
+                  onClick={() => router.push(`/factures-emises/${inv.id}`)}
+                  onMouseEnter={e => { e.currentTarget.style.background = st === 'overdue' ? RETARD_BG_SURVOL : C.hover }}
+                  onMouseLeave={e => { e.currentTarget.style.background = st === 'overdue' ? RETARD_BG : 'transparent' }}>
+
+                  <span style={{ fontSize: 12.5, fontFamily: MONO, color: C.muted }}>{inv.invoice_number}</span>
+                  <span style={{ fontSize: 13.5, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.client_name}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.projects?.name || inv.object || '—'}</span>
+                  <span style={{ fontSize: 12.5, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmtDate(inv.issue_date)}</span>
+                  <span style={{ fontSize: 12.5, color: st === 'overdue' ? C.danger : C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmtDate(inv.due_date)}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, textAlign: 'right', color: AL.black, fontVariantNumeric: 'tabular-nums' }}>
+                    {fmtCHF(inv.amount)} <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>{inv.currency}</span>
+                  </span>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }} onClick={e => e.stopPropagation()}>
+                    <select value={inv.status || 'created'} onChange={e => changeStatus(inv, e.target.value)} title="Changer le statut"
+                      style={{ fontFamily: FONT, fontSize: 11, fontWeight: 500, letterSpacing: '.04em', padding: '3px 10px',
+                        borderRadius: R.pill, border: 'none', cursor: 'pointer', outline: 'none',
+                        background: STATUS_BG[st], color: STATUS_COLORS[st] }}>
+                      {['created', 'sent', 'pending', 'paid', 'cancelled'].map(k => (
+                        <option key={k} value={k} style={{ color: AL.black, background: C.surface }}>{STATUS_LABELS[k]}</option>
+                      ))}
+                    </select>
+                    <input type="date"
+                      value={inv[dateFieldOf(inv)] ? String(inv[dateFieldOf(inv)]).slice(0, 10) : ''}
+                      onChange={e => patchInvoice(inv, { [dateFieldOf(inv)]: e.target.value || null })}
+                      title={inv.status === 'paid' ? 'Date de paiement' : "Date d'envoi"}
+                      style={{ width: 124, fontFamily: FONT, fontSize: 11, color: C.muted, padding: '4px 10px',
+                        borderRadius: R.pill, border: `1px solid ${C.border}`, background: C.surface, outline: 'none' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                    <a href={pdfHref(inv)} title="Télécharger le PDF (avec QR-bill)"
+                      style={{ ...lienAction, textDecoration: 'none' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                      onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>pdf</a>
+                    {[
+                      { label: 'envoyer',   title: 'Envoyer la facture par e-mail',                   act: () => openSend(inv) },
+                      { label: 'dupliquer', title: 'Créer une nouvelle facture avec le même contenu', act: () => duplicate(inv) },
+                    ].map(b => (
+                      <button key={b.label} title={b.title} onClick={b.act} style={lienAction}
+                        onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                        onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </main>

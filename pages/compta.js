@@ -6,8 +6,9 @@ import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { fmtCHF } from '../lib/money'
+import { AL, C } from '../lib/theme'
 
-const PINK = '#111827'
+const PINK = AL.black
 
 export default function Compta() {
   const router = useRouter()
@@ -105,14 +106,14 @@ export default function Compta() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: AL.white }}>
       <Head><title>Maze Project — Compta</title></Head>
       <NavBar title="Comptabilité" />
 
       <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1200, margin: '0 auto' }}>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
-          <h2 className="font-semibold text-gray-900 mb-4" style={{ fontSize: 16 }}>Export pour la fiduciaire</h2>
+        <div className="u-surface u-panel border u-line p-5 md:p-6">
+          <h2 className="font-semibold u-ink mb-4" style={{ fontSize: 16 }}>Export pour la fiduciaire</h2>
 
           {/* Période */}
           <div className="space-y-3 mb-5">
@@ -125,32 +126,32 @@ export default function Compta() {
                 ['lastYear',    'Année dernière'],
               ].map(([k, label]) => (
                 <button key={k} onClick={() => setRange(k)}
-                  className="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                  className="px-3 py-1 u-pill text-xs font-medium u-fill u-ink hover:u-fill">
                   {label}
                 </button>
               ))}
             </div>
             <div className="flex items-center gap-2">
               <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-                className="px-3 py-1.5 border border-gray-200 rounded-md text-sm bg-white" />
-              <span className="text-xs text-gray-400">au</span>
+                className="px-3 py-1.5 border u-line u-pill text-sm u-surface" />
+              <span className="text-xs u-muted">au</span>
               <input type="date" value={to} onChange={e => setTo(e.target.value)}
-                className="px-3 py-1.5 border border-gray-200 rounded-md text-sm bg-white" />
+                className="px-3 py-1.5 border u-line u-pill text-sm u-surface" />
             </div>
           </div>
 
           {/* Mode */}
           <div className="mb-5">
-            <p className="text-xs font-medium text-gray-500 mb-2">Inclure</p>
+            <p className="text-xs font-medium u-muted mb-2">Inclure</p>
             <div className="flex gap-1.5">
               <button onClick={() => setMode('all')}
-                className="px-3 py-1.5 rounded-md text-xs font-medium"
-                style={mode === 'all' ? { background: '#111827', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+                className="px-3 py-1.5 u-pill text-xs font-medium"
+                style={mode === 'all' ? { background: AL.black, color: 'white' } : { background: 'rgba(12,12,12,.06)', color: C.muted }}>
                 Toutes les factures (engagement)
               </button>
               <button onClick={() => setMode('paid')}
-                className="px-3 py-1.5 rounded-md text-xs font-medium"
-                style={mode === 'paid' ? { background: '#111827', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+                className="px-3 py-1.5 u-pill text-xs font-medium"
+                style={mode === 'paid' ? { background: AL.black, color: 'white' } : { background: 'rgba(12,12,12,.06)', color: C.muted }}>
                 Payées uniquement (trésorerie)
               </button>
             </div>
@@ -159,19 +160,19 @@ export default function Compta() {
           {/* Aperçu */}
           {preview && (
             <div className="grid grid-cols-3 gap-3 mb-5">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <div className="text-xs text-green-700 mb-1">Recettes ({preview.countRec})</div>
-                <div className="font-bold tabular-nums text-green-900" style={{ fontSize: 20 }}>{fmtCHF(preview.recettes)}</div>
+              <div className="u-ok-bg border u-line u-panel p-3">
+                <div className="text-xs u-ok mb-1">Recettes ({preview.countRec})</div>
+                <div className="font-bold tabular-nums u-ok" style={{ fontSize: 20 }}>{fmtCHF(preview.recettes)}</div>
               </div>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <div className="text-xs text-red-700 mb-1">Dépenses ({preview.countDep})</div>
-                <div className="font-bold tabular-nums text-red-900" style={{ fontSize: 20 }}>{fmtCHF(preview.depenses)}</div>
+              <div className="u-ko-bg border u-line u-panel p-3">
+                <div className="text-xs u-ko mb-1">Dépenses ({preview.countDep})</div>
+                <div className="font-bold tabular-nums u-ko" style={{ fontSize: 20 }}>{fmtCHF(preview.depenses)}</div>
               </div>
-              <div className="rounded-lg p-3 border"
-                style={{ background: preview.balance >= 0 ? '#f0fdf4' : '#fef2f2',
-                         borderColor: preview.balance >= 0 ? '#bbf7d0' : '#fecaca' }}>
-                <div className="text-xs mb-1" style={{ color: preview.balance >= 0 ? '#166534' : '#991b1b' }}>Balance</div>
-                <div className="font-bold tabular-nums" style={{ fontSize: 20, color: preview.balance >= 0 ? '#14532d' : '#7f1d1d' }}>
+              <div className="u-panel p-3 border"
+                style={{ background: preview.balance >= 0 ? 'rgba(27,122,90,.10)' : 'rgba(196,0,43,.10)',
+                         borderColor: preview.balance >= 0 ? 'rgba(27,122,90,.10)' : 'rgba(196,0,43,.10)' }}>
+                <div className="text-xs mb-1" style={{ color: preview.balance >= 0 ? C.success : C.danger }}>Balance</div>
+                <div className="font-bold tabular-nums" style={{ fontSize: 20, color: preview.balance >= 0 ? C.success : C.danger }}>
                   {preview.balance >= 0 ? '+' : ''}{fmtCHF(preview.balance)}
                 </div>
               </div>
@@ -179,19 +180,19 @@ export default function Compta() {
           )}
 
           <button onClick={download}
-            className="w-full px-4 py-2.5 rounded-md text-sm font-medium text-white"
+            className="w-full px-4 py-2.5 u-pill text-sm font-medium text-white"
             style={{ background: PINK }}>
             📥 Télécharger le CSV
           </button>
-          <p className="text-xs text-gray-400 mt-2 text-center">
+          <p className="text-xs u-muted mt-2 text-center">
             Format CSV compatible Excel (séparateur ;). Une ligne par facture/frais + totaux en bas.
           </p>
         </div>
 
         {/* Journal comptable (partie double) */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
-          <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: 16 }}>Journal comptable (partie double)</h2>
-          <p className="text-xs text-gray-500 mb-4">
+        <div className="u-surface u-panel border u-line p-5 md:p-6">
+          <h2 className="font-semibold u-ink mb-1" style={{ fontSize: 16 }}>Journal comptable (partie double)</h2>
+          <p className="text-xs u-muted mb-4">
             Écritures au plan comptable suisse PME : débiteurs/ventes + TVA due, charges + impôt préalable/créanciers,
             frais, et paiements bancaires rapprochés. Importable dans Banana, Crésus, bexio ou Excel.
           </p>
@@ -200,18 +201,18 @@ export default function Compta() {
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 {[
-                  { label: 'Chiffre d\'affaires HT', value: journal.tva.revenueNet, color: '#166534', bg: '#f0fdf4', border: '#bbf7d0' },
-                  { label: 'TVA due (2200)', value: journal.tva.vatDue, color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-                  { label: 'Impôt préalable (1170)', value: journal.tva.vatInput, color: '#9a3412', bg: '#fff7ed', border: '#fed7aa' },
-                  { label: 'TVA à payer', value: journal.tva.vatToPay, color: '#111827', bg: '#f9fafb', border: '#e5e7eb' },
+                  { label: 'Chiffre d\'affaires HT', value: journal.tva.revenueNet, color: C.success, bg: 'rgba(27,122,90,.10)', border: 'rgba(27,122,90,.10)' },
+                  { label: 'TVA due (2200)', value: journal.tva.vatDue, color: C.info, bg: C.infoBg, border: C.infoBg },
+                  { label: 'Impôt préalable (1170)', value: journal.tva.vatInput, color: C.warning, bg: 'rgba(166,99,0,.12)', border: 'rgba(166,99,0,.12)' },
+                  { label: 'TVA à payer', value: journal.tva.vatToPay, color: AL.black, bg: 'rgba(12,12,12,.05)', border: 'rgba(12,12,12,.08)' },
                 ].map((c, i) => (
-                  <div key={i} className="rounded-lg p-3 border" style={{ background: c.bg, borderColor: c.border }}>
+                  <div key={i} className="u-panel p-3 border" style={{ background: c.bg, borderColor: c.border }}>
                     <div className="text-xs mb-1" style={{ color: c.color }}>{c.label}</div>
                     <div className="font-bold tabular-nums" style={{ fontSize: 18, color: c.color }}>{fmtCHF(c.value)}</div>
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mb-3">
+              <p className="text-xs u-muted mb-3">
                 {journal.lines.length} écriture(s) · total mouvementé {fmtCHF(journal.totalDebit)} CHF · débit = crédit ✓
                 <span className="ml-1">— récap TVA selon la méthode effective.</span>
               </p>
@@ -219,7 +220,7 @@ export default function Compta() {
           )}
 
           <button onClick={downloadJournal}
-            className="w-full px-4 py-2.5 rounded-md text-sm font-medium text-white"
+            className="w-full px-4 py-2.5 u-pill text-sm font-medium text-white"
             style={{ background: PINK }}>
             📥 Télécharger le journal (CSV)
           </button>
@@ -227,12 +228,12 @@ export default function Compta() {
 
         {/* Décompte TVA (méthode effective) */}
         {journal?.decompte && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
-            <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: 16 }}>Décompte TVA — méthode effective</h2>
-            <p className="text-xs text-gray-500 mb-4">Chiffres correspondant au formulaire AFC pour la période choisie (sélectionne « Trimestre » ci-dessus).</p>
+          <div className="u-surface u-panel border u-line p-5 md:p-6">
+            <h2 className="font-semibold u-ink mb-1" style={{ fontSize: 16 }}>Décompte TVA — méthode effective</h2>
+            <p className="text-xs u-muted mb-4">Chiffres correspondant au formulaire AFC pour la période choisie (sélectionne « Trimestre » ci-dessus).</p>
             <table className="w-full" style={{ fontSize: 13 }}>
               <thead>
-                <tr className="text-gray-500" style={{ fontSize: 11 }}>
+                <tr className="u-muted" style={{ fontSize: 11 }}>
                   <th className="text-left py-1.5">Poste</th>
                   <th className="text-right py-1.5">Chiffre d'affaires HT</th>
                   <th className="text-right py-1.5">Impôt</th>
@@ -240,30 +241,30 @@ export default function Compta() {
               </thead>
               <tbody>
                 {journal.decompte.rates.map((r, i) => (
-                  <tr key={i} className="border-t border-gray-100">
+                  <tr key={i} className="border-t u-line">
                     <td className="py-1.5">Prestations imposables à {r.rate}%</td>
                     <td className="text-right tabular-nums">{fmtCHF(r.net)}</td>
                     <td className="text-right tabular-nums">{fmtCHF(r.vat)}</td>
                   </tr>
                 ))}
-                <tr className="border-t border-gray-200 font-semibold">
+                <tr className="border-t u-line font-semibold">
                   <td className="py-1.5">Total impôt dû</td>
                   <td className="text-right tabular-nums">{fmtCHF(journal.decompte.totalRevenue)}</td>
                   <td className="text-right tabular-nums">{fmtCHF(journal.decompte.vatDue)}</td>
                 </tr>
-                <tr className="border-t border-gray-100">
+                <tr className="border-t u-line">
                   <td className="py-1.5">Impôt préalable — matériel et prestations (400)</td>
                   <td></td>
                   <td className="text-right tabular-nums">− {fmtCHF(journal.decompte.vatInput)}</td>
                 </tr>
                 {journal.decompte.vatInputInvest > 0 && (
-                  <tr className="border-t border-gray-100">
+                  <tr className="border-t u-line">
                     <td className="py-1.5">Impôt préalable — investissements (405)</td>
                     <td></td>
                     <td className="text-right tabular-nums">− {fmtCHF(journal.decompte.vatInputInvest)}</td>
                   </tr>
                 )}
-                <tr className="border-t-2 border-gray-300 font-bold">
+                <tr className="border-t-2 u-line font-bold">
                   <td className="py-2">{journal.decompte.balance >= 0 ? 'À payer à l\'AFC (500)' : 'En votre faveur (510)'}</td>
                   <td></td>
                   <td className="text-right tabular-nums" style={{ fontSize: 16 }}>{fmtCHF(Math.abs(journal.decompte.balance))}</td>
@@ -275,12 +276,12 @@ export default function Compta() {
 
         {/* Balance des comptes */}
         {journal?.balance?.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
-            <h2 className="font-semibold text-gray-900 mb-3" style={{ fontSize: 16 }}>Balance des comptes</h2>
+          <div className="u-surface u-panel border u-line p-5 md:p-6">
+            <h2 className="font-semibold u-ink mb-3" style={{ fontSize: 16 }}>Balance des comptes</h2>
             <div className="overflow-x-auto">
               <table className="w-full" style={{ fontSize: 13 }}>
                 <thead>
-                  <tr className="text-gray-500" style={{ fontSize: 11 }}>
+                  <tr className="u-muted" style={{ fontSize: 11 }}>
                     <th className="text-left py-1.5">Compte</th>
                     <th className="text-left py-1.5">Libellé</th>
                     <th className="text-right py-1.5">Débit</th>
@@ -290,11 +291,11 @@ export default function Compta() {
                 </thead>
                 <tbody>
                   {journal.balance.map(a => (
-                    <tr key={a.account} className="border-t border-gray-100">
+                    <tr key={a.account} className="border-t u-line">
                       <td className="py-1.5 tabular-nums font-medium">{a.account}</td>
-                      <td className="py-1.5 text-gray-600">{a.label}</td>
-                      <td className="text-right tabular-nums text-gray-600">{a.debit ? fmtCHF(a.debit) : ''}</td>
-                      <td className="text-right tabular-nums text-gray-600">{a.credit ? fmtCHF(a.credit) : ''}</td>
+                      <td className="py-1.5 u-ink">{a.label}</td>
+                      <td className="text-right tabular-nums u-ink">{a.debit ? fmtCHF(a.debit) : ''}</td>
+                      <td className="text-right tabular-nums u-ink">{a.credit ? fmtCHF(a.credit) : ''}</td>
                       <td className="text-right tabular-nums font-semibold">{fmtCHF(a.solde)}</td>
                     </tr>
                   ))}
@@ -352,9 +353,9 @@ function AccountMapping({ onChanged }) {
     scope === 'sale' ? a.kind === 'produit' : (a.kind === 'charge' || a.number.startsWith('15')))
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6">
-      <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: 16 }}>Correspondance catégorie → compte</h2>
-      <p className="text-xs text-gray-500 mb-4">
+    <div className="u-surface u-panel border u-line p-5 md:p-6">
+      <h2 className="font-semibold u-ink mb-1" style={{ fontSize: 16 }}>Correspondance catégorie → compte</h2>
+      <p className="text-xs u-muted mb-4">
         Détermine sur quel compte chaque pièce est imputée dans le journal. La ligne « (défaut) » s'applique
         aux catégories non mappées.
       </p>
@@ -365,24 +366,24 @@ function AccountMapping({ onChanged }) {
           return (
             <div key={s.key}>
               <div className="flex items-baseline gap-2 mb-1.5">
-                <h3 className="font-semibold text-gray-800" style={{ fontSize: 13 }}>{s.label}</h3>
-                <span className="text-gray-400" style={{ fontSize: 11 }}>{s.hint}</span>
+                <h3 className="font-semibold u-ink" style={{ fontSize: 13 }}>{s.label}</h3>
+                <span className="u-muted" style={{ fontSize: 11 }}>{s.hint}</span>
               </div>
               <table className="w-full" style={{ fontSize: 13 }}>
                 <tbody>
                   {cats.map(cat => {
                     const key = `${s.key}:${cat}`
                     return (
-                      <tr key={key} className="border-t border-gray-100">
+                      <tr key={key} className="border-t u-line">
                         <td className="py-1.5" style={{ width: '45%' }}>
-                          {cat === '' ? <span className="text-gray-500 italic">(défaut)</span> : cat}
+                          {cat === '' ? <span className="u-muted italic">(défaut)</span> : cat}
                         </td>
                         <td className="py-1.5">
                           <select
                             value={accountOf(s.key, cat)}
                             onChange={e => setMapping(s.key, cat, e.target.value)}
                             disabled={saving === key}
-                            className="px-2 py-1 border border-gray-200 rounded-md bg-white w-full"
+                            className="px-2 py-1 border u-line u-pill u-surface w-full"
                             style={{ fontSize: 12, maxWidth: 380 }}>
                             <option value="">— choisir un compte —</option>
                             {optionsFor(s.key).map(a => (
@@ -394,7 +395,7 @@ function AccountMapping({ onChanged }) {
                     )
                   })}
                   {cats.length === 1 && (
-                    <tr><td colSpan={2} className="py-2 text-gray-400" style={{ fontSize: 12 }}>
+                    <tr><td colSpan={2} className="py-2 u-muted" style={{ fontSize: 12 }}>
                       Aucune catégorie utilisée pour l'instant — seul le défaut s'applique.
                     </td></tr>
                   )}

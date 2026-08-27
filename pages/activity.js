@@ -3,23 +3,24 @@ import useSWR from 'swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
+import { AL, C } from '../lib/theme'
 
-const PINK = '#111827'
+const PINK = AL.black
 const PERSON_COLORS = {
-  Arnaud: '#3b82f6',
-  Gabin: '#8b5cf6',
-  Guillaume: '#111827',
+  Arnaud: C.info,
+  Gabin: C.violet,
+  Guillaume: AL.black,
 }
 
 const ACTION_LABELS = {
-  task_completed:   { emoji: '✅', label: 'a terminé',           color: '#16a34a' },
-  task_uncompleted: { emoji: '↩️',  label: 'a réouvert',          color: '#ea580c' },
-  task_created:     { emoji: '✨', label: 'a créé la tâche',     color: '#3b82f6' },
-  task_updated:     { emoji: '✏️', label: 'a modifié',            color: '#6b7280' },
-  task_deleted:     { emoji: '🗑️', label: 'a supprimé',           color: '#ef4444' },
-  project_created:  { emoji: '🚀', label: 'a créé le projet',    color: '#8b5cf6' },
-  project_updated:  { emoji: '🔧', label: 'a mis à jour',        color: '#6b7280' },
-  project_deleted:  { emoji: '🗑️', label: 'a supprimé le projet', color: '#ef4444' },
+  task_completed:   { emoji: '✅', label: 'a terminé',           color: C.success },
+  task_uncompleted: { emoji: '↩️',  label: 'a réouvert',          color: C.warning },
+  task_created:     { emoji: '✨', label: 'a créé la tâche',     color: C.info },
+  task_updated:     { emoji: '✏️', label: 'a modifié',            color: C.muted },
+  task_deleted:     { emoji: '🗑️', label: 'a supprimé',           color: C.danger },
+  project_created:  { emoji: '🚀', label: 'a créé le projet',    color: C.violet },
+  project_updated:  { emoji: '🔧', label: 'a mis à jour',        color: C.muted },
+  project_deleted:  { emoji: '🗑️', label: 'a supprimé le projet', color: C.danger },
 }
 
 function timeAgo(dateStr) {
@@ -63,7 +64,7 @@ export default function Activity() {
   const grouped  = groupByDay(filtered)
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: AL.white, fontFamily: 'Inter, sans-serif' }}>
       <Head>
         <title>Activité — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -73,14 +74,14 @@ export default function Activity() {
       <NavBar title="activité" />
 
       {/* Filtre par personne */}
-      <div className="bg-white border-b" style={{ borderColor: '#f0f0f0' }}>
+      <div className="u-surface border-b" style={{ borderColor: 'rgba(12,12,12,.08)' }}>
         <div className="max-w-3xl mx-auto px-4 py-2 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {['all', 'Arnaud', 'Gabin', 'Guillaume'].map(p => (
             <button key={p} onClick={() => setFilter(p)}
-              className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
+              className="px-3 py-1 u-pill text-xs font-medium flex-shrink-0 transition-all"
               style={filter === p
-                ? { background: p === 'all' ? '#111' : PERSON_COLORS[p], color: 'white' }
-                : { background: '#f3f4f6', color: '#6b7280' }}>
+                ? { background: p === 'all' ? AL.black : PERSON_COLORS[p], color: 'white' }
+                : { background: 'rgba(12,12,12,.06)', color: C.muted }}>
               {p === 'all' ? 'Tous' : p}
             </button>
           ))}
@@ -89,11 +90,11 @@ export default function Activity() {
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         {loading ? (
-          <div className="text-center py-20 text-gray-400 text-sm">Chargement...</div>
+          <div className="text-center py-20 u-muted text-sm">Chargement...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-3">📋</div>
-            <p className="text-gray-400 text-sm">Aucune activité enregistrée</p>
+            <p className="u-muted text-sm">Aucune activité enregistrée</p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -101,55 +102,55 @@ export default function Activity() {
               <div key={day}>
                 {/* Séparateur jour */}
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-1 h-px bg-gray-100" />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                  <div className="flex-1 h-px u-fill" />
+                  <span className="text-xs font-semibold u-muted uppercase tracking-wide whitespace-nowrap">
                     {formatDay(day)}
                   </span>
-                  <div className="flex-1 h-px bg-gray-100" />
+                  <div className="flex-1 h-px u-fill" />
                 </div>
 
                 {/* Entrées du jour */}
                 <div className="space-y-2">
                   {dayEntries.map(entry => {
-                    const meta = ACTION_LABELS[entry.action] || { emoji: '•', label: entry.action, color: '#6b7280' }
-                    const personColor = PERSON_COLORS[entry.actor] || '#64748b'
+                    const meta = ACTION_LABELS[entry.action] || { emoji: '•', label: entry.action, color: C.muted }
+                    const personColor = PERSON_COLORS[entry.actor] || C.muted
                     return (
                       <div key={entry.id}
-                        className="bg-white rounded-2xl border flex items-start gap-3 px-4 py-3"
-                        style={{ borderColor: '#f3f4f6' }}>
+                        className="u-surface u-panel border flex items-start gap-3 px-4 py-3"
+                        style={{ borderColor: 'rgba(12,12,12,.06)' }}>
                         {/* Avatar */}
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold mt-0.5"
+                        <div className="w-8 h-8 u-pill flex items-center justify-center flex-shrink-0 text-white text-xs font-bold mt-0.5"
                           style={{ background: personColor }}>
                           {entry.actor?.[0] || '?'}
                         </div>
 
                         {/* Contenu */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-900 leading-snug">
+                          <p className="text-sm u-ink leading-snug">
                             <span className="font-semibold" style={{ color: personColor }}>{entry.actor}</span>
                             {' '}
-                            <span className="text-gray-500">{meta.label}</span>
+                            <span className="u-muted">{meta.label}</span>
                             {entry.entity_name && (
                               <>
                                 {' '}
-                                <span className="font-medium text-gray-900">«{entry.entity_name}»</span>
+                                <span className="font-medium u-ink">«{entry.entity_name}»</span>
                               </>
                             )}
                           </p>
                           {entry.metadata?.responsible && entry.entity_type === 'task' && (
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              Responsable : <span className="font-medium" style={{ color: PERSON_COLORS[entry.metadata.responsible] || '#6b7280' }}>{entry.metadata.responsible}</span>
+                            <p className="text-xs u-muted mt-0.5">
+                              Responsable : <span className="font-medium" style={{ color: PERSON_COLORS[entry.metadata.responsible] || C.muted }}>{entry.metadata.responsible}</span>
                             </p>
                           )}
                           {entry.metadata?.client && (
-                            <p className="text-xs text-gray-400 mt-0.5">Client : {entry.metadata.client}</p>
+                            <p className="text-xs u-muted mt-0.5">Client : {entry.metadata.client}</p>
                           )}
                         </div>
 
                         {/* Time + emoji */}
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
                           <span className="text-base">{meta.emoji}</span>
-                          <span className="text-xs text-gray-300 whitespace-nowrap">{timeAgo(entry.created_at)}</span>
+                          <span className="text-xs u-muted whitespace-nowrap">{timeAgo(entry.created_at)}</span>
                         </div>
                       </div>
                     )

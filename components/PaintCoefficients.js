@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { C, FONT, MONO } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { apiGet, apiPut } from '../lib/api'
 import {
   COMPLEXITES_DEFAUT, normaliserComplexites,
@@ -65,7 +65,7 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
 
   const champ = {
     width: 68, padding: '5px 7px', border: `1px solid ${C.border}`, borderRadius: 6,
-    font: `13px ${MONO}`, color: C.ink, background: '#fff', textAlign: 'right',
+    font: `13px ${MONO}`, color: C.ink, background: AL.white, textAlign: 'right',
   }
   const th = {
     textAlign: 'left', padding: '6px 8px', borderBottom: `1px solid ${C.border}`,
@@ -74,7 +74,7 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
   const td = { padding: '6px 8px', borderBottom: `1px solid ${C.divider}` }
 
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: '14px 16px' }}>
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, background: C.surface, padding: '14px 16px' }}>
       <p style={{ font: `12.5px ${FONT}`, color: C.inkTertiary, margin: '0 0 12px', maxWidth: '68ch', lineHeight: 1.6 }}>
         <strong>Quantité peinture</strong> mesure la surconsommation due à la
         <em>forme</em> de la pièce : chants, retours, recoins, angles où le pistolet
@@ -108,7 +108,7 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
                   <input
                     disabled={!peutModifier}
                     aria-label={`Code du niveau ${cle}`}
-                    style={{ width: 76, padding: '5px 6px', border: `1px solid ${C.border}`, borderRadius: 6, font: `600 12px ${MONO}`, color: C.ink, background: peutModifier ? '#fff' : '#f8fafc' }}
+                    style={{ width: 76, padding: '5px 6px', border: `1px solid ${C.border}`, borderRadius: 6, font: `600 12px ${MONO}`, color: C.ink, background: peutModifier ? AL.white : C.hover }}
                     defaultValue={cle}
                     onBlur={e => {
                       const nouveau = e.target.value.trim()
@@ -122,20 +122,20 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
                 <td style={td}>
                   <input
                     disabled={!peutModifier}
-                    style={{ width: '100%', padding: '5px 7px', border: `1px solid ${C.border}`, borderRadius: 6, font: `13px ${FONT}`, color: C.ink, background: peutModifier ? '#fff' : '#f8fafc' }}
+                    style={{ width: '100%', padding: '5px 7px', border: `1px solid ${C.border}`, borderRadius: 6, font: `13px ${FONT}`, color: C.ink, background: peutModifier ? AL.white : C.hover }}
                     value={brouillon[cle]?.label || ''}
                     onChange={e => majCoef(cle, 'label', e.target.value)}
                   />
                 </td>
                 <td style={{ ...td, textAlign: 'right' }}>
                   <input disabled={!peutModifier} type="number" step="0.01" min="0.1" max="20"
-                    style={{ ...champ, background: peutModifier ? '#fff' : '#f8fafc' }}
+                    style={{ ...champ, background: peutModifier ? AL.white : C.hover }}
                     value={brouillon[cle]?.quantite ?? ''}
                     onChange={e => majCoef(cle, 'quantite', e.target.value)} />
                 </td>
                 <td style={{ ...td, textAlign: 'right' }}>
                   <input disabled={!peutModifier} type="number" step="0.01" min="0.1" max="20"
-                    style={{ ...champ, background: peutModifier ? '#fff' : '#f8fafc' }}
+                    style={{ ...champ, background: peutModifier ? AL.white : C.hover }}
                     value={brouillon[cle]?.temps ?? ''}
                     onChange={e => majCoef(cle, 'temps', e.target.value)} />
                 </td>
@@ -156,22 +156,22 @@ export default function PaintCoefficients({ coefficients, onChange, peutModifier
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
           <button onClick={enregistrer} disabled={!modifie || etat === 'enregistrement'}
             style={{
-              padding: '7px 14px', borderRadius: 8, border: 'none', cursor: modifie ? 'pointer' : 'default',
-              background: modifie ? C.ink : '#e5e7eb', color: modifie ? '#fff' : C.muted,
+              padding: '7px 14px', borderRadius: R.panel, border: 'none', cursor: modifie ? 'pointer' : 'default',
+              background: modifie ? C.ink : C.border, color: modifie ? AL.white : C.muted,
               font: `500 13px ${FONT}`,
             }}>
             {etat === 'enregistrement' ? 'Enregistrement…' : 'Enregistrer'}
           </button>
           <button onClick={() => setBrouillon(b => ajouterComplexite(b))}
-            style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.ink, cursor: 'pointer', font: `500 13px ${FONT}` }}>
+            style={{ padding: '7px 12px', borderRadius: R.panel, border: `1px solid ${C.border}`, background: C.surface, color: C.ink, cursor: 'pointer', font: `500 13px ${FONT}` }}>
             + Niveau
           </button>
           <button onClick={() => setBrouillon(COMPLEXITES_DEFAUT)}
             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: `13px ${FONT}`, color: C.muted, textDecoration: 'underline' }}>
             Revenir aux valeurs d’origine
           </button>
-          {etat === 'ok' && <span style={{ font: `12.5px ${FONT}`, color: '#065f46' }}>Enregistré pour toute l’équipe.</span>}
-          {etat === 'erreur' && <span style={{ font: `12.5px ${FONT}`, color: '#9a3412' }}>Échec — rien n’a été modifié.</span>}
+          {etat === 'ok' && <span style={{ font: `12.5px ${FONT}`, color: C.success }}>Enregistré pour toute l’équipe.</span>}
+          {etat === 'erreur' && <span style={{ font: `12.5px ${FONT}`, color: C.warning }}>Échec — rien n’a été modifié.</span>}
         </div>
       ) : (
         <p style={{ font: `12.5px ${FONT}`, color: C.muted, margin: '12px 0 0' }}>

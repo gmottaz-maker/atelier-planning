@@ -4,18 +4,26 @@ import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
+import { AL, C, FONT, MONO, R, personChip } from '../lib/theme'
 
-const PINK = '#111827'
+// Cet écran n'a PAS de maquette : le handoff v2 ne cartographie pas /schedule.
+// Ce qui suit applique le système par extension — jetons, deux radius, aucune
+// ombre, statuts sémantiques — sans inventer de mise en page nouvelle.
+
+const PINK = AL.black
 const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
 const DEFAULT_PAUSE = 1.0
 
+// Six types, quatre couleurs : le système n'a que quatre rôles sémantiques.
+// Les demi-journées partagent la couleur du congé — c'est le libellé et
+// l'icône qui les distinguent, pas une sixième teinte inventée.
 const TYPES = {
-  WORK:        { label: 'Travail',   color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: '⏱' },
-  VACATION:    { label: 'Congé J',   color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: '🏖' },
-  VACATION_AM: { label: '½ Matin',   color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', icon: '🌅' },
-  VACATION_PM: { label: '½ Après-m', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', icon: '🌇' },
-  SICK:        { label: 'Maladie',   color: '#ea580c', bg: '#fff7ed', border: '#fed7aa', icon: '🤒' },
-  HOLIDAY:     { label: 'Férié',     color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '🇨🇭' },
+  WORK:        { label: 'Travail',   color: AL.black,  bg: C.neutralBg, border: C.border,  icon: '⏱' },
+  VACATION:    { label: 'Congé J',   color: C.success, bg: C.successBg, border: C.border,  icon: '🏖' },
+  VACATION_AM: { label: '½ Matin',   color: C.success, bg: C.successBg, border: C.border,  icon: '🌅' },
+  VACATION_PM: { label: '½ Après-m', color: C.success, bg: C.successBg, border: C.border,  icon: '🌇' },
+  SICK:        { label: 'Maladie',   color: C.danger,  bg: C.dangerBg,  border: C.border,  icon: '🤒' },
+  HOLIDAY:     { label: 'Férié',     color: C.warning, bg: C.warningBg, border: C.border,  icon: '🇨🇭' },
 }
 // Types comptant comme demi-journée de congé
 const HALF_DAY_TYPES = ['VACATION_AM', 'VACATION_PM']
@@ -23,12 +31,12 @@ const HALF_DAY_TYPES = ['VACATION_AM', 'VACATION_PM']
 const FULL_DAY_VACATION_TYPES = ['VACATION']
 
 const EXPENSE_CATEGORIES = [
-  { key: 'Repas',       icon: '🍽',  color: '#ea580c' },
-  { key: 'Transport',   icon: '🚗',  color: '#3b82f6' },
-  { key: 'Hébergement', icon: '🏨',  color: '#8b5cf6' },
-  { key: 'Fournitures', icon: '🛒',  color: '#16a34a' },
-  { key: 'Matériel',    icon: '🔧',  color: '#64748b' },
-  { key: 'Autre',       icon: '📋',  color: '#9ca3af' },
+  { key: 'Repas',       icon: '🍽',  color: C.warning },
+  { key: 'Transport',   icon: '🚗',  color: C.info },
+  { key: 'Hébergement', icon: '🏨',  color: C.violet },
+  { key: 'Fournitures', icon: '🛒',  color: C.success },
+  { key: 'Matériel',    icon: '🔧',  color: C.muted },
+  { key: 'Autre',       icon: '📋',  color: C.muted },
 ]
 const CURRENCIES = ['CHF', 'EUR', 'USD']
 
@@ -712,16 +720,27 @@ export default function SchedulePage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa', fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: AL.black }}>
       <Head>
         <title>Horaires — Maze Project</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <style>{`
           * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
           body { margin: 0; }
+
+
+          /* Écran sans maquette : les classes de couleur de l'écran pointent
+             sur les jetons du système, une seule définition pour chacune. */
+          .sch-ink   { color: ${AL.black}; }
+          .sch-muted { color: ${C.muted}; }
+          .sch-ok    { color: ${C.success}; }
+          .sch-ko    { color: ${C.danger}; }
+          .sch-warn  { color: ${C.warning}; }
+          .sch-line  { border-color: ${C.border}; }
+          .sch-fill  { background: ${C.neutralBg}; }
           .day-cell { transition: background 0.1s; }
-          .day-cell:hover { background: #f8f8f8; }
-          input:focus, select:focus { outline: none; border-color: ${PINK} !important; box-shadow: 0 0 0 3px ${PINK}22 !important; }
+          .day-cell:hover { background: rgba(12,12,12,.05); }
+          input:focus, select:focus { outline: none; border-color: ${PINK} !important; box-shadow: none !important; }
           input { font-size: 16px !important; }
           @media (max-width: 640px) {
             .week-desktop { display: none !important; }
@@ -737,17 +756,17 @@ export default function SchedulePage() {
 
       {/* ── NavBar ── */}
       <NavBar title="Horaires">
-        {loading && <span className="text-xs text-gray-400 animate-pulse mr-1">…</span>}
+        {loading && <span className="text-xs sch-muted animate-pulse mr-1">…</span>}
         <button
           onClick={() => exportCSV(entries, effectiveUser, year)}
-          className="px-3 py-2 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors"
+          className="px-3 py-2 u-pill text-sm font-medium border sch-line sch-ink hover:sch-line transition-colors"
           title="Exporter CSV"
         >
           Exporter
         </button>
         <button
           onClick={() => { setSettingsError(''); setSettingsOpen(true) }}
-          className="px-3 py-2 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors"
+          className="px-3 py-2 u-pill text-sm font-medium border sch-line sch-ink hover:sch-line transition-colors"
           title="Paramètres horaires"
         >
           Paramètres
@@ -759,10 +778,10 @@ export default function SchedulePage() {
         {/* ── Header ── */}
         <header className="flex items-baseline justify-between">
           <div>
-            <h1 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 'clamp(20px, 5vw, 28px)' }}>
+            <h1 style={{ fontSize: 'clamp(26px, 5vw, 38px)', fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>
               Horaires {isAdmin && selectedUser ? `· ${selectedUser}` : ''}
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p style={{ fontSize: 18, color: C.muted, margin: '12px 0 0' }}>
               {effectiveUser} · {year}
             </p>
           </div>
@@ -774,42 +793,42 @@ export default function SchedulePage() {
             label="Congés restants"
             value={vacationLeft % 1 === 0 ? `${vacationLeft}j` : `${vacationLeft.toFixed(1)}j`}
             sub={`Pris : ${vacationTaken % 1 === 0 ? vacationTaken : vacationTaken.toFixed(1)} / ${settings.vacation_days}j`}
-            color={vacationLeft > 5 ? '#16a34a' : vacationLeft > 0 ? '#ea580c' : '#dc2626'}
+            color={vacationLeft > 5 ? C.success : vacationLeft > 0 ? C.warning : C.danger}
           />
           <StatCard
             label="Semaine en cours"
             value={`${thisWeekH.toFixed(1)}h`}
             sub={`Objectif ${settings.weekly_hours}h`}
-            color={thisWeekH >= settings.weekly_hours ? '#16a34a' : '#111827'}
+            color={thisWeekH >= settings.weekly_hours ? C.success : AL.black}
           />
           <StatCard
             label="Solde heures"
             value={`${overtime >= 0 ? '+' : ''}${overtime.toFixed(1)}h`}
             sub={`${workedHours.toFixed(1)}h cette année`}
-            color={overtime >= 0 ? '#16a34a' : '#ea580c'}
+            color={overtime >= 0 ? C.success : C.warning}
           />
           <StatCard
             label="Maladie"
             value={`${sickDays}j`}
             sub={sickDays === 1 ? 'cette année' : 'cette année'}
-            color={sickDays > 0 ? '#ea580c' : '#6b7280'}
+            color={sickDays > 0 ? C.warning : C.muted}
           />
         </div>
 
         {/* ── Pointeuse (clock-in/out) ── */}
         {clockInTime ? (
-          <div className="px-6 py-4 rounded-lg border flex items-center gap-4 flex-wrap" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+          <div className="px-6 py-4 u-panel border flex items-center gap-4 flex-wrap" style={{ background: C.successBg, borderColor: C.successBg }}>
             <div className="flex items-center gap-3 flex-1">
-              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: '#22c55e', boxShadow: '0 0 0 4px #bbf7d0', animation: 'pulse 2s infinite' }} />
+              <div className="w-2.5 h-2.5 u-pill flex-shrink-0" style={{ background: C.success, boxShadow: `0 0 0 4px ${C.successBg}`, animation: 'pulse 2s infinite' }} />
               <div>
-                <p className="font-semibold" style={{ color: '#15803d', fontSize: 15 }}>En service depuis {clockInTime}</p>
-                {clockElapsed && <p className="text-xs mt-0.5" style={{ color: '#15803d' }}>Durée : <span className="font-semibold tabular-nums">{clockElapsed}</span></p>}
+                <p className="font-semibold" style={{ color: C.success, fontSize: 15 }}>En service depuis {clockInTime}</p>
+                {clockElapsed && <p className="text-xs mt-0.5" style={{ color: C.success }}>Durée : <span className="font-semibold tabular-nums">{clockElapsed}</span></p>}
               </div>
             </div>
             <button
               onClick={handleClockOut}
-              className="px-4 py-2 rounded-md text-sm font-medium text-white flex-shrink-0"
-              style={{ background: '#111827' }}
+              className="px-4 py-2 u-pill text-sm font-medium text-white flex-shrink-0"
+              style={{ background: AL.black }}
             >
               Pointer le départ
             </button>
@@ -818,10 +837,10 @@ export default function SchedulePage() {
           <div>
             <button
               onClick={handleClockIn}
-              className="px-4 py-2.5 rounded-md text-sm font-medium border transition-colors"
-              style={{ background: 'white', color: '#15803d', borderColor: '#bbf7d0' }}
+              className="px-4 py-2.5 u-pill text-sm font-medium border transition-colors"
+              style={{ background: 'white', color: C.success, borderColor: C.successBg }}
             >
-              <span className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: '#22c55e' }} />
+              <span className="inline-block w-2 h-2 u-pill mr-2 align-middle" style={{ background: C.success }} />
               Pointer l'arrivée
             </button>
           </div>
@@ -835,8 +854,8 @@ export default function SchedulePage() {
               <select
                 value={selectedUser || ''}
                 onChange={e => setSelectedUser(e.target.value || null)}
-                className="text-sm border rounded-md px-3 py-2 bg-white"
-                style={{ borderColor: '#e5e7eb', color: '#374151' }}
+                className="text-sm border u-pill px-3 py-2 bg-white"
+                style={{ borderColor: C.border, color: AL.black }}
               >
                 <option value="">Moi ({user?.name})</option>
                 {KNOWN_USERS.filter(u => u !== user?.name).map(u => (
@@ -845,15 +864,15 @@ export default function SchedulePage() {
               </select>
             )}
             {/* View toggle */}
-            <div className="flex rounded-md border overflow-hidden bg-white" style={{ borderColor: '#e5e7eb' }}>
+            <div className="flex u-pill border overflow-hidden bg-white" style={{ borderColor: C.border }}>
               {[['week','Semaine'], ['month','Mois']].map(([v, label]) => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
                   className="px-4 py-2 text-sm font-medium transition-colors"
                   style={{
-                    background: view === v ? '#111827' : 'white',
-                    color: view === v ? 'white' : '#6b7280',
+                    background: view === v ? AL.black : 'white',
+                    color: view === v ? 'white' : C.muted,
                     border: 'none',
                     cursor: 'pointer',
                   }}
@@ -868,25 +887,25 @@ export default function SchedulePage() {
           <div className="flex items-center gap-2">
             <button
               onClick={prevPeriod}
-              className="w-9 h-9 flex items-center justify-center rounded-md border text-gray-600 hover:bg-gray-50 bg-white"
-              style={{ borderColor: '#e5e7eb' }}
+              className="w-9 h-9 flex items-center justify-center u-pill border sch-ink hover:sch-fill bg-white"
+              style={{ borderColor: C.border }}
             >
               ‹
             </button>
             <button
               onClick={goToday}
-              className="px-3 py-2 text-sm rounded-md border font-medium bg-white hover:border-gray-400 transition-colors"
-              style={{ borderColor: '#e5e7eb', color: '#374151' }}
+              className="px-3 py-2 text-sm u-pill border font-medium bg-white hover:sch-line transition-colors"
+              style={{ borderColor: C.border, color: AL.black }}
             >
               Aujourd'hui
             </button>
-            <span className="font-semibold text-gray-900 min-w-[220px] text-center" style={{ fontSize: 15 }}>
+            <span className="font-semibold sch-ink min-w-[220px] text-center" style={{ fontSize: 15 }}>
               {periodLabel}
             </span>
             <button
               onClick={nextPeriod}
-              className="w-9 h-9 flex items-center justify-center rounded-md border text-gray-600 hover:bg-gray-50 bg-white"
-              style={{ borderColor: '#e5e7eb' }}
+              className="w-9 h-9 flex items-center justify-center u-pill border sch-ink hover:sch-fill bg-white"
+              style={{ borderColor: C.border }}
             >
               ›
             </button>
@@ -919,9 +938,9 @@ export default function SchedulePage() {
                     key={i}
                     onClick={() => openDay(ds)}
                     style={{
-                      background: holiday ? '#fffbeb' : isOff ? '#f9fafb' : 'white',
-                      border: `1px solid ${today ? PINK : '#e5e7eb'}`,
-                      borderRadius: 16,
+                      background: holiday ? C.warningBg : isOff ? C.hover : 'white',
+                      border: `1px solid ${today ? PINK : C.border}`,
+                      borderRadius: R.panel,
                       padding: '12px 14px',
                       opacity: future ? 0.6 : 1,
                       cursor: 'pointer',
@@ -935,7 +954,7 @@ export default function SchedulePage() {
                       <div style={{
                         width: 36, height: 36, borderRadius: '50%',
                         background: today ? PINK : 'transparent',
-                        color: today ? 'white' : holiday ? '#b45309' : isOff ? '#d1d5db' : '#111',
+                        color: today ? 'white' : holiday ? C.warning : isOff ? C.border : AL.black,
                         fontWeight: 700, fontSize: 16,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         margin: '0 auto',
@@ -944,7 +963,7 @@ export default function SchedulePage() {
                       </div>
                       <div style={{
                         fontSize: 10, fontWeight: 600, marginTop: 2,
-                        color: holiday ? '#b45309' : isOff ? '#d1d5db' : '#9ca3af',
+                        color: holiday ? C.warning : isOff ? C.border : C.muted,
                       }}>
                         {DAYS_FR[i]}
                       </div>
@@ -953,15 +972,15 @@ export default function SchedulePage() {
                     {/* Content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {holiday && (
-                        <div style={{ fontSize: 11, color: '#b45309', fontWeight: 600, marginBottom: 4 }}>
+                        <div style={{ fontSize: 11, color: C.warning, fontWeight: 600, marginBottom: 4 }}>
                           🇨🇭 {holiday}
                         </div>
                       )}
                       {!hasAny && isOff && !holiday && (
-                        <span style={{ fontSize: 12, color: '#d1d5db' }}>Jour off</span>
+                        <span style={{ fontSize: 12, color: C.border }}>Jour off</span>
                       )}
                       {!hasAny && !isOff && !holiday && (
-                        <span style={{ fontSize: 12, color: '#d1d5db' }}>Appuyer pour ajouter</span>
+                        <span style={{ fontSize: 12, color: C.border }}>Appuyer pour ajouter</span>
                       )}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {work    && <EntryChip type="WORK"        hours={effectiveHours(work)} arrival={work.arrival_time} departure={work.departure_time} note={work.note} overtime={hasOT} />}
@@ -974,7 +993,7 @@ export default function SchedulePage() {
                     </div>
 
                     {/* Arrow */}
-                    <svg style={{ flexShrink: 0, color: '#d1d5db', marginTop: 8 }} width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg style={{ flexShrink: 0, color: C.border, marginTop: 8 }} width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -983,18 +1002,18 @@ export default function SchedulePage() {
             </div>
             {/* Mobile week footer */}
             <div className="mt-3 px-1 flex items-center justify-between text-sm">
-              <span className="text-gray-500 text-xs">Total semaine</span>
-              <span className="font-bold" style={{ color: weekH >= settings.weekly_hours ? '#16a34a' : weekH > 0 ? '#ea580c' : '#d1d5db' }}>
-                {weekH.toFixed(1)}h <span className="font-normal text-gray-400">/ {settings.weekly_hours}h</span>
+              <span className="sch-muted text-xs">Total semaine</span>
+              <span className="font-bold" style={{ color: weekH >= settings.weekly_hours ? C.success : weekH > 0 ? C.warning : C.border }}>
+                {weekH.toFixed(1)}h <span className="font-normal sch-muted">/ {settings.weekly_hours}h</span>
               </span>
             </div>
           </div>
 
           {/* ── Desktop week view ── */}
           <div className="week-desktop">
-            <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+            <div className="bg-white u-panel border overflow-hidden" style={{ borderColor: C.border }}>
               {/* Week header */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '1px solid rgba(12,12,12,.08)' }}>
                 {weekDays.map((d, i) => {
                   const today     = isToday(d)
                   const isOff     = offDays.includes(d.getDay())
@@ -1004,24 +1023,24 @@ export default function SchedulePage() {
                       key={i}
                       className="text-center py-3 px-2"
                       style={{
-                        borderRight: i < 4 ? '1px solid #f0f0f0' : 'none',
-                        background: holiday ? '#fffbeb' : isOff ? '#f9fafb' : 'white',
+                        borderRight: i < 4 ? '1px solid rgba(12,12,12,.08)' : 'none',
+                        background: holiday ? C.warningBg : isOff ? C.hover : 'white',
                       }}
                     >
-                      <div className="text-xs font-medium mb-1" style={{ color: holiday ? '#b45309' : isOff ? '#d1d5db' : '#9ca3af' }}>
+                      <div className="text-xs font-medium mb-1" style={{ color: holiday ? C.warning : isOff ? C.border : C.muted }}>
                         {DAYS_FR[i]}{isOff && !holiday ? ' ·off' : ''}
                       </div>
                       <div
-                        className="text-sm font-bold mx-auto flex items-center justify-center w-7 h-7 rounded-full"
+                        className="text-sm font-bold mx-auto flex items-center justify-center w-7 h-7 u-pill"
                         style={{
                           background: today ? PINK : 'transparent',
-                          color: today ? 'white' : holiday ? '#b45309' : isOff ? '#d1d5db' : '#111',
+                          color: today ? 'white' : holiday ? C.warning : isOff ? C.border : AL.black,
                         }}
                       >
                         {d.getDate()}
                       </div>
                       {holiday && (
-                        <div className="text-center mt-0.5 truncate px-1" style={{ fontSize: 9, color: '#b45309', fontWeight: 600 }}>
+                        <div className="text-center mt-0.5 truncate px-1" style={{ fontSize: 9, color: C.warning, fontWeight: 600 }}>
                           🇨🇭 {holiday}
                         </div>
                       )}
@@ -1054,17 +1073,17 @@ export default function SchedulePage() {
                       className="day-cell p-2"
                       onClick={() => openDay(ds)}
                       style={{
-                        borderRight: i < 4 ? '1px solid #f8f8f8' : 'none',
+                        borderRight: i < 4 ? '1px solid rgba(12,12,12,.05)' : 'none',
                         cursor: 'pointer',
-                        background: isOff ? '#f9fafb' : 'white',
+                        background: isOff ? C.hover : 'white',
                         opacity: future ? 0.55 : 1,
                         minHeight: 120,
                       }}
                     >
                       {isOff && !hasAny && (
                         <div className="text-center mt-4">
-                          <div className="text-xs font-medium" style={{ color: '#d1d5db' }}>Jour off</div>
-                          <div className="text-xs" style={{ color: '#e5e7eb', marginTop: 2 }}>⚡ + OT</div>
+                          <div className="text-xs font-medium" style={{ color: C.border }}>Jour off</div>
+                          <div className="text-xs" style={{ color: C.border, marginTop: 2 }}>⚡ + OT</div>
                         </div>
                       )}
                       <div className="flex flex-col gap-1.5 mt-1">
@@ -1077,10 +1096,10 @@ export default function SchedulePage() {
                         {sick     && <EntryChip type="SICK" note={sick.note} />}
                         {hdEntry  && <EntryChip type="HOLIDAY" note={hdEntry.note} />}
                         {!hasAny && !isOff && !holiday && (
-                          <div className="text-xs text-gray-300 text-center mt-4">+</div>
+                          <div className="text-xs sch-muted text-center mt-4">+</div>
                         )}
                         {!hasAny && holiday && !isOff && (
-                          <div className="text-xs text-center mt-3 px-1" style={{ color: '#d97706' }}>
+                          <div className="text-xs text-center mt-3 px-1" style={{ color: C.warning }}>
                             🇨🇭 Férié
                           </div>
                         )}
@@ -1091,13 +1110,13 @@ export default function SchedulePage() {
               </div>
 
               {/* Week footer – total */}
-              <div className="border-t px-4 py-2 flex items-center justify-between" style={{ borderColor: '#f0f0f0' }}>
-                <span className="text-xs text-gray-500">Total semaine (effectif)</span>
+              <div className="border-t px-4 py-2 flex items-center justify-between" style={{ borderColor: C.border }}>
+                <span className="text-xs sch-muted">Total semaine (effectif)</span>
                 <span
                   className="text-sm font-bold"
-                  style={{ color: weekH >= settings.weekly_hours ? '#16a34a' : weekH > 0 ? '#ea580c' : '#d1d5db' }}
+                  style={{ color: weekH >= settings.weekly_hours ? C.success : weekH > 0 ? C.warning : C.border }}
                 >
-                  {weekH.toFixed(1)}h <span className="font-normal text-gray-400">/ {settings.weekly_hours}h</span>
+                  {weekH.toFixed(1)}h <span className="font-normal sch-muted">/ {settings.weekly_hours}h</span>
                 </span>
               </div>
             </div>
@@ -1108,11 +1127,11 @@ export default function SchedulePage() {
 
         {/* ── Month View ── */}
         {view === 'month' && (
-          <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+          <div className="bg-white u-panel border overflow-hidden" style={{ borderColor: C.border }}>
             {/* Day headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #f0f0f0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid rgba(12,12,12,.08)' }}>
               {DAYS_FR.map(d => (
-                <div key={d} className="text-center py-2 text-xs font-medium text-gray-400">{d}</div>
+                <div key={d} className="text-center py-2 text-xs font-medium sch-muted">{d}</div>
               ))}
             </div>
             {/* Month grid */}
@@ -1139,25 +1158,25 @@ export default function SchedulePage() {
                     className="day-cell p-1.5"
                     onClick={() => inMonth && !weekend && openDay(ds)}
                     style={{
-                      borderRight: (i + 1) % 7 !== 0 ? '1px solid #f8f8f8' : 'none',
-                      borderBottom: i < monthGrid.length - 7 ? '1px solid #f8f8f8' : 'none',
+                      borderRight: (i + 1) % 7 !== 0 ? '1px solid rgba(12,12,12,.05)' : 'none',
+                      borderBottom: i < monthGrid.length - 7 ? '1px solid rgba(12,12,12,.05)' : 'none',
                       minHeight: 72,
-                      background: holiday && inMonth ? '#fffbeb' : weekend ? '#fafafa' : isOff ? '#f9fafb' : 'white',
+                      background: holiday && inMonth ? C.warningBg : weekend ? C.surface : isOff ? C.hover : 'white',
                       opacity: !inMonth ? 0.25 : future ? 0.55 : 1,
                       cursor: inMonth && !weekend ? 'pointer' : 'default',
                     }}
                   >
                     <div
-                      className="text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full mx-auto"
+                      className="text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center u-pill mx-auto"
                       style={{
                         background: today ? PINK : 'transparent',
-                        color: today ? 'white' : holiday ? '#b45309' : (weekend || isOff) ? '#d1d5db' : '#374151',
+                        color: today ? 'white' : holiday ? C.warning : (weekend || isOff) ? C.border : AL.black,
                       }}
                     >
                       {d.getDate()}
                     </div>
                     {holiday && inMonth && (
-                      <div className="truncate text-center mb-0.5 font-semibold" style={{ fontSize: 8, color: '#b45309' }}>
+                      <div className="truncate text-center mb-0.5 font-semibold" style={{ fontSize: 8, color: C.warning }}>
                         🇨🇭 {holiday}
                       </div>
                     )}
@@ -1206,29 +1225,29 @@ export default function SchedulePage() {
             {/* Month footer – totals */}
             <div
               className="month-footer border-t px-5 py-3 flex flex-wrap items-center gap-4"
-              style={{ borderColor: '#f0f0f0', background: '#fafafa' }}
+              style={{ borderColor: C.border, background: C.surface }}
             >
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <span className="text-xs font-semibold sch-muted uppercase tracking-wide">
                 {MONTHS_FR[displayMonth]} {displayYear}
               </span>
               <span className="flex items-center gap-1.5 text-sm">
                 <span style={{ color: TYPES.WORK.color, fontWeight: 600 }}>⏱ {monthWorkH.toFixed(1)}h</span>
-                <span className="text-gray-400 text-xs">effectifs</span>
+                <span className="sch-muted text-xs">effectifs</span>
               </span>
               {monthVacDays > 0 && (
                 <span className="flex items-center gap-1.5 text-sm">
                   <span style={{ color: TYPES.VACATION.color, fontWeight: 600 }}>🏖 {monthVacDays}j</span>
-                  <span className="text-gray-400 text-xs">de congé</span>
+                  <span className="sch-muted text-xs">de congé</span>
                 </span>
               )}
               {monthSickDays > 0 && (
                 <span className="flex items-center gap-1.5 text-sm">
                   <span style={{ color: TYPES.SICK.color, fontWeight: 600 }}>🤒 {monthSickDays}j</span>
-                  <span className="text-gray-400 text-xs">maladie</span>
+                  <span className="sch-muted text-xs">maladie</span>
                 </span>
               )}
               {monthWorkH > 0 && (
-                <span className="ml-auto text-xs text-gray-400">
+                <span className="ml-auto text-xs sch-muted">
                   {monthWorkDays} jour{monthWorkDays > 1 ? 's' : ''} travaillé{monthWorkDays > 1 ? 's' : ''}
                 </span>
               )}
@@ -1241,13 +1260,13 @@ export default function SchedulePage() {
           {/* Section header */}
           <div className="flex justify-between items-baseline mb-5">
             <div>
-              <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 22 }}>Frais</h2>
-              <p className="text-sm text-gray-500 mt-0.5">{year} · {expenses.length} note{expenses.length > 1 ? 's' : ''}</p>
+              <h2 className="font-semibold sch-ink tracking-tight" style={{ fontSize: 22 }}>Frais</h2>
+              <p className="text-sm sch-muted mt-0.5">{year} · {expenses.length} note{expenses.length > 1 ? 's' : ''}</p>
             </div>
             <button
               onClick={openAddExpense}
-              className="px-4 py-2 rounded-md text-sm font-medium text-white"
-              style={{ background: '#111827' }}
+              className="px-4 py-2 u-pill text-sm font-medium text-white"
+              style={{ background: AL.black }}
             >
               + Ajouter un frais
             </button>
@@ -1266,29 +1285,29 @@ export default function SchedulePage() {
 
           {/* Expense list */}
           {expenses.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-              <p className="text-gray-400 text-sm">Aucun frais enregistré pour {year}</p>
-              <button onClick={openAddExpense} className="mt-4 px-4 py-2 rounded-md text-sm font-medium text-white" style={{ background: '#111827' }}>
+            <div className="bg-white u-panel border sch-line p-12 text-center">
+              <p className="sch-muted text-sm">Aucun frais enregistré pour {year}</p>
+              <button onClick={openAddExpense} className="mt-4 px-4 py-2 u-pill text-sm font-medium text-white" style={{ background: AL.black }}>
                 Ajouter mon premier frais
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-white u-panel border sch-line overflow-hidden">
               {expenses.map((exp, i) => {
                 const cat = EXPENSE_CATEGORIES.find(c => c.key === exp.category) || EXPENSE_CATEGORIES[5]
                 return (
                   <div
                     key={exp.id}
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                    style={{ borderBottom: i < expenses.length - 1 ? '1px solid #f3f4f6' : 'none' }}
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:sch-fill transition-colors"
+                    style={{ borderBottom: i < expenses.length - 1 ? `1px solid ${C.border}` : 'none' }}
                     onClick={() => openEditExpense(exp)}
                   >
                     {/* Receipt thumbnail or category icon */}
                     {(() => {
                       const src = receiptSrc(exp)
                       return (
-                        <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
-                          style={{ background: src ? '#f3f4f6' : `${cat.color}18`, fontSize: src ? 10 : 20 }}>
+                        <div className="w-10 h-10 u-panel flex-shrink-0 overflow-hidden flex items-center justify-center"
+                          style={{ background: src ? C.neutralBg : `${cat.color}18`, fontSize: src ? 10 : 20 }}>
                           {src
                             ? <img src={src} alt="reçu" className="w-full h-full object-cover" onError={e => { e.target.style.display='none' }} />
                             : cat.icon
@@ -1298,15 +1317,15 @@ export default function SchedulePage() {
                     })()}
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{exp.merchant || exp.category}</p>
-                      <p className="text-xs text-gray-400">{new Date(exp.date+'T12:00:00').toLocaleDateString('fr-CH', { day:'numeric', month:'short' })} · <span style={{ color: cat.color }}>{cat.icon} {exp.category}</span></p>
+                      <p className="text-sm font-semibold sch-ink truncate">{exp.merchant || exp.category}</p>
+                      <p className="text-xs sch-muted">{new Date(exp.date+'T12:00:00').toLocaleDateString('fr-CH', { day:'numeric', month:'short' })} · <span style={{ color: cat.color }}>{cat.icon} {exp.category}</span></p>
                     </div>
                     {/* Amount */}
                     <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-gray-800">{exp.amount != null ? `${parseFloat(exp.amount).toFixed(2)}` : '—'}</p>
-                      <p className="text-xs text-gray-400">{exp.currency}</p>
+                      <p className="text-sm font-bold sch-ink">{exp.amount != null ? `${parseFloat(exp.amount).toFixed(2)}` : '—'}</p>
+                      <p className="text-xs sch-muted">{exp.currency}</p>
                     </div>
-                    <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 sch-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -1319,13 +1338,13 @@ export default function SchedulePage() {
         {/* ── Admin overview ── */}
         {isAdmin && allSettings.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wide">Vue équipe — {year}</h3>
-            <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: '#e5e7eb' }}>
+            <h3 className="text-sm font-semibold sch-muted mb-3 uppercase tracking-wide">Vue équipe — {year}</h3>
+            <div className="bg-white u-panel border overflow-hidden" style={{ borderColor: C.border }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <tr style={{ borderBottom: '1px solid rgba(12,12,12,.08)' }}>
                     {['Collaborateur', 'Contrat', 'Congés alloués', 'Congés pris', 'Solde', 'Maladie'].map(h => (
-                      <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-gray-400">{h}</th>
+                      <th key={h} className="text-left px-4 py-2 text-xs font-semibold sch-muted">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1334,13 +1353,13 @@ export default function SchedulePage() {
                     const s = allSettings.find(x => x.user_name === uname)
                     if (!s) return null
                     return (
-                      <tr key={uname} style={{ borderBottom: '1px solid #f8f8f8' }}>
-                        <td className="px-4 py-2.5 font-medium text-gray-800">{uname}</td>
-                        <td className="px-4 py-2.5 text-gray-500">{s.weekly_hours}h/sem</td>
-                        <td className="px-4 py-2.5 text-gray-500">{s.vacation_days}j</td>
-                        <td className="px-4 py-2.5 text-gray-500">—</td>
+                      <tr key={uname} style={{ borderBottom: '1px solid rgba(12,12,12,.05)' }}>
+                        <td className="px-4 py-2.5 font-medium sch-ink">{uname}</td>
+                        <td className="px-4 py-2.5 sch-muted">{s.weekly_hours}h/sem</td>
+                        <td className="px-4 py-2.5 sch-muted">{s.vacation_days}j</td>
+                        <td className="px-4 py-2.5 sch-muted">—</td>
                         <td className="px-4 py-2.5 font-semibold" style={{ color: PINK }}>—</td>
-                        <td className="px-4 py-2.5 text-gray-500">—</td>
+                        <td className="px-4 py-2.5 sch-muted">—</td>
                       </tr>
                     )
                   })}
@@ -1361,23 +1380,23 @@ export default function SchedulePage() {
             return (
               <>
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-bold text-gray-900">
+                  <h3 className="font-bold sch-ink">
                     {DAYS_FR[d.getDay() === 0 ? 6 : d.getDay() - 1]} {d.getDate()} {MONTHS_FR[d.getMonth()]}
                   </h3>
                   {isOff && formType === 'WORK' && (
                     <span
-                      className="text-xs font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: '#fef3c7', color: '#d97706' }}
+                      className="text-xs font-bold px-2 py-0.5 u-pill"
+                      style={{ background: C.warningBg, color: C.warning }}
                     >⚡ Heures sup</span>
                   )}
                   {fut && (
                     <span
-                      className="text-xs font-medium px-2 py-0.5 rounded-full"
-                      style={{ background: '#eff6ff', color: '#3b82f6' }}
+                      className="text-xs font-medium px-2 py-0.5 u-pill"
+                      style={{ background: C.neutralBg, color: C.info }}
                     >Planifié</span>
                   )}
                 </div>
-                <p className="text-xs text-gray-400 mb-4">{effectiveUser} · {year}</p>
+                <p className="text-xs sch-muted mb-4">{effectiveUser} · {year}</p>
               </>
             )
           })()}
@@ -1391,11 +1410,11 @@ export default function SchedulePage() {
                   <button
                     key={t}
                     onClick={() => switchModalType(t)}
-                    className="flex-1 flex flex-col items-center py-2 rounded-xl border-2 transition-all"
+                    className="flex-1 flex flex-col items-center py-2 u-panel border-2 transition-all"
                     style={{
-                      borderColor: formType === t ? cfg.color : '#e5e7eb',
+                      borderColor: formType === t ? cfg.color : C.border,
                       background:  formType === t ? cfg.bg : 'white',
-                      color:       formType === t ? cfg.color : '#6b7280',
+                      color:       formType === t ? cfg.color : C.muted,
                     }}
                   >
                     <span style={{ fontSize: 16 }}>{cfg.icon}</span>
@@ -1411,11 +1430,11 @@ export default function SchedulePage() {
                   <button
                     key={t}
                     onClick={() => switchModalType(t)}
-                    className="flex-1 flex flex-row items-center justify-center gap-2 py-2 rounded-xl border-2 transition-all"
+                    className="flex-1 flex flex-row items-center justify-center gap-2 py-2 u-panel border-2 transition-all"
                     style={{
-                      borderColor: formType === t ? cfg.color : '#e5e7eb',
+                      borderColor: formType === t ? cfg.color : C.border,
                       background:  formType === t ? cfg.bg : 'white',
-                      color:       formType === t ? cfg.color : '#6b7280',
+                      color:       formType === t ? cfg.color : C.muted,
                     }}
                   >
                     <span style={{ fontSize: 14 }}>{cfg.icon}</span>
@@ -1432,30 +1451,30 @@ export default function SchedulePage() {
               {/* Arrivée + Départ */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Arrivée</label>
+                  <label className="block text-xs font-medium sch-muted mb-1">Arrivée</label>
                   <input
                     type="time"
                     value={formArrival}
                     onChange={e => setFormArrival(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-gray-900 text-center"
-                    style={{ borderColor: '#e5e7eb' }}
+                    className="w-full border u-panel px-3 py-2 sch-ink text-center"
+                    style={{ borderColor: C.border }}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Départ</label>
+                  <label className="block text-xs font-medium sch-muted mb-1">Départ</label>
                   <input
                     type="time"
                     value={formDeparture}
                     onChange={e => setFormDeparture(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-gray-900 text-center"
-                    style={{ borderColor: '#e5e7eb' }}
+                    className="w-full border u-panel px-3 py-2 sch-ink text-center"
+                    style={{ borderColor: C.border }}
                   />
                 </div>
               </div>
 
               {/* Pause */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Pause (h)</label>
+                <label className="block text-xs font-medium sch-muted mb-1">Pause (h)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -1464,29 +1483,29 @@ export default function SchedulePage() {
                     step="0.25"
                     value={formPause}
                     onChange={e => setFormPause(parseFloat(e.target.value) || 0)}
-                    className="w-full border rounded-lg px-3 py-2 text-gray-900"
-                    style={{ borderColor: '#e5e7eb' }}
+                    className="w-full border u-panel px-3 py-2 sch-ink"
+                    style={{ borderColor: C.border }}
                   />
-                  <span className="text-sm text-gray-400">h</span>
+                  <span className="text-sm sch-muted">h</span>
                 </div>
               </div>
 
               {/* Summary: présence → effectif */}
               <div
-                className="rounded-lg px-3 py-2.5 space-y-1"
-                style={{ background: '#f8faff', border: '1px solid #e0e7ff' }}
+                className="u-panel px-3 py-2.5 space-y-1"
+                style={{ background: 'rgba(12,12,12,.05)', border: '1px solid rgba(12,12,12,.06)' }}
               >
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs sch-muted">
                   <span>Présence ({formArrival} → {formDeparture})</span>
-                  <span className="font-medium text-gray-700">{formPresence.toFixed(2)}h</span>
+                  <span className="font-medium sch-ink">{formPresence.toFixed(2)}h</span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs sch-muted">
                   <span>Pause</span>
-                  <span className="font-medium text-gray-700">− {formPause}h</span>
+                  <span className="font-medium sch-ink">− {formPause}h</span>
                 </div>
-                <div className="flex items-center justify-between border-t pt-1 mt-1" style={{ borderColor: '#e0e7ff' }}>
-                  <span className="text-xs font-semibold text-green-700">Temps effectif</span>
-                  <span className="text-sm font-bold text-green-700">
+                <div className="flex items-center justify-between border-t pt-1 mt-1" style={{ borderColor: C.neutralBg }}>
+                  <span className="text-xs font-semibold sch-ok">Temps effectif</span>
+                  <span className="text-sm font-bold sch-ok">
                     {formEffective != null ? `${formEffective.toFixed(2)}h` : '—'}
                   </span>
                 </div>
@@ -1496,22 +1515,22 @@ export default function SchedulePage() {
 
           {/* Note */}
           <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-500 mb-1">Note (optionnel)</label>
+            <label className="block text-xs font-medium sch-muted mb-1">Note (optionnel)</label>
             <input
               type="text"
               placeholder="Ex: arrêt médical, formation…"
               value={formNote}
               onChange={e => setFormNote(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-gray-900"
-              style={{ borderColor: '#e5e7eb' }}
+              className="w-full border u-panel px-3 py-2 sch-ink"
+              style={{ borderColor: C.border }}
             />
           </div>
 
           {/* Error */}
           {saveError && (
             <div
-              className="mb-4 px-3 py-2 rounded-lg text-sm"
-              style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}
+              className="mb-4 px-3 py-2 u-panel text-sm"
+              style={{ background: 'rgba(196,0,43,.10)', border: '1px solid rgba(196,0,43,.10)', color: C.danger }}
             >
               ⚠️ {saveError}
             </div>
@@ -1522,8 +1541,8 @@ export default function SchedulePage() {
               <button
                 onClick={deleteEntry}
                 disabled={saving}
-                className="px-4 py-2 rounded-xl border text-sm font-medium"
-                style={{ borderColor: '#fca5a5', color: '#dc2626', background: '#fff5f5' }}
+                className="px-4 py-2 u-panel border text-sm font-medium"
+                style={{ borderColor: 'rgba(196,0,43,.10)', color: C.danger, background: 'rgba(196,0,43,.10)' }}
               >
                 Supprimer
               </button>
@@ -1531,15 +1550,15 @@ export default function SchedulePage() {
             <button
               onClick={() => setModal(null)}
               disabled={saving}
-              className="flex-1 px-4 py-2 rounded-xl border text-sm font-medium text-gray-600"
-              style={{ borderColor: '#e5e7eb' }}
+              className="flex-1 px-4 py-2 u-panel border text-sm font-medium sch-ink"
+              style={{ borderColor: C.border }}
             >
               Annuler
             </button>
             <button
               onClick={saveEntry}
               disabled={saving}
-              className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+              className="flex-1 px-4 py-2 u-panel text-sm font-semibold text-white"
               style={{ background: PINK, opacity: saving ? 0.7 : 1 }}
             >
               {saving ? '…' : 'Enregistrer'}
@@ -1577,35 +1596,35 @@ export default function SchedulePage() {
         const effectif = Math.max(0, totalH - pause)
         return (
           <Modal onClose={() => setClockOutModal(false)}>
-            <h3 className="font-bold text-gray-900 mb-1">Confirmer le départ</h3>
-            <p className="text-xs text-gray-400 mb-4">{effectiveUser} · {clockInDate}</p>
-            <div className="rounded-xl p-4 mb-4 space-y-2" style={{ background: '#f8faff', border: '1px solid #e0e7ff' }}>
+            <h3 className="font-bold sch-ink mb-1">Confirmer le départ</h3>
+            <p className="text-xs sch-muted mb-4">{effectiveUser} · {clockInDate}</p>
+            <div className="u-panel p-4 mb-4 space-y-2" style={{ background: 'rgba(12,12,12,.05)', border: '1px solid rgba(12,12,12,.06)' }}>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Arrivée</span>
-                <span className="font-semibold text-gray-800">{clockInTime}</span>
+                <span className="sch-muted">Arrivée</span>
+                <span className="font-semibold sch-ink">{clockInTime}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Départ</span>
-                <span className="font-semibold text-gray-800">{dep}</span>
+                <span className="sch-muted">Départ</span>
+                <span className="font-semibold sch-ink">{dep}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Présence</span>
-                <span className="font-semibold text-gray-800">{totalH.toFixed(2)}h</span>
+                <span className="sch-muted">Présence</span>
+                <span className="font-semibold sch-ink">{totalH.toFixed(2)}h</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Pause auto</span>
-                <span className="font-semibold text-gray-800">− {pause}h</span>
+                <span className="sch-muted">Pause auto</span>
+                <span className="font-semibold sch-ink">− {pause}h</span>
               </div>
-              <div className="flex justify-between border-t pt-2 mt-1" style={{ borderColor: '#e0e7ff' }}>
-                <span className="text-sm font-bold text-green-700">Temps effectif</span>
-                <span className="text-base font-bold text-green-700">{effectif.toFixed(2)}h</span>
+              <div className="flex justify-between border-t pt-2 mt-1" style={{ borderColor: C.neutralBg }}>
+                <span className="text-sm font-bold sch-ok">Temps effectif</span>
+                <span className="text-base font-bold sch-ok">{effectif.toFixed(2)}h</span>
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setClockOutModal(false)} className="flex-1 px-4 py-2 rounded-xl border text-sm font-medium text-gray-600" style={{ borderColor: '#e5e7eb' }}>
+              <button onClick={() => setClockOutModal(false)} className="flex-1 px-4 py-2 u-panel border text-sm font-medium sch-ink" style={{ borderColor: C.border }}>
                 Annuler
               </button>
-              <button onClick={confirmClockOut} disabled={saving} className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: PINK, opacity: saving ? 0.7 : 1 }}>
+              <button onClick={confirmClockOut} disabled={saving} className="flex-1 px-4 py-2 u-panel text-sm font-semibold text-white" style={{ background: PINK, opacity: saving ? 0.7 : 1 }}>
                 {saving ? '…' : 'Enregistrer'}
               </button>
             </div>
@@ -1616,11 +1635,11 @@ export default function SchedulePage() {
       {/* ── Settings modal ── */}
       {settingsOpen && (
         <Modal onClose={() => !settingsSaving && setSettingsOpen(false)}>
-          <h3 className="font-bold text-gray-900 mb-1">Paramètres horaires</h3>
-          <p className="text-xs text-gray-400 mb-4">{effectiveUser} · {year}</p>
+          <h3 className="font-bold sch-ink mb-1">Paramètres horaires</h3>
+          <p className="text-xs sch-muted mb-4">{effectiveUser} · {year}</p>
 
           <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-500 mb-1">
+            <label className="block text-xs font-medium sch-muted mb-1">
               Jours de congé annuels
             </label>
             <input
@@ -1629,13 +1648,13 @@ export default function SchedulePage() {
               max="60"
               value={setVacation}
               onChange={e => setSetVacation(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-gray-900"
-              style={{ borderColor: '#e5e7eb' }}
+              className="w-full border u-panel px-3 py-2 sch-ink"
+              style={{ borderColor: C.border }}
             />
           </div>
 
           <div className="mb-5">
-            <label className="block text-xs font-medium text-gray-500 mb-1">
+            <label className="block text-xs font-medium sch-muted mb-1">
               Heures contractuelles / semaine
             </label>
             <input
@@ -1645,10 +1664,10 @@ export default function SchedulePage() {
               step="0.1"
               value={setWeeklyH}
               onChange={e => setSetWeeklyH(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-gray-900"
-              style={{ borderColor: '#e5e7eb' }}
+              className="w-full border u-panel px-3 py-2 sch-ink"
+              style={{ borderColor: C.border }}
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs sch-muted mt-1">
               → {(parseFloat(setWeeklyH) / Math.max(1, 5 - setOffDays.length)).toFixed(1)}h/jour
               · {5 - setOffDays.length}j/sem
               · Ex: 42h (100%), 33.6h (80%)
@@ -1657,7 +1676,7 @@ export default function SchedulePage() {
 
           {/* Jours non travaillés */}
           <div className="mb-5">
-            <label className="block text-xs font-medium text-gray-500 mb-2">
+            <label className="block text-xs font-medium sch-muted mb-2">
               Jours non travaillés (cochez les jours off)
             </label>
             <div className="flex gap-2">
@@ -1676,11 +1695,11 @@ export default function SchedulePage() {
                     onClick={() => setSetOffDays(prev =>
                       prev.includes(dow) ? prev.filter(d => d !== dow) : [...prev, dow]
                     )}
-                    className="flex-1 py-2 rounded-lg border-2 text-xs font-semibold transition-all"
+                    className="flex-1 py-2 u-panel border-2 text-xs font-semibold transition-all"
                     style={{
-                      borderColor: isChecked ? PINK : '#e5e7eb',
-                      background:  isChecked ? '#fff1f4' : 'white',
-                      color:       isChecked ? PINK : '#9ca3af',
+                      borderColor: isChecked ? PINK : C.border,
+                      background:  isChecked ? 'rgba(196,0,43,.10)' : 'white',
+                      color:       isChecked ? PINK : C.muted,
                     }}
                   >
                     {label}
@@ -1689,15 +1708,15 @@ export default function SchedulePage() {
                 )
               })}
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">
+            <p className="text-xs sch-muted mt-1.5">
               Les heures saisies sur ces jours comptent automatiquement comme heures supplémentaires.
             </p>
           </div>
 
           {settingsError && (
             <div
-              className="mb-4 px-3 py-2 rounded-lg text-sm"
-              style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}
+              className="mb-4 px-3 py-2 u-panel text-sm"
+              style={{ background: 'rgba(196,0,43,.10)', border: '1px solid rgba(196,0,43,.10)', color: C.danger }}
             >
               ⚠️ {settingsError}
             </div>
@@ -1707,15 +1726,15 @@ export default function SchedulePage() {
             <button
               onClick={() => setSettingsOpen(false)}
               disabled={settingsSaving}
-              className="flex-1 px-4 py-2 rounded-xl border text-sm font-medium text-gray-600"
-              style={{ borderColor: '#e5e7eb' }}
+              className="flex-1 px-4 py-2 u-panel border text-sm font-medium sch-ink"
+              style={{ borderColor: C.border }}
             >
               Annuler
             </button>
             <button
               onClick={saveSettings}
               disabled={settingsSaving}
-              className="flex-1 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+              className="flex-1 px-4 py-2 u-panel text-sm font-semibold text-white"
               style={{ background: PINK, opacity: settingsSaving ? 0.7 : 1 }}
             >
               {settingsSaving ? '…' : 'Enregistrer'}
@@ -1736,7 +1755,7 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose, saving])
 
-  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none transition-colors"
+  const inputCls = "w-full px-3 py-2 border sch-line u-pill text-sm bg-white focus:sch-line focus:outline-none transition-colors"
 
   return (
     <>
@@ -1753,18 +1772,18 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
             width: '100%',
             maxWidth: 520,
             animation: 'drawerSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) both',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: FONT,
           }}>
           {/* Header */}
-          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+          <div className="flex items-center justify-between px-8 py-5 border-b sch-line">
             <div>
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">{editId ? 'Modifier' : 'Nouveau frais'}</p>
-              <h2 className="font-semibold text-gray-900 tracking-tight" style={{ fontSize: 20 }}>
+              <p className="text-xs uppercase tracking-wider sch-muted mb-0.5">{editId ? 'Modifier' : 'Nouveau frais'}</p>
+              <h2 className="font-semibold sch-ink tracking-tight" style={{ fontSize: 20 }}>
                 {editId ? (form.merchant || 'Frais') : 'Ajouter un frais'}
               </h2>
             </div>
             <button onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              className="w-9 h-9 flex items-center justify-center u-pill sch-muted hover:sch-fill hover:sch-ink transition-colors"
               style={{ fontSize: 22 }}>
               ×
             </button>
@@ -1774,15 +1793,15 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
           <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
             {/* Receipt */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Photo du reçu</label>
+              <label className="block text-xs font-medium sch-muted mb-1.5">Photo du reçu</label>
               <label
-                className="block w-full rounded-md border border-dashed cursor-pointer overflow-hidden transition-colors"
-                style={{ borderColor: receiptPreview ? '#bbf7d0' : '#e5e7eb', background: receiptPreview ? '#f0fdf4' : '#fafafa', minHeight: 84 }}
-                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#111827' }}
-                onDragLeave={e => { e.currentTarget.style.borderColor = receiptPreview ? '#bbf7d0' : '#e5e7eb' }}
+                className="block w-full u-pill border border-dashed cursor-pointer overflow-hidden transition-colors"
+                style={{ borderColor: receiptPreview ? C.successBg : C.border, background: receiptPreview ? C.successBg : C.surface, minHeight: 84 }}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = AL.black }}
+                onDragLeave={e => { e.currentTarget.style.borderColor = receiptPreview ? C.successBg : C.border }}
                 onDrop={e => {
                   e.preventDefault()
-                  e.currentTarget.style.borderColor = receiptPreview ? '#bbf7d0' : '#e5e7eb'
+                  e.currentTarget.style.borderColor = receiptPreview ? C.successBg : C.border
                   const file = e.dataTransfer.files?.[0]
                   if (file && file.type.startsWith('image/')) onReceiptFile(file)
                 }}>
@@ -1795,16 +1814,16 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
                 />
                 {receiptPreview ? (
                   <div className="flex items-center gap-3 p-3">
-                    <img src={receiptPreview} alt="reçu" className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+                    <img src={receiptPreview} alt="reçu" className="w-16 h-16 object-cover u-pill flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold" style={{ color: '#15803d' }}>Reçu attaché</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Cliquer pour changer</p>
+                      <p className="text-sm font-semibold" style={{ color: C.success }}>Reçu attaché</p>
+                      <p className="text-xs sch-muted mt-0.5">Cliquer pour changer</p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-6 gap-1">
-                    <p className="text-sm text-gray-600 font-medium">Glisser une image ou <span className="text-gray-900 underline">parcourir</span></p>
-                    <p className="text-xs text-gray-400">JPG / PNG / HEIC</p>
+                    <p className="text-sm sch-ink font-medium">Glisser une image ou <span className="sch-ink underline">parcourir</span></p>
+                    <p className="text-xs sch-muted">JPG / PNG / HEIC</p>
                   </div>
                 )}
               </label>
@@ -1813,29 +1832,29 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
                 <button
                   onClick={onScan}
                   disabled={scanLoading}
-                  className="mt-3 w-full py-2 rounded-md text-sm font-medium border transition-colors"
+                  className="mt-3 w-full py-2 u-pill text-sm font-medium border transition-colors"
                   style={{
-                    background: scanLoading ? '#f3f4f6' : 'white',
-                    color: scanLoading ? '#9ca3af' : '#2563eb',
-                    borderColor: '#bfdbfe',
+                    background: scanLoading ? C.neutralBg : 'white',
+                    color: scanLoading ? C.muted : AL.black,
+                    borderColor: 'rgba(12,12,12,.08)',
                   }}>
                   {scanLoading ? 'Analyse en cours…' : 'Scanner avec l\'IA'}
                 </button>
               )}
               {scanError && (
-                <p className="mt-2 text-xs text-orange-600">{scanError}</p>
+                <p className="mt-2 text-xs sch-warn">{scanError}</p>
               )}
             </div>
 
             {/* Date + Montant */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Date</label>
+                <label className="block text-xs font-medium sch-muted mb-1.5">Date</label>
                 <input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))}
                   className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Montant</label>
+                <label className="block text-xs font-medium sch-muted mb-1.5">Montant</label>
                 <div className="flex gap-2">
                   <input type="number" step="0.01" min="0" placeholder="0.00" value={form.amount}
                     onChange={e => setForm(f=>({...f,amount:e.target.value}))}
@@ -1850,7 +1869,7 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
 
             {/* Commerçant */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Commerçant</label>
+              <label className="block text-xs font-medium sch-muted mb-1.5">Commerçant</label>
               <input type="text" placeholder="Ex : Migros, SBB, Hôtel Ibis…" value={form.merchant}
                 onChange={e => setForm(f=>({...f,merchant:e.target.value}))}
                 className={inputCls} />
@@ -1858,7 +1877,7 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
 
             {/* Catégorie */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-2">Catégorie</label>
+              <label className="block text-xs font-medium sch-muted mb-2">Catégorie</label>
               <div className="grid grid-cols-3 gap-2">
                 {EXPENSE_CATEGORIES.map(cat => {
                   const active = form.category === cat.key
@@ -1867,10 +1886,10 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
                       key={cat.key}
                       type="button"
                       onClick={() => setForm(f=>({...f,category:cat.key}))}
-                      className="py-2.5 rounded-md text-sm font-medium transition-colors border"
+                      className="py-2.5 u-pill text-sm font-medium transition-colors border"
                       style={active
                         ? { borderColor: cat.color, background: cat.color + '14', color: cat.color }
-                        : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }
+                        : { borderColor: C.border, background: 'white', color: C.muted }
                       }>
                       {cat.key}
                     </button>
@@ -1881,23 +1900,23 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
 
             {/* Mode de paiement */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-2">Mode de paiement</label>
+              <label className="block text-xs font-medium sch-muted mb-2">Mode de paiement</label>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button"
                   onClick={() => setForm(f => ({ ...f, payment_method: 'company' }))}
-                  className="py-2.5 rounded-md text-sm font-medium transition-colors border"
+                  className="py-2.5 u-pill text-sm font-medium transition-colors border"
                   style={form.payment_method === 'personal'
-                    ? { borderColor: '#f59e0b', background: '#fef3c7', color: '#92400e' }
-                    : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                    ? { borderColor: C.warning, background: C.warningBg, color: C.warning }
+                    : { borderColor: C.border, background: 'white', color: C.muted }}>
                   💳 Compte perso
                   <span className="block text-[10px] opacity-75 font-normal">à rembourser</span>
                 </button>
                 <button type="button"
                   onClick={() => setForm(f => ({ ...f, payment_method: 'company' }))}
-                  className="py-2.5 rounded-md text-sm font-medium transition-colors border"
+                  className="py-2.5 u-pill text-sm font-medium transition-colors border"
                   style={form.payment_method === 'company'
-                    ? { borderColor: '#0ea5e9', background: '#e0f2fe', color: '#075985' }
-                    : { borderColor: '#e5e7eb', background: 'white', color: '#6b7280' }}>
+                    ? { borderColor: C.outline, background: C.neutralBg, color: AL.black }
+                    : { borderColor: C.border, background: 'white', color: C.muted }}>
                   🏢 Carte société
                   <span className="block text-[10px] opacity-75 font-normal">déjà payé</span>
                 </button>
@@ -1906,35 +1925,35 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
 
             {/* Note */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Note</label>
+              <label className="block text-xs font-medium sch-muted mb-1.5">Note</label>
               <textarea rows={2} placeholder="Détails supplémentaires…" value={form.description}
                 onChange={e => setForm(f=>({...f,description:e.target.value}))}
                 className={inputCls} style={{ resize: 'vertical' }} />
             </div>
 
             {saveError && (
-              <div className="px-4 py-3 rounded-md text-sm" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626' }}>
+              <div className="px-4 py-3 u-pill text-sm" style={{ background: 'rgba(196,0,43,.10)', border: '1px solid rgba(196,0,43,.10)', color: C.danger }}>
                 {saveError}
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+          <div className="px-8 py-4 border-t sch-line flex items-center justify-between gap-3">
             {editId ? (
               <button onClick={() => onDelete(editId)} disabled={saving}
-                className="text-sm font-medium text-red-600 hover:text-red-700">
+                className="text-sm font-medium sch-ko hover:sch-ko">
                 Supprimer
               </button>
             ) : <span />}
             <div className="flex items-center gap-3">
               <button type="button" onClick={onClose} disabled={saving}
-                className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+                className="px-4 py-2 u-pill text-sm font-medium sch-ink hover:sch-fill transition-colors">
                 Annuler
               </button>
               <button onClick={onSave} disabled={saving || !form.date}
-                className="px-5 py-2 rounded-md text-white font-medium text-sm transition-opacity disabled:opacity-50"
-                style={{ background: '#111827' }}>
+                className="px-5 py-2 u-pill text-white font-medium text-sm transition-opacity disabled:opacity-50"
+                style={{ background: AL.black }}>
                 {saving ? 'Enregistrement…' : editId ? 'Mettre à jour' : 'Enregistrer'}
               </button>
             </div>
@@ -1947,10 +1966,10 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
 
 function StatCard({ label, value, sub, color }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <p className="text-xs uppercase tracking-wider text-gray-400">{label}</p>
-      <p className="font-semibold tabular-nums mt-2" style={{ color: color || '#111827', fontSize: 28, letterSpacing: '-0.02em' }}>{value}</p>
-      <p className="text-xs text-gray-500 mt-1">{sub}</p>
+    <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: 22, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', color: C.muted }}>{label}</span>
+      <span style={{ color: color || AL.black, fontSize: 26, fontWeight: 500, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+      <span style={{ fontSize: 12.5, color: C.muted }}>{sub}</span>
     </div>
   )
 }
@@ -1960,8 +1979,8 @@ function EntryChip({ type, hours, arrival, departure, note, overtime }) {
   const timeRange = arrival && departure ? `${arrival}–${departure}` : null
   return (
     <div
-      className="rounded-lg px-2 py-1.5 text-xs font-medium"
-      style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}
+      className="px-2 py-1.5 text-xs"
+      style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`, borderRadius: 6, fontWeight: 500 }}
       title={note || cfg.label}
     >
       <div className="flex items-center gap-1">
@@ -1974,12 +1993,12 @@ function EntryChip({ type, hours, arrival, departure, note, overtime }) {
         {overtime && (
           <span
             className="ml-auto text-xs font-bold rounded px-1"
-            style={{ background: '#fef3c7', color: '#d97706', fontSize: 9 }}
+            style={{ background: C.warningBg, color: C.warning, fontSize: 9, borderRadius: R.pill }}
           >⚡ OT</span>
         )}
       </div>
       {timeRange && <div className="mt-0.5 font-normal" style={{ fontSize: 10, opacity: 0.8 }}>{timeRange}</div>}
-      {note && <div className="truncate text-gray-400 mt-0.5" style={{ fontSize: 10 }}>{note}</div>}
+      {note && <div className="truncate mt-0.5" style={{ fontSize: 10, color: C.muted }}>{note}</div>}
     </div>
   )
 }
@@ -1992,7 +2011,7 @@ function Modal({ children, onClose }) {
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl"
+        className="bg-white u-panel w-full max-w-sm p-5 shadow-xl"
         style={{ maxHeight: '90vh', overflowY: 'auto' }}
       >
         {children}

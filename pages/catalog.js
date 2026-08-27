@@ -4,7 +4,7 @@ import { useAuth } from './_app'
 import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
-import { C, FONT, MONO } from '../lib/theme'
+import { C, FONT, MONO, R } from '../lib/theme'
 
 const UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'm³', 'km', 'PAN', 'pce', 'forfait', 'kg', 'l']
 const CSV_COLS = ['id', 'type', 'name', 'unit', 'vat_rate', 'purchase_price', 'margin', 'sale_price', 'vendor', 'notes']
@@ -168,13 +168,13 @@ export default function Catalog() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {[['all', 'Tous'], ['article', 'Articles'], ['heure', 'Heures']].map(([k, lbl]) => (
             <button key={k} onClick={() => setTypeFilter(k)}
-              style={{ font: `600 12px ${FONT}`, padding: '6px 14px', borderRadius: 99, cursor: 'pointer',
+              style={{ font: `600 12px ${FONT}`, padding: '6px 14px', borderRadius: R.pill, cursor: 'pointer',
                 border: `1px solid ${typeFilter === k ? 'transparent' : C.border}`,
-                background: typeFilter === k ? C.ink : C.surface, color: typeFilter === k ? '#fff' : C.inkSecondary }}>{lbl}</button>
+                background: typeFilter === k ? C.ink : C.surface, color: typeFilter === k ? AL.white : C.inkSecondary }}>{lbl}</button>
           ))}
           <button onClick={() => setShowArchived(s => !s)}
-            style={{ font: `600 12px ${FONT}`, padding: '6px 14px', borderRadius: 99, cursor: 'pointer', border: `1px solid ${C.border}`,
-              background: showArchived ? C.ink : C.surface, color: showArchived ? '#fff' : C.inkSecondary }}>
+            style={{ font: `600 12px ${FONT}`, padding: '6px 14px', borderRadius: R.pill, cursor: 'pointer', border: `1px solid ${C.border}`,
+              background: showArchived ? C.ink : C.surface, color: showArchived ? AL.white : C.inkSecondary }}>
             {showArchived ? 'Archivés inclus' : 'Actifs'}
           </button>
           {importMsg && <span style={{ font: `12px ${MONO}`, color: C.muted }}>{importMsg}</span>}
@@ -203,7 +203,7 @@ function CatalogTable({ title, type, rows, val, setD, commit, commitNow, remove,
   const th = { font: `500 10px ${MONO}`, letterSpacing: '.06em', color: C.muted, textTransform: 'uppercase', padding: '8px 8px', textAlign: 'left', whiteSpace: 'nowrap' }
   const thR = { ...th, textAlign: 'right' }
   const cell = { padding: '2px 4px', borderTop: `1px solid ${C.divider}` }
-  const inp = { width: '100%', padding: '6px 8px', borderRadius: 5, border: `1px solid transparent`, background: 'transparent', font: `13px ${FONT}`, color: C.ink }
+  const inp = { width: '100%', padding: '6px 8px', borderRadius: R.pill, border: `1px solid transparent`, background: 'transparent', font: `13px ${FONT}`, color: C.ink }
   const inpR = { ...inp, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
   const isHeure = type === 'heure'
 
@@ -217,11 +217,11 @@ function CatalogTable({ title, type, rows, val, setD, commit, commitNow, remove,
   )
 
   return (
-    <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+    <section style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${C.divider}` }}>
         <span style={{ font: `700 14px ${FONT}` }}>{title} <span style={{ color: C.muted, fontWeight: 400 }}>· {rows.length}</span></span>
         <button onClick={() => addItem(type)}
-          style={{ font: `600 12px ${FONT}`, padding: '6px 12px', borderRadius: 5, cursor: 'pointer', border: 'none', background: C.ink, color: C.accentOnDark }}>+ {isHeure ? 'Heure' : 'Article'}</button>
+          style={{ font: `600 12px ${FONT}`, padding: '6px 12px', borderRadius: R.pill, cursor: 'pointer', border: 'none', background: C.ink, color: C.accentOnDark }}>+ {isHeure ? 'Heure' : 'Article'}</button>
       </div>
       {rows.length === 0 ? (
         <p style={{ color: C.muted, fontSize: 13, padding: '24px', textAlign: 'center' }}>Aucun {isHeure ? 'poste horaire' : 'article'}.</p>

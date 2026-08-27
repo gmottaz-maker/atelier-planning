@@ -14,7 +14,9 @@ import { useSuggestions } from '../../lib/useSuggestions'
 import AddressInput, { mapsViewUrl, mapsDirectionsUrl } from '../../components/AddressInput'
 import CatalogPicker, { toPurchaseRow, toRateRow } from '../../components/CatalogPicker'
 import QuoteEditor from '../../components/QuoteEditor'
-import { C, FONT, MONO, personChip, initials as themeInitials } from '../../lib/theme'
+import { AL, C, FONT, MONO, R, initials as themeInitials, personChip } from '../../lib/theme'
+import { statutProjet, libelleStatut } from '../../lib/projectStatus'
+import ButtonPill from '../../components/ButtonPill'
 import {
   genLogUid, TYPES_WITH_DATE, today, toDateStr, isCompletedToday, fmtDate,
   getDaysRemaining, getProjectColor, ensureUid, initLogistics,
@@ -22,16 +24,27 @@ import {
 } from '../../lib/projectHelpers'
 import { fmtCHF } from '../../lib/money'
 
-const PINK = '#111827'
+const PINK = AL.black
 
 // Champ quantité : step natif 0.5, mais le passage vide/0 → 0.5 (premier clic up) saute directement à 1
 const PERSON_COLORS = {
-  Arnaud: '#3b82f6',
-  Gabin: '#8b5cf6',
+  Arnaud: C.info,
+  Gabin: C.violet,
   Guillaume: PINK,
-  'Sous-traitant': '#64748b',
+  'Sous-traitant': C.muted,
 }
 // Liste par défaut — surchargée par useResponsibles() depuis l'API au runtime
+// Micro-label de section : mono capitales du système. Les capitales sont ici
+// une exception assumée à la règle des minuscules — le handoff excepte
+// explicitement les labels de groupe et les en-têtes.
+const microLabel = {
+  fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em',
+  textTransform: 'uppercase', color: C.muted,
+}
+// Titre de section. 22px : c'est la valeur du prototype de la page projet,
+// le README général annonçait 26px pour les h2 en général.
+const h2Style = { fontSize: 22, fontWeight: 500, margin: 0, color: AL.black }
+
 const DEFAULT_RESPONSIBLE = 'non défini'
 
 const LOGISTICS_TYPES = [
@@ -60,13 +73,13 @@ function Logo() {
 // ─── TimeRangeInput ───────────────────────────────────────────────────────────
 function TimeRangeInput({ value, onChange }) {
   const { start, end } = parseTimeRange(value)
-  const inp = "flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white"
+  const inp = "flex-1 px-2 py-1.5 border u-line u-panel text-sm u-surface"
   return (
     <div className="flex items-center gap-1.5">
       <input type="time" value={start}
         onChange={e => onChange(combineTime(e.target.value, end))}
         className={inp} style={{ fontSize: 14 }} />
-      <span className="text-gray-400 text-xs">–</span>
+      <span className="u-muted text-xs">–</span>
       <input type="time" value={end}
         onChange={e => onChange(combineTime(start, e.target.value))}
         className={inp} style={{ fontSize: 14 }} />
@@ -112,22 +125,22 @@ function EditTaskModal({ task, currentUser, onSave, onDelete, onClose }) {
     setDeleting(false)
   }
 
-  const inp = "w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white focus:border-gray-400 focus:outline-none"
+  const inp = "w-full px-3 py-2 border u-line u-panel text-sm u-surface focus:u-line focus:outline-none"
 
   return (
     <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.35)' }} onClick={onClose}>
       <div
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6"
+        className="w-full sm:max-w-md u-surface rounded-t-3xl sm:u-panel shadow-2xl p-6"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-gray-900">Modifier la tâche</h3>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600" style={{ background: '#f3f4f6' }}>✕</button>
+          <h3 className="font-bold u-ink">Modifier la tâche</h3>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center u-pill u-muted hover:u-ink" style={{ background: C.neutralBg }}>✕</button>
         </div>
 
         <div className="space-y-3 mb-5">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Titre</label>
+            <label className="block text-xs font-medium u-muted mb-1">Titre</label>
             <input
               autoFocus type="text" value={form.title}
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
@@ -137,20 +150,20 @@ function EditTaskModal({ task, currentUser, onSave, onDelete, onClose }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Responsable</label>
+              <label className="block text-xs font-medium u-muted mb-1">Responsable</label>
               <select value={form.responsible} onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))} className={inp}>
                 {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+              <label className="block text-xs font-medium u-muted mb-1">Date</label>
               <input type="date" value={form.execution_date}
                 onChange={e => setForm(f => ({ ...f, execution_date: e.target.value }))}
                 className={inp} />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie</label>
+            <label className="block text-xs font-medium u-muted mb-1">Catégorie</label>
             <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp}>
               {TASK_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.icon} {c.label}</option>)}
             </select>
@@ -160,13 +173,13 @@ function EditTaskModal({ task, currentUser, onSave, onDelete, onClose }) {
         <div className="flex gap-2">
           <button
             onClick={handleDelete} disabled={deleting}
-            className="px-4 py-2.5 rounded-xl text-sm font-semibold border"
-            style={{ borderColor: '#fca5a5', color: '#dc2626', background: '#fff5f5' }}>
+            className="px-4 py-2.5 u-panel text-sm font-semibold border"
+            style={{ borderColor: C.dangerBg, color: C.danger, background: C.dangerBg }}>
             {deleting ? '…' : 'Supprimer'}
           </button>
           <button
             onClick={handleSave} disabled={saving || !form.title.trim()}
-            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 u-panel text-sm font-semibold text-white disabled:opacity-50"
             style={{ background: PINK }}>
             {saving ? '…' : 'Enregistrer'}
           </button>
@@ -179,18 +192,18 @@ function EditTaskModal({ task, currentUser, onSave, onDelete, onClose }) {
 // ─── TaskItem ─────────────────────────────────────────────────────────────────
 function TaskItem({ task, onToggle, onEdit }) {
   const completed  = task.status === 'completed'
-  const respColor  = PERSON_COLORS[task.responsible] || '#9ca3af'
+  const respColor  = PERSON_COLORS[task.responsible] || C.muted
   const dateInfo   = !completed && fmtTaskDate(task.execution_date)
   return (
     <div
-      className="flex items-center gap-3 py-3 px-2 -mx-2 border-b last:border-b-0 group rounded-md hover:bg-gray-50 transition-colors"
-      style={{ borderColor: '#f3f4f6', cursor: onEdit ? 'pointer' : 'default' }}
+      className="flex items-center gap-3 py-3 px-2 -mx-2 border-b last:border-b-0 group u-pill hover:u-fill transition-colors"
+      style={{ borderColor: C.border, cursor: onEdit ? 'pointer' : 'default' }}
       onClick={() => onEdit && onEdit(task)}
     >
       <button
         onClick={e => { e.stopPropagation(); onToggle(task) }}
-        className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all hover:scale-110"
-        style={{ borderColor: completed ? '#22c55e' : '#d1d5db', background: completed ? '#22c55e' : 'white' }}>
+        className="w-5 h-5 u-pill border-2 flex items-center justify-center flex-shrink-0 transition-all hover:scale-110"
+        style={{ borderColor: completed ? C.success : C.muted, background: completed ? C.success : 'white' }}>
         {completed && (
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
             <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -199,14 +212,14 @@ function TaskItem({ task, onToggle, onEdit }) {
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={`leading-snug ${completed ? 'text-gray-400 line-through' : 'text-gray-900 font-medium'}`}
+        <p className={`leading-snug ${completed ? 'u-muted line-through' : 'u-ink font-medium'}`}
           style={{ fontSize: 14 }}>
           {task.title}
         </p>
       </div>
 
       {task.responsible && (
-        <span className="text-xs font-medium px-2 py-0.5 rounded-md flex-shrink-0"
+        <span className="text-xs font-medium px-2 py-0.5 u-pill flex-shrink-0"
           style={{ background: respColor + '15', color: respColor }}>
           {task.responsible}
         </span>
@@ -220,7 +233,7 @@ function TaskItem({ task, onToggle, onEdit }) {
       )}
 
       {onEdit && !completed && (
-        <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5 u-muted group-hover:u-muted flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       )}
@@ -270,8 +283,8 @@ function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
     setSaving(false)
   }
 
-  const inp = "px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white w-full"
-  const lbl = "block text-[10px] text-gray-400 mb-0.5"
+  const inp = "px-2.5 py-1.5 border u-line u-panel text-sm u-surface w-full"
+  const lbl = "block text-[10px] u-muted mb-0.5"
   return (
     <form onSubmit={handleSubmit} className="pt-2 pb-1 space-y-2">
       <div>
@@ -323,12 +336,12 @@ function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
       </div>
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !form.article.trim()}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+          className="px-3 py-1.5 u-panel text-xs font-semibold text-white disabled:opacity-50"
           style={{ background: PINK }}>
           {saving ? '…' : 'Ajouter'}
         </button>
         <button type="button" onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 border border-gray-200">
+          className="px-3 py-1.5 u-panel text-xs font-semibold u-muted border u-line">
           Annuler
         </button>
       </div>
@@ -397,43 +410,43 @@ function CommandeItem({ task, currentUser, onUpdate, onDelete }) {
 
   return (
     <>
-      <div className="py-3 border-b last:border-b-0" style={{ borderColor: '#f3f4f6' }}>
+      <div className="py-3 border-b last:border-b-0" style={{ borderColor: C.border }}>
         <div className="flex items-start gap-3">
-          <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-            style={{ background: isReceived ? '#22c55e' : '#d1d5db' }} />
+          <div className="w-2 h-2 u-pill mt-1.5 flex-shrink-0"
+            style={{ background: isReceived ? C.success : C.muted }} />
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2 flex-wrap">
-              <span className={`text-sm font-medium ${isReceived ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+              <span className={`text-sm font-medium ${isReceived ? 'u-muted line-through' : 'u-ink'}`}>
                 {task.title}
               </span>
               {data.quantity && (
-                <span className="text-xs text-gray-500">· {data.quantity}</span>
+                <span className="text-xs u-muted">· {data.quantity}</span>
               )}
               {data.vendor && (
-                <span className="text-xs text-gray-500">· {data.vendor}</span>
+                <span className="text-xs u-muted">· {data.vendor}</span>
               )}
             </div>
-            <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+            <div className="text-xs u-muted mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
               {data.order_date && <span>Commandé {fmtDate(data.order_date)}</span>}
               {data.expected_date && <span>Réception prévue {fmtDate(data.expected_date)}</span>}
-              {data.received_at && <span style={{ color: '#16a34a' }}>Reçu {fmtDate(data.received_at)}{data.received_by ? ` par ${data.received_by}` : ''}</span>}
-              {data.storage_location && <span style={{ color: '#16a34a' }}>Rangé : {data.storage_location}</span>}
+              {data.received_at && <span style={{ color: C.success }}>Reçu {fmtDate(data.received_at)}{data.received_by ? ` par ${data.received_by}` : ''}</span>}
+              {data.storage_location && <span style={{ color: C.success }}>Rangé : {data.storage_location}</span>}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isReceived ? (
               <button onClick={() => setShowPicker(true)} disabled={saving}
-                className="text-xs font-medium px-3 py-1.5 rounded-md text-white disabled:opacity-50"
-                style={{ background: '#111827' }}>
+                className="text-xs font-medium px-3 py-1.5 u-pill text-white disabled:opacity-50"
+                style={{ background: AL.black }}>
                 Réceptionné
               </button>
             ) : (
               <button onClick={reopen} disabled={saving}
-                className="text-xs text-gray-500 hover:text-gray-900">
+                className="text-xs u-muted hover:u-ink">
                 Annuler
               </button>
             )}
-            <button onClick={remove} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+            <button onClick={remove} className="text-xs u-muted hover:u-ko">✕</button>
           </div>
         </div>
       </div>
@@ -467,19 +480,19 @@ function StorageLocationPicker({ onConfirm, onCancel, saving }) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4"
       style={{ background: 'rgba(0,0,0,0.35)' }}
       onClick={onCancel}>
-      <div className="bg-white rounded-xl w-full sm:max-w-md p-6 shadow-xl"
+      <div className="u-surface u-panel w-full sm:max-w-md p-6 shadow-xl"
         onClick={e => e.stopPropagation()}>
-        <h3 className="font-semibold text-gray-900 text-base mb-1">Lieu de stockage</h3>
-        <p className="text-xs text-gray-500 mb-4">Où as-tu rangé cette commande ?</p>
+        <h3 className="font-semibold u-ink text-base mb-1">Lieu de stockage</h3>
+        <p className="text-xs u-muted mb-4">Où as-tu rangé cette commande ?</p>
         <div className="space-y-1.5 mb-4">
           {STORAGE_LOCATIONS.map(loc => (
             <button key={loc}
               onClick={() => setPicked(loc)}
-              className="w-full text-left px-4 py-2.5 rounded-md text-sm transition-colors border"
+              className="w-full text-left px-4 py-2.5 u-pill text-sm transition-colors border"
               style={{
-                borderColor: picked === loc ? '#111827' : '#e5e7eb',
-                background: picked === loc ? '#111827' : 'white',
-                color: picked === loc ? 'white' : '#374151',
+                borderColor: picked === loc ? AL.black : C.border,
+                background: picked === loc ? AL.black : 'white',
+                color: picked === loc ? 'white' : AL.black,
                 fontWeight: picked === loc ? 600 : 500,
               }}>
               {loc}
@@ -488,11 +501,11 @@ function StorageLocationPicker({ onConfirm, onCancel, saving }) {
           {extra.map(loc => (
             <button key={loc}
               onClick={() => { setPicked('Autres'); setCustomValue(loc) }}
-              className="w-full text-left px-4 py-2.5 rounded-md text-sm transition-colors border"
+              className="w-full text-left px-4 py-2.5 u-pill text-sm transition-colors border"
               style={{
-                borderColor: picked === 'Autres' && customValue === loc ? '#111827' : '#e5e7eb',
-                background: picked === 'Autres' && customValue === loc ? '#111827' : 'white',
-                color: picked === 'Autres' && customValue === loc ? 'white' : '#374151',
+                borderColor: picked === 'Autres' && customValue === loc ? AL.black : C.border,
+                background: picked === 'Autres' && customValue === loc ? AL.black : 'white',
+                color: picked === 'Autres' && customValue === loc ? 'white' : AL.black,
                 fontWeight: picked === 'Autres' && customValue === loc ? 600 : 500,
               }}>
               {loc}
@@ -500,11 +513,11 @@ function StorageLocationPicker({ onConfirm, onCancel, saving }) {
           ))}
           <button
             onClick={() => setPicked('Autres')}
-            className="w-full text-left px-4 py-2.5 rounded-md text-sm transition-colors border"
+            className="w-full text-left px-4 py-2.5 u-pill text-sm transition-colors border"
             style={{
-              borderColor: isAutres ? '#111827' : '#e5e7eb',
-              background: isAutres ? '#f9fafb' : 'white',
-              color: '#374151',
+              borderColor: isAutres ? AL.black : C.border,
+              background: isAutres ? C.hover : 'white',
+              color: AL.black,
               fontWeight: isAutres ? 600 : 500,
             }}>
             Autres…
@@ -513,14 +526,14 @@ function StorageLocationPicker({ onConfirm, onCancel, saving }) {
             <input autoFocus type="text" value={customValue}
               onChange={e => setCustomValue(e.target.value)}
               placeholder="Préciser le lieu de stockage"
-              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm" />
+              className="w-full px-3 py-2 border u-line u-pill text-sm" />
           )}
         </div>
         <div className="flex items-center gap-3 justify-end">
-          <button onClick={onCancel} className="text-sm text-gray-500 hover:text-gray-900">Annuler</button>
+          <button onClick={onCancel} className="text-sm u-muted hover:u-ink">Annuler</button>
           <button onClick={handleConfirm} disabled={saving || (!picked || (isAutres && !customValue.trim()))}
-            className="px-4 py-2 rounded-md text-sm font-medium text-white disabled:opacity-50"
-            style={{ background: '#111827' }}>
+            className="px-4 py-2 u-pill text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: AL.black }}>
             {saving ? 'Enregistrement…' : 'Confirmer'}
           </button>
         </div>
@@ -569,7 +582,7 @@ function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
     setSaving(false)
   }
 
-  const inp = "px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white w-full"
+  const inp = "px-2.5 py-1.5 border u-line u-panel text-sm u-surface w-full"
   return (
     <form onSubmit={handleSubmit} className="pt-2 pb-1 space-y-2">
       <input autoFocus type="text" value={form.title}
@@ -585,13 +598,13 @@ function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
       />
       <div className="flex gap-2">
         <div className="flex-1">
-          <label className="block text-[10px] text-gray-400 mb-0.5">Dépose</label>
+          <label className="block text-[10px] u-muted mb-0.5">Dépose</label>
           <input type="date" value={form.drop_date}
             onChange={e => setForm(f => ({ ...f, drop_date: e.target.value }))}
             className={inp} style={{ fontSize: 14 }} />
         </div>
         <div className="flex-1">
-          <label className="block text-[10px] text-gray-400 mb-0.5">Récupération prévue</label>
+          <label className="block text-[10px] u-muted mb-0.5">Récupération prévue</label>
           <input type="date" value={form.expected_pickup_date}
             onChange={e => setForm(f => ({ ...f, expected_pickup_date: e.target.value }))}
             className={inp} style={{ fontSize: 14 }} />
@@ -604,12 +617,12 @@ function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
       </select>
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !form.title.trim()}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+          className="px-3 py-1.5 u-panel text-xs font-semibold text-white disabled:opacity-50"
           style={{ background: PINK }}>
           {saving ? '…' : 'Ajouter'}
         </button>
         <button type="button" onClick={onCancel}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 border border-gray-200">
+          className="px-3 py-1.5 u-panel text-xs font-semibold u-muted border u-line">
           Annuler
         </button>
       </div>
@@ -748,53 +761,53 @@ function SousTraitanceItem({ task, currentUser, onUpdate, onDelete, onAddTask })
   }
 
   const stateLabel = isDone ? 'À l\'atelier' : isReady ? 'Prêt à récupérer' : 'Chez le sous-traitant'
-  const stateColor = isDone ? '#16a34a' : isReady ? '#d97706' : '#6b7280'
+  const stateColor = isDone ? C.success : isReady ? C.warning : C.muted
 
   return (
     <>
-    <div className="py-3 border-b last:border-b-0" style={{ borderColor: '#f3f4f6' }}>
+    <div className="py-3 border-b last:border-b-0" style={{ borderColor: C.border }}>
       <div className="flex items-start gap-3">
-        <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: stateColor }} />
+        <div className="w-2 h-2 u-pill mt-1.5 flex-shrink-0" style={{ background: stateColor }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className={`text-sm font-medium ${isDone ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+            <span className={`text-sm font-medium ${isDone ? 'u-muted line-through' : 'u-ink'}`}>
               {task.title}
             </span>
             {data.subcontractor && (
-              <span className="text-xs text-gray-500">· {data.subcontractor}</span>
+              <span className="text-xs u-muted">· {data.subcontractor}</span>
             )}
             <span className="text-xs font-medium" style={{ color: stateColor }}>· {stateLabel}</span>
           </div>
-          <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+          <div className="text-xs u-muted mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
             {data.drop_date && <span>Dépose {fmtDate(data.drop_date)}</span>}
             {data.expected_pickup_date && <span>Récup prévue {fmtDate(data.expected_pickup_date)}</span>}
-            {data.ready_at && !isDone && <span style={{ color: '#d97706' }}>Prêt depuis {fmtDate(data.ready_at)}</span>}
-            {data.picked_up_at && <span style={{ color: '#16a34a' }}>À l'atelier {fmtDate(data.picked_up_at)}{data.picked_up_by ? ` (${data.picked_up_by})` : ''}</span>}
-            {data.storage_location && <span style={{ color: '#16a34a' }}>Rangé : {data.storage_location}</span>}
+            {data.ready_at && !isDone && <span style={{ color: C.warning }}>Prêt depuis {fmtDate(data.ready_at)}</span>}
+            {data.picked_up_at && <span style={{ color: C.success }}>À l'atelier {fmtDate(data.picked_up_at)}{data.picked_up_by ? ` (${data.picked_up_by})` : ''}</span>}
+            {data.storage_location && <span style={{ color: C.success }}>Rangé : {data.storage_location}</span>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {!isReady && !isDone && (
             <button onClick={markReady} disabled={saving}
-              className="text-xs font-medium px-3 py-1.5 rounded-md text-white disabled:opacity-50"
-              style={{ background: '#d97706' }}>
+              className="text-xs font-medium px-3 py-1.5 u-pill text-white disabled:opacity-50"
+              style={{ background: C.warning }}>
               {saving ? '…' : 'Prêt à récupérer'}
             </button>
           )}
           {isReady && !isDone && (
             <button onClick={() => setShowPicker(true)} disabled={saving}
-              className="text-xs font-medium px-3 py-1.5 rounded-md text-white disabled:opacity-50"
-              style={{ background: '#111827' }}>
+              className="text-xs font-medium px-3 py-1.5 u-pill text-white disabled:opacity-50"
+              style={{ background: AL.black }}>
               À l'atelier
             </button>
           )}
           {isDone && (
             <button onClick={reopen} disabled={saving}
-              className="text-xs text-gray-500 hover:text-gray-900">
+              className="text-xs u-muted hover:u-ink">
               Annuler
             </button>
           )}
-          <button onClick={remove} className="text-xs text-gray-400 hover:text-red-500">✕</button>
+          <button onClick={remove} className="text-xs u-muted hover:u-ko">✕</button>
         </div>
       </div>
     </div>
@@ -1413,14 +1426,14 @@ export default function ProjectPage() {
 
   // ── Computed ─────────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#fafafa' }}>
-      <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: PINK }} />
+    <div className="min-h-screen flex items-center justify-center" style={{ background: AL.white }}>
+      <div className="w-6 h-6 u-pill border-2 animate-spin" style={{ borderColor: C.border, borderTopColor: PINK }} />
     </div>
   )
   if (!project || project.error) return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: '#fafafa' }}>
-      <p className="text-gray-500">Projet introuvable.</p>
-      <Link href="/" className="text-sm text-blue-500 underline">← Retour</Link>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: AL.white }}>
+      <p className="u-muted">Projet introuvable.</p>
+      <Link href="/" className="text-sm u-info underline">← Retour</Link>
     </div>
   )
 
@@ -1428,7 +1441,7 @@ export default function ProjectPage() {
   const daysLeft = getDaysRemaining(project.deadline)
   const activeTasks = tasks.filter(t => t.status === 'active')
 
-  const inp = "w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:border-gray-400 focus:outline-none transition-colors"
+  const inp = "w-full px-2.5 py-1.5 border u-line u-panel text-sm u-surface focus:u-line focus:outline-none transition-colors"
 
   return (
     <>
@@ -1451,115 +1464,117 @@ export default function ProjectPage() {
         `}</style>
       </Head>
 
-      <div className="w-full" style={{ padding: '22px 32px 40px' }}>
+      <div className="w-full" style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 40 }}>
 
         {/* Fil d'Ariane */}
-        <Link href="/" className="no-print" style={{ display: 'inline-block', font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textDecoration: 'none', marginBottom: 14 }}>
-          ← PROJETS / <span style={{ color: C.inkSecondary }}>{(project.name || '').toUpperCase()}</span>
+        <Link href="/" className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 11, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase',
+          color: C.muted, textDecoration: 'none' }}>
+          ← projets <span>/</span> <span style={{ color: AL.black }}>{project.name}</span>
         </Link>
 
 
-        {/* ── Hero header (11c) ── */}
-        <div className="mb-8" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
-          <div style={{ height: 5, width: '100%', background: daysLeft != null && daysLeft <= 7 ? C.accent : color }} />
-          <div style={{ padding: '22px 28px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 24 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ font: `10px ${MONO}`, letterSpacing: '.14em', color: C.muted, marginBottom: 6 }}>PROJET</p>
-                <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-.4px', lineHeight: 1.1, color: C.ink }}>{project.name}</h1>
-                {project.client && <p style={{ color: C.muted, marginTop: 6, fontSize: 15 }}>{project.client}</p>}
-                <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: '12px 28px' }}>
-                  {project.deadline && (
-                    <div>
-                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>DEADLINE</div>
-                      <div style={{ fontWeight: 600, marginTop: 3, fontSize: 15, color: C.ink }}>
-                        {fmtDate(project.deadline)}
-                        <span style={{ marginLeft: 8, font: `11px ${MONO}`, fontWeight: 400, color: daysLeft < 0 ? C.danger : daysLeft <= 7 ? C.accent : C.success }}>
-                          {daysLeft < 0 ? `RETARD ${Math.abs(daysLeft)}J` : daysLeft === 0 ? "AUJOURD'HUI" : `DANS ${daysLeft}J`}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {project.delivery_type && (
-                    <div>
-                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>MODE</div>
-                      <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{project.delivery_type}</div>
-                    </div>
-                  )}
-                  <div>
-                    <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>STATUT</div>
-                    <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{project.status === 'active' ? 'En cours' : 'Archivé'}</div>
-                  </div>
-                  {project.reference && (
-                    <div>
-                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>RÉFÉRENCE</div>
-                      <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{project.reference}</div>
-                    </div>
-                  )}
-                  {activeTasks.length > 0 && (
-                    <div>
-                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>TÂCHES ACTIVES</div>
-                      <div style={{ marginTop: 3, fontSize: 14, color: C.ink }}>{activeTasks.length}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
+        {/* ── Carte d'en-tête ──────────────────────────────────────────────
+            Liseré haut de 3px coloré par le statut, comme les cartes de la
+            liste : c'est la même fonction qui rend les deux, elles ne peuvent
+            pas diverger. Pas de bordure, pas d'ombre. */}
+        <div style={{ background: C.surface, borderRadius: R.panel, borderTop: `3px solid ${statutProjet(project).stripe}`,
+          padding: '32px 32px 28px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 32, flexWrap: 'wrap' }}>
 
-              {/* Responsable + progression */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18, flex: 'none', width: 260, maxWidth: '100%' }}>
-                {project.responsible && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'flex-end' }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>RESPONSABLE</div>
-                      <div style={{ fontWeight: 600, marginTop: 3, fontSize: 14, color: C.ink }}>{project.responsible}</div>
-                    </div>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', background: personChip(project.responsible).fg }}>
-                      {themeInitials(project.responsible)}
-                    </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 280, flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={microLabel}>projet</span>
+              <h1 style={{ fontSize: 38, fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>{project.name}</h1>
+              {project.client && <span style={{ fontSize: 15, color: C.muted }}>{project.client}</span>}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28, flexWrap: 'wrap', marginTop: 4 }}>
+              {project.deadline && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={microLabel}>deadline</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 15, fontWeight: 500 }}>{fmtDate(project.deadline)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '.04em', padding: '3px 10px',
+                      borderRadius: R.pill, color: statutProjet(project).fg, background: statutProjet(project).bg }}>
+                      {statutProjet(project).text}
+                    </span>
                   </div>
-                )}
-                {(() => {
-                  const done = tasks.filter(t => t.status === 'completed').length
-                  const total = tasks.length
-                  const pct = total > 0 ? Math.round((done / total) * 100) : 0
-                  return (
-                    <div style={{ width: '100%' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>PROGRESSION</span>
-                        <span style={{ font: `600 13px ${MONO}`, color: C.ink }}>{total === 0 ? '—' : `${pct}%`}</span>
-                      </div>
-                      <div style={{ width: '100%', height: 7, borderRadius: 4, background: C.divider, overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: total === 0 ? C.faintBorder : pct === 100 ? C.success : C.ink }} />
-                      </div>
-                      <div style={{ marginTop: 6, font: `10.5px ${MONO}`, color: C.muted, textAlign: 'right' }}>
-                        {total === 0 ? 'AUCUNE TÂCHE' : `${done} / ${total} TÂCHE${total > 1 ? 'S' : ''}`}
-                      </div>
-                    </div>
-                  )
-                })()}
+                </div>
+              )}
+              {project.delivery_type && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={microLabel}>mode</span>
+                  <span style={{ fontSize: 15 }}>{project.delivery_type}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={microLabel}>statut</span>
+                <span style={{ fontSize: 15, fontWeight: 500, color: statutProjet(project).fg }}>{libelleStatut(project)}</span>
               </div>
+              {project.reference && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={microLabel}>référence</span>
+                  <span style={{ fontSize: 15 }}>{project.reference}</span>
+                </div>
+              )}
+              {activeTasks.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={microLabel}>tâches actives</span>
+                  <span style={{ fontSize: 15 }}>{activeTasks.length}</span>
+                </div>
+              )}
             </div>
 
             {project.description && (
-              <div style={{ marginTop: 22, paddingTop: 20, borderTop: `1px solid ${C.divider}` }}>
-                <p style={{ font: `10px ${MONO}`, letterSpacing: '.14em', color: C.muted, marginBottom: 8 }}>RÉSUMÉ</p>
-                <p style={{ color: C.inkTertiary, lineHeight: 1.6, whiteSpace: 'pre-wrap', fontSize: 14 }}>{project.description}</p>
+              <div style={{ marginTop: 10, paddingTop: 18, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={microLabel}>résumé</span>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45, color: AL.black, whiteSpace: 'pre-wrap' }}>{project.description}</p>
               </div>
             )}
+          </div>
+
+          {/* Responsable + progression */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <span style={microLabel}>responsable</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14, color: project.responsible ? AL.black : C.muted }}>{project.responsible || 'non défini'}</span>
+                <div style={{ width: 26, height: 26, borderRadius: R.pill, background: AL.black, color: AL.white,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500, flex: 'none' }}>
+                  {themeInitials(project.responsible)}
+                </div>
+              </div>
+            </div>
+            {(() => {
+              const done = tasks.filter(t => t.status === 'completed').length
+              const total = tasks.length
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, minWidth: 140 }}>
+                  <span style={microLabel}>progression</span>
+                  <div style={{ width: 140, height: 4, borderRadius: 2, background: C.border, overflow: 'hidden' }}>
+                    {total > 0 && pct > 0 && <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: AL.black }} />}
+                  </div>
+                  <span style={{ fontSize: 12, color: C.muted }}>
+                    {total === 0 ? 'aucune tâche' : `${done} / ${total} tâche${total > 1 ? 's' : ''} · ${pct}%`}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
         </div>
 
         {/* ── Mises à jour ── */}
-        <div className="mb-8 md:mb-12">
-          <div className="flex items-baseline justify-between mb-5">
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: C.ink }}>Mises à jour</h2>
-            <span style={{ font: `11px ${MONO}`, color: C.muted }}>{updates.length} NOTE{updates.length > 1 ? 'S' : ''}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <h2 style={h2Style}>Mises à jour</h2>
+            <span style={{ fontSize: 12, color: C.muted }}>{updates.length} note{updates.length > 1 ? 's' : ''}</span>
           </div>
 
-          {/* Form */}
+          {/* Zone de saisie : une seule bordure, le filet outline de 1.5px */}
           <div
-            className="bg-white rounded-2xl border p-4 md:p-5 mb-4 transition-colors"
-            style={{ borderColor: updateDragging ? '#111827' : '#e5e7eb', background: updateDragging ? '#f9fafb' : 'white' }}
+            style={{ background: updateDragging ? C.hover : C.surface, border: `1.5px solid ${C.outline}`,
+              borderRadius: R.panel, padding: 16, transition: 'background .15s ease' }}
             onDragOver={e => { e.preventDefault(); setUpdateDragging(true) }}
             onDragLeave={() => setUpdateDragging(false)}
             onDrop={e => {
@@ -1572,76 +1587,69 @@ export default function ProjectPage() {
               onChange={e => setNewUpdate(e.target.value)}
               placeholder="Téléphone client, mail, changement de scope, photo chantier… (glisser-déposer une image OK)"
               rows={3}
-              className="w-full text-sm text-gray-900 placeholder-gray-400 border-0 focus:outline-none resize-y leading-relaxed bg-transparent"
-              style={{ minHeight: 64 }}
+              style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', minHeight: 64,
+                fontFamily: FONT, fontSize: 14, lineHeight: 1.45, color: AL.black, background: 'transparent' }}
             />
             {newUpdateImage && (
               <div className="mt-3 relative inline-block">
-                <img src={newUpdateImage.preview} alt="" style={{ maxHeight: 160, borderRadius: 8 }} />
+                <img src={newUpdateImage.preview} alt="" style={{ maxHeight: 160, borderRadius: R.panel }} />
                 <button
                   onClick={() => setNewUpdateImage(null)}
-                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black"
+                  className="absolute top-1 right-1 w-6 h-6 u-pill bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black"
                   type="button">×</button>
               </div>
             )}
-            {updateError && <p className="text-xs text-red-500 mt-2">{updateError}</p>}
-            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-              <label className="text-xs font-medium text-gray-500 hover:text-gray-900 cursor-pointer flex items-center gap-1.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <path d="M21 15l-5-5L5 21" />
-                </svg>
-                Joindre une image
-                <input type="file" accept="image/*" className="hidden"
+            {updateError && <p style={{ margin: '8px 0 0', fontSize: 12, color: C.danger }}>{updateError}</p>}
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <label style={{ fontSize: 13, color: C.muted, cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
+                joindre une image
+                <input type="file" accept="image/*" style={{ display: 'none' }}
                   onChange={e => { pickUpdateImage(e.target.files?.[0]); e.target.value = '' }} />
               </label>
-              <button
-                onClick={postUpdate}
-                disabled={postingUpdate || !newUpdate.trim()}
-                className="disabled:opacity-40"
-                style={{ background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '8px 16px', borderRadius: 5, border: 'none', cursor: 'pointer' }}>
-                {postingUpdate ? 'Publication…' : 'Publier'}
-              </button>
+              <ButtonPill onClick={postUpdate} disabled={postingUpdate || !newUpdate.trim()}>
+                {postingUpdate ? 'publication…' : 'publier'}
+              </ButtonPill>
             </div>
           </div>
 
           {/* Timeline */}
           {updates.length === 0 ? (
-            <p className="text-sm text-gray-400 px-2">Aucune mise à jour. Note ici les téléphones, mails ou décisions au fil du projet.</p>
+            <p style={{ margin: 0, fontSize: 13, color: C.muted }}>Aucune mise à jour. Note ici les téléphones, mails ou décisions au fil du projet.</p>
           ) : (
             <ol className="space-y-3">
               {updates.map(u => {
                 const initials = (u.author || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
-                const c = PERSON_COLORS[u.author] || '#9ca3af'
+                const c = PERSON_COLORS[u.author] || C.muted
                 return (
-                  <li key={u.id} className="bg-white rounded-2xl border border-gray-200 p-4 md:p-5">
+                  <li key={u.id} className="u-surface u-panel border u-line p-4 md:p-5">
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+                      <div className="w-9 h-9 u-pill flex items-center justify-center text-white font-semibold flex-shrink-0"
                         style={{ background: c, fontSize: 13 }}>
                         {initials}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline justify-between gap-3">
                           <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="font-semibold text-gray-900" style={{ fontSize: 14 }}>{u.author}</span>
-                            <span className="text-xs text-gray-400">{fmtRelative(u.created_at)}</span>
+                            <span className="font-semibold u-ink" style={{ fontSize: 14 }}>{u.author}</span>
+                            <span className="text-xs u-muted">{fmtRelative(u.created_at)}</span>
                           </div>
                           {isAdmin && (
                             <button onClick={() => deleteUpdate(u.id)}
-                              className="text-xs text-gray-300 hover:text-red-500 flex-shrink-0">
+                              className="text-xs u-muted hover:u-ko flex-shrink-0">
                               Supprimer
                             </button>
                           )}
                         </div>
-                        <p className="mt-1.5 text-gray-700 whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
+                        <p className="mt-1.5 u-ink whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
                           {u.content}
                         </p>
                         {u.image_kdrive_id && (
                           <div className="mt-3">
                             <a href={`/api/update-image?updateId=${u.id}`} target="_blank" rel="noopener">
                               <img src={`/api/update-image?updateId=${u.id}`} alt={u.image_filename || ''}
-                                style={{ maxHeight: 320, maxWidth: '100%', borderRadius: 10, border: '1px solid #e5e7eb' }} />
+                                style={{ maxHeight: 320, maxWidth: '100%', borderRadius: R.panel, border: `1px solid ${C.border}` }} />
                             </a>
                           </div>
                         )}
@@ -1655,22 +1663,22 @@ export default function ProjectPage() {
         </div>
 
         {/* ── Two columns ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-8 items-start">
 
           {/* ════ LEFT: Tâches groupées ════ */}
           <div>
-            <div className="flex items-baseline justify-between mb-5">
-              <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Tâches</h2>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h2 style={h2Style}>Tâches</h2>
               {(() => {
                 const totalActive = tasks.filter(t => t.status === 'active').length
                 return totalActive > 0 ? (
-                  <span className="text-xs text-gray-500">
+                  <span style={{ fontSize: 12, color: C.muted }}>
                     {totalActive} tâche{totalActive > 1 ? 's' : ''} active{totalActive > 1 ? 's' : ''}
                   </span>
                 ) : null
               })()}
             </div>
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {TASK_CATEGORIES.map(cat => {
                 const catTasks = tasks.filter(t =>
                   (t.category === cat.key || (!t.category && cat.key === 'bureau')) &&
@@ -1686,32 +1694,35 @@ export default function ProjectPage() {
                 // Catégorie vide → ligne discrète repliée
                 if (isEmpty) {
                   return (
-                    <button key={cat.key}
-                      onClick={openAdd}
-                      className="w-full flex items-center gap-3 px-5 py-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors text-left group">
-                      <div className="w-1 h-5 rounded-full" style={{ background: cat.color }} />
-                      <span className="font-medium text-gray-600 group-hover:text-gray-900" style={{ fontSize: 14 }}>{cat.label}</span>
-                      <span className="ml-auto text-xs text-gray-400 group-hover:text-gray-700">+ Ajouter</span>
+                    <button key={cat.key} onClick={openAdd}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                        padding: '14px 18px', background: C.surface, border: `1.5px solid ${C.outline}`,
+                        borderRadius: R.panel, cursor: 'pointer', fontFamily: FONT }}>
+                      <div style={{ width: 3, height: 16, borderRadius: 2, background: cat.color, flex: 'none' }} />
+                      <span style={{ flex: 1, fontSize: 14.5, fontWeight: 500, color: AL.black }}>{cat.label}</span>
+                      <span style={{ fontSize: 13, color: C.muted }}>+ Ajouter</span>
                     </button>
                   )
                 }
 
                 return (
-                  <div key={cat.key} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    <div className="flex items-center justify-between pl-4 pr-5 py-3 border-b border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="w-1 h-5 rounded-full" style={{ background: cat.color }} />
-                        <span className="font-semibold text-gray-900" style={{ fontSize: 14 }}>{cat.label}</span>
+                  <div key={cat.key} style={{ background: C.surface, border: `1.5px solid ${C.outline}`, borderRadius: R.panel, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                        <div style={{ width: 3, height: 16, borderRadius: 2, background: cat.color, flex: 'none' }} />
+                        <span style={{ fontSize: 14.5, fontWeight: 500, color: AL.black }}>{cat.label}</span>
                         {activeCount > 0 && (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-md"
-                            style={{ background: cat.color + '15', color: cat.color }}>
+                          <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: R.pill,
+                            background: C.neutralBg, color: AL.black }}>
                             {activeCount}
                           </span>
                         )}
                       </div>
                       <button
                         onClick={() => isSpecial ? setAddingCategory(isAdding ? null : cat.key) : openAdd()}
-                        className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
+                        style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontSize: 13, fontFamily: FONT, color: C.muted }}
+                        onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                        onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
                         {isAdding ? 'Annuler' : '+ Ajouter'}
                       </button>
                     </div>
@@ -1753,18 +1764,16 @@ export default function ProjectPage() {
 
           {/* ════ RIGHT: Logistique ════ */}
           <div>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Logistique</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+              <h2 style={h2Style}>Logistique</h2>
               {logisticsDirty && (
-                <button onClick={() => saveLogistics()} disabled={logisticsSaving}
-                  className="text-xs font-medium px-3 py-1.5 rounded-md text-white disabled:opacity-60 transition-opacity"
-                  style={{ background: '#111827' }}>
-                  {logisticsSaving ? 'Enregistrement…' : 'Enregistrer'}
-                </button>
+                <ButtonPill onClick={() => saveLogistics()} disabled={logisticsSaving} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                  {logisticsSaving ? 'enregistrement…' : 'enregistrer'}
+                </ButtonPill>
               )}
             </div>
 
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {logistics.map((item, idx) => {
                 const type = LOGISTICS_TYPES.find(t => t.key === item.type) || { label: item.type }
                 const hasContent = item.date || item.address || item.time || item.contact || item.notes
@@ -1772,20 +1781,20 @@ export default function ProjectPage() {
 
                 if (isEditing) {
                   return (
-                    <div key={idx} className="bg-white rounded-lg border border-gray-300 overflow-hidden">
-                      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    <div key={idx} className="u-surface u-panel border u-line overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b u-line u-fill">
+                        <span className="text-xs font-semibold uppercase tracking-wider u-muted">
                           {hasContent ? 'Modifier' : 'Nouveau point logistique'}
                         </span>
                         <div className="flex items-center gap-3 text-xs">
                           {hasContent && (
                             <button onClick={() => setExpandedLogIdx(null)}
-                              className="font-medium text-gray-700 hover:text-gray-900">
+                              className="font-medium u-ink hover:u-ink">
                               Terminer
                             </button>
                           )}
                           <button onClick={() => removeLogItem(idx)}
-                            className="text-gray-400 hover:text-red-500">
+                            className="u-muted hover:u-ko">
                             Supprimer
                           </button>
                         </div>
@@ -1793,7 +1802,7 @@ export default function ProjectPage() {
                       <div className="p-5 space-y-3">
                         <div className="flex gap-3">
                           <div className="flex-1">
-                            <label className="block text-xs text-gray-400 mb-1">Type</label>
+                            <label className="block text-xs u-muted mb-1">Type</label>
                             <select value={item.type}
                               onChange={e => updateLogItem(idx, 'type', e.target.value)}
                               className={inp} style={{ fontSize: 14 }}>
@@ -1803,14 +1812,14 @@ export default function ProjectPage() {
                             </select>
                           </div>
                           <div className="flex-1">
-                            <label className="block text-xs text-gray-400 mb-1">Date</label>
+                            <label className="block text-xs u-muted mb-1">Date</label>
                             <input type="date" value={item.date || ''} style={{ fontSize: 14 }}
                               onChange={e => updateLogItem(idx, 'date', e.target.value)}
                               className={inp} />
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-400 mb-1">Adresse</label>
+                          <label className="block text-xs u-muted mb-1">Adresse</label>
                           <AddressInput
                             value={item.address || ''}
                             onChange={v => updateLogItem(idx, 'address', v)}
@@ -1821,24 +1830,24 @@ export default function ProjectPage() {
                           {item.address && (
                             <div className="mt-2 flex items-center gap-3 text-xs">
                               <a href={mapsViewUrl(item.address)} target="_blank" rel="noopener"
-                                className="text-gray-500 hover:text-gray-900 underline">Voir sur Maps</a>
+                                className="u-muted hover:u-ink underline">Voir sur Maps</a>
                               <a href={mapsDirectionsUrl(item.address)} target="_blank" rel="noopener"
-                                className="font-medium text-gray-900 hover:underline">Itinéraire →</a>
+                                className="font-medium u-ink hover:underline">Itinéraire →</a>
                             </div>
                           )}
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-400 mb-1">Heure prévue</label>
+                          <label className="block text-xs u-muted mb-1">Heure prévue</label>
                           <TimeRangeInput value={item.time || ''} onChange={v => updateLogItem(idx, 'time', v)} />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-400 mb-1">Contact</label>
+                          <label className="block text-xs u-muted mb-1">Contact</label>
                           <input type="text" value={item.contact || ''} placeholder="Nom + téléphone" style={{ fontSize: 14 }}
                             onChange={e => updateLogItem(idx, 'contact', e.target.value)}
                             className={inp} />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-400 mb-1">Notes</label>
+                          <label className="block text-xs u-muted mb-1">Notes</label>
                           <textarea rows={2} value={item.notes || ''} placeholder="Accès, remarques…" style={{ fontSize: 14, resize: 'none' }}
                             onChange={e => updateLogItem(idx, 'notes', e.target.value)}
                             className={inp} />
@@ -1846,11 +1855,11 @@ export default function ProjectPage() {
 
                         {/* Personnes assignées */}
                         <div>
-                          <label className="block text-xs text-gray-400 mb-2">Personnes</label>
+                          <label className="block text-xs u-muted mb-2">Personnes</label>
                           <div className="flex flex-wrap gap-2">
                             {LOGISTICS_ASSIGNEES.map(name => {
                               const active = (item.assignees || []).includes(name)
-                              const color = PERSON_COLORS[name] || '#6b7280'
+                              const color = PERSON_COLORS[name] || C.muted
                               return (
                                 <button key={name} type="button"
                                   onClick={() => {
@@ -1858,11 +1867,11 @@ export default function ProjectPage() {
                                     const next = list.includes(name) ? list.filter(n => n !== name) : [...list, name]
                                     updateLogItem(idx, 'assignees', next)
                                   }}
-                                  className="text-xs font-medium px-3 py-1.5 rounded-md border transition-colors"
+                                  className="text-xs font-medium px-3 py-1.5 u-pill border transition-colors"
                                   style={{
-                                    borderColor: active ? color : '#e5e7eb',
+                                    borderColor: active ? color : C.border,
                                     background: active ? color + '14' : 'white',
-                                    color: active ? color : '#6b7280',
+                                    color: active ? color : C.muted,
                                   }}>
                                   {name}
                                 </button>
@@ -1870,15 +1879,15 @@ export default function ProjectPage() {
                             })}
                           </div>
                           {(item.assignees || []).includes('Coople') && (
-                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-md border border-gray-200 bg-gray-50">
+                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 u-pill border u-line u-fill">
                               <div>
-                                <label className="block text-xs text-gray-500 mb-1">Coople — Nom et prénom</label>
+                                <label className="block text-xs u-muted mb-1">Coople — Nom et prénom</label>
                                 <input type="text" value={item.coople_contact?.name || ''} style={{ fontSize: 14 }}
                                   onChange={e => updateLogItem(idx, 'coople_contact', { ...(item.coople_contact || {}), name: e.target.value })}
                                   className={inp} placeholder="Jean Dupont" />
                               </div>
                               <div>
-                                <label className="block text-xs text-gray-500 mb-1">Téléphone</label>
+                                <label className="block text-xs u-muted mb-1">Téléphone</label>
                                 <input type="tel" value={item.coople_contact?.phone || ''} style={{ fontSize: 14 }}
                                   onChange={e => updateLogItem(idx, 'coople_contact', { ...(item.coople_contact || {}), phone: e.target.value })}
                                   className={inp} placeholder="079 123 45 67" />
@@ -1889,18 +1898,18 @@ export default function ProjectPage() {
 
                         {/* Véhicule */}
                         <div>
-                          <label className="block text-xs text-gray-400 mb-2">Véhicule</label>
+                          <label className="block text-xs u-muted mb-2">Véhicule</label>
                           <div className="flex flex-wrap gap-2">
                             {VEHICLES.map(v => {
                               const active = item.vehicle === v
                               return (
                                 <button key={v} type="button"
                                   onClick={() => updateLogItem(idx, 'vehicle', active ? '' : v)}
-                                  className="text-xs font-medium px-3 py-1.5 rounded-md border transition-colors"
+                                  className="text-xs font-medium px-3 py-1.5 u-pill border transition-colors"
                                   style={{
-                                    borderColor: active ? '#111827' : '#e5e7eb',
-                                    background: active ? '#111827' : 'white',
-                                    color: active ? 'white' : '#6b7280',
+                                    borderColor: active ? AL.black : C.border,
+                                    background: active ? AL.black : 'white',
+                                    color: active ? 'white' : C.muted,
                                   }}>
                                   {v}
                                 </button>
@@ -1915,21 +1924,21 @@ export default function ProjectPage() {
 
                 // ─── Carte info (mode lecture) ───
                 return (
-                  <div key={idx} className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:border-gray-300 transition-colors">
-                    <div className="flex items-baseline justify-between gap-3 px-5 py-3 border-b border-gray-100">
+                  <div key={idx} className="u-surface u-panel border u-line overflow-hidden hover:u-line transition-colors">
+                    <div className="flex items-baseline justify-between gap-3 px-5 py-3 border-b u-line">
                       <div className="flex items-baseline gap-3 min-w-0">
-                        <span className="font-semibold text-gray-900" style={{ fontSize: 15 }}>{type.label}</span>
+                        <span className="font-semibold u-ink" style={{ fontSize: 15 }}>{type.label}</span>
                         {item.date && (
-                          <span className="text-sm text-gray-500">{fmtDate(item.date)}</span>
+                          <span className="text-sm u-muted">{fmtDate(item.date)}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-3 text-xs flex-shrink-0">
                         <button onClick={() => setExpandedLogIdx(idx)}
-                          className="font-medium text-gray-600 hover:text-gray-900">
+                          className="font-medium u-ink hover:u-ink">
                           Modifier
                         </button>
                         <button onClick={() => removeLogItem(idx)}
-                          className="text-gray-400 hover:text-red-500">
+                          className="u-muted hover:u-ko">
                           Supprimer
                         </button>
                       </div>
@@ -1938,37 +1947,37 @@ export default function ProjectPage() {
                       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3" style={{ fontSize: 13 }}>
                         {item.address && (
                           <div className="sm:col-span-2">
-                            <dt className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Adresse</dt>
-                            <dd className="text-gray-900">{item.address}</dd>
+                            <dt className="text-xs uppercase tracking-wider u-muted mb-0.5">Adresse</dt>
+                            <dd className="u-ink">{item.address}</dd>
                             <dd className="mt-1.5 flex items-center gap-3 text-xs">
                               <a href={mapsViewUrl(item.address)} target="_blank" rel="noopener"
-                                className="text-gray-500 hover:text-gray-900 underline">Voir sur Maps</a>
+                                className="u-muted hover:u-ink underline">Voir sur Maps</a>
                               <a href={mapsDirectionsUrl(item.address)} target="_blank" rel="noopener"
-                                className="font-medium text-gray-900 hover:underline">Itinéraire →</a>
+                                className="font-medium u-ink hover:underline">Itinéraire →</a>
                             </dd>
                           </div>
                         )}
                         {item.time && (
                           <div>
-                            <dt className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Heure</dt>
-                            <dd className="text-gray-900 tabular-nums">{fmtTimeDisplay(item.time)}</dd>
+                            <dt className="text-xs uppercase tracking-wider u-muted mb-0.5">Heure</dt>
+                            <dd className="u-ink tabular-nums">{fmtTimeDisplay(item.time)}</dd>
                           </div>
                         )}
                         {item.contact && (
                           <div>
-                            <dt className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Contact</dt>
-                            <dd className="text-gray-900">{item.contact}</dd>
+                            <dt className="text-xs uppercase tracking-wider u-muted mb-0.5">Contact</dt>
+                            <dd className="u-ink">{item.contact}</dd>
                           </div>
                         )}
                         {Array.isArray(item.assignees) && item.assignees.length > 0 && (
                           <div className="sm:col-span-2">
-                            <dt className="text-xs uppercase tracking-wider text-gray-400 mb-1.5">Personnes</dt>
+                            <dt className="text-xs uppercase tracking-wider u-muted mb-1.5">Personnes</dt>
                             <dd className="flex flex-wrap gap-1.5">
                               {item.assignees.map(name => {
-                                const color = PERSON_COLORS[name] || '#6b7280'
+                                const color = PERSON_COLORS[name] || C.muted
                                 return (
                                   <span key={name}
-                                    className="text-xs font-medium px-2 py-0.5 rounded-md"
+                                    className="text-xs font-medium px-2 py-0.5 u-pill"
                                     style={{ background: color + '14', color }}>
                                     {name}
                                   </span>
@@ -1976,24 +1985,24 @@ export default function ProjectPage() {
                               })}
                             </dd>
                             {item.assignees.includes('Coople') && (item.coople_contact?.name || item.coople_contact?.phone) && (
-                              <dd className="mt-2 text-xs text-gray-600">
-                                <span className="text-gray-400">Coople : </span>
+                              <dd className="mt-2 text-xs u-ink">
+                                <span className="u-muted">Coople : </span>
                                 {item.coople_contact?.name}
-                                {item.coople_contact?.phone && <> · <a href={`tel:${item.coople_contact.phone}`} className="text-gray-700 hover:underline">{item.coople_contact.phone}</a></>}
+                                {item.coople_contact?.phone && <> · <a href={`tel:${item.coople_contact.phone}`} className="u-ink hover:underline">{item.coople_contact.phone}</a></>}
                               </dd>
                             )}
                           </div>
                         )}
                         {item.vehicle && (
                           <div>
-                            <dt className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Véhicule</dt>
-                            <dd className="text-gray-900">{item.vehicle}</dd>
+                            <dt className="text-xs uppercase tracking-wider u-muted mb-0.5">Véhicule</dt>
+                            <dd className="u-ink">{item.vehicle}</dd>
                           </div>
                         )}
                         {item.notes && (
                           <div className="sm:col-span-2">
-                            <dt className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">Notes</dt>
-                            <dd className="text-gray-700 whitespace-pre-wrap leading-relaxed">{item.notes}</dd>
+                            <dt className="text-xs uppercase tracking-wider u-muted mb-0.5">Notes</dt>
+                            <dd className="u-ink whitespace-pre-wrap leading-relaxed">{item.notes}</dd>
                           </div>
                         )}
                       </dl>
@@ -2004,22 +2013,26 @@ export default function ProjectPage() {
 
               {/* Add logistics item */}
               {addingLogistics ? (
-                <div className="bg-white rounded-lg border border-gray-200 px-5 py-4">
-                  <p className="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-3">Choisir un type</p>
+                <div className="u-surface u-panel border u-line px-5 py-4">
+                  <p className="text-xs uppercase tracking-wider font-semibold u-muted mb-3">Choisir un type</p>
                   <div className="flex flex-wrap gap-2">
                     {LOGISTICS_TYPES.map(t => (
                       <button key={t.key} onClick={() => addLogItem(t.key)}
-                        className="text-xs font-medium px-3 py-2 rounded-md border border-gray-200 hover:border-gray-900 hover:text-gray-900 text-gray-600 transition-colors">
+                        className="text-xs font-medium px-3 py-2 u-pill border u-line hover:u-line hover:u-ink u-ink transition-colors">
                         {t.label}
                       </button>
                     ))}
                   </div>
                   <button onClick={() => setAddingLogistics(false)}
-                    className="mt-3 text-xs text-gray-500 hover:text-gray-900">Annuler</button>
+                    className="mt-3 text-xs u-muted hover:u-ink">Annuler</button>
                 </div>
               ) : (
                 <button onClick={() => setAddingLogistics(true)}
-                  className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-900 border border-dashed border-gray-200 hover:border-gray-400 rounded-lg transition-colors">
+                  style={{ width: '100%', padding: 18, textAlign: 'center', background: 'none',
+                    border: `1.5px dashed ${C.outline}`, borderRadius: R.panel, cursor: 'pointer',
+                    fontFamily: FONT, fontSize: 13, color: C.muted, transition: 'color .15s ease' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                  onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
                   + Ajouter un point logistique
                 </button>
               )}
@@ -2029,35 +2042,33 @@ export default function ProjectPage() {
         </div>
 
         {/* ── Visite sur site ── */}
-        <div className="mt-12">
-          <div className="flex items-center justify-between mb-5">
-            <button
-              onClick={() => setVisitExpanded(v => !v)}
-              className="flex items-center gap-3 group">
-              <span className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Visite sur site</span>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+            <button onClick={() => setVisitExpanded(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}>
+              <span style={h2Style}>Visite sur site</span>
               {visitSummary && !visitExpanded && (
-                <span className="text-xs text-green-600">complétée</span>
+                <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '.04em', padding: '3px 10px',
+                  borderRadius: R.pill, color: C.success, background: C.successBg }}>COMPLÉTÉE</span>
               )}
-              <span className="text-gray-300 text-xs">{visitExpanded ? '▲' : '▼'}</span>
+              {/* Chevron unique, pivoté de 180° à l'ouverture — le handoff
+                  proscrit d'alterner deux glyphes différents. */}
+              <span style={{ fontSize: 12, color: C.muted, display: 'inline-block',
+                transform: visitExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▾</span>
             </button>
             {visitExpanded && (
-              <div className="flex items-center gap-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {visitDirty && (
-                  <button onClick={saveVisit} disabled={visitSaving}
-                    className="text-xs font-medium px-3 py-1.5 rounded-md text-white disabled:opacity-60"
-                    style={{ background: '#111827' }}>
-                    {visitSaving ? 'Enregistrement…' : 'Enregistrer'}
-                  </button>
+                  <ButtonPill onClick={saveVisit} disabled={visitSaving} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                    {visitSaving ? 'enregistrement…' : 'enregistrer'}
+                  </ButtonPill>
                 )}
-                <button onClick={generateSummary} disabled={summaryLoading}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-full text-white disabled:opacity-50 transition-opacity"
-                  style={{ background: PINK }}>
-                  {summaryLoading ? '⏳ Génération...' : '✨ Résumé IA'}
-                </button>
-                <button onClick={() => window.print()}
-                  className="no-print text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors">
-                  🖨️ Imprimer
-                </button>
+                <ButtonPill onClick={generateSummary} disabled={summaryLoading} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                  {summaryLoading ? 'génération…' : 'résumé ia'}
+                </ButtonPill>
+                <ButtonPill onClick={() => window.print()} className="no-print" style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                  imprimer
+                </ButtonPill>
               </div>
             )}
           </div>
@@ -2065,29 +2076,29 @@ export default function ProjectPage() {
           {visitExpanded && (
             <div className="space-y-4">
               {/* ── Form grid ── */}
-              <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <div className="u-surface u-panel border u-line p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                   {/* Date */}
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Date de visite</label>
+                    <label className="block text-xs u-muted mb-1">Date de visite</label>
                     <input type="date" value={siteVisit.date} style={{ fontSize: 14 }}
                       onChange={e => setVisitField('date', e.target.value)} className={inp} />
                   </div>
 
                   {/* Participants */}
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Participants</label>
+                    <label className="block text-xs u-muted mb-1">Participants</label>
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {responsibles.filter(r => r !== 'non défini' && r !== 'Sous-traitant').map(name => {
                         const active = (siteVisit.participants || []).includes(name)
                         return (
                           <button key={name} type="button" onClick={() => toggleParticipant(name)}
-                            className="text-xs font-semibold px-2.5 py-1 rounded-full border transition-all"
+                            className="text-xs font-semibold px-2.5 py-1 u-pill border transition-all"
                             style={{
-                              borderColor: active ? PERSON_COLORS[name] : '#e5e7eb',
+                              borderColor: active ? PERSON_COLORS[name] : C.border,
                               background: active ? PERSON_COLORS[name] + '18' : 'white',
-                              color: active ? PERSON_COLORS[name] : '#9ca3af',
+                              color: active ? PERSON_COLORS[name] : C.muted,
                             }}>{name}</button>
                         )
                       })}
@@ -2096,26 +2107,26 @@ export default function ProjectPage() {
 
                   {/* Address */}
                   <div className="sm:col-span-2">
-                    <label className="block text-xs text-gray-400 mb-1">Adresse du lieu</label>
+                    <label className="block text-xs u-muted mb-1">Adresse du lieu</label>
                     <input type="text" value={siteVisit.address} placeholder="Rue, ville..." style={{ fontSize: 14 }}
                       onChange={e => setVisitField('address', e.target.value)} className={inp} />
                   </div>
 
                   {/* Space dimensions */}
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Surface (m²)</label>
+                    <label className="block text-xs u-muted mb-1">Surface (m²)</label>
                     <input type="text" value={siteVisit.surface} placeholder="ex: 120" style={{ fontSize: 14 }}
                       onChange={e => setVisitField('surface', e.target.value)} className={inp} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Hauteur sous plafond (m)</label>
+                    <label className="block text-xs u-muted mb-1">Hauteur sous plafond (m)</label>
                     <input type="text" value={siteVisit.ceiling_height} placeholder="ex: 3.5" style={{ fontSize: 14 }}
                       onChange={e => setVisitField('ceiling_height', e.target.value)} className={inp} />
                   </div>
 
                   {/* Floor type */}
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Type de sol</label>
+                    <label className="block text-xs u-muted mb-1">Type de sol</label>
                     <select value={siteVisit.floor_type} onChange={e => setVisitField('floor_type', e.target.value)}
                       className={inp} style={{ fontSize: 14 }}>
                       <option value="">— Choisir —</option>
@@ -2127,43 +2138,43 @@ export default function ProjectPage() {
 
                   {/* Access */}
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Accès livraison</label>
+                    <label className="block text-xs u-muted mb-1">Accès livraison</label>
                     <input type="text" value={siteVisit.access_notes} placeholder="Monte-charge, quai, escalier..." style={{ fontSize: 14 }}
                       onChange={e => setVisitField('access_notes', e.target.value)} className={inp} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Horaires d'accès</label>
+                    <label className="block text-xs u-muted mb-1">Horaires d'accès</label>
                     <input type="text" value={siteVisit.access_hours} placeholder="ex: 08h00 – 18h00" style={{ fontSize: 14 }}
                       onChange={e => setVisitField('access_hours', e.target.value)} className={inp} />
                   </div>
 
                   {/* Technical */}
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Électricité</label>
+                    <label className="block text-xs u-muted mb-1">Électricité</label>
                     <input type="text" value={siteVisit.electricity} placeholder="ex: 2×16A, triphasé, nb prises..." style={{ fontSize: 14 }}
                       onChange={e => setVisitField('electricity', e.target.value)} className={inp} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Éclairage</label>
+                    <label className="block text-xs u-muted mb-1">Éclairage</label>
                     <input type="text" value={siteVisit.lighting} placeholder="ex: naturel + spots, modifiable..." style={{ fontSize: 14 }}
                       onChange={e => setVisitField('lighting', e.target.value)} className={inp} />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Réseau / Wifi</label>
+                    <label className="block text-xs u-muted mb-1">Réseau / Wifi</label>
                     <input type="text" value={siteVisit.wifi} placeholder="ex: Wifi disponible, code: xxx" style={{ fontSize: 14 }}
                       onChange={e => setVisitField('wifi', e.target.value)} className={inp} />
                   </div>
 
                   {/* Contact */}
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Contact sur place</label>
+                    <label className="block text-xs u-muted mb-1">Contact sur place</label>
                     <input type="text" value={siteVisit.contacts} placeholder="Nom + téléphone" style={{ fontSize: 14 }}
                       onChange={e => setVisitField('contacts', e.target.value)} className={inp} />
                   </div>
 
                   {/* Constraints */}
                   <div className="sm:col-span-2">
-                    <label className="block text-xs text-gray-400 mb-1">Contraintes particulières</label>
+                    <label className="block text-xs u-muted mb-1">Contraintes particulières</label>
                     <textarea rows={2} value={siteVisit.constraints} style={{ fontSize: 14, resize: 'none' }}
                       placeholder="Horaires imposés, règles du lieu, travaux en cours..."
                       onChange={e => setVisitField('constraints', e.target.value)} className={inp} />
@@ -2171,7 +2182,7 @@ export default function ProjectPage() {
 
                   {/* Observations */}
                   <div className="sm:col-span-2">
-                    <label className="block text-xs text-gray-400 mb-1">Observations générales</label>
+                    <label className="block text-xs u-muted mb-1">Observations générales</label>
                     <textarea rows={3} value={siteVisit.observations} style={{ fontSize: 14, resize: 'none' }}
                       placeholder="Points d'attention, remarques de l'équipe..."
                       onChange={e => setVisitField('observations', e.target.value)} className={inp} />
@@ -2182,26 +2193,26 @@ export default function ProjectPage() {
 
               {/* ── AI Summary ── */}
               {(visitSummary || summaryLoading) && (
-                <div className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: PINK + '44' }}>
+                <div className="u-surface u-panel border overflow-hidden" style={{ borderColor: PINK + '44' }}>
                   <div className="flex items-center gap-2 px-4 py-2.5 border-b" style={{ borderColor: PINK + '22', background: PINK + '08' }}>
                     <span className="text-sm">✨</span>
-                    <span className="text-xs font-bold text-gray-700">Analyse IA</span>
+                    <span className="text-xs font-bold u-ink">Analyse IA</span>
                     {visitSummary && (
                       <button onClick={generateSummary} disabled={summaryLoading}
-                        className="ml-auto text-xs text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50">
+                        className="ml-auto text-xs u-muted hover:u-ink transition-colors disabled:opacity-50">
                         {summaryLoading ? '⏳' : '↻ Regénérer'}
                       </button>
                     )}
                   </div>
                   <div className="px-4 py-4">
                     {summaryLoading && !visitSummary ? (
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <div className="w-4 h-4 rounded-full border-2 animate-spin flex-shrink-0"
-                          style={{ borderColor: '#e5e7eb', borderTopColor: PINK }} />
+                      <div className="flex items-center gap-2 text-sm u-muted">
+                        <div className="w-4 h-4 u-pill border-2 animate-spin flex-shrink-0"
+                          style={{ borderColor: C.border, borderTopColor: PINK }} />
                         Analyse en cours...
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{visitSummary}</div>
+                      <div className="text-sm u-ink leading-relaxed whitespace-pre-wrap">{visitSummary}</div>
                     )}
                   </div>
                 </div>
@@ -2211,7 +2222,7 @@ export default function ProjectPage() {
         </div>
 
         {/* ── Offre ── */}
-        <div className="mt-12 no-print">
+        <div className="no-print">
           {(() => {
             const managementTotal     = quote.management.reduce((s, r) => s + laborNet(r), 0)
             const itemsTotal          = quote.items.reduce((s, it) => s + itemTotal(it), 0)
@@ -2221,77 +2232,70 @@ export default function ProjectPage() {
             const autoRef             = `${new Date().getFullYear()}-${String(project?.id || '').slice(-4).toUpperCase()}`
             const statusMeta          = quoteStatusMeta(quote.status)
 
-            const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
-            const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 rounded"
-            const th = "px-3 py-2 text-left text-xs font-semibold text-gray-700 bg-gray-100"
-            const td = "border-t border-gray-100 align-middle"
-            const tdRO = "px-3 py-1.5 text-sm text-right text-gray-600 tabular-nums"
+            const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full focus:outline-none focus:u-surface focus:u-line rounded"
+            const txtCell = "px-2 py-1.5 text-sm bg-transparent w-full focus:outline-none focus:u-surface focus:u-line rounded"
+            const th = "px-3 py-2 text-left text-xs font-semibold u-ink u-fill"
+            const td = "border-t u-line align-middle"
+            const tdRO = "px-3 py-1.5 text-sm text-right u-ink tabular-nums"
 
             return (
               <>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3 flex-wrap">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                     <button onClick={() => setQuoteExpanded(v => !v)}
-                      className="flex items-center gap-2 group">
-                      <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Offre</h2>
-                      <span className="text-gray-400 group-hover:text-gray-700 text-sm">{quoteExpanded ? '▾' : '▸'}</span>
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}>
+                      <span style={h2Style}>Offre</span>
+                      <span style={{ fontSize: 12, color: C.muted, display: 'inline-block',
+                        transform: quoteExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▾</span>
                       {!quoteExpanded && grandTotal > 0 && (
-                        <span className="text-sm text-gray-500 ml-2">· Total {fmtCHF(grandTotal)} CHF</span>
+                        <span style={{ fontSize: 13, color: C.muted, marginLeft: 4 }}>· Total {fmtCHF(grandTotal)} CHF</span>
                       )}
                     </button>
                     {quoteExpanded ? (
                       <>
+                        {/* Le statut est un select, mais il porte le costume d'une
+                            pill outline : c'est un contrôle, donc radius 999. */}
                         <select
                           value={quote.status || 'brouillon'}
                           onChange={e => { setQuote(q => ({ ...q, status: e.target.value })); setQuoteDirty(true) }}
-                          className="text-xs font-semibold rounded-full pl-2.5 pr-1 py-1 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-300"
-                          style={{ background: statusMeta.bg, color: statusMeta.color }}>
+                          style={{ fontFamily: FONT, fontSize: 13, padding: '0.45rem 1rem', borderRadius: R.pill,
+                            border: `1.5px solid ${C.outline}`, background: C.surface, color: AL.black, cursor: 'pointer' }}>
                           {QUOTE_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                         </select>
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: C.muted }}>
                           <span>N°</span>
                           <input
                             value={quote.number || ''}
                             placeholder={autoRef}
                             onChange={e => { setQuote(q => ({ ...q, number: e.target.value })); setQuoteDirty(true) }}
-                            className="w-28 px-2 py-1 rounded border border-gray-200 text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-300" />
+                            style={{ width: 112, padding: '6px 12px', borderRadius: R.pill, border: `1.5px solid ${C.border}`,
+                              fontFamily: FONT, fontSize: 13, color: AL.black, outline: 'none' }} />
                         </div>
                       </>
                     ) : (
-                      <span className="text-xs font-semibold rounded-full px-2.5 py-1"
-                        style={{ background: statusMeta.bg, color: statusMeta.color }}>
+                      <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '.04em', padding: '3px 10px',
+                        borderRadius: R.pill, background: C.neutralBg, color: AL.black, textTransform: 'uppercase' }}>
                         {statusMeta.label}
                       </span>
                     )}
                   </div>
                   {quoteExpanded && (
-                    <div className="flex items-center gap-3">
-                      {quoteDirty && <span className="text-xs text-amber-600">non enregistré</span>}
-                      <button onClick={saveQuote} disabled={!quoteDirty || quoteSaving}
-                        className="px-4 py-1.5 rounded-md text-sm font-medium text-white disabled:opacity-40"
-                        style={{ background: '#111827' }}>
-                        {quoteSaving ? 'Enregistrement…' : 'Enregistrer'}
-                      </button>
-                      <a href={`/projects/${id}/devis`} target="_blank" rel="noopener"
-                        className="px-4 py-1.5 rounded-md text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors inline-flex items-center gap-1.5"
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      {quoteDirty && <span style={{ fontSize: 12, color: C.warning }}>non enregistré</span>}
+                      <ButtonPill onClick={saveQuote} disabled={!quoteDirty || quoteSaving} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                        {quoteSaving ? 'enregistrement…' : 'enregistrer'}
+                      </ButtonPill>
+                      <ButtonPill href={`/projects/${id}/devis`} target="_blank" rel="noopener"
+                        style={{ fontSize: 13, padding: '0.45rem 1rem' }}
                         title={quoteDirty ? 'Enregistre d\'abord pour inclure les dernières modifs' : 'Aperçu et PDF de l\'offre'}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                        </svg>
-                        Offre PDF
-                      </a>
+                        offre pdf
+                      </ButtonPill>
                       {isAdmin && (
-                        <a href={`/factures-emises/new?from=${id}`}
-                          className="px-4 py-1.5 rounded-md text-sm font-medium text-white inline-flex items-center gap-1.5"
-                          style={{ background: '#111827' }}
+                        <ButtonPill href={`/factures-emises/new?from=${id}`}
+                          style={{ fontSize: 13, padding: '0.45rem 1rem' }}
                           title={quoteDirty ? 'Enregistre d\'abord' : 'Convertir en facture officielle avec QR-bill'}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="4" width="18" height="16" rx="2" />
-                            <path d="M3 10h18" />
-                          </svg>
-                          Convertir en facture
-                        </a>
+                          convertir en facture
+                        </ButtonPill>
                       )}
                     </div>
                   )}
@@ -2301,13 +2305,13 @@ export default function ProjectPage() {
                   <div className="space-y-6">
                     {/* Destinataire (société + personne + adresse) : édité via « Modifier » le projet. */}
                     {(project.client || project.client_address) && (
-                      <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
-                        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Destinataire — offre &amp; facture</div>
-                        <div className="text-sm font-semibold text-gray-800">{project.client || '—'}</div>
+                      <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: '18px 20px' }}>
+                        <span style={microLabel}>destinataire — offre &amp; facture</span>
+                        <div style={{ fontSize: 15, fontWeight: 500, marginTop: 6, color: AL.black }}>{project.client || '—'}</div>
                         {(project.client_address || '').split('\n').filter(Boolean).map((l, i) => (
-                          <div key={i} className="text-xs text-gray-500">{l}</div>
+                          <div key={i} style={{ fontSize: 13, color: C.muted }}>{l}</div>
                         ))}
-                        <p className="text-xs text-gray-400 mt-1.5">Modifier via « Modifier » le projet (choix entreprise + personne).</p>
+                        <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>Modifier via « Modifier » le projet (choix entreprise + personne).</p>
                       </div>
                     )}
 
@@ -2323,38 +2327,40 @@ export default function ProjectPage() {
         </div>
 
         {/* ── Aperçu dossier kDrive ── */}
-        <div className="mt-12 no-print">
-          <div className="flex items-baseline justify-between mb-5">
-            <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>Dossier kDrive</h2>
+        <div className="no-print">
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h2 style={h2Style}>Dossier kDrive</h2>
             {project.kdrive_folder_id && (
               <a
                 href={`https://kdrive.infomaniak.com/app/drive/${KDRIVE_DRIVE_ID}/files/${kdrivePath.length > 0 ? kdrivePath[kdrivePath.length - 1].id : project.kdrive_folder_id}`}
                 target="_blank" rel="noopener noreferrer"
-                className="text-xs font-medium text-gray-500 hover:text-gray-900">
+                style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}
+                onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
                 Ouvrir sur kDrive ↗
               </a>
             )}
           </div>
 
           {!project.kdrive_folder_id ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
-              <p className="text-sm text-gray-500">Aucun dossier kDrive lié à ce projet.</p>
-              <p className="text-xs text-gray-400 mt-1">Modifie le projet pour le lier à un dossier existant sur kDrive.</p>
+            <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: 24, textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: 13, color: C.muted }}>Aucun dossier kDrive lié à ce projet.</p>
+              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: C.muted }}>Modifie le projet pour le lier à un dossier existant sur kDrive.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div style={{ background: C.surface, border: `1.5px solid ${C.outline}`, borderRadius: R.panel, overflow: 'hidden' }}>
               {/* Breadcrumb */}
               {kdrivePath.length > 0 && (
-                <div className="px-5 py-3 border-b border-gray-100 flex items-center flex-wrap gap-1 text-xs">
+                <div className="px-5 py-3 border-b u-line flex items-center flex-wrap gap-1 text-xs">
                   <button onClick={() => kdriveGoTo(-1)}
-                    className="px-1.5 py-0.5 rounded text-gray-500 hover:text-gray-900">
+                    className="px-1.5 py-0.5 rounded u-muted hover:u-ink">
                     📁 Racine
                   </button>
                   {kdrivePath.map((p, i) => (
                     <span key={i} className="flex items-center gap-1">
-                      <span className="text-gray-300">/</span>
+                      <span className="u-muted">/</span>
                       <button onClick={() => kdriveGoTo(i)}
-                        className={`px-1.5 py-0.5 rounded ${i === kdrivePath.length - 1 ? 'font-semibold text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}>
+                        className={`px-1.5 py-0.5 rounded ${i === kdrivePath.length - 1 ? 'font-semibold u-ink' : 'u-muted hover:u-ink'}`}>
                         {p.name}
                       </button>
                     </span>
@@ -2365,22 +2371,22 @@ export default function ProjectPage() {
               {/* Grid */}
               <div className="p-4">
                 {kdriveLoading ? (
-                  <p className="text-center text-sm text-gray-400 py-8">Chargement…</p>
+                  <p className="text-center text-sm u-muted py-8">Chargement…</p>
                 ) : kdriveError ? (
-                  <p className="text-center text-sm text-red-500 py-8">{kdriveError}</p>
+                  <p className="text-center text-sm u-ko py-8">{kdriveError}</p>
                 ) : kdriveItems.length === 0 ? (
-                  <p className="text-center text-sm text-gray-400 py-8">Dossier vide</p>
+                  <p className="text-center text-sm u-muted py-8">Dossier vide</p>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {kdriveItems.map(item => {
                       if (item.type === 'dir') {
                         return (
                           <button key={item.id} onClick={() => enterKdriveFolder(item)}
-                            className="group flex flex-col items-center text-center p-3 rounded-xl border border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-                            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            className="group flex flex-col items-center text-center p-3 u-panel border u-line hover:u-line hover:u-fill transition-colors">
+                            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
                             </svg>
-                            <span className="mt-2 text-xs text-gray-700 truncate w-full">{item.name}</span>
+                            <span className="mt-2 text-xs u-ink truncate w-full">{item.name}</span>
                           </button>
                         )
                       }
@@ -2390,8 +2396,8 @@ export default function ProjectPage() {
                         <a key={item.id}
                           href={`https://kdrive.infomaniak.com/app/drive/${KDRIVE_DRIVE_ID}/preview/${item.id}`}
                           target="_blank" rel="noopener noreferrer"
-                          className="group block rounded-xl border border-gray-100 hover:border-gray-300 overflow-hidden transition-colors">
-                          <div className="w-full h-28 bg-gray-50 flex items-center justify-center overflow-hidden">
+                          className="group block u-panel border u-line hover:u-line overflow-hidden transition-colors">
+                          <div className="w-full h-28 u-fill flex items-center justify-center overflow-hidden">
                             {item.has_thumbnail ? (
                               <img
                                 src={`/api/kdrive/thumbnail?fileId=${item.id}&token=${encodeURIComponent(item.token || '')}`}
@@ -2403,11 +2409,11 @@ export default function ProjectPage() {
                             ) : isPdf ? (
                               <div className="flex flex-col items-center gap-1">
                                 <span className="text-3xl">📄</span>
-                                <span className="text-xs text-gray-400 font-medium">PDF</span>
+                                <span className="text-xs u-muted font-medium">PDF</span>
                               </div>
                             ) : (
                               <div className="flex flex-col items-center gap-1">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.5">
                                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                                   <polyline points="14 2 14 8 20 8" />
                                 </svg>
@@ -2415,8 +2421,8 @@ export default function ProjectPage() {
                             )}
                           </div>
                           <div className="px-2 py-1.5">
-                            <p className="text-xs text-gray-700 truncate" title={item.name}>{item.name}</p>
-                            <p className="text-[10px] text-gray-400">{fmtSize(item.size)}</p>
+                            <p className="text-xs u-ink truncate" title={item.name}>{item.name}</p>
+                            <p className="text-[10px] u-muted">{fmtSize(item.size)}</p>
                           </div>
                         </a>
                       )
@@ -2429,34 +2435,34 @@ export default function ProjectPage() {
         </div>
 
         {/* ── Fichiers du projet ── */}
-        <div className="mt-12 no-print">
-          <h2 className="font-semibold text-gray-900 mb-5" style={{ fontSize: 20 }}>Fichiers</h2>
+        <div className="no-print">
+          <h2 style={{ ...h2Style, marginBottom: 20 }}>Fichiers</h2>
 
           {/* Drop zone */}
           <div
             onDragOver={e => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className="rounded-lg border border-dashed transition-colors mb-4 cursor-pointer"
-            style={{ borderColor: isDragging ? '#111827' : '#e5e7eb', background: isDragging ? '#f9fafb' : 'white' }}
+            style={{ borderRadius: R.panel, border: `1.5px dashed ${C.outline}`, marginBottom: 16, cursor: 'pointer',
+              background: isDragging ? C.hover : C.surface, transition: 'background .15s ease' }}
             onClick={() => document.getElementById('file-input-hidden').click()}>
             <input id="file-input-hidden" type="file" multiple accept="image/*,.pdf"
               className="hidden"
               onChange={e => Array.from(e.target.files).forEach(uploadFile)} />
             <div className="flex flex-col items-center justify-center py-10 gap-1.5">
               {uploading ? (
-                <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />
+                <div className="w-6 h-6 u-pill border-2 animate-spin" style={{ borderColor: C.border, borderTopColor: AL.black }} />
               ) : (
                 <>
-                  <p className="text-sm text-gray-600 font-medium">Glisser des fichiers ici ou <span className="text-gray-900 underline">parcourir</span></p>
-                  <p className="text-xs text-gray-400">Images (JPG, PNG, WEBP) · PDF · max 10 MB</p>
+                  <p style={{ margin: 0, fontSize: 13.5, color: AL.black }}>Glisser des fichiers ici ou <span style={{ textDecoration: 'underline' }}>parcourir</span></p>
+                  <p style={{ margin: 0, fontSize: 12.5, color: C.muted }}>Images (JPG, PNG, WEBP) · PDF · max 10 MB</p>
                 </>
               )}
             </div>
           </div>
 
           {uploadError && (
-            <p className="text-xs text-red-500 mb-2">{uploadError}</p>
+            <p className="text-xs u-ko mb-2">{uploadError}</p>
           )}
 
           {/* File grid */}
@@ -2466,24 +2472,24 @@ export default function ProjectPage() {
                 const isImage = f.mime_type?.startsWith('image/')
                 const isPdf = f.mime_type === 'application/pdf'
                 return (
-                  <div key={f.id} className="group relative bg-white rounded-xl border border-gray-100 overflow-hidden">
+                  <div key={f.id} className="group relative u-surface u-panel border u-line overflow-hidden">
                     {/* Thumbnail */}
                     <a href={f.url} target="_blank" rel="noreferrer" className="block">
                       {isImage ? (
                         <img src={f.url} alt={f.filename}
                           className="w-full h-32 object-cover" />
                       ) : (
-                        <div className="w-full h-32 flex flex-col items-center justify-center gap-1 bg-gray-50">
+                        <div className="w-full h-32 flex flex-col items-center justify-center gap-1 u-fill">
                           <span className="text-3xl">📄</span>
-                          <span className="text-xs text-gray-400 font-medium">PDF</span>
+                          <span className="text-xs u-muted font-medium">PDF</span>
                         </div>
                       )}
                     </a>
                     {/* Label + delete */}
                     <div className="px-2 py-1.5 flex items-center gap-1">
-                      <p className="text-xs text-gray-600 truncate flex-1">{f.filename}</p>
+                      <p className="text-xs u-ink truncate flex-1">{f.filename}</p>
                       <button onClick={() => deleteFile(f)}
-                        className="flex-shrink-0 text-gray-300 hover:text-red-400 transition-colors text-xs opacity-0 group-hover:opacity-100">✕</button>
+                        className="flex-shrink-0 u-muted hover:u-ko transition-colors text-xs opacity-0 group-hover:opacity-100">✕</button>
                     </div>
                   </div>
                 )
@@ -2495,17 +2501,17 @@ export default function ProjectPage() {
         {/* ── Print form (hidden on screen, shown on print) ── */}
         <div className="print-form" style={{ padding: '2cm', fontFamily: 'Inter, sans-serif' }}>
           {/* Header */}
-          <div style={{ borderBottom: '2px solid #111827', paddingBottom: '12px', marginBottom: '24px' }}>
+          <div style={{ borderBottom: `2px solid ${AL.black}`, paddingBottom: '12px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={{ fontSize: '10px', fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Amazing Lab — Visite sur site</p>
-                <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#111', margin: 0 }}>{project.name}</h1>
-                {project.client && <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0 0' }}>{project.client}</p>}
+                <p style={{ fontSize: '10px', fontWeight: 700, color: AL.black, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>Amazing Lab — Visite sur site</p>
+                <h1 style={{ fontSize: '22px', fontWeight: 700, color: AL.black, margin: 0 }}>{project.name}</h1>
+                {project.client && <p style={{ fontSize: '14px', color: C.muted, margin: '4px 0 0 0' }}>{project.client}</p>}
               </div>
               {project.deadline && (
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase' }}>Deadline</p>
-                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#374151' }}>{fmtDate(project.deadline)}</p>
+                  <p style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase' }}>Deadline</p>
+                  <p style={{ fontSize: '14px', fontWeight: 600, color: AL.black }}>{fmtDate(project.deadline)}</p>
                 </div>
               )}
             </div>
@@ -2540,9 +2546,9 @@ export default function ProjectPage() {
           <PrintField label="Contraintes particulières" tall />
           <PrintField label="Observations générales" tall />
 
-          <div style={{ marginTop: '32px', borderTop: '1px solid #e5e7eb', paddingTop: '12px', display: 'flex', justifyContent: 'space-between' }}>
-            <p style={{ fontSize: '10px', color: '#9ca3af' }}>Amazing Lab © {new Date().getFullYear()}</p>
-            <p style={{ fontSize: '10px', color: '#9ca3af' }}>amazinglab.ch</p>
+          <div style={{ marginTop: '32px', borderTop: `1px solid ${C.border}`, paddingTop: '12px', display: 'flex', justifyContent: 'space-between' }}>
+            <p style={{ fontSize: '10px', color: C.muted }}>Amazing Lab © {new Date().getFullYear()}</p>
+            <p style={{ fontSize: '10px', color: C.muted }}>amazinglab.ch</p>
           </div>
         </div>
 
@@ -2594,10 +2600,10 @@ export default function ProjectPage() {
 function PrintField({ label, tall }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <p style={{ fontSize: '9px', fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>{label}</p>
+      <p style={{ fontSize: '9px', fontWeight: 700, color: AL.black, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>{label}</p>
       <div style={{
-        borderBottom: tall ? 'none' : '1px solid #d1d5db',
-        border: tall ? '1px solid #d1d5db' : undefined,
+        borderBottom: tall ? 'none' : `1px solid ${C.muted}`,
+        border: tall ? `1px solid ${C.muted}` : undefined,
         borderRadius: tall ? '6px' : undefined,
         minHeight: tall ? '60px' : '24px',
         width: '100%',

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import useSWR from 'swr'
 import { fmtCHF } from '../lib/money'
+import { AL, C, R } from '../lib/theme'
 
 const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
 
@@ -56,35 +57,35 @@ export default function CatalogPicker({ kind = 'all', onPick, label = '+ Catalog
 
   function choose(it) { onPick(it); setOpen(false); setQ('') }
 
-  const dd = { position: 'absolute', top: '100%', right: 0, marginTop: 4, width: 320, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 60 }
+  const dd = { position: 'absolute', top: '100%', right: 0, marginTop: 4, width: 320, background: AL.white, border: '1px solid rgba(12,12,12,.08)', borderRadius: R.panel, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 60 }
 
   return (
     <div ref={boxRef} style={{ position: 'relative', display: 'inline-block' }}>
       <button type="button" onClick={() => setOpen(o => !o)}
-        style={{ font: '600 11px system-ui', padding: '3px 8px', borderRadius: 5, cursor: 'pointer', border: '1px solid #d1d5db', background: '#fff', color: '#4b5563' }}>
+        style={{ font: '600 11px system-ui', padding: '3px 8px', borderRadius: R.pill, cursor: 'pointer', border: `1px solid ${C.muted}`, background: AL.white, color: AL.black }}>
         {label}
       </button>
       {open && (
         <div style={dd}>
-          <div style={{ padding: 8, borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ padding: 8, borderBottom: '1px solid rgba(12,12,12,.06)' }}>
             <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher dans le catalogue…"
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 13, outline: 'none' }} />
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(12,12,12,.08)', fontSize: 13, outline: 'none' }} />
           </div>
           <div style={{ maxHeight: 280, overflowY: 'auto' }}>
             {matches.length === 0 ? (
-              <div style={{ padding: '12px', fontSize: 13, color: '#9ca3af' }}>Aucun article.</div>
+              <div style={{ padding: '12px', fontSize: 13, color: C.muted }}>Aucun article.</div>
             ) : matches.map(it => (
               <button key={it.id} type="button" onClick={() => choose(it)}
                 style={{ display: 'flex', width: '100%', textAlign: 'left', gap: 10, alignItems: 'center', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                onMouseEnter={e => e.currentTarget.style.background = C.hover}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name || 'Sans nom'}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: '#9ca3af' }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name || 'Sans nom'}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: C.muted }}>
                     {[it.type === 'heure' ? 'Heure' : 'Article', it.unit, it.vendor].filter(Boolean).join(' · ')}
                   </span>
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: AL.black, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {fmtCHF(saleOf(it))}
                 </span>
               </button>

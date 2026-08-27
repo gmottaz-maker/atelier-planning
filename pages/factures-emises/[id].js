@@ -17,8 +17,8 @@ import SendDocumentModal from '../../components/SendDocumentModal'
 import QuoteEditor, { defaultQuote } from '../../components/QuoteEditor'
 import { computeQuoteTotal } from '../../lib/quoteTotals'
 import { invoiceTotals } from '../../lib/invoiceTotals'
-import { pdfFilename } from '../../lib/pdfFilename'
 import { fmtCHF } from '../../lib/money'
+import { AL, C } from '../../lib/theme'
 
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10) }
 const today = () => new Date().toISOString().slice(0, 10)
@@ -48,7 +48,6 @@ export default function FactureEmisePage() {
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
   const [sendOpen, setSendOpen] = useState(false)
-  const [pdfBusy, setPdfBusy] = useState('')     // mode en cours de génération
   const dueTouched = useRef(false)
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); setDirty(true) }
@@ -147,29 +146,12 @@ export default function FactureEmisePage() {
     finally { setSaving(false) }
   }
 
-  async function downloadPdf(mode) {
-    if (pdfBusy) return          // une seule génération à la fois (cf. lib/htmlToPdf)
-    setPdfBusy(mode)
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 90000)
-    try {
-      const r = await fetch(`/api/customer-invoices/${id}/pdf`, { signal: ctrl.signal })
-      if (!r.ok) throw new Error(`Erreur ${r.status}`)
-      const blob = await r.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = pdfFilename(mode === 'summary' ? 'facture-résumée' : 'facture-détaillée',
-        invoice?.projects?.name || invoice?.client_name, invoice?.issue_date)
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 60000)
-    } catch (e) {
-      alert(e.name === 'AbortError'
-        ? 'La génération du PDF a pris trop de temps. Réessaie dans un instant.'
-        : 'Téléchargement impossible : ' + e.message)
-    }
-    finally { clearTimeout(timer); setPdfBusy('') }
-  }
+  // Lien réel plutôt que fetch + clic programmatique : au-delà du premier
+  // téléchargement, Chrome bloque silencieusement les suivants quand le geste
+  // utilisateur a expiré pendant la génération. Détail dans
+  // pages/factures-emises.js, même correctif.
+  const pdfHref = (mode) =>
+    `/api/customer-invoices/${id}/pdf?download=1&mode=${mode}`
 
   async function remove() {
     if (!confirm('Supprimer cette facture ?')) return
@@ -187,31 +169,31 @@ export default function FactureEmisePage() {
 
   if (user && !isAdmin) return null
 
-  const input = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none"
-  const label = "block text-xs font-medium text-gray-500 mb-1.5"
+  const input = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none"
+  const label = "block text-xs font-medium u-muted mb-1.5"
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: AL.white }}>
       <Head><title>{isNew ? 'Nouvelle facture' : `Facture ${invoice?.invoice_number || ''}`} — Maze Project</title></Head>
       <NavBar title={isNew ? 'Nouvelle facture' : `Facture ${invoice?.invoice_number || ''}`}>
-        <Link href="/factures-emises" className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">← Factures</Link>
-        {dirty && <span className="text-xs text-amber-600 mr-2">non enregistré</span>}
+        <Link href="/factures-emises" className="px-3 py-2 text-sm font-medium u-ink hover:u-ink">← Factures</Link>
+        {dirty && <span className="text-xs u-warn mr-2">non enregistré</span>}
         <button onClick={() => save()} disabled={saving || loading}
-          className="px-4 py-2 text-sm font-medium rounded-md text-white disabled:opacity-50" style={{ background: '#111827' }}>
+          className="px-4 py-2 text-sm font-medium u-pill text-white disabled:opacity-50" style={{ background: AL.black }}>
           {saving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </NavBar>
 
       {loading ? (
-        <p className="text-sm text-gray-400 py-16 text-center">Chargement…</p>
+        <p className="text-sm u-muted py-16 text-center">Chargement…</p>
       ) : (
         <main className="w-full px-4 md:px-10 py-6 md:py-10 space-y-6" style={{ maxWidth: 1400, margin: '0 auto' }}>
 
-          {error && <div className="rounded-md px-4 py-3 text-sm" style={{ background: '#fee2e2', color: '#991b1b' }}>{error}</div>}
+          {error && <div className="u-pill px-4 py-3 text-sm" style={{ background: C.dangerBg, color: C.danger }}>{error}</div>}
 
           {/* ── Destinataire ── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Destinataire</h2>
+          <div className="u-surface u-panel border u-line p-5 space-y-4">
+            <h2 className="font-semibold u-ink" style={{ fontSize: 15 }}>Destinataire</h2>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className={label}>Projet — reprend son offre</label>
@@ -219,13 +201,13 @@ export default function FactureEmisePage() {
                   <option value="">— Aucun —</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name} · {p.client}</option>)}
                 </select>
-                <p className="text-xs text-gray-400 mt-1">Choisir un projet recopie son offre dans l'éditeur ci-dessous.</p>
+                <p className="text-xs u-muted mt-1">Choisir un projet recopie son offre dans l'éditeur ci-dessous.</p>
               </div>
               <div>
-                <label className={label}>Objet — nom libre {form.project_id && <span className="text-gray-400">(remplace le nom du projet)</span>}</label>
+                <label className={label}>Objet — nom libre {form.project_id && <span className="u-muted">(remplace le nom du projet)</span>}</label>
                 <input className={input} value={form.object} onChange={e => set('object', e.target.value)}
                   placeholder="ex. Stockage T3 2026, Acompte chantier…" />
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs u-muted mt-1">
                   Permet de nommer la facture sans la lier à un projet. Sans objet ni projet, la facture n'a pas d'intitulé.
                 </p>
               </div>
@@ -249,15 +231,15 @@ export default function FactureEmisePage() {
           </div>
 
           {/* ── Paramètres de facturation ── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Facturation</h2>
+          <div className="u-surface u-panel border u-line p-5 space-y-4">
+            <h2 className="font-semibold u-ink" style={{ fontSize: 15 }}>Facturation</h2>
             <div className="grid md:grid-cols-4 gap-4">
               <div>
                 <label className={label}>Émise le</label>
                 <input type="date" className={input} value={form.issue_date} onChange={e => setIssueDate(e.target.value)} />
               </div>
               <div>
-                <label className={label}>Échéance <span className="text-gray-400">(+30 j)</span></label>
+                <label className={label}>Échéance <span className="u-muted">(+30 j)</span></label>
                 <input type="date" className={input} value={form.due_date}
                   onChange={e => { dueTouched.current = true; set('due_date', e.target.value) }} />
               </div>
@@ -277,7 +259,7 @@ export default function FactureEmisePage() {
                 </select>
               </div>
               <div className="md:col-span-2">
-                <label className={label}>IBAN bénéficiaire <span className="text-gray-400">(vide = celui par défaut)</span></label>
+                <label className={label}>IBAN bénéficiaire <span className="u-muted">(vide = celui par défaut)</span></label>
                 <input className={input} value={form.iban_recipient} onChange={e => set('iban_recipient', e.target.value)} placeholder="CH…" />
               </div>
               {!isNew && (
@@ -305,11 +287,11 @@ export default function FactureEmisePage() {
           </div>
 
           {/* ── Escompte sur toute la facture ── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900" style={{ fontSize: 15 }}>Escompte sur la facture</h2>
+          <div className="u-surface u-panel border u-line p-5 space-y-3">
+            <h2 className="font-semibold u-ink" style={{ fontSize: 15 }}>Escompte sur la facture</h2>
             <div className="grid md:grid-cols-4 gap-4">
               <div className="md:col-span-2">
-                <label className={label}>Libellé <span className="text-gray-400">(imprimé sur le PDF)</span></label>
+                <label className={label}>Libellé <span className="u-muted">(imprimé sur le PDF)</span></label>
                 <input className={input} value={form.discount_label} onChange={e => set('discount_label', e.target.value)}
                   placeholder="ex. Remise commerciale, Geste client…" />
               </div>
@@ -324,33 +306,33 @@ export default function FactureEmisePage() {
                   value={form.discount_amount} onChange={e => set('discount_amount', e.target.value)} placeholder="0" />
               </div>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs u-muted">
               S'applique au sous-total HT, avant TVA. Les deux se cumulent : le pourcentage d'abord, puis le montant fixe.
             </p>
           </div>
 
           {/* ── Récapitulatif TVA ── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="u-surface u-panel border u-line p-5">
             {discount > 0 && (
               <>
-                <div className="flex justify-between text-sm text-gray-600 mb-1">
+                <div className="flex justify-between text-sm u-ink mb-1">
                   <span>Sous-total HT</span><span className="tabular-nums font-medium">{fmtCHF(subtotal)} {form.currency}</span>
                 </div>
-                <div className="flex justify-between text-sm mb-1" style={{ color: '#b91c1c' }}>
+                <div className="flex justify-between text-sm mb-1" style={{ color: C.danger }}>
                   <span>{form.discount_label || (form.discount_rate ? `Escompte ${form.discount_rate} %` : 'Escompte')}</span>
                   <span className="tabular-nums font-medium">− {fmtCHF(discount)} {form.currency}</span>
                 </div>
               </>
             )}
-            <div className="flex justify-between text-sm text-gray-600 mb-1">
+            <div className="flex justify-between text-sm u-ink mb-1">
               <span>{discount > 0 ? 'Net HT' : 'Total HT'}</span><span className="tabular-nums font-medium">{fmtCHF(net)} {form.currency}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
+            <div className="flex justify-between text-sm u-ink mb-2">
               <span>TVA {form.vat_rate} %</span><span className="tabular-nums font-medium">{fmtCHF(vat)} {form.currency}</span>
             </div>
-            <div className="flex justify-between items-baseline pt-2 border-t border-gray-100">
-              <span className="text-sm font-semibold text-gray-700">Total TTC</span>
-              <span className="font-bold tabular-nums text-gray-900" style={{ fontSize: 22 }}>{fmtCHF(gross)} {form.currency}</span>
+            <div className="flex justify-between items-baseline pt-2 border-t u-line">
+              <span className="text-sm font-semibold u-ink">Total TTC</span>
+              <span className="font-bold tabular-nums u-ink" style={{ fontSize: 22 }}>{fmtCHF(gross)} {form.currency}</span>
             </div>
           </div>
 
@@ -359,26 +341,28 @@ export default function FactureEmisePage() {
             <div className="flex gap-2">
               {!isNew && (
                 <>
-                  <button onClick={() => downloadPdf('detailed')} disabled={dirty || !!pdfBusy}
+                  <a href={dirty ? undefined : pdfHref('detailed')} aria-disabled={dirty}
                     title={dirty ? 'Enregistre d\'abord pour inclure les dernières modifications' : 'PDF détaillé avec QR-bill'}
-                    className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400 disabled:opacity-40">
-                    {pdfBusy === 'detailed' ? 'Génération…' : 'PDF détaillé'}
-                  </button>
-                  <button onClick={() => downloadPdf('summary')} disabled={dirty || !!pdfBusy}
-                    className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400 disabled:opacity-40">
-                    {pdfBusy === 'summary' ? 'Génération…' : 'PDF résumé'}
-                  </button>
+                    className="px-4 py-2 u-pill text-sm font-medium border u-line u-ink hover:u-line"
+                    style={{ opacity: dirty ? .4 : 1, pointerEvents: dirty ? 'none' : 'auto', textDecoration: 'none' }}>
+                    PDF détaillé
+                  </a>
+                  <a href={dirty ? undefined : pdfHref('summary')} aria-disabled={dirty}
+                    className="px-4 py-2 u-pill text-sm font-medium border u-line u-ink hover:u-line"
+                    style={{ opacity: dirty ? .4 : 1, pointerEvents: dirty ? 'none' : 'auto', textDecoration: 'none' }}>
+                    PDF résumé
+                  </a>
                   <button onClick={() => setSendOpen(true)} disabled={dirty}
-                    className="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400 disabled:opacity-40">
+                    className="px-4 py-2 u-pill text-sm font-medium border u-line u-ink hover:u-line disabled:opacity-40">
                     Envoyer par e-mail
                   </button>
                 </>
               )}
             </div>
             <div className="flex gap-2">
-              {!isNew && <button onClick={remove} className="px-4 py-2 text-sm font-medium text-red-500 hover:text-red-700">Supprimer</button>}
+              {!isNew && <button onClick={remove} className="px-4 py-2 text-sm font-medium u-ko hover:u-ko">Supprimer</button>}
               <button onClick={() => save({ close: true })} disabled={saving}
-                className="px-5 py-2 rounded-md text-white font-medium text-sm disabled:opacity-50" style={{ background: '#111827' }}>
+                className="px-5 py-2 u-pill text-white font-medium text-sm disabled:opacity-50" style={{ background: AL.black }}>
                 {saving ? 'Enregistrement…' : 'Enregistrer et fermer'}
               </button>
             </div>
