@@ -8,8 +8,9 @@ import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
 import { DISPLAY_STATUSES, STATUS_ORDER, effectiveStatus } from '../lib/supplierStatus'
 import { fmtCHF as fmtMontant } from '../lib/money'
+import { AL, C } from '../lib/theme'
 
-const PINK = '#111827'
+const PINK = AL.black
 
 function fmtCHF(n) {
   if (n == null) return '—'
@@ -231,17 +232,17 @@ export default function FacturesFournisseurs() {
   }, { total: 0, toPay: 0, paid: 0 })
 
   return (
-    <div className="min-h-screen" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen" style={{ background: AL.white }}>
       <Head><title>Maze Project — Factures fournisseurs</title></Head>
 
       <NavBar title="Factures fournisseurs">
-        <label className="px-4 py-2 text-sm font-medium rounded-md text-white cursor-pointer" style={{ background: PINK }}>
+        <label className="px-4 py-2 text-sm font-medium u-pill text-white cursor-pointer" style={{ background: PINK }}>
           📁 Importer
           <input type="file" multiple accept="image/*,application/pdf" className="hidden"
             onChange={e => { Array.from(e.target.files || []).forEach(processDroppedFile); e.target.value = '' }} />
         </label>
         <button onClick={() => { setEditing(null); setDrawerOpen(true) }}
-          className="ml-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:border-gray-400">
+          className="ml-2 px-4 py-2 text-sm font-medium u-pill border u-line u-ink hover:u-line">
           + Manuel
         </button>
       </NavBar>
@@ -250,10 +251,10 @@ export default function FacturesFournisseurs() {
       {dragging && (
         <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
           style={{ background: 'rgba(17, 24, 39, 0.55)' }}>
-          <div className="bg-white rounded-2xl px-10 py-8 text-center shadow-2xl border-2 border-dashed" style={{ borderColor: '#111827' }}>
+          <div className="u-surface u-panel px-10 py-8 text-center shadow-2xl border-2 border-dashed" style={{ borderColor: AL.black }}>
             <div className="text-5xl mb-3">📥</div>
-            <p className="font-semibold text-gray-900" style={{ fontSize: 18 }}>Déposez votre facture ici</p>
-            <p className="text-sm text-gray-500 mt-1">JPG · PNG · PDF — l'IA va l'analyser</p>
+            <p className="font-semibold u-ink" style={{ fontSize: 18 }}>Déposez votre facture ici</p>
+            <p className="text-sm u-muted mt-1">JPG · PNG · PDF — l'IA va l'analyser</p>
           </div>
         </div>
       )}
@@ -262,25 +263,25 @@ export default function FacturesFournisseurs() {
       {processing.length > 0 && (
         <div className="fixed bottom-5 right-5 z-30 space-y-2 max-w-sm">
           {processing.map(p => (
-            <div key={p.id} className="bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex items-center gap-3">
+            <div key={p.id} className="u-surface u-panel shadow-lg border u-line px-4 py-3 flex items-center gap-3">
               {p.status === 'done' ? (
-                <span className="text-green-600">✓</span>
+                <span className="u-ok">✓</span>
               ) : p.status === 'error' ? (
-                <span className="text-red-500">✕</span>
+                <span className="u-ko">✕</span>
               ) : p.status === 'duplicate' ? (
-                <span className="text-amber-600">⚠</span>
+                <span className="u-warn">⚠</span>
               ) : (
-                <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#e5e7eb', borderTopColor: '#111827' }} />
+                <div className="w-4 h-4 u-pill border-2 animate-spin" style={{ borderColor: C.border, borderTopColor: AL.black }} />
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm font-medium u-ink truncate">{p.name}</p>
+                <p className="text-xs u-muted">
                   {p.status === 'reading'   && 'Lecture…'}
                   {p.status === 'scanning'  && 'Analyse IA…'}
                   {p.status === 'uploading' && 'Sauvegarde sur kDrive…'}
                   {p.status === 'done' && !p.multiVat && 'Importée ✓'}
                   {p.status === 'done' && p.multiVat && (
-                    <span className="text-amber-700">
+                    <span className="u-warn">
                       Importée ✓ — ⚠ Plusieurs taux TVA détectés ({p.vatBreakdown?.map(b => b.rate + '%').join(' + ')})
                     </span>
                   )}
@@ -288,10 +289,10 @@ export default function FacturesFournisseurs() {
                   {p.status === 'duplicate' && (
                     <>
                       Doublon ({p.duplicate?.supplier_name}, n° {p.duplicate?.invoice_number || '—'}, {p.duplicate?.amount} CHF){' '}
-                      <button onClick={p.retry} className="ml-1 underline text-amber-700 hover:text-amber-900">Importer quand même</button>
+                      <button onClick={p.retry} className="ml-1 underline u-warn hover:u-warn">Importer quand même</button>
                       {' · '}
                       <button onClick={() => setProcessing(pp => pp.filter(xx => xx.id !== p.id))}
-                        className="underline text-gray-500 hover:text-gray-700">Ignorer</button>
+                        className="underline u-muted hover:u-ink">Ignorer</button>
                     </>
                   )}
                 </p>
@@ -306,14 +307,14 @@ export default function FacturesFournisseurs() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Total année', value: totals.total, color: '#111827' },
-            { label: 'À payer',     value: totals.toPay, color: '#f59e0b' },
-            { label: 'Payé',        value: totals.paid,  color: '#22c55e' },
+            { label: 'Total année', value: totals.total, color: AL.black },
+            { label: 'À payer',     value: totals.toPay, color: C.warning },
+            { label: 'Payé',        value: totals.paid,  color: C.success },
           ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3">
-              <div className="text-xs text-gray-500 mb-1">{s.label}</div>
+            <div key={s.label} className="u-surface u-panel border u-line px-4 py-3">
+              <div className="text-xs u-muted mb-1">{s.label}</div>
               <div className="font-semibold tabular-nums" style={{ fontSize: 22, color: s.color, letterSpacing: '-0.02em' }}>
-                {fmtCHF(s.value)} <span className="text-xs font-normal text-gray-400">CHF</span>
+                {fmtCHF(s.value)} <span className="text-xs font-normal u-muted">CHF</span>
               </div>
             </div>
           ))}
@@ -322,7 +323,7 @@ export default function FacturesFournisseurs() {
         {/* Filtres */}
         <div className="flex items-center gap-2 flex-wrap">
           <select value={year} onChange={e => setYear(Number(e.target.value))}
-            className="px-3 py-1.5 border border-gray-200 rounded-md text-sm bg-white">
+            className="px-3 py-1.5 border u-line u-pill text-sm u-surface">
             {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <div className="flex gap-1.5">
@@ -334,10 +335,10 @@ export default function FacturesFournisseurs() {
               { key: 'paid',         label: 'Payées' },
             ].map(f => (
               <button key={f.key} onClick={() => setFilter(f.key)}
-                className="px-3 py-1.5 rounded-md text-xs font-medium"
+                className="px-3 py-1.5 u-pill text-xs font-medium"
                 style={filter === f.key
-                  ? { background: '#111827', color: 'white' }
-                  : { background: '#f3f4f6', color: '#6b7280' }}>
+                  ? { background: AL.black, color: 'white' }
+                  : { background: C.neutralBg, color: C.muted }}>
                 {f.label}
               </button>
             ))}
@@ -346,16 +347,16 @@ export default function FacturesFournisseurs() {
 
         {/* Liste */}
         {loading ? (
-          <p className="text-sm text-gray-400 py-12 text-center">Chargement…</p>
+          <p className="text-sm u-muted py-12 text-center">Chargement…</p>
         ) : visible.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-            <p className="text-sm text-gray-400">Aucune facture {filter === 'all' ? '' : ('— filtre : ' + filter)}.</p>
+          <div className="u-surface u-panel border u-line p-12 text-center">
+            <p className="text-sm u-muted">Aucune facture {filter === 'all' ? '' : ('— filtre : ' + filter)}.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="u-surface u-panel border u-line overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
+                <tr className="u-fill border-b u-line">
                   {[
                     { key: 'supplier_name',  label: 'Fournisseur' },
                     { key: 'invoice_number', label: 'N° facture' },
@@ -366,11 +367,11 @@ export default function FacturesFournisseurs() {
                     { key: 'status',         label: 'Statut' },
                   ].map(c => (
                     <th key={c.key}
-                      className={`px-4 py-3 font-semibold text-gray-700 cursor-pointer select-none hover:text-gray-900 ${c.align === 'right' ? 'text-right' : 'text-left'}`}
+                      className={`px-4 py-3 font-semibold u-ink cursor-pointer select-none hover:u-ink ${c.align === 'right' ? 'text-right' : 'text-left'}`}
                       style={{ fontSize: 11 }}
                       onClick={() => toggleSort(c.key)}>
                       {c.label}
-                      <span className="ml-1" style={{ color: sort.key === c.key ? '#111827' : '#d1d5db' }}>
+                      <span className="ml-1" style={{ color: sort.key === c.key ? AL.black : C.muted }}>
                         {sort.key === c.key ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'}
                       </span>
                     </th>
@@ -382,32 +383,32 @@ export default function FacturesFournisseurs() {
                 {visible.map(inv => {
                   const st = dueStatus(inv)
                   return (
-                    <tr key={inv.id} className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer"
+                    <tr key={inv.id} className="border-t u-line hover:u-fill cursor-pointer"
                       onClick={() => { setEditing(inv); setDrawerOpen(true) }}>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{inv.supplier_name}</div>
-                        {inv.category && <div className="text-xs text-gray-400">{inv.category}</div>}
+                        <div className="font-medium u-ink">{inv.supplier_name}</div>
+                        {inv.category && <div className="text-xs u-muted">{inv.category}</div>}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{inv.invoice_number || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(inv.issue_date)}</td>
-                      <td className="px-4 py-3 text-gray-600 tabular-nums">{fmtDate(inv.due_date)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                        {fmtCHF(inv.amount)} <span className="text-xs font-normal text-gray-400">{inv.currency || 'CHF'}</span>
+                      <td className="px-4 py-3 u-ink">{inv.invoice_number || '—'}</td>
+                      <td className="px-4 py-3 u-ink tabular-nums">{fmtDate(inv.issue_date)}</td>
+                      <td className="px-4 py-3 u-ink tabular-nums">{fmtDate(inv.due_date)}</td>
+                      <td className="px-4 py-3 text-right font-semibold u-ink tabular-nums">
+                        {fmtCHF(inv.amount)} <span className="text-xs font-normal u-muted">{inv.currency || 'CHF'}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 tabular-nums">
+                      <td className="px-4 py-3 u-ink tabular-nums">
                         {inv.paid_at ? (
                           fmtDate(String(inv.paid_at).slice(0, 10))
                         ) : inv.scheduled_payment_date ? (
-                          <span className="text-blue-600">{fmtDate(inv.scheduled_payment_date)}</span>
+                          <span className="u-info">{fmtDate(inv.scheduled_payment_date)}</span>
                         ) : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold inline-block"
+                        <span className="px-2 py-0.5 u-pill text-xs font-semibold inline-block"
                           style={{ background: DISPLAY_STATUSES[st].color + '18', color: DISPLAY_STATUSES[st].color }}>
                           {DISPLAY_STATUSES[st].label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-300">›</td>
+                      <td className="px-4 py-3 text-right u-muted">›</td>
                     </tr>
                   )
                 })}
@@ -569,7 +570,7 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const inputCls = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:border-gray-400 focus:outline-none"
+  const inputCls = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none"
 
   return (
     <>
@@ -579,27 +580,27 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
       `}</style>
       <div className="fixed inset-0 z-50" style={{ background: 'rgba(15,23,42,0.35)', animation: 'drawerFade 0.15s ease-out both' }}
         onClick={e => e.target === e.currentTarget && onClose()}>
-        <div className="fixed top-0 right-0 bottom-0 bg-white flex flex-col shadow-2xl"
+        <div className="fixed top-0 right-0 bottom-0 u-surface flex flex-col shadow-2xl"
           style={{ width: '100%', maxWidth: 560, animation: 'drawerSlide 0.2s cubic-bezier(0.4,0,0.2,1) both', fontFamily: 'Inter, sans-serif' }}>
 
-          <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
+          <div className="flex items-center justify-between px-8 py-5 border-b u-line">
             <div>
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-0.5">{isEdit ? 'Modifier' : 'Nouvelle facture fournisseur'}</p>
-              <h2 className="font-semibold text-gray-900" style={{ fontSize: 20 }}>
+              <p className="text-xs uppercase tracking-wider u-muted mb-0.5">{isEdit ? 'Modifier' : 'Nouvelle facture fournisseur'}</p>
+              <h2 className="font-semibold u-ink" style={{ fontSize: 20 }}>
                 {isEdit ? (form.supplier_name || 'Facture') : 'Saisir une facture'}
               </h2>
             </div>
-            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100" style={{ fontSize: 22 }}>×</button>
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center u-pill u-muted hover:u-fill" style={{ fontSize: 22 }}>×</button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
             {/* Upload + scan IA */}
             {!isEdit && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">PDF ou image de la facture</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">PDF ou image de la facture</label>
                 <label
-                  className="block w-full rounded-md border border-dashed cursor-pointer overflow-hidden"
-                  style={{ borderColor: filePreview ? '#bbf7d0' : '#e5e7eb', background: filePreview ? '#f0fdf4' : '#fafafa', minHeight: 96 }}
+                  className="block w-full u-pill border border-dashed cursor-pointer overflow-hidden"
+                  style={{ borderColor: filePreview ? C.successBg : C.border, background: filePreview ? C.successBg : AL.white, minHeight: 96 }}
                   onDragOver={e => { e.preventDefault() }}
                   onDrop={e => {
                     e.preventDefault()
@@ -614,47 +615,47 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
                         <img src={`data:${filePreview.mime};base64,${filePreview.base64}`} alt=""
                           className="w-16 h-16 object-cover rounded" />
                       ) : (
-                        <div className="w-16 h-16 flex items-center justify-center bg-white rounded border">📄</div>
+                        <div className="w-16 h-16 flex items-center justify-center u-surface rounded border">📄</div>
                       )}
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-green-700">Fichier attaché</div>
-                        <div className="text-xs text-gray-500 truncate">{filePreview.name}</div>
+                        <div className="text-sm font-medium u-ok">Fichier attaché</div>
+                        <div className="text-xs u-muted truncate">{filePreview.name}</div>
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-6 gap-1">
-                      <p className="text-sm text-gray-600 font-medium">Glisser un fichier ou <span className="underline">parcourir</span></p>
-                      <p className="text-xs text-gray-400">PDF / Image · sera stocké sur kDrive</p>
+                      <p className="text-sm u-ink font-medium">Glisser un fichier ou <span className="underline">parcourir</span></p>
+                      <p className="text-xs u-muted">PDF / Image · sera stocké sur kDrive</p>
                     </div>
                   )}
                 </label>
                 {filePreview && filePreview.mime.startsWith('image/') && (
                   <button onClick={scan} disabled={scanLoading}
-                    className="mt-3 w-full py-2 rounded-md text-sm font-medium border"
-                    style={{ borderColor: '#bfdbfe', color: '#2563eb', background: scanLoading ? '#f3f4f6' : 'white' }}>
+                    className="mt-3 w-full py-2 u-pill text-sm font-medium border"
+                    style={{ borderColor: C.infoBg, color: C.info, background: scanLoading ? C.neutralBg : 'white' }}>
                     {scanLoading ? 'Analyse IA…' : 'Pré-remplir avec l\'IA'}
                   </button>
                 )}
-                {scanError && <p className="text-xs text-red-500 mt-2">{scanError}</p>}
+                {scanError && <p className="text-xs u-ko mt-2">{scanError}</p>}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Fournisseur *</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Fournisseur *</label>
                 <div className="mb-2"><ContactPicker placeholder="Choisir dans les contacts…" onSelect={({ name }) => set('supplier_name', name)} /></div>
                 <input className={inputCls} value={form.supplier_name} onChange={e => set('supplier_name', e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">N° facture</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">N° facture</label>
                 <input className={inputCls} value={form.invoice_number} onChange={e => set('invoice_number', e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Catégorie</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Catégorie</label>
                 <input className={inputCls} value={form.category} onChange={e => set('category', e.target.value)} placeholder="Matériel, services..." />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Total TTC *</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Total TTC *</label>
                 <input type="number" step="0.01" className={inputCls} value={form.amount}
                   onChange={e => {
                     set('amount', e.target.value)
@@ -662,13 +663,13 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
                   }} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Devise</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Devise</label>
                 <select className={inputCls} value={form.currency} onChange={e => set('currency', e.target.value)}>
                   <option>CHF</option><option>EUR</option><option>USD</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">TVA (%)</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">TVA (%)</label>
                 <select className={inputCls} value={form.vat_rate}
                   onChange={e => {
                     set('vat_rate', e.target.value)
@@ -682,41 +683,41 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Montant HT</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Montant HT</label>
                 <input type="number" step="0.01" className={inputCls} value={form.amount_net}
                   onChange={e => set('amount_net', e.target.value)}
                   placeholder="auto si TTC + taux" />
               </div>
               <div className="col-span-2 -mt-1">
-                <p className="text-xs text-gray-400">
-                  TVA : <span className="font-semibold text-gray-700 tabular-nums">{form.vat_amount ? `${form.vat_amount} ${form.currency}` : '—'}</span>
+                <p className="text-xs u-muted">
+                  TVA : <span className="font-semibold u-ink tabular-nums">{form.vat_amount ? `${form.vat_amount} ${form.currency}` : '—'}</span>
                 </p>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Émise le</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Émise le</label>
                 <input type="date" className={inputCls} value={form.issue_date} onChange={e => set('issue_date', e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Échéance</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Échéance</label>
                 <input type="date" className={inputCls} value={form.due_date} onChange={e => set('due_date', e.target.value)} />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Référence paiement (QR/ESR)</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Référence paiement (QR/ESR)</label>
                 <input className={inputCls} value={form.payment_reference} onChange={e => set('payment_reference', e.target.value)}
                   placeholder="27 chiffres si QR-bill" />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">IBAN du fournisseur</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">IBAN du fournisseur</label>
                 <input className={inputCls} value={form.iban} onChange={e => set('iban', e.target.value)} />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Notes</label>
+                <label className="block text-xs font-medium u-muted mb-1.5">Notes</label>
                 <textarea rows={2} className={inputCls} value={form.notes} onChange={e => set('notes', e.target.value)} />
               </div>
               {isEdit && (
                 <>
                   <div className={form.status === 'sent_to_bank' ? '' : 'col-span-2'}>
-                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Statut</label>
+                    <label className="block text-xs font-medium u-muted mb-1.5">Statut</label>
                     {/* « En retard » se déduit de l'échéance, il ne se choisit pas */}
                     <select className={inputCls} value={form.status} onChange={e => set('status', e.target.value)}>
                       <option value="pending">À payer</option>
@@ -726,16 +727,16 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
                   </div>
                   {form.status === 'sent_to_bank' && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1.5">Date de paiement</label>
+                      <label className="block text-xs font-medium u-muted mb-1.5">Date de paiement</label>
                       <input type="date" className={inputCls} value={form.scheduled_payment_date}
                         onChange={e => set('scheduled_payment_date', e.target.value)} />
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs u-muted mt-1">
                         Peut être future. Le statut passera à « payée » tout seul au prochain import CAMT.
                       </p>
                     </div>
                   )}
                   {form.status === 'paid' && invoice?.paid_at && (
-                    <div className="col-span-2 text-xs text-gray-500">
+                    <div className="col-span-2 text-xs u-muted">
                       Payée le {fmtDate(String(invoice.paid_at).slice(0, 10))}
                       {invoice.paid_transaction_id ? ' — rapprochée du relevé bancaire' : ''}
                     </div>
@@ -744,25 +745,25 @@ function SupplierInvoiceDrawer({ invoice, currentUser, onClose, onSaved }) {
               )}
             </div>
 
-            {saveError && <p className="text-xs text-red-500">{saveError}</p>}
+            {saveError && <p className="text-xs u-ko">{saveError}</p>}
 
             {isEdit && invoice?.kdrive_file_id && (
               <a href={`/api/kdrive/download?fileId=${invoice.kdrive_file_id}`} target="_blank" rel="noopener"
-                className="block w-full text-center px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:border-gray-400">
+                className="block w-full text-center px-4 py-2 u-pill text-sm font-medium border u-line u-ink hover:u-line">
                 📎 Ouvrir le fichier attaché
               </a>
             )}
           </div>
 
-          <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+          <div className="px-8 py-4 border-t u-line flex items-center justify-between gap-3">
             {isEdit ? (
-              <button onClick={deleteInvoice} className="text-sm font-medium text-red-500 hover:text-red-700">Supprimer</button>
+              <button onClick={deleteInvoice} className="text-sm font-medium u-ko hover:u-ko">Supprimer</button>
             ) : <span />}
             <div className="flex gap-2">
-              <button onClick={onClose} className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">Annuler</button>
+              <button onClick={onClose} className="px-4 py-2 u-pill text-sm font-medium u-ink hover:u-fill">Annuler</button>
               <button onClick={save} disabled={saving}
-                className="px-5 py-2 rounded-md text-white font-medium text-sm disabled:opacity-50"
-                style={{ background: '#111827' }}>
+                className="px-5 py-2 u-pill text-white font-medium text-sm disabled:opacity-50"
+                style={{ background: AL.black }}>
                 {saving ? 'Enregistrement…' : isEdit ? 'Mettre à jour' : 'Enregistrer'}
               </button>
             </div>

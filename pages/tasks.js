@@ -4,47 +4,53 @@ import Head from 'next/head'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
 import TaskFormDrawer from '../components/TaskFormDrawer'
-import { C, FONT, MONO, personChip } from '../lib/theme'
+import { AL, C, FONT, MONO, R, personChip } from '../lib/theme'
+import ButtonPill from '../components/ButtonPill'
 import useIsAdmin from '../lib/useIsAdmin'
 
-const PINK = '#111827'
+const PINK = AL.black
 const PEOPLE = ['Arnaud', 'Guillaume', 'Gabin', 'non défini']  // valeur par défaut, surchargée par useResponsibles()
+// Aligné sur PERSON de lib/theme.js — une seule source pour la couleur des gens.
 const PERSON_COLORS = {
-  Arnaud: '#3b82f6',
-  Gabin: '#8b5cf6',
-  Guillaume: PINK,
-  'Sous-traitant': '#64748b',
-  'non défini': '#9ca3af',
-  'Coople': '#64748b',
+  Arnaud: personChip('Arnaud').fg,
+  Gabin: personChip('Gabin').fg,
+  Guillaume: personChip('Guillaume').fg,
+  'Sous-traitant': C.muted,
+  'non défini': C.muted,
+  'Coople': C.muted,
 }
 
 function colorForName(name) {
   if (PERSON_COLORS[name]) return PERSON_COLORS[name]
-  if (!name) return '#9ca3af'
+  if (!name) return C.muted
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
   return `hsl(${Math.abs(hash) % 360}, 45%, 48%)`
 }
 
+// Couleurs de groupe. Le handoff les annonce comme « reprises du code », mais
+// le code portait encore la palette de juillet : elles passent au système v2 là
+// où un équivalent existe. Le bleu de « cette semaine » n'a pas d'équivalent —
+// il reste, et c'est le même que la chip d'Arnaud, que le design system porte.
 const SECTIONS = [
-  { key: 'overdue',        label: 'En retard',                color: '#c03d2e' },
-  { key: 'today',          label: "Aujourd'hui",              color: '#a26a1f' },
-  { key: 'tomorrow',       label: 'Demain',                   color: '#a26a1f' },
-  { key: 'thisWeek',       label: 'Cette semaine',            color: '#3e6d9e' },
-  { key: 'nextWeek',       label: 'Semaine prochaine',        color: '#6b5f65' },
-  { key: 'later',          label: 'Plus tard',                color: '#9a8d93' },
-  { key: 'noDate',         label: 'Sans date',                color: '#9a8d93' },
-  { key: 'completedToday', label: "Terminées aujourd'hui",    color: '#3e8e6e' },
+  { key: 'overdue',        label: 'En retard',                color: C.danger },
+  { key: 'today',          label: "Aujourd'hui",              color: C.warning },
+  { key: 'tomorrow',       label: 'Demain',                   color: C.warning },
+  { key: 'thisWeek',       label: 'Cette semaine',            color: C.info },
+  { key: 'nextWeek',       label: 'Semaine prochaine',        color: C.muted },
+  { key: 'later',          label: 'Plus tard',                color: C.muted },
+  { key: 'noDate',         label: 'Sans date',                color: C.muted },
+  { key: 'completedToday', label: "Terminées aujourd'hui",    color: C.success },
 ]
 
 // Badge d'échéance mono à droite de la ligne (12a)
 function dueBadge(task, days) {
   if (days == null) return null
-  if (days < 0)   return { text: `${-days}J DE RETARD`, fg: '#c03d2e', bg: '#f9e7e4' }
-  if (days === 0) return { text: "AUJOURD'HUI",         fg: '#a26a1f', bg: '#f5ecda' }
-  if (days === 1) return { text: 'DEMAIN',              fg: '#a26a1f', bg: '#f5ecda' }
-  if (days <= 14) return { text: `J-${days}`,           fg: '#3e6d9e', bg: '#e5ecf4' }
-  return { text: `J-${days}`, fg: '#6b5f65', bg: '#f2eaed' }
+  if (days < 0)   return { text: `${-days}j de retard`, fg: C.danger }
+  if (days === 0) return { text: "aujourd'hui",         fg: C.warning }
+  if (days === 1) return { text: 'demain',              fg: C.warning }
+  if (days <= 14) return { text: `J-${days}`,           fg: C.info }
+  return { text: `J-${days}`, fg: C.muted }
 }
 
 // Rail de filtres (12a)
@@ -132,15 +138,15 @@ function CountdownBadge({ task }) {
   const hasDueDate = task.due_date && task.due_date !== task.execution_date
 
   let bg, color, label
-  if (days < 0) { bg = '#fee2e2'; color = '#dc2626'; label = `${Math.abs(days)}j de retard` }
-  else if (days === 0) { bg = '#fee2e2'; color = '#dc2626'; label = "Aujourd'hui !" }
-  else if (days === 1) { bg = '#fff7ed'; color = '#ea580c'; label = 'Demain' }
-  else if (days <= 7) { bg = '#fff7ed'; color = '#ea580c'; label = `J-${days}` }
-  else { bg = '#f0fdf4'; color = '#16a34a'; label = `J-${days}` }
+  if (days < 0) { bg = C.dangerBg; color = C.danger; label = `${Math.abs(days)}j de retard` }
+  else if (days === 0) { bg = C.dangerBg; color = C.danger; label = "aujourd'hui" }
+  else if (days === 1) { bg = C.warningBg; color = C.warning; label = 'demain' }
+  else if (days <= 7) { bg = C.warningBg; color = C.warning; label = `J-${days}` }
+  else { bg = C.successBg; color = C.success; label = `J-${days}` }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
-      style={{ background: bg, color }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px',
+      borderRadius: R.pill, fontSize: 11, fontWeight: 500, background: bg, color }}>
       {hasDueDate && <span title="Date d'échéance">⏰</span>}
       {label}
     </span>
@@ -157,48 +163,47 @@ function TaskCard({ task, currentUser, isAdmin, onToggle, onEdit, onDelete }) {
   const badge       = !completed && dueBadge(task, daysRemaining(task))
 
   return (
+    // Ligne, pas carte : le séparateur est un filet HAUT. Les tâches d'un même
+    // groupe forment ainsi une liste continue, sans 8 bordures empilées.
     <div className="group" style={{
-      background: C.surface, border: `1px solid ${completed ? C.divider : C.border}`,
-      borderRadius: 8, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 12,
-      opacity: completed ? 0.6 : 1, fontFamily: FONT,
+      display: 'flex', alignItems: 'center', gap: 14, padding: '13px 4px',
+      borderTop: `1px solid ${C.border}`, opacity: completed ? 0.6 : 1, fontFamily: FONT,
     }}>
-      {/* Checkbox */}
+      {/* Case à cocher carrée, filet outline 1.5px */}
       <button onClick={() => onToggle(task)} aria-label="Basculer" style={{
-        width: 17, height: 17, borderRadius: '50%', flex: 'none', cursor: 'pointer', padding: 0,
-        border: completed ? 'none' : `2px solid ${C.faintBorder}`,
+        width: 16, height: 16, borderRadius: 4, flex: 'none', cursor: 'pointer', padding: 0,
+        border: completed ? 'none' : `1.5px solid ${C.outline}`,
         background: completed ? C.success : 'transparent',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: AL.white, fontSize: 9,
       }}>{completed && '✓'}</button>
 
       {/* Corps */}
       <button onClick={() => !completed && onEdit(task)}
-        style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: completed ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: completed ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', gap: 1 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {task.is_private && <span style={{ fontSize: 11 }} title="Privée">🔒</span>}
-          <span style={{ fontSize: 13.5, fontWeight: completed ? 400 : 600, color: completed ? C.muted : C.ink, textDecoration: completed ? 'line-through' : 'none' }}>{task.title}</span>
+          <span style={{ fontSize: 14.5, fontWeight: 500, color: completed ? C.muted : AL.black, textDecoration: completed ? 'line-through' : 'none' }}>{task.title}</span>
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: chip.fg, background: chip.bg, padding: '2px 9px', borderRadius: 6 }}>{task.responsible}</span>
-          {projectName && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: completed ? C.faintChevron : C.muted }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: C.faint }} />
-              {projectName}
-            </span>
-          )}
-        </span>
+        {projectName && <span style={{ fontSize: 12.5, color: C.muted }}>{projectName}</span>}
       </button>
 
-      {/* Badge échéance */}
-      {badge && (
-        <span style={{ font: `10px ${MONO}`, color: badge.fg, background: badge.bg, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap', flex: 'none' }}>{badge.text}</span>
-      )}
+      {/* Chip de personne */}
+      <span style={{ fontSize: 12, fontWeight: 500, color: chip.fg, background: chip.bg,
+        padding: '5px 12px', borderRadius: R.pill, flex: 'none', whiteSpace: 'nowrap' }}>{task.responsible}</span>
+
+      {/* Échéance, dans la couleur du groupe */}
+      <span style={{ fontSize: 13, color: badge ? badge.fg : C.muted, width: 110, textAlign: 'right', flex: 'none', whiteSpace: 'nowrap' }}>
+        {badge ? badge.text : '—'}
+      </span>
 
       {/* Actions au survol */}
       {!completed && (
-        <span className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ display: 'flex', gap: 10, fontSize: 11.5, flex: 'none' }}>
-          <button onClick={() => onEdit(task)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Modifier</button>
+        <span className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ display: 'flex', gap: 12, flex: 'none' }}>
+          <button onClick={() => onEdit(task)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `12px ${FONT}` }}
+            onMouseEnter={e => { e.currentTarget.style.color = AL.black }} onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>modifier</button>
           {canDelete && (
-            <button onClick={() => onDelete(task)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Supprimer</button>
+            <button onClick={() => onDelete(task)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `12px ${FONT}` }}
+              onMouseEnter={e => { e.currentTarget.style.color = AL.black }} onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>supprimer</button>
           )}
         </span>
       )}
@@ -211,14 +216,14 @@ function fmtTaskDate(task) {
   const ref = task.due_date && task.due_date !== task.execution_date ? task.due_date : task.execution_date
   if (!ref) return null
   const todayStr = toDateStr(today())
-  if (ref === todayStr) return { label: "Aujourd'hui", color: '#d97706' }
+  if (ref === todayStr) return { label: "Aujourd'hui", color: C.warning }
   const [y, m, d] = ref.split('-').map(Number)
   const date = new Date(y, m-1, d); date.setHours(0,0,0,0)
   const diff = Math.round((date - today()) / 86400000)
-  if (diff < 0) return { label: `${Math.abs(diff)}j en retard`, color: '#dc2626' }
-  if (diff === 1) return { label: 'Demain', color: '#d97706' }
-  if (diff <= 7) return { label: `Dans ${diff}j`, color: '#0284c7' }
-  return { label: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), color: '#6b7280' }
+  if (diff < 0) return { label: `${Math.abs(diff)}j en retard`, color: C.danger }
+  if (diff === 1) return { label: 'Demain', color: C.warning }
+  if (diff <= 7) return { label: `Dans ${diff}j`, color: C.info }
+  return { label: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), color: C.muted }
 }
 
 
@@ -227,7 +232,7 @@ function fmtTaskDate(task) {
 function WhoAreYou({ onSelect }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center px-6"
-      style={{ background: '#fafafa' }}>
+      style={{ background: AL.white }}>
       <div className="mb-8 text-center">
         <svg width="40" height="40" viewBox="0 0 40 40" fill="none" className="mx-auto mb-3">
           <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" />
@@ -235,13 +240,13 @@ function WhoAreYou({ onSelect }) {
           <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="2" fill="none" transform="rotate(120 20 20)" />
           <circle cx="20" cy="20" r="3" fill={PINK} />
         </svg>
-        <p className="font-bold text-gray-900 text-lg">amazing lab</p>
-        <p className="text-gray-500 text-sm mt-1">Qui es-tu ?</p>
+        <p className="font-bold u-ink text-lg">amazing lab</p>
+        <p className="u-muted text-sm mt-1">Qui es-tu ?</p>
       </div>
       <div className="w-full space-y-3 max-w-xs">
         {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
           <button key={p} onClick={() => onSelect(p)}
-            className="w-full py-4 rounded-2xl text-white text-lg font-semibold transition-opacity hover:opacity-90"
+            className="w-full py-4 u-panel text-white text-lg font-semibold transition-opacity hover:opacity-90"
             style={{ background: PERSON_COLORS[p] }}>
             {p}
           </button>
@@ -469,35 +474,23 @@ export default function Tasks() {
 
       {/* Feedback toast */}
       {feedback && (
-        <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 px-4 py-2 rounded-2xl shadow-lg text-sm font-medium text-white"
+        <div className="fixed top-4 left-1/2 z-50 -translate-x-1/2 px-4 py-2 u-panel shadow-lg text-sm font-medium text-white"
           style={{ background: feedback.type === 'err' ? C.danger : C.ink }}>
           {feedback.msg}
         </div>
       )}
 
       {/* Header 12a */}
-      <div style={{ padding: '26px 32px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, borderBottom: `1px solid ${C.border}`, paddingBottom: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 23, fontWeight: 700, letterSpacing: '-.4px' }}>Tâches</span>
-            <span style={{ font: `11.5px ${MONO}`, color: C.muted }}>
-              {activeCount} ACTIVE{activeCount > 1 ? 'S' : ''} · {activePersonFilter === 'all' ? "TOUTE L'ÉQUIPE" : activePersonFilter.toUpperCase()} · {({ today: "AUJOURD'HUI", week: 'CETTE SEMAINE', twoweeks: '2 SEMAINES', all: 'TOUT' })[view]}
-            </span>
-          </div>
-          <div style={{ flex: 1 }} />
-          {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
-            <button onClick={requestNotifications} title="Activer les notifications"
-              style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${C.border}`, background: C.surface, color: C.muted, cursor: 'pointer', fontSize: 15 }}>🔔</button>
-          )}
-          <button onClick={() => { setEditingTask(null); setShowForm(true) }}
-            style={{ border: `1px solid ${C.ink}`, background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>
-            + NOUVELLE TÂCHE
-          </button>
-        </div>
+      <div style={{ padding: '32px 40px 0' }}>
+        <h1 style={{ fontSize: 38, fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>Tâches</h1>
+        <p style={{ fontSize: 18, color: C.muted, margin: '12px 0 32px' }}>
+          {activeCount} tâche{activeCount > 1 ? 's' : ''} active{activeCount > 1 ? 's' : ''}
+          {' · '}{activePersonFilter === 'all' ? "toute l'équipe" : activePersonFilter.toLowerCase()}
+        </p>
       </div>
 
       {/* Tabs vue + Filtre personne — mobile uniquement */}
-      <div className="md:hidden bg-white border-b px-4 pb-3 pt-2 space-y-2" style={{ borderColor: '#f0f0f0' }}>
+      <div className="md:hidden px-4 pb-3 pt-2 space-y-2" style={{ borderBottom: `1px solid ${C.border}`, background: C.surface }}>
         <div className="flex gap-1">
           {[
             { key: 'today', label: "Aujourd'hui" },
@@ -505,104 +498,117 @@ export default function Tasks() {
             { key: 'twoweeks', label: '2 semaines' },
           ].map(v => (
             <button key={v.key} onClick={() => setView(v.key)}
-              className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
-              style={view === v.key ? { background: PINK, color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+              className="flex-1 py-2 text-xs transition-all"
+              style={view === v.key ? { background: AL.black, color: AL.white, borderRadius: R.pill } : { background: C.neutralBg, color: C.muted, borderRadius: R.pill }}>
               {v.label}
             </button>
           ))}
         </div>
         <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           <button onClick={() => setPersonFilter('all')}
-            className="px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all"
-            style={activePersonFilter === 'all' ? { background: '#111', color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+            className="px-3 py-1 u-pill text-xs font-medium flex-shrink-0 transition-all"
+            style={activePersonFilter === 'all' ? { background: AL.black, color: AL.white } : { background: C.neutralBg, color: C.muted }}>
             Tous
           </button>
           {['Arnaud', 'Gabin', 'Guillaume'].map(p => (
             <button key={p} onClick={() => setPersonFilter(p)}
-              className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 transition-all"
-              style={activePersonFilter === p ? { background: PERSON_COLORS[p], color: 'white' } : { background: '#f3f4f6', color: '#6b7280' }}>
+              className="px-3 py-1 u-pill text-xs font-semibold flex-shrink-0 transition-all"
+              style={activePersonFilter === p ? { background: personChip(p).fg, color: AL.white } : { background: personChip(p).bg, color: personChip(p).fg }}>
               {p}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Layout 12a : rail + liste */}
-      <div style={{ padding: '16px 32px 40px', display: 'flex', gap: 28 }}>
+      {/* Barre de filtres.
+          Le handoff v1 (tour 12a) dessinait un rail de 186px à gauche ; le
+          prototype v2 l'a remplacé par des chips en ligne. Le filtre PROJET
+          n'existe pas dans la maquette v2 mais existe dans le code : il reste,
+          en select pilule, plutôt que de perdre la fonction. */}
+      <div style={{ padding: '0 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
 
-        {/* ── Rail de filtres (desktop) ── */}
-        <aside className="hidden md:flex" style={{ width: 186, flex: 'none', flexDirection: 'column' }}>
-          <div style={railLabel}>PÉRIODE</div>
-          {[
-            { key: 'today',    label: "Aujourd'hui" },
-            { key: 'week',     label: 'Cette semaine' },
-            { key: 'twoweeks', label: '2 semaines' },
-            { key: 'all',      label: 'Tout' },
-          ].map(v => (
-            <button key={v.key} onClick={() => setView(v.key)} style={railItem(view === v.key)}>
-              <span>{v.label}</span>
-            </button>
-          ))}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[
+              { key: 'today',    label: "aujourd'hui" },
+              { key: 'week',     label: 'cette semaine' },
+              { key: 'twoweeks', label: '2 semaines' },
+              { key: 'all',      label: 'tout' },
+            ].map(v => {
+              const actif = view === v.key
+              return (
+                <button key={v.key} onClick={actif ? undefined : () => setView(v.key)}
+                  style={{ fontFamily: FONT, fontSize: 13, fontWeight: actif ? 500 : 400, padding: '8px 16px',
+                    borderRadius: R.pill, border: `1.5px solid ${C.outline}`,
+                    background: actif ? AL.black : C.surface, color: actif ? AL.white : AL.black,
+                    cursor: actif ? 'default' : 'pointer' }}>{v.label}</button>
+              )
+            })}
+          </div>
 
-          <div style={{ ...railLabel, paddingTop: 14 }}>PERSONNE</div>
-          <button onClick={() => setPersonFilter('all')} style={railItem(activePersonFilter === 'all')}>
-            <span>Toute l'équipe</span>
-          </button>
-          {(responsibles || []).filter(p => p !== 'non défini').map(p => {
-            const n = totalActiveByPerson.filter(t => t.responsible === p).length
-            return (
-              <button key={p} onClick={() => setPersonFilter(p)} style={railItem(activePersonFilter === p)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: personChip(p).fg }} />
-                  {p}
-                </span>
-                {n > 0 && <span style={{ font: `10.5px ${MONO}`, color: C.faint }}>{n}</span>}
-              </button>
-            )
-          })}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[{ nom: 'all', label: "toute l'équipe" }, ...(responsibles || []).filter(p => p !== 'non défini').map(p => ({ nom: p, label: p }))].map(p => {
+              const actif = activePersonFilter === p.nom
+              const chip = p.nom === 'all' ? { fg: C.muted, bg: C.hover } : personChip(p.nom)
+              const n = p.nom === 'all' ? 0 : totalActiveByPerson.filter(t => t.responsible === p.nom).length
+              return (
+                <button key={p.nom} onClick={() => setPersonFilter(p.nom)}
+                  style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500, padding: '6px 13px', borderRadius: R.pill,
+                    border: actif ? `1.5px solid ${C.outline}` : '1.5px solid transparent',
+                    background: chip.bg, color: chip.fg, cursor: 'pointer' }}>
+                  {p.label}{n > 0 ? ` ${n}` : ''}
+                </button>
+              )
+            })}
+          </div>
 
           {projectsWithTasks.length > 0 && (
-            <>
-              <div style={{ ...railLabel, paddingTop: 14 }}>PROJET</div>
-              <button onClick={() => setProjectFilter('all')} style={railItem(projectFilter === 'all')}>
-                <span>Tous les projets</span>
-              </button>
-              {projectsWithTasks.slice(0, 12).map(p => {
-                const n = projectTaskCounts[p.id]
-                return (
-                  <button key={p.id} onClick={() => setProjectFilter(p.id)} style={railItem(projectFilter === p.id)}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                    {n > 0 && <span style={{ font: `10.5px ${MONO}`, color: C.faint, flex: 'none' }}>{n}</span>}
-                  </button>
-                )
-              })}
-            </>
+            <select value={projectFilter} onChange={e => setProjectFilter(e.target.value)}
+              style={{ fontFamily: FONT, fontSize: 13, padding: '8px 16px', borderRadius: R.pill,
+                border: `1.5px solid ${C.outline}`, background: C.surface, color: AL.black, cursor: 'pointer', maxWidth: 220 }}>
+              <option value="all">tous les projets</option>
+              {projectsWithTasks.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({projectTaskCounts[p.id]})</option>
+              ))}
+            </select>
           )}
-        </aside>
+        </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {notifStatus !== 'unsupported' && notifStatus !== 'granted' && (
+            <button onClick={requestNotifications} title="Activer les notifications"
+              style={{ width: 40, height: 40, borderRadius: R.pill, border: `1.5px solid ${C.outline}`,
+                background: C.surface, color: C.muted, cursor: 'pointer', fontSize: 15 }}>🔔</button>
+          )}
+          <ButtonPill onClick={() => { setEditingTask(null); setShowForm(true) }}>+ nouvelle tâche</ButtonPill>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 40px 104px' }}>
         {/* ── Liste tâches ── */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ minWidth: 0 }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: '80px 0', color: C.muted, fontSize: 13 }}>Chargement…</div>
           ) : visibleTasks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 0', background: C.surface, borderRadius: 8, border: `1px solid ${C.border}` }}>
-              <p style={{ color: C.muted, fontSize: 13 }}>Aucune tâche dans cette vue.</p>
+            <div style={{ textAlign: 'center', padding: '80px 0' }}>
+              <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>Aucune tâche dans cette vue.</p>
               <button onClick={() => { setEditingTask(null); setShowForm(true) }}
-                style={{ marginTop: 14, font: `600 12px ${FONT}`, color: C.inkSecondary, background: 'none', border: 'none', cursor: 'pointer' }}>
-                + Créer une tâche
+                style={{ marginTop: 14, font: `12px ${FONT}`, color: C.muted, background: 'none', border: 'none', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+                onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
+                + créer une tâche
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}>
               {SECTIONS.filter(s => sectionsForView.includes(s.key)).map(section => {
                 const items = grouped[section.key] || []
                 if (items.length === 0) return null
                 return (
                   <section key={section.key} style={{ display: 'contents' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: section.color, flex: 'none' }} />
-                      <span style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', color: section.color }}>{section.label.toUpperCase()}</span>
-                      <span style={{ font: `10px ${MONO}`, color: C.muted }}>{items.length}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 24 }}>
+                      <span style={{ font: `700 10.5px ${MONO}`, letterSpacing: '.1em', textTransform: 'uppercase', color: section.color }}>{section.label}</span>
+                      <span style={{ font: `11px ${MONO}`, color: C.muted }}>{items.length}</span>
                     </div>
                     {items.map(task => (
                       <TaskCard key={task.id} task={task} currentUser={currentUser} isAdmin={isAdmin}
@@ -619,8 +625,8 @@ export default function Tasks() {
       {/* FAB mobile uniquement */}
       <button
         onClick={() => { setEditingTask(null); setShowForm(true) }}
-        className="fixed right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-2xl font-light active:scale-95 md:hidden"
-        style={{ background: PINK, bottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+        className="fixed right-5 w-14 h-14 u-pill flex items-center justify-center text-2xl font-light active:scale-95 md:hidden"
+        style={{ background: AL.black, color: AL.white, bottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
         +
       </button>
 

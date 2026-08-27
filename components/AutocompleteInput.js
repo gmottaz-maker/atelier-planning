@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { AL, C, R } from '../lib/theme'
 
 /**
  * Champ texte avec dropdown d'autocomplete visible (au focus ou en tapant).
@@ -65,7 +66,7 @@ export default function AutocompleteInput({
           style={{
             position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
             border: 'none', background: 'transparent', cursor: 'pointer',
-            color: '#9ca3af', fontSize: 11, padding: 4,
+            color: C.muted, fontSize: 11, padding: 4,
           }}>
           ▾
         </button>
@@ -73,7 +74,7 @@ export default function AutocompleteInput({
       {open && filtered.length > 0 && (
         <ul style={{
           position: 'absolute', zIndex: 50, top: '100%', left: 0, right: 0, marginTop: 4,
-          background: 'white', border: '1px solid #e5e7eb', borderRadius: 8,
+          background: 'white', border: '1px solid rgba(12,12,12,.08)', borderRadius: R.panel,
           boxShadow: '0 8px 24px rgba(0,0,0,0.08)', maxHeight: 220, overflowY: 'auto',
           padding: 4, listStyle: 'none',
         }}>
@@ -84,8 +85,8 @@ export default function AutocompleteInput({
               style={{
                 padding: '7px 10px', fontSize: 13, cursor: 'pointer',
                 borderRadius: 4,
-                background: i === active ? '#f3f4f6' : 'transparent',
-                color: '#374151',
+                background: i === active ? C.neutralBg : 'transparent',
+                color: AL.black,
               }}>
               {s}
             </li>

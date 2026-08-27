@@ -21,7 +21,7 @@
 // autres pages.
 import { useState, useEffect, useMemo } from 'react'
 import Head from 'next/head'
-import { C, FONT, MONO } from '../../lib/theme'
+import { AL, C, FONT, MONO, R } from '../../lib/theme'
 import useIsMobile from '../../lib/useIsMobile'
 import PaintCosting, { articlesChiffrables } from '../../components/PaintCosting'
 import PaintCoefficients, { useCoefficients } from '../../components/PaintCoefficients'
@@ -224,7 +224,7 @@ export default function Peintures() {
   }
 
   // ── styles partagés ────────────────────────────────────────────────────
-  const card = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8 }
+  const card = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel }
   const legend = {
     font: `700 10px ${MONO}`, letterSpacing: '.12em', color: C.inkTertiary,
     textTransform: 'uppercase', marginBottom: 6,
@@ -233,7 +233,7 @@ export default function Peintures() {
   // texte — la grille donne la largeur, la hauteur est fixe.
   const chipStyle = on => ({
     border: `1px solid ${on ? C.ink : C.border}`, background: on ? C.ink : C.surface,
-    color: on ? '#fff' : C.inkSecondary, borderRadius: 99, padding: '0 10px',
+    color: on ? AL.white : C.inkSecondary, borderRadius: R.pill, padding: '0 10px',
     fontFamily: FONT, fontSize: 12, fontWeight: on ? 600 : 400, lineHeight: 1.15,
     cursor: 'pointer',
     // Hauteur fixe + largeur de la grille : gabarit identique pour toutes. Les
@@ -242,7 +242,7 @@ export default function Peintures() {
     textAlign: 'center', overflow: 'hidden',
   })
   const badgeStyle = kind => ({
-    font: `${kind === 'hit' ? 600 : 400} 11px ${FONT}`, padding: '2px 7px', borderRadius: 99,
+    font: `${kind === 'hit' ? 600 : 400} 11px ${FONT}`, padding: '2px 7px', borderRadius: R.pill,
     background: kind === 'hit' ? C.successBg : kind === 'miss' ? C.dangerBg : C.warningBg,
     color: kind === 'hit' ? C.success : kind === 'miss' ? C.danger : C.warning,
   })
@@ -306,7 +306,7 @@ export default function Peintures() {
           Réinitialiser
         </button>
         <button type="button" aria-pressed={strict} onClick={() => setStrict(s => !s)}
-          style={{ flex: 1, padding: '7px 10px', borderRadius: 6, cursor: 'pointer', font: `${strict ? 600 : 400} 13px ${FONT}`, border: `1px solid ${strict ? C.ink : C.border}`, background: strict ? C.ink : C.surface, color: strict ? '#fff' : C.inkSecondary }}>
+          style={{ flex: 1, padding: '7px 10px', borderRadius: 6, cursor: 'pointer', font: `${strict ? 600 : 400} 13px ${FONT}`, border: `1px solid ${strict ? C.ink : C.border}`, background: strict ? C.ink : C.surface, color: strict ? AL.white : C.inkSecondary }}>
           {strict ? 'Strict ✓' : 'Filtrer strict'}
         </button>
       </div>
@@ -321,7 +321,7 @@ export default function Peintures() {
             style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface, minWidth: isMobile ? 140 : 220 }} />
           <button type="button" onClick={() => setReglagesOuverts(o => !o)}
             aria-expanded={reglagesOuverts}
-            style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${reglagesOuverts ? C.ink : C.border}`, background: reglagesOuverts ? C.ink : C.surface, color: reglagesOuverts ? '#fff' : C.ink, font: `500 13px ${FONT}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${reglagesOuverts ? C.ink : C.border}`, background: reglagesOuverts ? C.ink : C.surface, color: reglagesOuverts ? AL.white : C.ink, font: `500 13px ${FONT}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             Coefficients
           </button>
         </div>
@@ -394,7 +394,7 @@ export default function Peintures() {
               : [p.medium ? L.med[p.medium] : null, p.components ? `${p.components}K` : null,
               p.gloss.map(g => L.gloss[g]).join('/') || null]
                 .filter(Boolean).map((t, j) => (
-                  <span key={j} style={{ font: `11px ${FONT}`, padding: '2px 7px', borderRadius: 99, background: C.divider, color: C.inkSecondary }}>{t}</span>
+                  <span key={j} style={{ font: `11px ${FONT}`, padding: '2px 7px', borderRadius: R.pill, background: C.divider, color: C.inkSecondary }}>{t}</span>
                 ))
 
             return (
@@ -407,11 +407,11 @@ export default function Peintures() {
                       <>
                         {/* fond blanc : les photos RUCO sont détourées sur blanc */}
                         <img src={IMG_BASE + p.imageFile} alt="" loading="lazy" width={48} height={48}
-                          style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6, background: '#fff', border: `1px solid ${C.border}`, display: 'block' }} />
-                        <span style={{ position: 'absolute', left: -5, top: -5, minWidth: 18, height: 18, padding: '0 4px', borderRadius: 99, display: 'grid', placeItems: 'center', font: `700 10px ${MONO}`, background: top ? C.ink : C.surface, color: top ? '#fff' : C.muted, border: `1px solid ${top ? C.ink : C.border}` }}>{i + 1}</span>
+                          style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 6, background: AL.white, border: `1px solid ${C.border}`, display: 'block' }} />
+                        <span style={{ position: 'absolute', left: -5, top: -5, minWidth: 18, height: 18, padding: '0 4px', borderRadius: R.pill, display: 'grid', placeItems: 'center', font: `700 10px ${MONO}`, background: top ? C.ink : C.surface, color: top ? AL.white : C.muted, border: `1px solid ${top ? C.ink : C.border}` }}>{i + 1}</span>
                       </>
                     ) : (
-                      <div style={{ width: '100%', height: '100%', borderRadius: 6, display: 'grid', placeItems: 'center', background: top ? C.ink : C.pageBg, color: top ? '#fff' : C.muted, border: `1px solid ${top ? C.ink : C.border}`, font: `700 15px ${MONO}` }}>{i + 1}</div>
+                      <div style={{ width: '100%', height: '100%', borderRadius: 6, display: 'grid', placeItems: 'center', background: top ? C.ink : C.pageBg, color: top ? AL.white : C.muted, border: `1px solid ${top ? C.ink : C.border}`, font: `700 15px ${MONO}` }}>{i + 1}</div>
                     )}
                   </div>
 
@@ -421,7 +421,7 @@ export default function Peintures() {
                       {/* Un prix d'atelier existe : le produit est chiffrable sans quitter la page. */}
                       {articlesChiffrables(p).length > 0 && (
                         <span title="Prix d’atelier connu — chiffrage disponible"
-                          style={{ font: `700 9px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', color: '#065f46', background: '#d1fae5', border: '1px solid #a7f3d0', borderRadius: 99, padding: '1px 6px' }}>
+                          style={{ font: `700 9px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', color: C.success, background: C.successBg, border: '1px solid ${C.successBg}', borderRadius: R.pill, padding: '1px 6px' }}>
                           chiffrable
                         </span>
                       )}

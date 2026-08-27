@@ -2,16 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Apercu Pro — police unique de l'interface (design system Amazing Lab).
+   Sous licence, livrée avec le handoff v2 en .otf ; convertie en woff2 et
+   servie depuis /public/fonts : 1,17 Mo d'OTF contre 176 Ko ici, sur le
+   chemin critique du premier rendu. `swap` pour ne jamais bloquer le texte. */
+@font-face {
+  font-family: 'Apercu Pro';
+  src: url('/fonts/apercu-pro-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Apercu Pro';
+  src: url('/fonts/apercu-pro-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Apercu Pro';
+  src: url('/fonts/apercu-pro-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  /* Refonte « Dashboard unifié » : Space Grotesk pour tout le texte UI */
-  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  color: #241a20;
-  background: #fdfcfc;
+  font-family: 'Apercu Pro', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  color: #0C0C0C;
+  background: #FFFFFF;
 }
 
 /* Scrollbar styling for dark display page */
@@ -26,3 +45,51 @@ body {
   background: #4b5563;
   border-radius: 3px;
 }
+
+/* ── Utilitaires de couleur ───────────────────────────────────────────────
+   Les écrans repris un par un passent en style inline avec les jetons de
+   lib/theme.js. Pour les écrans encore en classes Tailwind, ces utilitaires
+   remplacent les `text-gray-500`, `border-gray-200` & compagnie : une seule
+   définition, sur les jetons du système, au lieu d'une palette parallèle
+   dispersée dans le balisage. Ils disparaissent au fur et à mesure que les
+   écrans passent en inline. */
+.u-ink      { color: #0C0C0C; }
+.u-muted    { color: #888888; }
+.u-ok       { color: #1B7A5A; }
+.u-ko       { color: #C4002B; }
+.u-warn     { color: #A66300; }
+.u-info     { color: #3E6D9E; }
+.u-line     { border-color: rgba(12, 12, 12, .08); }
+.u-fill     { background: rgba(12, 12, 12, .06); }
+.u-surface  { background: #FFFFFF; }
+.u-ok-bg    { background: rgba(27, 122, 90, .10); }
+.u-ko-bg    { background: rgba(196, 0, 43, .10); }
+.u-warn-bg  { background: rgba(166, 99, 0, .12); }
+.u-info-bg  { background: rgba(62, 109, 158, .12); }
+.u-hover:hover      { background: rgba(12, 12, 12, .05); }
+.u-hover-ink:hover  { color: #0C0C0C; }
+.u-divide > * + *   { border-color: rgba(12, 12, 12, .08); }
+
+/* Variantes d'état. Ces classes sont écrites `hover:u-ink` dans le balisage :
+   Tailwind ne les connaît pas et ne génère rien pour elles, donc le sélecteur
+   est défini ici, avec les deux-points échappés. */
+.hover\:u-ink:hover        { color: #0C0C0C; }
+.hover\:u-muted:hover      { color: #888888; }
+.hover\:u-ko:hover         { color: #C4002B; }
+.hover\:u-warn:hover       { color: #A66300; }
+.hover\:u-info:hover       { color: #3E6D9E; }
+.hover\:u-fill:hover       { background: rgba(12, 12, 12, .06); }
+.hover\:u-line:hover       { border-color: #0C0C0C; }
+.focus\:u-line:focus       { border-color: #0C0C0C; outline: none; }
+.focus\:u-surface:focus    { background: #FFFFFF; }
+.focus-within\:u-line:focus-within { border-color: #0C0C0C; }
+
+/* ── Rayons ────────────────────────────────────────────────────────────────
+   Le système n'en a que deux : 15px pour un conteneur de contenu, 999px pour
+   tout ce qui est cliquable. Ces deux classes remplacent les `rounded-md`,
+   `rounded-lg`, `rounded-xl` & co. des écrans encore en Tailwind. Les seules
+   exceptions tolérées sont les micro-formes : 2px pour une barre d'avancement
+   de 4px de haut, 4px pour une case à cocher, 6px pour une cellule de
+   planning — toutes justifiées à leur point d'usage. */
+.u-panel { border-radius: 15px; }
+.u-pill  { border-radius: 999px; }

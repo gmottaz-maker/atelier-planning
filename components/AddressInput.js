@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { AL, C, R } from '../lib/theme'
 
 /**
  * Champ d'adresse avec autocomplete Google Maps Places (fallback Nominatim).
@@ -95,15 +96,15 @@ export default function AddressInput({ value, onChange, placeholder, className, 
       {open && suggestions.length > 0 && (
         <ul style={{
           position: 'absolute', zIndex: 9999, top: '100%', left: 0, right: 0, marginTop: 4,
-          background: 'white', border: '1px solid #e5e7eb', borderRadius: 12,
+          background: 'white', border: `1px solid ${C.border}`, borderRadius: R.panel,
           boxShadow: '0 8px 24px rgba(0,0,0,0.1)', overflow: 'hidden', padding: 0, listStyle: 'none',
         }}>
           {suggestions.map((s, i) => (
             <li key={i} onMouseDown={() => pick(s)}
               style={{
                 padding: '9px 14px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
-                overflow: 'hidden', textOverflow: 'ellipsis', color: '#374151',
-                background: i === active ? '#f3f4f6' : 'white',
+                overflow: 'hidden', textOverflow: 'ellipsis', color: AL.black,
+                background: i === active ? C.neutralBg : 'white',
               }}>
               📍 {s}
             </li>

@@ -5,7 +5,7 @@
 // regroupés à part, et chacun reste autonome.
 import Head from 'next/head'
 import Link from 'next/link'
-import { C, FONT, MONO } from '../../lib/theme'
+import { C, FONT, MONO, R } from '../../lib/theme'
 
 const OUTILS = [
   {
@@ -30,7 +30,7 @@ export default function Outils() {
           {OUTILS.map(o => (
             <Link key={o.href} href={o.href} style={{ textDecoration: 'none' }}>
               <article style={{
-                border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px',
+                border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '16px 18px',
                 background: C.surface, display: 'flex', flexDirection: 'column', gap: 6,
               }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>

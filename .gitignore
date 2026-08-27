@@ -19,3 +19,11 @@ ios/
 
 # Import contacts (PII — à exécuter en local, pas dans l'historique git)
 seed-contacts.sql
+
+# Bundles de design (handoff Claude Design) et leurs archives.
+# Ce sont des RÉFÉRENCES, pas des sources : ils n'entrent pas dans le build et
+# embarquent chacun une copie des polices Apercu Pro sous licence (~1,2 Mo).
+# Les seules polices versionnées sont les .woff2 de public/fonts, servies par
+# l'application. Les bundles vivent en local ; leur README fait foi pour la spec.
+design_handoff_*/
+*.zip

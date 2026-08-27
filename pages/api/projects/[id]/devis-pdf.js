@@ -23,7 +23,10 @@ export default async function handler(req, res) {
   try {
     const pdf = await htmlToPdf(buildDevisHtml(project, company))
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="${pdfFilename('devis', project.name)}"`)
+    // `?download=1` : téléchargement plutôt qu'ouverture dans le visualiseur.
+    const disposition = req.query.download ? 'attachment' : 'inline'
+    res.setHeader('Content-Disposition', `${disposition}; filename="${pdfFilename('devis', project.name)}"`)
+    res.setHeader('Cache-Control', 'no-store')
     res.send(Buffer.from(pdf))
   } catch (e) {
     console.error('devis-pdf:', e)

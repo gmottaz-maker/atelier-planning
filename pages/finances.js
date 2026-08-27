@@ -7,7 +7,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { quoteStatusMeta } from '../lib/quoteStatus'
-import { C, FONT, MONO } from '../lib/theme'
+import { C, FONT, MONO, R } from '../lib/theme'
 import { fmtCHF0 as fmtCHF } from '../lib/money'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ export default function Finances() {
             {[new Date().getFullYear(), new Date().getFullYear() - 1].map((y, i) => (
               <button key={y} onClick={() => setYear(y)}
                 style={{ padding: '6px 14px', cursor: 'pointer', border: 'none', borderLeft: i ? `1px solid ${C.border}` : 'none', font: `${year === y ? 600 : 400} 12px ${FONT}`,
-                  background: year === y ? C.ink : C.surface, color: year === y ? '#fff' : C.inkSecondary }}>
+                  background: year === y ? C.ink : C.surface, color: year === y ? AL.white : C.inkSecondary }}>
                 {y}
               </button>
             ))}
@@ -114,7 +114,7 @@ export default function Finances() {
         {/* KPI tiles */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
           {tiles.map(t => (
-            <div key={t.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div key={t.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 3 }}>
               <span style={{ font: `600 22px ${MONO}`, color: t.danger && montantRetard > 0 ? C.danger : (t.color || C.ink) }}>{t.value} <span style={{ fontSize: 12, fontWeight: 400, color: C.muted }}>CHF</span></span>
               <span style={{ fontSize: 12, fontWeight: 600, color: C.ink }}>{t.label}</span>
               <span style={{ font: `10px ${MONO}`, color: C.muted }}>{t.sub.toUpperCase()}</span>
@@ -129,7 +129,7 @@ export default function Finances() {
               <span style={{ fontSize: 16, fontWeight: 700 }}>Factures à encaisser</span>
               <span style={{ font: `11px ${MONO}`, color: C.muted }}>{impayees.length} · {fmtCHF(montantAttente + montantRetard)} CHF</span>
             </div>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 16px' }}>
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '4px 16px' }}>
               {isLoading ? (
                 <p style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>Chargement…</p>
               ) : impayeesSorted.length === 0 ? (
@@ -146,7 +146,7 @@ export default function Finances() {
                       <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>{inv.invoice_number} · ÉCHÉANCE {fmtDate(inv.due_date)}</span>
                     </div>
                     <span style={{ font: `600 13px ${MONO}`, color: C.ink, whiteSpace: 'nowrap' }}>{fmtCHF(inv.amount)} {inv.currency || 'CHF'}</span>
-                    <span style={{ font: `10px ${MONO}`, color: b.fg, background: b.bg, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap', flex: 'none' }}>{b.text}</span>
+                    <span style={{ font: `10px ${MONO}`, color: b.fg, background: b.bg, padding: '2px 8px', borderRadius: R.pill, whiteSpace: 'nowrap', flex: 'none' }}>{b.text}</span>
                   </div>
                 )
               })}
@@ -161,7 +161,7 @@ export default function Finances() {
                 <span style={{ fontSize: 16, fontWeight: 700 }}>Devis à suivre</span>
                 <span style={{ font: `11px ${MONO}`, color: C.muted }}>{accepteAFacturer.length + devisACorriger.length + devisEnvoyes.length}</span>
               </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 16px' }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '4px 16px' }}>
                 {accepteAFacturer.length + devisACorriger.length + devisEnvoyes.length === 0 ? (
                   <p style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>Rien à relancer.</p>
                 ) : [...accepteAFacturer, ...devisACorriger, ...devisEnvoyes].map((o, i, arr) => {
@@ -174,7 +174,7 @@ export default function Finances() {
                         <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>{o.p.client}{note}</span>
                       </div>
                       <span style={{ font: `600 13px ${MONO}`, whiteSpace: 'nowrap' }}>{fmtCHF(o.total)}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: m.color, background: m.bg, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap', textTransform: 'uppercase' }}>{m.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: m.color, background: m.bg, padding: '2px 8px', borderRadius: R.pill, whiteSpace: 'nowrap', textTransform: 'uppercase' }}>{m.label}</span>
                     </Link>
                   )
                 })}
@@ -187,7 +187,7 @@ export default function Finances() {
                 <span style={{ fontSize: 16, fontWeight: 700 }}>Fournisseurs à payer</span>
                 <span style={{ font: `11px ${MONO}`, color: C.muted }}>{fournAPayer.length} · {fmtCHF(montantFourn)} CHF</span>
               </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 16px' }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '4px 16px' }}>
                 {fournAPayer.length === 0 ? (
                   <p style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>Aucune facture fournisseur en attente.</p>
                 ) : [...fournAPayer].sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999')).map((inv, i, arr) => {
@@ -196,7 +196,7 @@ export default function Finances() {
                     <div key={inv.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderBottom: i === arr.length - 1 ? 'none' : `1px solid ${C.divider}` }}>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.supplier_name}</span>
                       <span style={{ font: `600 13px ${MONO}`, whiteSpace: 'nowrap' }}>{fmtCHF(inv.amount)}</span>
-                      <span style={{ font: `10px ${MONO}`, color: b.fg, background: b.bg, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap', flex: 'none' }}>{b.text}</span>
+                      <span style={{ font: `10px ${MONO}`, color: b.fg, background: b.bg, padding: '2px 8px', borderRadius: R.pill, whiteSpace: 'nowrap', flex: 'none' }}>{b.text}</span>
                     </div>
                   )
                 })}

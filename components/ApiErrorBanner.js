@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { surErreurApi } from '../lib/api'
+import { C, R } from '../lib/theme'
 
 // Bandeau d'erreur des mutations API.
 //
@@ -39,7 +40,7 @@ export default function ApiErrorBanner() {
     >
       {erreurs.map(e => (
         <div key={e.cle} style={{
-          background: '#7f1d1d', color: '#fff', borderRadius: 10, padding: '12px 14px',
+          background: C.danger, color: AL.white, borderRadius: R.panel, padding: '12px 14px',
           boxShadow: '0 8px 24px rgba(0,0,0,.28)', display: 'flex', alignItems: 'flex-start', gap: 10,
         }}>
           <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1.2 }}>⚠</span>
@@ -55,7 +56,7 @@ export default function ApiErrorBanner() {
           <button
             onClick={() => setErreurs(l => l.filter(x => x.cle !== e.cle))}
             aria-label="Fermer l’alerte"
-            style={{ background: 'none', border: 'none', color: '#fff', opacity: .7, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}
+            style={{ background: 'none', border: 'none', color: AL.white, opacity: .7, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 2 }}
           >×</button>
         </div>
       ))}

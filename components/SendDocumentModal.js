@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import adminFetch from '../lib/adminFetch'
+import { AL } from '../lib/theme'
 
 const isEmail = s => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)
 
@@ -13,10 +14,10 @@ function EmailChips({ value, onChange, placeholder }) {
     setDraft('')
   }
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border border-gray-200 rounded-md bg-white focus-within:border-gray-400" style={{ minHeight: 40 }}>
+    <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 border u-line u-pill u-surface focus-within:u-line" style={{ minHeight: 40 }}>
       {value.map(e => (
-        <span key={e} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 rounded px-2 py-0.5" style={{ fontSize: 12 }}>
-          {e}<button type="button" onClick={() => onChange(value.filter(x => x !== e))} className="text-gray-400 hover:text-red-500" style={{ lineHeight: 1 }}>×</button>
+        <span key={e} className="inline-flex items-center gap-1 u-fill u-ink rounded px-2 py-0.5" style={{ fontSize: 12 }}>
+          {e}<button type="button" onClick={() => onChange(value.filter(x => x !== e))} className="u-muted hover:u-ko" style={{ lineHeight: 1 }}>×</button>
         </span>
       ))}
       <input value={draft}
@@ -105,21 +106,21 @@ export default function SendDocumentModal({ type, docId, mode, contactId, projec
     finally { setSending(false) }
   }
 
-  const lbl = 'block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide'
-  const inp = 'w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400'
+  const lbl = 'block text-xs font-medium u-muted mb-1 uppercase tracking-wide'
+  const inp = 'w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line'
 
   return (
     <div onMouseDown={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px', overflowY: 'auto' }}>
-      <div onMouseDown={e => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full" style={{ maxWidth: 560 }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900" style={{ fontSize: 16 }}>Envoyer {type === 'facture' ? 'la facture' : "l'offre"} par e-mail</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+      <div onMouseDown={e => e.stopPropagation()} className="u-surface u-panel shadow-xl w-full" style={{ maxWidth: 560 }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b u-line">
+          <h3 className="font-semibold u-ink" style={{ fontSize: 16 }}>Envoyer {type === 'facture' ? 'la facture' : "l'offre"} par e-mail</h3>
+          <button onClick={onClose} className="u-muted hover:u-ink text-xl leading-none">×</button>
         </div>
         <div className="px-6 py-5 flex flex-col gap-4">
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className={lbl} style={{ marginBottom: 0 }}>Destinataires</label>
-              {!showCc && <button type="button" onClick={() => setShowCc(true)} className="text-xs text-gray-500 hover:text-gray-900">+ Cc</button>}
+              {!showCc && <button type="button" onClick={() => setShowCc(true)} className="text-xs u-muted hover:u-ink">+ Cc</button>}
             </div>
             <EmailChips value={to} onChange={setTo} placeholder="email@client.ch — Entrée pour ajouter" />
           </div>
@@ -137,10 +138,10 @@ export default function SendDocumentModal({ type, docId, mode, contactId, projec
                 {tplList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <button type="button" onClick={saveTemplate} title="Enregistrer le message actuel comme modèle"
-                className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded px-2.5 py-2 whitespace-nowrap">Enregistrer</button>
+                className="text-xs font-medium u-ink hover:u-ink border u-line rounded px-2.5 py-2 whitespace-nowrap">Enregistrer</button>
               {tplId && (
                 <button type="button" onClick={deleteTemplate} title="Supprimer ce modèle"
-                  className="text-xs font-medium text-gray-400 hover:text-red-600 border border-gray-200 rounded px-2.5 py-2">Suppr.</button>
+                  className="text-xs font-medium u-muted hover:u-ko border u-line rounded px-2.5 py-2">Suppr.</button>
               )}
             </div>
           </div>
@@ -151,18 +152,18 @@ export default function SendDocumentModal({ type, docId, mode, contactId, projec
           <div>
             <label className={lbl}>Message</label>
             <textarea value={message} onChange={e => setMessage(e.target.value)} rows={8} className={inp} style={{ resize: 'vertical' }} />
-            <p className="text-xs text-gray-400 mt-1">Placeholders dans un modèle : <code>{'{projet}'}</code> et <code>{'{numero}'}</code> (remplacés à la sélection).</p>
+            <p className="text-xs u-muted mt-1">Placeholders dans un modèle : <code>{'{projet}'}</code> et <code>{'{numero}'}</code> (remplacés à la sélection).</p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-md px-3 py-2">
+          <div className="flex items-center gap-2 text-xs u-muted u-fill u-pill px-3 py-2">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
             {label} en pièce jointe (PDF{type === 'facture' ? ' + QR' : ''}) · copie à hello@amazinglab.ch
           </div>
-          {error && <div className="text-sm text-red-600">{error}</div>}
+          {error && <div className="text-sm u-ko">{error}</div>}
         </div>
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100">Annuler</button>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t u-line">
+          <button onClick={onClose} className="px-4 py-2 u-pill text-sm font-medium u-ink hover:u-fill">Annuler</button>
           <button onClick={send} disabled={sending || !to.length}
-            className="px-5 py-2 rounded-md text-sm font-medium text-white disabled:opacity-40" style={{ background: '#111827' }}>
+            className="px-5 py-2 u-pill text-sm font-medium text-white disabled:opacity-40" style={{ background: AL.black }}>
             {sending ? 'Envoi…' : 'Envoyer'}
           </button>
         </div>

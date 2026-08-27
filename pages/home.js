@@ -3,7 +3,7 @@ import useSWR from 'swr'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useAuth } from './_app'
-import { C, FONT, MONO, CAL_CAT } from '../lib/theme'
+import { AL, C, CAL_CAT, FONT, MONO, R } from '../lib/theme'
 
 const TARGET_CALS = ['Montage extérieur', 'Entretien', 'Production atelier', 'Visite et meeting']
 
@@ -64,7 +64,7 @@ function TaskRow({ task, onToggle, last }) {
           width: 17, height: 17, borderRadius: '50%', flex: 'none', cursor: 'pointer', padding: 0,
           border: completed ? 'none' : `2px solid ${C.faintBorder}`,
           background: completed ? C.success : 'transparent',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: AL.white, fontSize: 9,
         }}>
         {completed && '✓'}
       </button>
@@ -76,7 +76,7 @@ function TaskRow({ task, onToggle, last }) {
         )}
       </div>
       {!completed && isLate && (
-        <span style={{ font: `10px ${MONO}`, color: C.danger, background: C.dangerBg, padding: '2px 8px', borderRadius: 99, flex: 'none' }}>RETARD</span>
+        <span style={{ font: `10px ${MONO}`, color: C.danger, background: C.dangerBg, padding: '2px 8px', borderRadius: R.pill, flex: 'none' }}>RETARD</span>
       )}
       {!completed && !isLate && task.execution_date && task.execution_date !== todayStr && (
         <span style={{ font: `10.5px ${MONO}`, color: C.muted, flex: 'none' }}>{fmtShortDate(task.execution_date)}</span>
@@ -90,7 +90,7 @@ function GroupHeader({ label, count, accent }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
       <span style={{ font: `500 10px ${MONO}`, letterSpacing: '.12em', color: C.muted }}>{label}</span>
       {count != null && count > 0 && (
-        <span style={{ font: `600 10px ${MONO}`, background: accent ? C.ink : C.divider, color: accent ? '#fff' : C.inkSecondary, padding: '1px 7px', borderRadius: 99 }}>{count}</span>
+        <span style={{ font: `600 10px ${MONO}`, background: accent ? C.ink : C.divider, color: accent ? AL.white : C.inkSecondary, padding: '1px 7px', borderRadius: R.pill }}>{count}</span>
       )}
     </div>
   )
@@ -243,7 +243,7 @@ export default function HomePage() {
 
   const segStyle = (active) => ({
     padding: '5px 14px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
-    background: active ? C.ink : C.surface, color: active ? '#fff' : C.inkSecondary,
+    background: active ? C.ink : C.surface, color: active ? AL.white : C.inkSecondary,
     border: 'none', fontFamily: FONT,
   })
 
@@ -263,7 +263,7 @@ export default function HomePage() {
           </div>
           <div style={{ flex: 1 }} />
           <button onClick={() => router.push('/tasks')}
-            style={{ border: `1px solid ${C.ink}`, background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>
+            style={{ border: `1px solid ${C.ink}`, background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: R.pill, cursor: 'pointer' }}>
             + NOUVELLE TÂCHE
           </button>
         </div>
@@ -273,7 +273,7 @@ export default function HomePage() {
           <div style={{ flex: '1.15 1 380px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 16, fontWeight: 700 }}>Mes tâches</span>
-              <div style={{ display: 'flex', border: `1px solid ${C.border}`, borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', border: `1px solid ${C.border}`, borderRadius: R.pill, overflow: 'hidden' }}>
                 <button style={segStyle(taskView === 'list')} onClick={() => setTaskView('list')}>Liste</button>
                 <button style={segStyle(taskView === 'week')} onClick={() => setTaskView('week')}>Semaine</button>
               </div>
@@ -324,7 +324,7 @@ export default function HomePage() {
                         {isToday && <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.accent }} />}
                         {dayTasks.length > 0 && <span style={{ font: `10px ${MONO}`, color: C.muted }}>{dayTasks.filter(t => t.status === 'active').length}</span>}
                       </div>
-                      <div style={{ border: `1px solid ${isToday ? C.border : C.divider}`, borderRadius: 8, background: isToday ? '#fdf4f6' : C.surface, padding: dayTasks.length ? '0 12px' : '8px 12px' }}>
+                      <div style={{ border: `1px solid ${isToday ? C.border : C.divider}`, borderRadius: R.panel, background: isToday ? 'rgba(255,77,109,.04)' : C.surface, padding: dayTasks.length ? '0 12px' : '8px 12px' }}>
                         {dayTasks.length === 0
                           ? <p style={{ fontSize: 12, color: C.faintChevron, margin: 0 }}>—</p>
                           : dayTasks.map((t, i) => <TaskRow key={t.id} task={t} onToggle={toggleTask} last={i === dayTasks.length - 1} />)}
@@ -341,25 +341,25 @@ export default function HomePage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 16, fontWeight: 700 }}>Agenda</span>
               {calStatus === 'ok'
-                ? <button onClick={connectCalendar} style={{ font: `11px ${MONO}`, color: C.inkSecondary, border: `1px solid ${C.border}`, padding: '4px 11px', borderRadius: 99, background: 'transparent', cursor: 'pointer' }}>↻ ACTUALISER</button>
-                : (calStatus === 'idle' || calStatus === 'error') && <button onClick={connectCalendar} style={{ font: `11px ${MONO}`, color: C.inkSecondary, border: `1px solid ${C.border}`, padding: '4px 11px', borderRadius: 99, background: 'transparent', cursor: 'pointer' }}>{calStatus === 'error' ? '↻ RÉESSAYER' : '+ CONNECTER'}</button>}
+                ? <button onClick={connectCalendar} style={{ font: `11px ${MONO}`, color: C.inkSecondary, border: `1px solid ${C.border}`, padding: '4px 11px', borderRadius: R.pill, background: 'transparent', cursor: 'pointer' }}>↻ ACTUALISER</button>
+                : (calStatus === 'idle' || calStatus === 'error') && <button onClick={connectCalendar} style={{ font: `11px ${MONO}`, color: C.inkSecondary, border: `1px solid ${C.border}`, padding: '4px 11px', borderRadius: R.pill, background: 'transparent', cursor: 'pointer' }}>{calStatus === 'error' ? '↻ RÉESSAYER' : '+ CONNECTER'}</button>}
             </div>
 
             {calStatus !== 'idle' && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {TARGET_CALS.map(c => {
                   const cat = CAL_CAT[c]
-                  return <span key={c} style={{ font: `10px ${MONO}`, color: cat.fg, background: cat.bg, padding: '3px 9px', borderRadius: 99 }}>{cat.label}</span>
+                  return <span key={c} style={{ font: `10px ${MONO}`, color: cat.fg, background: cat.bg, padding: '3px 9px', borderRadius: R.pill }}>{cat.label}</span>
                 })}
               </div>
             )}
 
             {calStatus === 'idle' && (
-              <div style={{ border: `1px dashed ${C.faintBorder}`, borderRadius: 8, padding: 32, textAlign: 'center' }}>
+              <div style={{ border: `1px dashed ${C.faintBorder}`, borderRadius: R.panel, padding: 32, textAlign: 'center' }}>
                 <div style={{ fontSize: 30, marginBottom: 8 }}>📅</div>
                 <p style={{ fontSize: 13, fontWeight: 600, color: C.inkSecondary, margin: 0 }}>Connectez Google Calendar</p>
                 <p style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>pour afficher vos événements des 14 prochains jours</p>
-                <button onClick={connectCalendar} style={{ marginTop: 16, font: `600 12px ${FONT}`, padding: '9px 16px', borderRadius: 5, background: C.ink, color: C.accentOnDark, border: 'none', cursor: 'pointer' }}>Connecter Google Calendar</button>
+                <button onClick={connectCalendar} style={{ marginTop: 16, font: `600 12px ${FONT}`, padding: '9px 16px', borderRadius: R.pill, background: C.ink, color: C.accentOnDark, border: 'none', cursor: 'pointer' }}>Connecter Google Calendar</button>
               </div>
             )}
 
@@ -370,14 +370,14 @@ export default function HomePage() {
             )}
 
             {calStatus === 'error' && (
-              <div style={{ background: C.dangerBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, fontSize: 13, color: C.danger }}>
+              <div style={{ background: C.dangerBg, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: 14, fontSize: 13, color: C.danger }}>
                 <p style={{ fontWeight: 600, margin: '0 0 4px' }}>Erreur de connexion</p>
                 <p style={{ fontSize: 11.5, margin: 0 }}>{calError}</p>
               </div>
             )}
 
             {(calStatus === 'ok') && (
-              <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, padding: 16, display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+              <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, background: C.surface, padding: 16, display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
                 {eventDates.length === 0 && <p style={{ fontSize: 13, color: C.muted }}>Aucun événement dans les 14 prochains jours.</p>}
                 {eventDates.map(dateStr => (
                   <div key={dateStr} style={{ display: 'contents' }}>
@@ -391,7 +391,7 @@ export default function HomePage() {
                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                             <span style={{ fontSize: 13, fontWeight: 600 }}>{event.summary || '(sans titre)'}</span>
                             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                              <span style={{ font: `9.5px ${MONO}`, color: cat.fg, background: cat.bg, padding: '1px 7px', borderRadius: 99 }}>{cat.label}</span>
+                              <span style={{ font: `9.5px ${MONO}`, color: cat.fg, background: cat.bg, padding: '1px 7px', borderRadius: R.pill }}>{cat.label}</span>
                               <span style={{ font: `10.5px ${MONO}`, color: C.muted }}>{isAllDay ? 'JOURNÉE ENTIÈRE' : `${fmtTime(event.start.dateTime)} – ${fmtTime(event.end?.dateTime)}`}</span>
                               {event.location && <span style={{ font: `10.5px ${MONO}`, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>📍 {event.location}</span>}
                             </div>

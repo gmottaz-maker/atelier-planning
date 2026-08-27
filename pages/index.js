@@ -8,24 +8,26 @@ import { useResponsibles } from '../lib/useResponsibles'
 import KDriveFolderPicker from '../components/KDriveFolderPicker'
 import BillingContactSelect from '../components/BillingContactSelect'
 import { PROJECT_PHASES, phaseMeta, isOngoing } from '../lib/projectPhase'
-import { C, FONT, MONO } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
+import { statutProjet, joursRestants } from '../lib/projectStatus'
+import ButtonPill from '../components/ButtonPill'
 import useIsAdmin from '../lib/useIsAdmin'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
 const COLOR_OPTIONS  = [
   { value: null,      label: 'Auto (selon urgence)', icon: '🤖' },
-  { value: '#22c55e', label: 'Vert',   icon: '🟢' },
-  { value: '#f59e0b', label: 'Orange', icon: '🟡' },
-  { value: '#ef4444', label: 'Rouge',  icon: '🔴' },
-  { value: '#3b82f6', label: 'Bleu',   icon: '🔵' },
-  { value: '#8b5cf6', label: 'Violet', icon: '🟣' },
-  { value: '#64748b', label: 'Gris',   icon: '⚫' },
+  { value: C.success, label: 'Vert',   icon: '🟢' },
+  { value: C.warning, label: 'Orange', icon: '🟡' },
+  { value: C.danger, label: 'Rouge',  icon: '🔴' },
+  { value: C.info, label: 'Bleu',   icon: '🔵' },
+  { value: C.violet, label: 'Violet', icon: '🟣' },
+  { value: C.muted, label: 'Gris',   icon: '⚫' },
 ]
-const PINK = '#111827'
-const PERSON_COLORS = { Arnaud: '#3b82f6', Gabin: '#8b5cf6', Guillaume: '#111827', 'Sous-traitant': '#64748b', 'non défini': '#9ca3af' }
+const PINK = AL.black
+const PERSON_COLORS = { Arnaud: C.info, Gabin: C.violet, Guillaume: AL.black, 'Sous-traitant': C.muted, 'non défini': C.muted }
 
 function colorForName(name) {
-  if (!name) return '#9ca3af'
+  if (!name) return C.muted
   if (PERSON_COLORS[name]) return PERSON_COLORS[name]
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
@@ -49,13 +51,13 @@ function getDaysRemaining(deadline) {
 // orange = 2 à 3 semaines, vert = le reste.
 function getAutoColor(deadline) {
   const d = getDaysRemaining(deadline)
-  if (d === null) return '#9ca3af'   // sans date → gris
-  if (d < 0)   return '#dc2626'      // en retard
-  if (d < 14)  return '#ef4444'      // proche (< 2 semaines)
-  if (d <= 21) return '#f59e0b'      // 2 à 3 semaines
-  return '#22c55e'                   // le reste
+  if (d === null) return C.muted   // sans date → gris
+  if (d < 0)   return C.danger      // en retard
+  if (d < 14)  return C.danger      // proche (< 2 semaines)
+  if (d <= 21) return C.warning      // 2 à 3 semaines
+  return C.success                   // le reste
 }
-const SUSPENDED_COLOR = '#94a3b8'      // gris ardoise — projet en pause
+const SUSPENDED_COLOR = C.muted      // gris ardoise — projet en pause
 function getProjectColor(p) {
   if (p.suspended) return SUSPENDED_COLOR   // en pause → gris, jamais « en retard »
   if (p.color_override) return p.color_override
@@ -78,7 +80,7 @@ function formatDateShort(s) {
 
 // Badge d'échéance « DANS xJ » (11b). urgent = accent, sinon neutre.
 function daysBadge(deadline, phase, suspended) {
-  if (suspended) return { text: 'EN PAUSE', kind: 'phase', color: SUSPENDED_COLOR, bg: '#f1f5f9' }
+  if (suspended) return { text: 'EN PAUSE', kind: 'phase', color: SUSPENDED_COLOR, bg: C.neutralBg }
   const pm = phaseMeta(phase)
   if (pm) return { text: pm.label.toUpperCase(), kind: 'phase', color: pm.color, bg: pm.bg }
   if (!deadline) return { text: 'Sans date', kind: 'none' }
@@ -87,6 +89,25 @@ function daysBadge(deadline, phase, suspended) {
   if (d <= 7) return { text: `DANS ${d}J`, kind: 'urgent' }
   return { text: `DANS ${d}J`, kind: 'normal' }
 }
+// Badge de statut : mêmes métriques partout (carte et liste).
+function BadgeStatut({ project }) {
+  const s = statutProjet(project)
+  return (
+    <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '.04em', padding: '3px 10px',
+      borderRadius: R.pill, color: s.fg, background: s.bg, whiteSpace: 'nowrap' }}>{s.text}</span>
+  )
+}
+
+// Barre d'avancement. Le handoff demande explicitement de traiter le cas
+// « aucune tâche » : on montre la piste vide, jamais une barre pleine.
+function BarreAvancement({ pct, actif }) {
+  return (
+    <div style={{ width: '100%', height: 4, borderRadius: 2, background: C.border, overflow: 'hidden' }}>
+      {actif && pct > 0 && <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: AL.black }} />}
+    </div>
+  )
+}
+
 // Buckets pour les pills de filtre temporel (11b)
 function timeBucket(deadline) {
   const d = getDaysRemaining(deadline)
@@ -97,10 +118,10 @@ function timeBucket(deadline) {
 
 // ─── Kanban par échéance ─────────────────────────────────────────────────────
 const KANBAN_COLUMNS = [
-  { key: 'overdue', label: 'En retard',     accent: '#dc2626' },
-  { key: 'week',    label: 'Cette semaine', accent: '#ea580c' },
-  { key: 'month',   label: 'Ce mois',       accent: '#ca8a04' },
-  { key: 'later',   label: 'Plus tard',     accent: '#16a34a' },
+  { key: 'overdue', label: 'En retard',     accent: C.danger },
+  { key: 'week',    label: 'Cette semaine', accent: C.warning },
+  { key: 'month',   label: 'Ce mois',       accent: C.warning },
+  { key: 'later',   label: 'Plus tard',     accent: C.success },
 ]
 function deadlineBucket(deadline) {
   const d = getDaysRemaining(deadline)
@@ -114,16 +135,16 @@ function deadlineBucket(deadline) {
 // Colonnes Kanban : En retard · mois courant · +1 · +2 · Plus tard (mois nommés)
 function buildKanbanColumns() {
   const now = new Date()
-  const monthAccents = ['#ea580c', '#ca8a04', '#16a34a']
-  const cols = [{ key: 'overdue', label: 'En retard', accent: '#dc2626' }]
+  const monthAccents = [C.warning, C.warning, C.success]
+  const cols = [{ key: 'overdue', label: 'En retard', accent: C.danger }]
   for (let i = 0; i < 3; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     const name = MONTHS_FR[d.getMonth()]
     cols.push({ key: ym, label: `${name.charAt(0).toUpperCase()}${name.slice(1)}`, accent: monthAccents[i] })
   }
-  cols.push({ key: 'later', label: 'Plus tard', accent: '#64748b' })
-  cols.push({ key: 'ongoing', label: 'En cours / livré', accent: '#1d4ed8' })   // projets avec une phase
+  cols.push({ key: 'later', label: 'Plus tard', accent: C.muted })
+  cols.push({ key: 'ongoing', label: 'En cours / livré', accent: C.info })   // projets avec une phase
   cols.push({ key: 'suspended', label: 'En pause', accent: SUSPENDED_COLOR })     // projets suspendus
   return cols
 }
@@ -159,17 +180,17 @@ function groupByMonth(projects) {
 // ─── DaysChip ────────────────────────────────────────────────────────────────
 
 function DaysChip({ deadline, phase, suspended }) {
-  if (suspended) return <span style={{ background:'#f1f5f9', color: SUSPENDED_COLOR }} className="px-2 py-0.5 rounded-full text-xs font-semibold">En pause</span>
+  if (suspended) return <span style={{ background:C.neutralBg, color: SUSPENDED_COLOR }} className="px-2 py-0.5 u-pill text-xs font-semibold">En pause</span>
   const pm = phaseMeta(phase)
-  if (pm) return <span style={{ background: pm.bg, color: pm.color }} className="px-2 py-0.5 rounded-full text-xs font-semibold">{pm.label}</span>
+  if (pm) return <span style={{ background: pm.bg, color: pm.color }} className="px-2 py-0.5 u-pill text-xs font-semibold">{pm.label}</span>
   const d = getDaysRemaining(deadline)
-  if (d === null) return <span style={{ background:'#f3f4f6',color:'#6b7280' }} className="px-2 py-0.5 rounded-full text-xs font-medium">Sans date</span>
-  if (d < 0)  return <span style={{ background:'#fee2e2',color:'#dc2626' }} className="px-2 py-0.5 rounded-full text-xs font-bold">En retard ({Math.abs(d)}j)</span>
-  if (d === 0) return <span style={{ background:'#fee2e2',color:'#dc2626' }} className="px-2 py-0.5 rounded-full text-xs font-bold">Aujourd'hui !</span>
-  if (d === 1) return <span style={{ background:'#fff7ed',color:'#ea580c' }} className="px-2 py-0.5 rounded-full text-xs font-bold">Demain</span>
-  if (d < 7)  return <span style={{ background:'#fff7ed',color:'#ea580c' }} className="px-2 py-0.5 rounded-full text-xs font-bold">{d}j restants</span>
-  if (d < 14) return <span style={{ background:'#fefce8',color:'#ca8a04' }} className="px-2 py-0.5 rounded-full text-xs font-bold">{d}j restants</span>
-  return <span style={{ background:'#f0fdf4',color:'#16a34a' }} className="px-2 py-0.5 rounded-full text-xs font-semibold">{d}j restants</span>
+  if (d === null) return <span style={{ background:C.neutralBg,color:C.muted }} className="px-2 py-0.5 u-pill text-xs font-medium">Sans date</span>
+  if (d < 0)  return <span style={{ background:C.dangerBg,color:C.danger }} className="px-2 py-0.5 u-pill text-xs font-bold">En retard ({Math.abs(d)}j)</span>
+  if (d === 0) return <span style={{ background:C.dangerBg,color:C.danger }} className="px-2 py-0.5 u-pill text-xs font-bold">Aujourd'hui !</span>
+  if (d === 1) return <span style={{ background:C.warningBg,color:C.warning }} className="px-2 py-0.5 u-pill text-xs font-bold">Demain</span>
+  if (d < 7)  return <span style={{ background:C.warningBg,color:C.warning }} className="px-2 py-0.5 u-pill text-xs font-bold">{d}j restants</span>
+  if (d < 14) return <span style={{ background:C.warningBg,color:C.warning }} className="px-2 py-0.5 u-pill text-xs font-bold">{d}j restants</span>
+  return <span style={{ background:C.successBg,color:C.success }} className="px-2 py-0.5 u-pill text-xs font-semibold">{d}j restants</span>
 }
 
 // ─── AtomLogo ────────────────────────────────────────────────────────────────
@@ -189,19 +210,19 @@ function AtomLogo({ size = 24 }) {
 
 function ProjectsSkeleton({ rows = 6 }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="u-surface u-panel border u-line overflow-hidden">
       <style>{`@keyframes maze-shimmer { 0% { opacity:.55 } 50% { opacity:1 } 100% { opacity:.55 } }`}</style>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-4 py-3.5 border-b border-gray-100 last:border-0"
+        <div key={i} className="flex items-center gap-4 px-4 py-3.5 border-b u-line last:border-0"
           style={{ animation: 'maze-shimmer 1.3s ease-in-out infinite', animationDelay: `${i * 0.08}s` }}>
-          <div className="w-1 h-9 rounded-full bg-gray-200 flex-shrink-0" />
+          <div className="w-1 h-9 u-pill u-fill flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="h-3.5 bg-gray-200 rounded w-1/3 mb-2" />
-            <div className="h-2.5 bg-gray-100 rounded w-1/5" />
+            <div className="h-3.5 u-fill rounded w-1/3 mb-2" />
+            <div className="h-2.5 u-fill rounded w-1/5" />
           </div>
-          <div className="w-7 h-7 rounded-full bg-gray-200 flex-shrink-0" />
-          <div className="h-5 bg-gray-100 rounded-full w-20 flex-shrink-0" />
-          <div className="h-2 bg-gray-100 rounded w-24 flex-shrink-0 hidden md:block" />
+          <div className="w-7 h-7 u-pill u-fill flex-shrink-0" />
+          <div className="h-5 u-fill u-pill w-20 flex-shrink-0" />
+          <div className="h-2 u-fill rounded w-24 flex-shrink-0 hidden md:block" />
         </div>
       ))}
     </div>
@@ -210,24 +231,39 @@ function ProjectsSkeleton({ rows = 6 }) {
 
 // ─── Menu d'actions compact (⋯) ─────────────────────────────────────────────
 
-function ProjectActionsMenu({ onEdit, onArchive, onDelete }) {
+// Menu d'actions secondaires. Il était en `position: absolute` calé sur un
+// parent `.group.relative` ; il est maintenant EN FLUX, donc utilisable aussi
+// bien dans le pied d'une carte que dans une ligne de liste, sans que le
+// conteneur ait à se déclarer positionné.
+function ProjectActionsMenu({ items = [] }) {
   const [open, setOpen] = useState(false)
-  const item = "w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors"
   return (
-    <div className="absolute top-3.5 right-2.5 z-10">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
-        aria-label="Actions"
-        className={`w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition ${open ? 'opacity-100 bg-gray-200' : 'md:opacity-0 md:group-hover:opacity-100'}`}
-        style={{ fontSize: 20, lineHeight: 1 }}>⋯</button>
+    <div style={{ position: 'relative', flex: 'none' }}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }} aria-label="Actions"
+        style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: R.pill, border: 'none', background: open ? C.hover : 'transparent',
+          color: open ? AL.black : C.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1,
+          transition: 'background .15s ease, color .15s ease' }}
+        onMouseEnter={e => { e.currentTarget.style.background = C.hover; e.currentTarget.style.color = AL.black }}
+        onMouseLeave={e => { if (!open) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.muted } }}>
+        ⋯
+      </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 w-44 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-20" style={{ fontSize: 13 }}>
-            <button onClick={() => { setOpen(false); onEdit() }} className={`${item} text-gray-700`}>Modifier</button>
-            <button onClick={() => { setOpen(false); onArchive() }} className={`${item} text-gray-700`}>Archiver</button>
-            <div className="my-1 border-t border-gray-100" />
-            <button onClick={() => { setOpen(false); onDelete() }} className={`${item} text-red-600 hover:bg-red-50`}>Supprimer</button>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'absolute', right: 0, top: 32, zIndex: 20, minWidth: 176,
+            background: C.surface, borderRadius: R.panel, border: `1.5px solid ${C.outline}`,
+            padding: 6, display: 'flex', flexDirection: 'column', fontFamily: FONT }}>
+            {items.map(it => (
+              <button key={it.label} onClick={() => { setOpen(false); it.onClick() }}
+                style={{ textAlign: 'left', padding: '8px 12px', borderRadius: R.pill, border: 'none',
+                  background: 'transparent', color: it.danger ? C.danger : AL.black,
+                  fontSize: 13, fontFamily: FONT, cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.background = it.danger ? C.dangerBg : C.hover }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}>
+                {it.label}
+              </button>
+            ))}
           </div>
         </>
       )}
@@ -246,7 +282,7 @@ function GanttView({ projects }) {
 
   if (dated.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400 text-sm">
+      <div className="u-surface u-panel border u-line p-10 text-center u-muted text-sm">
         Aucun projet daté à afficher sur la frise.
       </div>
     )
@@ -286,22 +322,22 @@ function GanttView({ projects }) {
   const todayX = x(today.getTime())
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="u-surface u-panel border u-line overflow-hidden">
       <div className="overflow-x-auto">
         <div style={{ minWidth: LABEL_W + trackWidth, position: 'relative' }}>
 
           {/* Séparateurs de mois (verticaux, sur toute la hauteur) */}
           {months.map(m => (
-            <div key={`sep-${m.key}`} style={{ position: 'absolute', top: 0, bottom: 0, left: LABEL_W + m.offset * PX_PER_DAY, width: 1, background: '#f3f4f6', zIndex: 0 }} />
+            <div key={`sep-${m.key}`} style={{ position: 'absolute', top: 0, bottom: 0, left: LABEL_W + m.offset * PX_PER_DAY, width: 1, background: C.neutralBg, zIndex: 0 }} />
           ))}
           {/* Ligne "aujourd'hui" */}
-          <div style={{ position: 'absolute', top: 0, bottom: 0, left: LABEL_W + todayX, width: 1.5, background: '#f87171', zIndex: 5 }} />
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: LABEL_W + todayX, width: 1.5, background: C.danger, zIndex: 5 }} />
 
           {/* En-tête des mois */}
-          <div className="flex border-b border-gray-100" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="flex border-b u-line" style={{ position: 'relative', zIndex: 1 }}>
             <div className="flex-shrink-0" style={{ width: LABEL_W }} />
             {months.map(m => (
-              <div key={m.key} className="text-gray-500 uppercase tracking-wide"
+              <div key={m.key} className="u-muted uppercase tracking-wide"
                 style={{ width: m.days * PX_PER_DAY, fontSize: 10.5, fontWeight: 600, padding: '8px 6px', flexShrink: 0 }}>
                 {m.label}
               </div>
@@ -319,16 +355,16 @@ function GanttView({ projects }) {
               const neutral = p.suspended || isOngoing(p.phase)
               const d = getDaysRemaining(p.deadline)
               return (
-                <div key={p.id} className="flex items-center border-b border-gray-50 hover:bg-gray-50/50 transition-colors" style={{ height: 46 }}>
+                <div key={p.id} className="flex items-center border-b u-line hover:u-fill/50 transition-colors" style={{ height: 46 }}>
                   <Link href={`/projects/${p.id}`} className="flex-shrink-0 px-4 min-w-0" style={{ width: LABEL_W }}>
-                    <div className="font-medium text-gray-900 truncate" style={{ fontSize: 13 }}>{p.name}</div>
-                    <div className="text-gray-400 truncate" style={{ fontSize: 11 }}>{p.client}</div>
+                    <div className="font-medium u-ink truncate" style={{ fontSize: 13 }}>{p.name}</div>
+                    <div className="u-muted truncate" style={{ fontSize: 11 }}>{p.client}</div>
                   </Link>
                   <div style={{ position: 'relative', width: trackWidth, height: '100%', flexShrink: 0 }}>
                     <div title={`${p.name} — échéance ${formatDate(p.deadline)}`}
                       style={{
                         position: 'absolute', top: '50%', transform: 'translateY(-50%)',
-                        left, width, height: 18, borderRadius: 9, background: color,
+                        left, width, height: 18, borderRadius: R.panel, background: color,
                         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                         paddingRight: 6, boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
                       }}>
@@ -336,7 +372,7 @@ function GanttView({ projects }) {
                     <span style={{
                       position: 'absolute', top: '50%', transform: 'translateY(-50%)',
                       left: left + width + 8, fontSize: 11, fontWeight: 600,
-                      color: (!neutral && d < 0) ? '#dc2626' : '#6b7280', whiteSpace: 'nowrap',
+                      color: (!neutral && d < 0) ? C.danger : C.muted, whiteSpace: 'nowrap',
                     }}>
                       {formatDateShort(p.deadline)}{neutral ? (p.suspended ? ' · pause' : '') : d < 0 ? ` · ${Math.abs(d)}j retard` : d === 0 ? " · auj." : ''}
                     </span>
@@ -349,7 +385,7 @@ function GanttView({ projects }) {
       </div>
 
       {undated.length > 0 && (
-        <div className="px-4 py-3 border-t border-gray-100 text-gray-400" style={{ fontSize: 12 }}>
+        <div className="px-4 py-3 border-t u-line u-muted" style={{ fontSize: 12 }}>
           {undated.length} projet{undated.length > 1 ? 's' : ''} sans date — non affiché{undated.length > 1 ? 's' : ''} sur la frise.
         </div>
       )}
@@ -453,15 +489,15 @@ function AddressInput({ value, onChange, placeholder, className, style }) {
       {open && suggestions.length > 0 && (
         <ul style={{
           position: 'absolute', zIndex: 9999, top: '100%', left: 0, right: 0, marginTop: 4,
-          background: 'white', border: '1px solid #e5e7eb', borderRadius: 12,
+          background: 'white', border: `1px solid ${C.border}`, borderRadius: R.panel,
           boxShadow: '0 8px 24px rgba(0,0,0,0.1)', overflow: 'hidden', padding: 0, listStyle: 'none',
         }}>
           {suggestions.map((s, i) => (
             <li key={i} onMouseDown={() => pick(s)}
               style={{
                 padding: '9px 14px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
-                overflow: 'hidden', textOverflow: 'ellipsis', color: '#374151',
-                background: i === active ? '#f3f4f6' : 'white',
+                overflow: 'hidden', textOverflow: 'ellipsis', color: AL.black,
+                background: i === active ? C.neutralBg : 'white',
               }}>
               📍 {s}
             </li>
@@ -496,7 +532,7 @@ function TimeRangeInput({ value, onChange, baseClass }) {
       <input type="time" value={start}
         onChange={e => onChange(fmtTimeRange(e.target.value, end))}
         className={`flex-1 ${baseClass}`} style={{ fontSize: 16 }} />
-      <span className="text-gray-400 text-sm flex-shrink-0">–</span>
+      <span className="u-muted text-sm flex-shrink-0">–</span>
       <input type="time" value={end}
         onChange={e => onChange(fmtTimeRange(start, e.target.value))}
         className={`flex-1 ${baseClass}`} style={{ fontSize: 16 }} />
@@ -531,7 +567,7 @@ function LogisticsModal({ project, onClose, onSave }) {
     onClose()
   }
 
-  const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white transition-all"
+  const inp = "w-full px-3 py-2.5 border u-line u-panel text-sm u-surface transition-all"
   const inpFocus = { fontSize: 16 }
 
   const hasMontage  = !!form.logistics_address
@@ -541,22 +577,22 @@ function LogisticsModal({ project, onClose, onSave }) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.45)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
+      <div className="u-surface w-full sm:max-w-lg rounded-t-3xl sm:u-panel overflow-hidden flex flex-col"
         style={{ maxHeight: '92vh' }}>
 
         {/* Handle (mobile) */}
         <div className="pt-4 sm:pt-0 flex-shrink-0">
-          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto sm:hidden" />
+          <div className="w-10 h-1 u-fill u-pill mx-auto sm:hidden" />
         </div>
 
         {/* Header */}
-        <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
+        <div className="px-5 pt-4 pb-3 border-b u-line flex items-start justify-between flex-shrink-0">
           <div>
-            <h2 className="font-bold text-gray-900 text-base">🚚 Infos logistiques</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{project.name} · {project.delivery_type}</p>
+            <h2 className="font-bold u-ink text-base">🚚 Infos logistiques</h2>
+            <p className="text-xs u-muted mt-0.5">{project.name} · {project.delivery_type}</p>
           </div>
           <button onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xl flex-shrink-0">
+            className="w-9 h-9 flex items-center justify-center u-pill u-fill u-muted text-xl flex-shrink-0">
             ×
           </button>
         </div>
@@ -564,18 +600,18 @@ function LogisticsModal({ project, onClose, onSave }) {
         {/* Tabs */}
         <div className="flex px-5 pt-3 gap-2 flex-shrink-0">
           <button onClick={() => setTab('montage')}
-            className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
+            className="flex-1 py-2 u-panel text-sm font-semibold transition-all"
             style={tab === 'montage'
               ? { background: PINK, color: 'white' }
-              : { background: '#f3f4f6', color: '#6b7280' }}>
+              : { background: C.neutralBg, color: C.muted }}>
             🔨 Montage
             {hasMontage && <span className="ml-1 text-xs opacity-70">✓</span>}
           </button>
           <button onClick={() => setTab('demontage')}
-            className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
+            className="flex-1 py-2 u-panel text-sm font-semibold transition-all"
             style={tab === 'demontage'
-              ? { background: '#8b5cf6', color: 'white' }
-              : { background: '#f3f4f6', color: '#6b7280' }}>
+              ? { background: C.violet, color: 'white' }
+              : { background: C.neutralBg, color: C.muted }}>
             🔧 Démontage
             {hasDemontage && <span className="ml-1 text-xs opacity-70">✓</span>}
           </button>
@@ -587,35 +623,35 @@ function LogisticsModal({ project, onClose, onSave }) {
             {/* ── Champs communs : date (démontage seulement), adresse, heure, contact, notes ── */}
             {tab === 'demontage' && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Date de démontage</label>
+                <label className="block text-xs font-medium u-muted mb-1 uppercase tracking-wide">Date de démontage</label>
                 <input type="date" value={form.disassembly_date}
                   onChange={e => set('disassembly_date', e.target.value)}
                   className={inp} style={inpFocus} />
               </div>
             )}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Adresse</label>
+              <label className="block text-xs font-medium u-muted mb-1 uppercase tracking-wide">Adresse</label>
               <AddressInput
                 value={tab === 'montage' ? form.logistics_address : form.disassembly_address}
                 onChange={v => set(tab === 'montage' ? 'logistics_address' : 'disassembly_address', v)}
                 placeholder="Rue, ville..." className={inp} style={inpFocus} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Heure prévue</label>
+              <label className="block text-xs font-medium u-muted mb-1 uppercase tracking-wide">Heure prévue</label>
               <TimeRangeInput
                 value={tab === 'montage' ? form.logistics_time : form.disassembly_time}
                 onChange={v => set(tab === 'montage' ? 'logistics_time' : 'disassembly_time', v)}
                 baseClass={inp} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Contact sur place</label>
+              <label className="block text-xs font-medium u-muted mb-1 uppercase tracking-wide">Contact sur place</label>
               <input type="text"
                 value={tab === 'montage' ? form.logistics_contact : form.disassembly_contact}
                 onChange={e => set(tab === 'montage' ? 'logistics_contact' : 'disassembly_contact', e.target.value)}
                 placeholder="Nom + téléphone" className={inp} style={inpFocus} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Commentaires</label>
+              <label className="block text-xs font-medium u-muted mb-1 uppercase tracking-wide">Commentaires</label>
               <textarea rows={3}
                 value={tab === 'montage' ? form.logistics_notes : form.disassembly_notes}
                 onChange={e => set(tab === 'montage' ? 'logistics_notes' : 'disassembly_notes', e.target.value)}
@@ -623,8 +659,8 @@ function LogisticsModal({ project, onClose, onSave }) {
             </div>
 
             <button type="submit" disabled={saving}
-              className="w-full py-3 rounded-2xl text-white font-semibold text-sm disabled:opacity-50 transition-opacity"
-              style={{ background: tab === 'montage' ? PINK : '#8b5cf6' }}>
+              className="w-full py-3 u-panel text-white font-semibold text-sm disabled:opacity-50 transition-opacity"
+              style={{ background: tab === 'montage' ? PINK : C.violet }}>
               {saving ? 'Enregistrement...' : 'Sauvegarder'}
             </button>
           </form>
@@ -647,22 +683,22 @@ function ProjectTasksModal({ project, tasks, onClose }) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.45)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
+      <div className="u-surface w-full sm:max-w-lg rounded-t-3xl sm:u-panel overflow-hidden flex flex-col"
         style={{ maxHeight: '80vh' }}>
         <div className="pt-4 sm:pt-0 flex-shrink-0">
-          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto sm:hidden mt-0 mb-2" />
+          <div className="w-10 h-1 u-fill u-pill mx-auto sm:hidden mt-0 mb-2" />
         </div>
-        <div className="px-5 pb-4 border-b border-gray-100 flex-shrink-0">
+        <div className="px-5 pb-4 border-b u-line flex-shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                <h2 className="font-bold text-gray-900 text-base leading-snug">{project.name}</h2>
+                <div className="w-2.5 h-2.5 u-pill flex-shrink-0" style={{ background: color }} />
+                <h2 className="font-bold u-ink text-base leading-snug">{project.name}</h2>
               </div>
-              <p className="text-sm text-gray-400">{project.client}</p>
+              <p className="text-sm u-muted">{project.client}</p>
             </div>
             <button onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-xl flex-shrink-0">
+              className="w-9 h-9 flex items-center justify-center u-pill u-fill u-muted text-xl flex-shrink-0">
               ×
             </button>
           </div>
@@ -671,34 +707,34 @@ function ProjectTasksModal({ project, tasks, onClose }) {
           {projectTasks.length === 0 ? (
             <div className="text-center py-10">
               <div className="text-3xl mb-2">📋</div>
-              <p className="text-gray-400 text-sm">Aucune tâche liée à ce projet</p>
+              <p className="u-muted text-sm">Aucune tâche liée à ce projet</p>
             </div>
           ) : (
             <>
               {active.map(task => (
-                <div key={task.id} className="flex items-center gap-3 py-3 px-3 rounded-2xl bg-gray-50">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PERSON_COLORS[task.responsible] || '#64748b' }} />
+                <div key={task.id} className="flex items-center gap-3 py-3 px-3 u-panel u-fill">
+                  <div className="w-2 h-2 u-pill flex-shrink-0" style={{ background: PERSON_COLORS[task.responsible] || C.muted }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
+                    <p className="text-sm font-semibold u-ink truncate">
                       {task.is_private && <span className="mr-1">🔒</span>}{task.title}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs u-muted mt-0.5">
                       {task.responsible}{task.execution_date && ` · ${task.execution_date.split('-').reverse().slice(0,2).join('.')}`}
                     </p>
                   </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0"
-                    style={{ background: (PERSON_COLORS[task.responsible] || '#64748b') + '22', color: PERSON_COLORS[task.responsible] || '#64748b' }}>
+                  <span className="text-xs px-2 py-0.5 u-pill font-medium flex-shrink-0"
+                    style={{ background: (PERSON_COLORS[task.responsible] || C.muted) + '22', color: PERSON_COLORS[task.responsible] || C.muted }}>
                     {task.responsible.split(' ')[0]}
                   </span>
                 </div>
               ))}
               {done.length > 0 && (
                 <div className="pt-2">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">Terminées</p>
+                  <p className="text-xs u-muted uppercase tracking-wide font-medium mb-2">Terminées</p>
                   {done.map(task => (
-                    <div key={task.id} className="flex items-center gap-3 py-2 px-3 rounded-2xl opacity-40">
-                      <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                      <p className="text-sm text-gray-500 line-through truncate">{task.title}</p>
+                    <div key={task.id} className="flex items-center gap-3 py-2 px-3 u-panel opacity-40">
+                      <div className="w-2 h-2 u-pill u-ok-bg flex-shrink-0" />
+                      <p className="text-sm u-muted line-through truncate">{task.title}</p>
                     </div>
                   ))}
                 </div>
@@ -706,9 +742,9 @@ function ProjectTasksModal({ project, tasks, onClose }) {
             </>
           )}
         </div>
-        <div className="px-5 pb-6 pt-3 border-t border-gray-100 flex-shrink-0">
+        <div className="px-5 pb-6 pt-3 border-t u-line flex-shrink-0">
           <Link href="/tasks"
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold border-2 transition-opacity hover:opacity-80"
+            className="flex items-center justify-center gap-2 w-full py-3 u-panel text-sm font-semibold border-2 transition-opacity hover:opacity-80"
             style={{ borderColor: PINK, color: PINK }}>
             Gérer les tâches →
           </Link>
@@ -757,7 +793,7 @@ export default function Admin() {
   const [logisticsProject, setLogisticsProject]   = useState(null)
   const [archiveTarget, setArchiveTarget]         = useState(null)
   const [pickerOpen, setPickerOpen]               = useState(false)
-  const [viewMode, setViewMode]                   = useState('cards')
+  const [viewMode, setViewMode]                   = useState('list')
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' && localStorage.getItem('projectsViewMode')
@@ -908,11 +944,31 @@ export default function Admin() {
     if (!b.deadline) return -1
     return new Date(a.deadline) - new Date(b.deadline)
   })
-  const archivedProjects = projects.filter(p => p.status !== 'active')
-  const inputClass = "w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 transition-colors bg-white"
+  // Les trois chiffres du bandeau sont dérivés de la liste déjà chargée —
+  // le handoff insiste sur ce point : pas de nouvel endpoint.
+  const stats = (() => {
+    const echeanceProche = activeProjects.filter(p => {
+      const d = getDaysRemaining(p.deadline)
+      return d !== null && d >= 0 && d <= 7
+    }).length
+    const pourcentages = activeProjects.map(p => {
+      const t = tasks.filter(x => x.project_id === p.id)
+      return t.length ? Math.round((t.filter(x => x.status === 'completed').length / t.length) * 100) : null
+    }).filter(v => v !== null)
+    const avancementMoyen = pourcentages.length
+      ? Math.round(pourcentages.reduce((a, b) => a + b, 0) / pourcentages.length)
+      : 0
+    return { echeanceProche, avancementMoyen }
+  })()
 
+  const archivedProjects = projects.filter(p => p.status !== 'active')
+  const inputClass = "w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line transition-colors u-surface"
+
+  // ── Carte de projet (vue cartes) ───────────────────────────────────────────
+  // v2 : carte d'information dense, SANS imagerie. Le handoff a abandonné la
+  // vignette photo de la première itération faute de photos disponibles : la
+  // place sert à porter de l'information utile plutôt qu'un placeholder.
   function renderProjectCard(project) {
-    const color       = getProjectColor(project)
     const fromTodoist = isFromTodoist(project)
     const incomplete  = needsCompletion(project)
     const allTasks    = tasks.filter(t => t.project_id === project.id)
@@ -922,173 +978,142 @@ export default function Admin() {
     const nextTask    = allTasks
       .filter(t => t.status === 'active')
       .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
-    const badge = daysBadge(project.deadline, project.phase, project.suspended)
-    // Liseré de carte : couleur de phase si définie, sinon feu tricolore d'échéance
-    const stripe = getProjectColor(project)
+    const s = statutProjet(project)
+    const lienAction = { background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+      font: `12px ${FONT}`, color: C.muted, transition: 'color .15s ease' }
+    const survolAction = {
+      onMouseEnter: e => { e.currentTarget.style.color = AL.black },
+      onMouseLeave: e => { e.currentTarget.style.color = C.muted },
+    }
 
     return (
       <div key={project.id}
-        style={{ background: C.surface, border: `1px solid ${incomplete ? '#f3ccd7' : C.border}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 268, fontFamily: FONT }}>
-        <div style={{ height: 5, background: stripe }} />
-        <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
-          {/* Titre + client + avatar */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Link href={`/projects/${project.id}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, textDecoration: 'none' }}>
-              <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-.2px', color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{project.name}</span>
-              <span style={{ fontSize: 13, color: incomplete ? C.accent : C.muted, fontWeight: incomplete ? 600 : 400 }}>{project.client}</span>
-            </Link>
-            <div title={project.responsible}
-              style={{ width: 30, height: 30, borderRadius: '50%', background: colorForName(project.responsible), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>
-              {initials(project.responsible)}
-            </div>
-          </div>
+        style={{ background: C.surface, borderRadius: R.panel, padding: 22, borderTop: `3px solid ${s.stripe}`,
+          display: 'flex', flexDirection: 'column', gap: 14, fontFamily: FONT }}>
 
-          {/* Deadline + badge */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ font: `600 13px ${MONO}`, color: badge.kind === 'none' ? C.muted : C.ink }}>{formatDate(project.deadline) || 'Sans date'}</span>
-            {incomplete
-              ? <span style={{ font: `11px ${MONO}`, color: C.accent }}>À COMPLÉTER</span>
-              : badge.kind === 'phase'
-                ? <span style={{ font: `11px ${MONO}`, padding: '2px 8px', borderRadius: 99, color: badge.color, background: badge.bg }}>{badge.text}</span>
-                : badge.kind !== 'none' && (
-                  <span style={{ font: `11px ${MONO}`, padding: '2px 8px', borderRadius: 99,
-                    color: badge.kind === 'urgent' ? C.accent : C.inkSecondary,
-                    background: badge.kind === 'urgent' ? C.accentBg : C.divider }}>{badge.text}</span>
-                )}
+        {/* En-tête : nom + client, avatar du responsable */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <Link href={`/projects/${project.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textDecoration: 'none' }}>
+            <span style={{ fontSize: 19, fontWeight: 500, lineHeight: 1.15, letterSpacing: '-.01em', color: AL.black }}>{project.name}</span>
+            <span style={{ fontSize: 13, color: incomplete ? C.accent : C.muted }}>
+              {project.client}{incomplete ? ' — à compléter' : ''}
+            </span>
+          </Link>
+          <div title={project.responsible}
+            style={{ width: 30, height: 30, borderRadius: R.pill, background: AL.black, color: AL.white,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 500, flex: 'none' }}>
+            {initials(project.responsible)}
           </div>
-
-          {/* Méta : responsable · mode · devis */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11.5, color: C.muted }}>
-            <span style={{ fontWeight: 600, color: C.inkTertiary }}>{project.responsible || 'non défini'}</span>
-            <span>·</span>
-            {fromTodoist
-              ? <span style={{ font: `10px ${MONO}`, color: C.inkSecondary }}>TODOIST</span>
-              : <span>{project.delivery_type}</span>}
-            {project.quote_data?.status && (() => {
-              const m = quoteStatusMeta(project.quote_data.status)
-              return (<><span>·</span>
-                <span style={{ font: `10px ${MONO}`, color: C.ink, border: `1px solid ${C.border}`, padding: '1px 7px', borderRadius: 99 }}>DEVIS · {m.label.toUpperCase()}</span>
-              </>)
-            })()}
-          </div>
-
-          {/* Progression */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', font: `11px ${MONO}`, color: C.muted }}>
-              <span>{totalCount === 0 ? 'Aucune tâche' : `${doneCount} / ${totalCount} tâches`}</span>
-              <span style={{ color: totalCount === 0 ? C.muted : C.ink, fontWeight: 600 }}>{totalCount === 0 ? '—' : `${progress}%`}</span>
-            </div>
-            <div style={{ height: 5, background: C.divider, borderRadius: 3 }}>
-              {totalCount > 0 && <div style={{ width: `${progress}%`, height: '100%', background: progress === 100 ? C.success : C.ink, borderRadius: 3 }} />}
-            </div>
-          </div>
-
-          {/* Prochaine tâche */}
-          {nextTask && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, borderTop: `1px solid ${C.divider}`, paddingTop: 9, fontSize: 11.5, color: C.inkSecondary }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: colorForName(nextTask.responsible), flex: 'none' }} />
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextTask.title}</span>
-              <span style={{ font: `10px ${MONO}`, color: C.muted }}>{nextTask.responsible}{nextTask.execution_date ? ` · ${formatDateShort(nextTask.execution_date)}` : ''}</span>
-            </div>
-          )}
         </div>
 
-        {/* Actions */}
-        <div style={{ padding: '9px 18px', borderTop: `1px solid ${C.divider}`, display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, color: C.muted }}>
-          <select value={project.phase || ''} onChange={e => patchPhase(project, e.target.value)}
-            title="Phase du projet"
-            style={{ border: `1px solid ${C.border}`, borderRadius: 5, background: C.surface, color: C.inkSecondary, font: `11px ${FONT}`, padding: '2px 4px', cursor: 'pointer', maxWidth: 120 }}>
-            <option value="">En préparation</option>
-            {PROJECT_PHASES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+        {/* Échéance + badge de statut */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: project.deadline ? AL.black : C.muted }}>
+            {formatDate(project.deadline) || 'Sans date'}
+          </span>
+          <BadgeStatut project={project} />
+        </div>
+
+        {/* Méta : responsable · mode · devis */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12.5, color: C.muted }}>
+          <span style={{ fontWeight: 500, color: AL.black }}>{project.responsible || 'non défini'}</span>
+          <span>·</span>
+          <span>{fromTodoist ? 'todoist' : project.delivery_type}</span>
+          {project.quote_data?.status && (() => {
+            const m = quoteStatusMeta(project.quote_data.status)
+            return (<>
+              <span>·</span>
+              <span style={{ padding: '2px 8px', borderRadius: R.pill, background: C.neutralBg, color: AL.black,
+                fontSize: 10.5, fontWeight: 500, letterSpacing: '.04em', textTransform: 'uppercase' }}>
+                devis · {m.label}
+              </span>
+            </>)
+          })()}
+        </div>
+
+        {/* Avancement */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: C.muted }}>
+            <span>{totalCount === 0 ? 'aucune tâche' : `${doneCount} / ${totalCount} tâches`}</span>
+            <span style={{ fontWeight: 500, color: totalCount === 0 ? C.muted : AL.black }}>
+              {totalCount === 0 ? '—' : `${progress}%`}
+            </span>
+          </div>
+          <BarreAvancement pct={progress} actif={totalCount > 0} />
+        </div>
+
+        {/* Prochaine tâche — seulement si elle existe */}
+        {nextTask && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: `1px solid ${C.border}`, paddingTop: 11, fontSize: 12, color: C.muted }}>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nextTask.title}</span>
+            <span style={{ fontSize: 11, flex: 'none' }}>
+              {nextTask.responsible}{nextTask.execution_date ? ` · ${formatDateShort(nextTask.execution_date)}` : ''}
+            </span>
+          </div>
+        )}
+
+        {/* Pied : phase du projet à gauche, actions à droite.
+            La maquette n'affiche que « modifier » et « archiver » ; le code en a
+            quatre. Les deux nommées restent en clair, les deux autres passent
+            dans le menu ⋯ — sinon le pied déborde sur deux lignes dès 300px. */}
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: C.muted }}>
+          <select value={project.phase || ''} onChange={e => patchPhase(project, e.target.value)} title="Phase du projet"
+            style={{ border: 'none', background: 'none', color: C.muted, font: `12px ${FONT}`, padding: 0, cursor: 'pointer', maxWidth: 104, minWidth: 0 }}>
+            <option value="">en préparation</option>
+            {PROJECT_PHASES.map(ph => <option key={ph.key} value={ph.key}>{ph.label.toLowerCase()}</option>)}
           </select>
-          <button onClick={() => handleEdit(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Modifier</button>
-          <button onClick={() => patchSuspended(project, !project.suspended)}
-            title={project.suspended ? 'Réactiver le projet' : 'Mettre en pause (le sort des « en retard »)'}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', color: project.suspended ? '#1d4ed8' : C.muted, cursor: 'pointer', padding: 0, font: `600 11.5px ${FONT}` }}>
-            {project.suspended ? 'Réactiver' : 'Suspendre'}
-          </button>
-          <button onClick={() => handleArchive(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Archiver</button>
-          <button onClick={() => handleDelete(project)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 0, font: `11.5px ${FONT}` }}>Supprimer</button>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => handleEdit(project)} style={lienAction} {...survolAction}>modifier</button>
+          <button onClick={() => handleArchive(project)} style={lienAction} {...survolAction}>archiver</button>
+          <ProjectActionsMenu items={[
+            { label: project.suspended ? 'réactiver' : 'suspendre', onClick: () => patchSuspended(project, !project.suspended) },
+            { label: 'supprimer', onClick: () => handleDelete(project), danger: true },
+          ]} />
         </div>
       </div>
     )
   }
 
+  // ── Ligne de projet (vue liste) ────────────────────────────────────────────
+  // Trois colonnes : projet (flex), statut (auto), avancement (120px, à droite).
+  // Le séparateur est un filet HAUT sur chaque ligne — pas de carte bordée.
   function renderProjectRow(project) {
-    const color       = getProjectColor(project)
-    const fromTodoist = isFromTodoist(project)
-    const incomplete  = needsCompletion(project)
-    const allTasks    = tasks.filter(t => t.project_id === project.id)
-    const doneCount   = allTasks.filter(t => t.status === 'completed').length
-    const totalCount  = allTasks.length
-    const progress    = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
-    const respColor   = colorForName(project.responsible)
+    const incomplete = needsCompletion(project)
+    const allTasks   = tasks.filter(t => t.project_id === project.id)
+    const doneCount  = allTasks.filter(t => t.status === 'completed').length
+    const totalCount = allTasks.length
+    const progress   = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
 
     return (
-      <div key={project.id} className="group relative flex gap-3.5 px-5 py-5 hover:bg-gray-50/70 transition-colors">
-        {/* Accent d'urgence (toute la hauteur) */}
-        <span className="w-1 rounded-full flex-shrink-0 self-stretch" style={{ background: color }} />
+      <div key={project.id}
+        style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 4px',
+          borderTop: `1px solid ${C.border}`, fontFamily: FONT }}>
 
-        <div className="flex-1 min-w-0">
-          {/* Ligne 1 — nom · client */}
-          <Link href={`/projects/${project.id}`} className="block min-w-0 pr-8 truncate">
-            <span className="font-semibold text-gray-900" style={{ fontSize: 15 }}>{project.name}</span>
-            <span className={incomplete ? 'font-medium' : 'text-gray-400'}
-              style={{ fontSize: 14, ...(incomplete ? { color: '#ea580c' } : {}) }}>
-              {'  ·  '}{project.client}
-            </span>
-            {fromTodoist && <span style={{ color: '#16a34a', fontSize: 12 }}> · Todoist</span>}
-          </Link>
+        <Link href={`/projects/${project.id}`}
+          style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textDecoration: 'none' }}>
+          <span style={{ fontSize: 20, fontWeight: 500, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {project.name}
+          </span>
+          <span style={{ fontSize: 13, color: incomplete ? C.accent : C.muted }}>
+            {project.client}{incomplete ? ' — à compléter' : ''}
+          </span>
+        </Link>
 
-          {/* Ligne 2 — méta : responsable · échéance · avancement */}
-          <div className="flex items-center flex-wrap gap-x-6 gap-y-2 mt-3" style={{ fontSize: 13 }}>
-            {/* Responsable */}
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
-                style={{ background: respColor, fontSize: 10, letterSpacing: '-0.02em' }}>
-                {initials(project.responsible)}
-              </span>
-              <span className="text-gray-600">{project.responsible || 'non défini'}</span>
-            </span>
+        <div style={{ flex: 'none' }}><BadgeStatut project={project} /></div>
 
-            {/* Échéance */}
-            <span className="inline-flex items-center gap-2">
-              <span className="text-gray-500 tabular-nums">{formatDate(project.deadline) || 'Sans date'}</span>
-              {!incomplete && <DaysChip deadline={project.deadline} phase={project.phase} suspended={project.suspended} />}
-            </span>
-
-            {/* Avancement */}
-            {totalCount === 0 ? (
-              <span className="text-gray-400">Aucune tâche</span>
-            ) : (
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block w-24 h-1.5 rounded-full overflow-hidden align-middle" style={{ background: '#f3f4f6' }}>
-                  <span className="block h-full rounded-full" style={{ width: `${progress}%`, background: progress === 100 ? '#22c55e' : '#111827' }} />
-                </span>
-                <span className="font-semibold tabular-nums text-gray-700">{progress}%</span>
-                <span className="text-gray-400 tabular-nums">{doneCount}/{totalCount}</span>
-              </span>
-            )}
-
-            {/* Statut devis */}
-            {project.quote_data?.status && (() => {
-              const m = quoteStatusMeta(project.quote_data.status)
-              return (
-                <span className="inline-flex items-center rounded-full px-2 py-0.5 font-semibold"
-                  style={{ background: m.bg, color: m.color, fontSize: 11 }}>
-                  Devis · {m.label}
-                </span>
-              )
-            })()}
-          </div>
+        <div style={{ width: 120, flex: 'none', display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: totalCount === 0 ? C.muted : AL.black }}>
+            {totalCount === 0 ? '—' : `${progress}%`}
+          </span>
+          <BarreAvancement pct={progress} actif={totalCount > 0} />
         </div>
 
-        {/* Menu actions compact */}
-        <ProjectActionsMenu
-          onEdit={() => handleEdit(project)}
-          onArchive={() => handleArchive(project)}
-          onDelete={() => handleDelete(project)}
-        />
+        <ProjectActionsMenu items={[
+          { label: 'modifier',  onClick: () => handleEdit(project) },
+          { label: project.suspended ? 'réactiver' : 'suspendre', onClick: () => patchSuspended(project, !project.suspended) },
+          { label: 'archiver',  onClick: () => handleArchive(project) },
+          { label: 'supprimer', onClick: () => handleDelete(project), danger: true },
+        ]} />
       </div>
     )
   }
@@ -1109,36 +1134,36 @@ export default function Admin() {
 
       {/* Feedback toast */}
       {feedback && (
-        <div className="fixed top-5 right-5 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-medium"
-          style={{ background: feedback.type === 'error' ? C.danger : C.ink, color: '#fff' }}>
+        <div className="fixed top-5 right-5 z-50 px-4 py-2.5 u-panel shadow-lg text-sm font-medium"
+          style={{ background: feedback.type === 'error' ? C.danger : C.ink, color: AL.white }}>
           {feedback.msg}
         </div>
       )}
 
-      <main className="w-full" style={{ padding: '26px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <main className="w-full" style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
         {/* Formulaire Add/Edit */}
         {showForm && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-5 md:px-8 py-4 md:py-5 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900 text-base">
+          <div className="u-surface u-panel border u-line overflow-hidden">
+            <div className="px-5 md:px-8 py-4 md:py-5 border-b u-line flex items-center justify-between">
+              <h2 className="font-semibold u-ink text-base">
                 {editingProject ? `Modifier — ${editingProject.name}` : 'Nouveau projet'}
               </h2>
               <button onClick={resetForm}
-                className="w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 transition-colors text-xl">
+                className="w-8 h-8 flex items-center justify-center u-pill u-muted hover:u-fill transition-colors text-xl">
                 ×
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 md:p-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Nom du projet *</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Nom du projet *</label>
                   <input type="text" required value={form.name}
                     onChange={e => handleFieldChange('name', e.target.value)}
                     placeholder="Ex: Bar comptoir EventX" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Client *</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Client *</label>
                   <BillingContactSelect
                     key={editingProject?.id || 'new'}
                     initialContactId={editingProject?.client_contact_id}
@@ -1152,73 +1177,73 @@ export default function Admin() {
                     className={inputClass} style={{ marginTop: 6, resize: 'none' }} />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Description courte (vue Atelier)</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Description courte (vue Atelier)</label>
                   <input type="text" value={form.short_description}
                     onChange={e => handleFieldChange('short_description', e.target.value)}
                     maxLength={80}
                     placeholder="Ex: 2 bars LED + podium"
                     className={inputClass} />
-                  <p className="text-xs text-gray-400 mt-1">Visible sur l'écran mural. Max 80 caractères.</p>
+                  <p className="text-xs u-muted mt-1">Visible sur l'écran mural. Max 80 caractères.</p>
                 </div>
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Description longue</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Description longue</label>
                   <textarea value={form.description}
                     onChange={e => handleFieldChange('description', e.target.value)}
                     rows={6}
                     placeholder="Colle ici un mail, des infos détaillées, le brief client…"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-gray-400 transition-colors bg-white resize-y leading-relaxed"
+                    className="w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line transition-colors u-surface resize-y leading-relaxed"
                     style={{ minHeight: 140 }}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Date de livraison</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Date de livraison</label>
                   <input type="date" value={form.deadline}
                     onChange={e => handleFieldChange('deadline', e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Référence</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Référence</label>
                   <input type="text" value={form.reference}
                     onChange={e => handleFieldChange('reference', e.target.value)}
                     placeholder="Réf. client / commande (sur l'offre & la facture)" className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Mode de livraison</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Mode de livraison</label>
                   <select value={form.delivery_type} onChange={e => handleFieldChange('delivery_type', e.target.value)} className={inputClass}>
                     {DELIVERY_TYPES.map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Phase</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Phase</label>
                   <select value={form.phase} onChange={e => handleFieldChange('phase', e.target.value)} className={inputClass}>
                     <option value="">En préparation</option>
                     {PROJECT_PHASES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
                   </select>
-                  <p className="text-xs text-gray-400 mt-1">Une phase définie retire le projet des « en retard ».</p>
+                  <p className="text-xs u-muted mt-1">Une phase définie retire le projet des « en retard ».</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Responsable</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Responsable</label>
                   <select value={form.responsible} onChange={e => handleFieldChange('responsible', e.target.value)} className={inputClass}>
                     {responsibles.map(r => <option key={r}>{r}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Couleur de la carte</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Couleur de la carte</label>
                   <select value={form.color_override ?? 'null'}
                     onChange={e => handleFieldChange('color_override', e.target.value === 'null' ? null : e.target.value)} className={inputClass}>
                     {COLOR_OPTIONS.map(c => <option key={String(c.value)} value={c.value ?? 'null'}>{c.icon} {c.label}</option>)}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Notes internes</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Notes internes</label>
                   <input type="text" value={form.notes}
                     onChange={e => handleFieldChange('notes', e.target.value)}
                     placeholder="Info logistique, remarques..." className={inputClass} />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Dossier kDrive</label>
+                  <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Dossier kDrive</label>
                   <div className="flex items-center gap-3 flex-wrap">
                     <button type="button" onClick={() => setPickerOpen(true)}
-                      className="px-3 py-2 text-sm rounded-md border border-gray-200 hover:border-gray-400 transition-colors text-gray-700 inline-flex items-center gap-2">
+                      className="px-3 py-2 text-sm u-pill border u-line hover:u-line transition-colors u-ink inline-flex items-center gap-2">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
                       </svg>
@@ -1226,27 +1251,27 @@ export default function Admin() {
                     </button>
                     {form.kdrive_folder_id && (
                       <>
-                        <span className="text-sm text-gray-600 truncate">
+                        <span className="text-sm u-ink truncate">
                           {form.kdrive_folder_path || `Dossier #${form.kdrive_folder_id}`}
                         </span>
                         <button type="button"
                           onClick={() => setForm(f => ({ ...f, kdrive_folder_id: null, kdrive_folder_path: '' }))}
-                          className="text-xs text-gray-400 hover:text-red-500">
+                          className="text-xs u-muted hover:u-ko">
                           retirer
                         </button>
                       </>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-1.5">Lie le projet à un dossier existant sur kDrive. Sinon, un dossier sera créé automatiquement au premier upload.</p>
+                  <p className="text-xs u-muted mt-1.5">Lie le projet à un dossier existant sur kDrive. Sinon, un dossier sera créé automatiquement au premier upload.</p>
                 </div>
               </div>
               <div className="mt-8 flex items-center gap-3">
                 <button type="submit" disabled={saving}
-                  style={{ background: '#111827', color: '#fff' }}
-                  className="px-5 py-2 rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
+                  style={{ background: AL.black, color: AL.white }}
+                  className="px-5 py-2 u-pill text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
                   {saving ? 'Enregistrement…' : editingProject ? 'Mettre à jour' : 'Créer le projet'}
                 </button>
-                <button type="button" onClick={resetForm} className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800">
+                <button type="button" onClick={resetForm} className="px-3 py-2 text-sm u-muted hover:u-ink">
                   Annuler
                 </button>
               </div>
@@ -1255,57 +1280,66 @@ export default function Admin() {
         )}
 
         {/* Projets actifs */}
-        <div className="mx-auto w-full" style={{ maxWidth: viewMode === 'list' ? 1180 : undefined }}>
-          {/* Header 11b */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.4px' }}>Projets en cours</span>
-            <span style={{ font: `12px ${MONO}`, color: C.muted }}>{activeProjects.length}</span>
-            <div style={{ flex: 1 }} />
-            <div style={{ display: 'flex', border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden', fontSize: 12 }}>
-              {[
-                { key: 'cards',  label: 'Cartes' },
-                { key: 'list',   label: 'Liste' },
-                { key: 'kanban', label: 'Kanban' },
-              ].map((v, i) => (
-                <button key={v.key} onClick={() => changeViewMode(v.key)}
-                  style={{ padding: '6px 14px', cursor: 'pointer', border: 'none', borderLeft: i ? `1px solid ${C.border}` : 'none', font: `${viewMode === v.key ? 600 : 400} 12px ${FONT}`,
-                    background: viewMode === v.key ? C.ink : C.surface, color: viewMode === v.key ? '#fff' : C.inkSecondary }}>
-                  {v.label}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => { resetForm(); setShowForm(true) }}
-              style={{ border: 'none', background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 16px', borderRadius: 5, cursor: 'pointer' }}>
-              + NOUVEAU PROJET
-            </button>
+        <div className="w-full">
+          {/* Titre display — le second mot en corail. C'est le seul endroit de
+              l'écran où l'accent apparaît, et il est bien au-dessus de 24px. */}
+          <h1 style={{ fontSize: '7vw', fontWeight: 400, lineHeight: 1, letterSpacing: '-.01em', margin: '24px 0 0', color: AL.black }}>
+            vos <span style={{ color: C.accent }}>projets</span>
+          </h1>
+          <p style={{ fontSize: 18, color: C.muted, margin: '16px 0 40px' }}>
+            {activeProjects.length} projet{activeProjects.length > 1 ? 's' : ''} actif{activeProjects.length > 1 ? 's' : ''}
+            {' · '}
+            {stats.echeanceProche} échéance{stats.echeanceProche > 1 ? 's' : ''} sous 7 jours
+          </p>
+
+          {/* Bandeau de stats — panneaux noirs. La profondeur vient de
+              l'inversion de fond, pas d'une ombre : il n'y en a aucune.
+              Les trois chiffres sont DÉRIVÉS de la liste déjà chargée, pas
+              d'un nouvel endpoint. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 64 }}>
+            {[
+              { valeur: activeProjects.length, label: 'projets actifs' },
+              { valeur: stats.echeanceProche,  label: 'échéance sous 7 jours' },
+              { valeur: `${stats.avancementMoyen}%`, label: 'avancement moyen' },
+            ].map(s => (
+              <div key={s.label} style={{ background: AL.black, borderRadius: R.panel, padding: 24, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 40, fontWeight: 500, lineHeight: 1, color: AL.white }}>{s.valeur}</span>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>{s.label}</span>
+              </div>
+            ))}
           </div>
 
-          {/* Pills de filtre temporel 11b */}
-          {activeProjects.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+          {/* Barre de contrôles : bascule de vue à gauche, action à droite.
+              Le handoff ne dessine que cartes/liste ; kanban et gantt existent
+              dans le code et sont conservés, au même format de pill. */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 32 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
-                { key: 'week',  label: 'CETTE SEMAINE' },
-                { key: 'two',   label: '2 SEMAINES' },
-                { key: 'later', label: 'PLUS TARD' },
-              ].map(b => {
-                const n = activeProjects.filter(p => timeBucket(p.deadline) === b.key).length
-                const accent = b.key === 'week'
+                { key: 'cards',  label: 'cartes' },
+                { key: 'list',   label: 'liste' },
+                { key: 'kanban', label: 'kanban' },
+                { key: 'gantt',  label: 'gantt' },
+              ].map(v => {
+                const actif = viewMode === v.key
                 return (
-                  <span key={b.key} style={{ font: `11px ${MONO}`, padding: '4px 10px', borderRadius: 99,
-                    color: accent ? C.accent : C.inkSecondary, background: accent ? C.accentBg : C.divider }}>
-                    {b.label} · {n}
-                  </span>
+                  <button key={v.key} onClick={actif ? undefined : () => changeViewMode(v.key)}
+                    style={{ fontFamily: FONT, fontSize: 13, fontWeight: actif ? 500 : 400, padding: '9px 18px',
+                      borderRadius: R.pill, border: `1.5px solid ${C.outline}`,
+                      background: actif ? AL.black : C.surface, color: actif ? AL.white : AL.black,
+                      cursor: actif ? 'default' : 'pointer' }}>
+                    {v.label}
+                  </button>
                 )
               })}
             </div>
-          )}
+            <ButtonPill onClick={() => { resetForm(); setShowForm(true) }}>+ nouveau projet</ButtonPill>
+          </div>
 
           {/* Bannière Todoist */}
           {activeProjects.some(needsCompletion) && (
-            <div className="mb-6 px-5 py-4 rounded-md border"
-              style={{ background: '#fff8f0', borderColor: '#fed7aa' }}>
-              <p className="text-sm text-orange-800">
-                <strong>{activeProjects.filter(needsCompletion).length} projet{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''}</strong> importé{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''} depuis Todoist — clique sur Modifier pour compléter les infos.
+            <div style={{ marginBottom: 24, padding: '16px 20px', borderRadius: R.panel, background: C.warningBg }}>
+              <p style={{ margin: 0, fontSize: 13, color: C.warning }}>
+                <strong style={{ fontWeight: 500 }}>{activeProjects.filter(needsCompletion).length} projet{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''}</strong> importé{activeProjects.filter(needsCompletion).length > 1 ? 's' : ''} depuis Todoist — clique sur « modifier » pour compléter les infos.
               </p>
             </div>
           )}
@@ -1313,11 +1347,11 @@ export default function Admin() {
           {loading ? (
             <ProjectsSkeleton />
           ) : activeProjects.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 0', background: C.surface, borderRadius: 8, border: `1px solid ${C.border}` }}>
+            <div style={{ textAlign: 'center', padding: '80px 0' }}>
               <p style={{ color: C.muted, fontSize: 13 }}>Aucun projet actif.</p>
             </div>
           ) : viewMode === 'cards' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, alignContent: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24, alignContent: 'start' }}>
               {activeProjects.map(renderProjectCard)}
             </div>
           ) : viewMode === 'gantt' ? (
@@ -1333,13 +1367,13 @@ export default function Admin() {
                   return (
                     <div key={col.key} className="flex-shrink-0 w-80">
                       <div className="flex items-center gap-2 mb-4 px-1">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col.accent }} />
-                        <h3 className="font-semibold text-gray-700 text-sm">{col.label}</h3>
-                        <span className="text-xs text-gray-400 tabular-nums">{colProjects.length}</span>
+                        <span className="w-2 h-2 u-pill flex-shrink-0" style={{ background: col.accent }} />
+                        <h3 className="font-semibold u-ink text-sm">{col.label}</h3>
+                        <span className="text-xs u-muted tabular-nums">{colProjects.length}</span>
                       </div>
                       <div className="space-y-4">
                         {colProjects.length === 0 ? (
-                          <div className="text-center py-10 rounded-xl border border-dashed border-gray-200 text-gray-300 text-xs">
+                          <div className="text-center py-10 u-panel border border-dashed u-line u-muted text-xs">
                             Aucun projet
                           </div>
                         ) : colProjects.map(renderProjectCard)}
@@ -1350,19 +1384,28 @@ export default function Admin() {
               })()}
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="divide-y divide-gray-100">
-                {groupByMonth(activeProjects).flatMap(g => [
-                  <div key={`m-${g.key}`}
-                    className="flex items-center gap-2 px-5 py-3 bg-gray-50/80 border-b border-gray-100"
-                    style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.06em' }}>
-                    <span className="text-gray-700 uppercase">{g.label}</span>
-                    <span className="inline-flex items-center justify-center h-4 px-1.5 rounded-full bg-gray-200 text-gray-600 tabular-nums"
-                      style={{ fontSize: 10.5, fontWeight: 600 }}>{g.items.length}</span>
-                  </div>,
-                  ...g.items.map(renderProjectRow),
-                ])}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {/* En-tête de colonnes. Capitales assumées : le handoff excepte
+                  explicitement les en-têtes de la règle des minuscules. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0 4px 12px',
+                fontSize: 11, fontWeight: 500, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
+                <span style={{ flex: 1 }}>projet</span>
+                <span style={{ flex: 'none' }}>statut</span>
+                <span style={{ width: 120, flex: 'none', textAlign: 'right' }}>avancement</span>
+                <span style={{ width: 28, flex: 'none' }} />
               </div>
+              {/* Le regroupement par mois ne vient pas du handoff — il vient du
+                  code existant, et il reste utile dès qu'on dépasse la douzaine
+                  de projets. Seule son habillage change. */}
+              {groupByMonth(activeProjects).flatMap(g => [
+                <div key={`m-${g.key}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '28px 4px 8px',
+                    fontSize: 11, fontWeight: 500, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
+                  <span>{g.label}</span>
+                  <span style={{ font: `10px ${MONO}` }}>{g.items.length}</span>
+                </div>,
+                ...g.items.map(renderProjectRow),
+              ])}
             </div>
           )}
         </div>
@@ -1371,24 +1414,28 @@ export default function Admin() {
         {archivedProjects.length > 0 && (
           <div>
             <button onClick={() => setShowArchived(v => !v)}
-              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-5">
-              <span className="text-xs">{showArchived ? '▾' : '▸'}</span>
-              Projets archivés ({archivedProjects.length})
+              style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: 0,
+                border: 'none', background: 'none', cursor: 'pointer', font: `13px ${FONT}`, color: C.muted }}
+              onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+              onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
+              <span style={{ fontSize: 11 }}>{showArchived ? '▾' : '▸'}</span>
+              projets archivés ({archivedProjects.length})
             </button>
             {showArchived && (
-              <div className="space-y-2">
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {archivedProjects.map(project => (
-                  <div key={project.id} className="bg-white rounded-md border border-gray-100 px-5 py-3 flex items-center justify-between hover:border-gray-200 transition-colors">
-                    <div className="flex items-baseline gap-3 text-sm">
-                      <span className="font-medium text-gray-600">{project.name}</span>
-                      <span className="text-gray-400">{project.client}</span>
-                      <span className="text-xs text-gray-400">{formatDate(project.deadline)}</span>
+                  <div key={project.id}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                      padding: '14px 4px', borderTop: `1px solid ${C.border}`, fontSize: 13 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, minWidth: 0 }}>
+                      <span style={{ fontWeight: 500, color: C.muted }}>{project.name}</span>
+                      <span style={{ color: C.muted }}>{project.client}</span>
+                      <span style={{ fontSize: 12, color: C.muted }}>{formatDate(project.deadline)}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <button onClick={() => handleRestore(project)} className="text-gray-500 hover:text-gray-900 transition-colors">Restaurer</button>
-                      <span className="text-gray-200">·</span>
-                      <button onClick={() => handleDelete(project)} className="text-gray-500 hover:text-red-600 transition-colors">Supprimer</button>
-                    </div>
+                    <ProjectActionsMenu items={[
+                      { label: 'restaurer', onClick: () => handleRestore(project) },
+                      { label: 'supprimer', onClick: () => handleDelete(project), danger: true },
+                    ]} />
                   </div>
                 ))}
               </div>
@@ -1397,7 +1444,7 @@ export default function Admin() {
         )}
 
         {/* Footer */}
-        <div className="pt-4 pb-8 flex items-center justify-center gap-2 text-xs text-gray-300">
+        <div className="pt-4 pb-8 flex items-center justify-center gap-2 text-xs u-muted">
           <AtomLogo size={16} />
           <span>maze project</span>
         </div>
@@ -1412,7 +1459,7 @@ export default function Admin() {
       {archiveTarget && (
         <div onMouseDown={() => setArchiveTarget(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,.45)', zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, maxWidth: 420, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,.25)', padding: 24, fontFamily: FONT }}>
+          <div onMouseDown={e => e.stopPropagation()} style={{ background: AL.white, borderRadius: R.panel, maxWidth: 420, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,.25)', padding: 24, fontFamily: FONT }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: C.ink, marginBottom: 8 }}>Archiver sans facture ?</div>
             <p style={{ fontSize: 14, color: C.inkSecondary, lineHeight: 1.55, margin: 0 }}>
               « <strong>{archiveTarget.name}</strong> » n'a aucune facture liée. Archiver quand même ?
@@ -1421,7 +1468,7 @@ export default function Admin() {
               <button onClick={() => setArchiveTarget(null)}
                 style={{ padding: '9px 16px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: C.inkSecondary, font: `600 13px ${FONT}`, cursor: 'pointer' }}>Annuler</button>
               <button onClick={() => { const p = archiveTarget; setArchiveTarget(null); doArchive(p) }}
-                style={{ padding: '9px 16px', borderRadius: 6, border: 'none', background: C.ink, color: '#fff', font: `600 13px ${FONT}`, cursor: 'pointer' }}>Archiver</button>
+                style={{ padding: '9px 16px', borderRadius: 6, border: 'none', background: C.ink, color: AL.white, font: `600 13px ${FONT}`, cursor: 'pointer' }}>Archiver</button>
             </div>
           </div>
         </div>

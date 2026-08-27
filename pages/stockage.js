@@ -4,7 +4,7 @@ import { useAuth } from './_app'
 import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
-import { C, FONT, MONO } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { fmtCHF as fmt } from '../lib/money'
 
 const RATE = 20            // CHF / palette (m²) / mois
@@ -90,7 +90,7 @@ export default function Stockage() {
   const clientPallets = c => gList.filter(g => g.client === c && !g.archived).reduce((s, g) => s + num(g.pallets), 0)
   const grandPallets = gList.filter(g => !g.archived).reduce((s, g) => s + num(g.pallets), 0)
 
-  const inp = { width: '100%', padding: '6px 8px', borderRadius: 5, border: '1px solid transparent', background: 'transparent', font: `13px ${FONT}`, color: C.ink }
+  const inp = { width: '100%', padding: '6px 8px', borderRadius: R.pill, border: '1px solid transparent', background: 'transparent', font: `13px ${FONT}`, color: C.ink }
   const inpR = { ...inp, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
   const th = { font: `500 10px ${MONO}`, letterSpacing: '.05em', color: C.muted, textTransform: 'uppercase', padding: '6px 8px', textAlign: 'left', whiteSpace: 'nowrap' }
   const cell = { padding: '1px 4px', borderTop: `1px solid ${C.divider}` }
@@ -109,7 +109,7 @@ export default function Stockage() {
     return (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
         {tags.map(tg => (
-          <span key={tg} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: C.violet, background: C.violetBg, padding: '1px 4px 1px 7px', borderRadius: 99 }}>
+          <span key={tg} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: C.violet, background: C.violetBg, padding: '1px 4px 1px 7px', borderRadius: R.pill }}>
             {tg}<button onClick={() => patchItem(it.id, { tags: tags.filter(x => x !== tg) })} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0 }}>×</button>
           </span>
         ))}
@@ -132,7 +132,7 @@ export default function Stockage() {
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
             style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface, minWidth: 200 }} />
           <button onClick={() => setShowArchived(s => !s)}
-            style={{ font: `600 12px ${FONT}`, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`, background: showArchived ? C.ink : C.surface, color: showArchived ? '#fff' : C.inkSecondary }}>
+            style={{ font: `600 12px ${FONT}`, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`, background: showArchived ? C.ink : C.surface, color: showArchived ? AL.white : C.inkSecondary }}>
             {showArchived ? 'Archivés inclus' : 'Actifs'}
           </button>
           <button onClick={() => setBillOpen(true)}
@@ -142,7 +142,7 @@ export default function Stockage() {
         </div>
 
         {shownClients.map(client => (
-          <section key={client} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
+          <section key={client} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '14px 18px', borderBottom: `1px solid ${C.divider}` }}>
               <span style={{ font: `700 16px ${FONT}` }}>{client}</span>
               <span style={{ font: `12px ${MONO}`, color: C.muted }}>
@@ -167,7 +167,7 @@ export default function Stockage() {
                       <td style={cell}>{field('g', g, 'pallets', inpR, 'number', '0')}</td>
                       <td style={cell}>
                         <select value={g.billing_mode || 'quarterly'} onChange={e => setMode(g, e.target.value)}
-                          style={{ font: `12px ${FONT}`, color: C.inkSecondary, border: `1px solid ${C.border}`, borderRadius: 5, padding: '4px 6px', background: '#fff' }}>
+                          style={{ font: `12px ${FONT}`, color: C.inkSecondary, border: `1px solid ${C.border}`, borderRadius: R.pill, padding: '4px 6px', background: AL.white }}>
                           <option value="quarterly">Trimestriel</option>
                           <option value="annual">Annuel</option>
                         </select>
@@ -258,10 +258,10 @@ function BillingModal({ onClose }) {
     } finally { setBusy(false) }
   }
 
-  const sel = { padding: '8px 10px', borderRadius: 6, border: `1px solid ${C.border}`, font: `14px ${FONT}`, background: '#fff' }
+  const sel = { padding: '8px 10px', borderRadius: 6, border: `1px solid ${C.border}`, font: `14px ${FONT}`, background: AL.white }
   return (
     <div onMouseDown={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8vh 16px', overflowY: 'auto' }}>
-      <div onMouseDown={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, maxWidth: 480, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,.25)', fontFamily: FONT }}>
+      <div onMouseDown={e => e.stopPropagation()} style={{ background: AL.white, borderRadius: R.panel, maxWidth: 480, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,.25)', fontFamily: FONT }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderBottom: `1px solid ${C.divider}` }}>
           <h3 style={{ font: `700 16px ${FONT}`, margin: 0 }}>Générer les factures de stockage</h3>
           <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 20, color: C.muted, cursor: 'pointer' }}>×</button>
@@ -281,7 +281,7 @@ function BillingModal({ onClose }) {
           <p style={{ font: `11px ${MONO}`, color: C.muted, margin: 0 }}>Facture au dernier jour du trimestre, échéance +30j, statut « Créée ». Contact/adresse à assigner ensuite.</p>
 
           {preview && (
-            <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden' }}>
               <div style={{ padding: '8px 12px', font: `600 11px ${MONO}`, color: C.muted, background: C.pageBg, textTransform: 'uppercase' }}>{preview.object} — {preview.created.length} facture(s)</div>
               {preview.created.map((c, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 12px', fontSize: 13, borderTop: `1px solid ${C.divider}` }}>
@@ -296,7 +296,7 @@ function BillingModal({ onClose }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '14px 22px', borderTop: `1px solid ${C.divider}` }}>
           <button onClick={onClose} style={{ padding: '9px 16px', borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: C.inkSecondary, font: `600 13px ${FONT}`, cursor: 'pointer' }}>Fermer</button>
-          <button onClick={() => run(false)} disabled={busy} style={{ padding: '9px 18px', borderRadius: 6, border: 'none', background: C.ink, color: '#fff', font: `600 13px ${FONT}`, cursor: 'pointer', opacity: busy ? 0.5 : 1 }}>Générer</button>
+          <button onClick={() => run(false)} disabled={busy} style={{ padding: '9px 18px', borderRadius: 6, border: 'none', background: C.ink, color: AL.white, font: `600 13px ${FONT}`, cursor: 'pointer', opacity: busy ? 0.5 : 1 }}>Générer</button>
         </div>
       </div>
     </div>
@@ -309,8 +309,8 @@ function PhotoCell({ it, onUpload }) {
     <>
       <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { onUpload(it, e.target.files?.[0]); e.target.value = '' }} />
       {it.photo_url
-        ? <img src={it.photo_url} alt="" onClick={() => ref.current?.click()} style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 5, cursor: 'pointer', border: `1px solid ${C.border}` }} />
-        : <button onClick={() => ref.current?.click()} style={{ border: `1px dashed ${C.border}`, background: 'transparent', color: C.muted, borderRadius: 5, width: 34, height: 34, cursor: 'pointer', fontSize: 15 }}>+</button>}
+        ? <img src={it.photo_url} alt="" onClick={() => ref.current?.click()} style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: R.pill, cursor: 'pointer', border: `1px solid ${C.border}` }} />
+        : <button onClick={() => ref.current?.click()} style={{ border: `1px dashed ${C.border}`, background: 'transparent', color: C.muted, borderRadius: R.pill, width: 34, height: 34, cursor: 'pointer', fontSize: 15 }}>+</button>}
     </>
   )
 }
