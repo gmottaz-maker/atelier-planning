@@ -810,11 +810,14 @@ export default function Admin() {
   }
 
   async function handleSaveLogistics(projectId, logisticsData) {
-    const project = projects.find(p => p.id === projectId)
+    // On n'envoie QUE ce qui change. Renvoyer `{ ...project }` renvoyait aussi
+    // le `quote_data` allégé par `?light=1` — c'est-à-dire `{ status }` — et
+    // le serveur écrasait l'offre entière avec ça. Cf. le garde-fou ajouté
+    // dans pages/api/projects/[id].js.
     await fetch(`/api/projects/${projectId}`, {
       method: 'PUT',
       headers: actorHeaders(),
-      body: JSON.stringify({ ...project, ...logisticsData }),
+      body: JSON.stringify(logisticsData),
     })
     showFeedback('Infos logistiques sauvegardées ✓')
     fetchProjects()
@@ -862,7 +865,7 @@ export default function Admin() {
     mutateProjects(projects.map(p => p.id === project.id ? { ...p, phase } : p), false)
     await fetch(`/api/projects/${project.id}`, {
       method: 'PUT', headers: actorHeaders(),
-      body: JSON.stringify({ ...project, phase }),
+      body: JSON.stringify({ phase }),
     }).catch(() => {})
     mutateProjects()
   }
@@ -871,7 +874,7 @@ export default function Admin() {
     mutateProjects(projects.map(p => p.id === project.id ? { ...p, suspended } : p), false)
     await fetch(`/api/projects/${project.id}`, {
       method: 'PUT', headers: actorHeaders(),
-      body: JSON.stringify({ ...project, suspended }),
+      body: JSON.stringify({ suspended }),
     }).catch(() => {})
     mutateProjects()
   }
@@ -882,7 +885,7 @@ export default function Admin() {
     const res = await fetch(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: actorHeaders(),
-      body: JSON.stringify({ ...project, status: 'archived' }),
+      body: JSON.stringify({ status: 'archived' }),
     }).catch(() => null)
     if (res && res.ok) showFeedback('Projet archivé')
     else showFeedback('Erreur lors de l\'archivage', 'error')
@@ -899,7 +902,7 @@ export default function Admin() {
     await fetch(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: actorHeaders(),
-      body: JSON.stringify({ ...project, status: 'active' }),
+      body: JSON.stringify({ status: 'active' }),
     })
     showFeedback('Projet restauré')
     fetchProjects()

@@ -1,6 +1,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser } from '../../../lib/requireAdmin'
 import { erreurApi } from '../../../lib/apiError'
+import { devisAEcrire } from '../../../lib/quoteGuard'
 
 async function logActivity(actor, action, project) {
   if (!actor) return
@@ -57,7 +58,16 @@ export default async function handler(req, res) {
     }
 
     if (kdrive_folder_id !== undefined) payload.kdrive_folder_id = kdrive_folder_id || null
-    if (quote_data !== undefined) payload.quote_data = quote_data
+
+    // Un devis ne s'écrase jamais par une version allégée : la décision, et
+    // la raison de cette règle, vivent dans lib/quoteGuard.js.
+    if (quote_data !== undefined) {
+      const { data: avant } = await supabase.from('projects').select('quote_data').eq('id', id).single()
+      const verdict = devisAEcrire(avant?.quote_data, quote_data)
+      if (verdict.ecrire) payload.quote_data = verdict.valeur
+      else console.warn(`projects/${id}: ${verdict.raison}`)
+    }
+
     if (client_address !== undefined) payload.client_address = client_address || null
     if (client_contact_id !== undefined) payload.client_contact_id = client_contact_id || null
     if (reference !== undefined) payload.reference = reference || null
