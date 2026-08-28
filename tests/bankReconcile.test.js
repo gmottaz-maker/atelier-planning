@@ -30,9 +30,11 @@ describe('planAutoReconcile — factures fournisseurs (débits)', () => {
   })
 
   it('ne rapproche pas un montant seul, sans preuve d\'identité du bénéficiaire', () => {
-    const tx = debit({ reference: 'REMBOURSEMENT DIVERS', counterparty_iban: null, counterparty_name: 'AUTRE' })
+    // Les deux noms doivent VRAIMENT différer : un nom identique des deux côtés
+    // est une preuve d'identité, et déclenche désormais la certitude.
+    const tx = debit({ reference: 'REMBOURSEMENT DIVERS', counterparty_iban: null, counterparty_name: 'BANQUE CANTONALE' })
     const inv = supplierInvoice({ payment_reference: null, iban: null, scheduled_payment_date: null,
-      supplier_name: 'AUTRE', due_date: '2026-01-01' })
+      supplier_name: 'Menuiserie Dupont', due_date: '2026-01-01' })
     const { matched } = planAutoReconcile([tx], { supplier_invoices: [inv] })
     expect(matched).toHaveLength(0)
   })
