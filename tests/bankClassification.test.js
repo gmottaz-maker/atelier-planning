@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'fs'
 import { NATURES, estNatureValide, nature, estTraitee } from '../lib/bankClassification'
 import { buildJournal, accountFor } from '../lib/comptaJournal'
 
@@ -21,6 +22,30 @@ describe('natures', () => {
 
   it('donne un compte par défaut à chaque nature', () => {
     for (const n of NATURES) expect(n.compteDefaut).toMatch(/^\d{4}$/)
+  })
+
+  // `account_mappings.account` est une clé étrangère vers `accounts(number)` :
+  // un compte par défaut absent du plan fait échouer la migration entière.
+  // C'est arrivé — 1090, 6940 et 8900 n'existaient pas, et le script a été
+  // annulé en bloc. Ce test tient les deux fichiers ensemble.
+  it('chaque compte par défaut est garanti par la migration', () => {
+    const sql = readFileSync(new URL('../schema-bank-classification.sql', import.meta.url), 'utf8')
+    // Comptes que la migration crée, plus ceux qu'elle déclare déjà présents.
+    const crees = [...sql.matchAll(/^\s*\('(\d{4})',\s*'[^']*',\s*'(?:actif|passif|produit|charge)'/gm)].map(m => m[1])
+    const mappes = [...sql.matchAll(/\('bank',\s*'(\w+)',\s*'(\d{4})'\)/g)]
+    // Toute nature du code doit avoir sa ligne de mapping dans la migration…
+    for (const n of NATURES) {
+      const ligne = mappes.find(m => m[1] === n.cle)
+      expect(ligne, `nature « ${n.cle} » absente de la migration`).toBeTruthy()
+      // …et le compte doit être le même des deux côtés.
+      expect(ligne[2], `compte divergent pour « ${n.cle} »`).toBe(n.compteDefaut)
+    }
+    // Les comptes hors plan initial doivent être créés par la migration.
+    const dejaAuPlan = ['5000', '6900', '6700']
+    for (const n of NATURES) {
+      if (dejaAuPlan.includes(n.compteDefaut)) continue
+      expect(crees, `le compte ${n.compteDefaut} n'est créé nulle part`).toContain(n.compteDefaut)
+    }
   })
 })
 
