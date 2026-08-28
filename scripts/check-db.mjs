@@ -68,6 +68,11 @@ const CONTROLES = [
     migration: 'schema-work-slots.sql',
     sonde: async () => !(await sb.from('work_slots').select('id').limit(1)).error,
   },
+  {
+    nom: 'bank_transactions.classification',
+    migration: 'schema-bank-classification.sql',
+    sonde: async () => !(await sb.from('bank_transactions').select('classification').limit(1)).error,
+  },
 ]
 
 let manquants = 0

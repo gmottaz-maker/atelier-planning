@@ -7,7 +7,7 @@ import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { matchesQuery, normalize } from '../lib/textSearch'
 import { fmtCHF as fmtMontant } from '../lib/money'
-import { AL, C, FONT } from '../lib/theme'
+import { AL, C, FONT, R } from '../lib/theme'
 
 const PINK = AL.black
 
@@ -20,6 +20,8 @@ function fmtDate(s) {
   const [y, m, d] = s.split('-')
   return `${d}.${m}.${y}`
 }
+
+import { NATURES, libelleNature, estTraitee } from '../lib/bankClassification'
 
 const TYPE_LABELS = {
   supplier_invoice: 'Facture fournisseur',
@@ -75,8 +77,8 @@ export default function Banque() {
       if (t.id !== txId) return [t]
       const nt = { ...t, ...patch }
       const visible = filter === 'all'
-        || (filter === 'matched' && nt.matched_to_type)
-        || (filter === 'unmatched' && !nt.matched_to_type)
+        || (filter === 'matched' && estTraitee(nt))
+        || (filter === 'unmatched' && !estTraitee(nt))
       return visible ? [nt] : []
     }))
   }
@@ -122,7 +124,9 @@ export default function Banque() {
           transaction_id: tx.id,
           type: suggestion.type,
           target_id: suggestion.candidate.id,
-          confidence: suggestion.score,
+          // Un rapprochement manuel n'a pas de score : la colonne reste vide,
+          // comme le prévoit schema-banking.sql (« NULL si match manuel »).
+          confidence: suggestion.score ?? null,
           actor: currentUser,
         }),
       })
@@ -152,9 +156,30 @@ export default function Banque() {
     }
   }
 
+  // Classement sans pièce : salaire, virement interne, frais bancaires, impôts.
+  // Ces mouvements n'ont aucun document en face ; sans ça ils restaient « à
+  // matcher » à vie et n'entraient pas au journal comptable.
+  async function classify(tx, cle) {
+    const avant = tx.classification || null
+    applyLocal(tx.id, { classification: cle, classified_at: cle ? new Date().toISOString() : null })
+    setSelected(null)
+    try {
+      const r = await adminFetch('/api/bank/classify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cle ? { transaction_id: tx.id, classification: cle } : { transaction_id: tx.id, clear: true }),
+      })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+    } catch (e) {
+      applyLocal(tx.id, { classification: avant })
+      alert('Échec du classement : ' + e.message)
+      load()
+    }
+  }
+
   const stats = transactions.reduce((acc, t) => {
     acc.total++
-    if (t.matched_to_type) acc.matched++
+    if (estTraitee(t)) acc.matched++
     return acc
   }, { total: 0, matched: 0 })
 
@@ -176,7 +201,7 @@ export default function Banque() {
       const k = sort.key
       let va, vb
       if (k === 'amount') { va = parseFloat(a.amount) || 0; vb = parseFloat(b.amount) || 0 }
-      else if (k === 'matched') { va = a.matched_to_type ? 1 : 0; vb = b.matched_to_type ? 1 : 0 }
+      else if (k === 'matched') { va = estTraitee(a) ? 1 : 0; vb = estTraitee(b) ? 1 : 0 }
       else { va = norm(a[k]); vb = norm(b[k]) }
       // Valeurs vides toujours en dernier, quel que soit le sens
       const ea = va === '' || va == null, eb = vb === '' || vb == null
@@ -325,7 +350,7 @@ export default function Banque() {
               </thead>
               <tbody>
                 {visible.map(tx => {
-                  const matched = !!tx.matched_to_type
+                  const matched = estTraitee(tx)
                   const isCredit = parseFloat(tx.amount) > 0
                   const topScore = tx.top_score || 0
                   return (
@@ -393,13 +418,34 @@ export default function Banque() {
           suggestions={suggestions}
           onClose={() => setSelected(null)}
           onConfirm={confirmMatch}
-          onUnmatch={unmatch} />
+          onUnmatch={unmatch}
+          onClassify={classify} />
       )}
     </div>
   )
 }
 
-function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
+function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch, onClassify }) {
+  // Recherche manuelle : quand l'automatique ne propose rien, on va chercher
+  // la pièce soi-même et on impose le lien.
+  const [q, setQ] = useState('')
+  const [manuels, setManuels] = useState(null)
+  const [chargeManuels, setChargeManuels] = useState(false)
+  useEffect(() => {
+    if (!tx || tx.matched_to_type || tx.classification) { setManuels(null); return }
+    let annule = false
+    setChargeManuels(true)
+    const t = setTimeout(async () => {
+      try {
+        const r = await adminFetch(`/api/bank/candidates?transaction_id=${tx.id}&q=${encodeURIComponent(q)}`)
+        const d = await r.json()
+        if (!annule) setManuels(d.candidates || [])
+      } catch { if (!annule) setManuels([]) }
+      finally { if (!annule) setChargeManuels(false) }
+    }, q ? 250 : 0)   // laisse finir la frappe avant d'interroger
+    return () => { annule = true; clearTimeout(t) }
+  }, [tx?.id, q])
+
   useEffect(() => {
     const onKey = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -407,7 +453,7 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
   }, [onClose])
 
   const isCredit = parseFloat(tx.amount) > 0
-  const matched = !!tx.matched_to_type
+  const matched = estTraitee(tx)
 
   return (
     <>
@@ -447,7 +493,17 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
 
           {/* Matching */}
           <div className="px-8 py-5 flex-1">
-            {matched ? (
+            {tx.classification ? (
+              <div>
+                <p className="text-xs uppercase tracking-wider u-muted mb-2">Classée sans pièce</p>
+                <div className="u-ok-bg border u-line u-panel px-4 py-3 mb-4">
+                  <p className="text-sm font-semibold u-ok">{libelleNature(tx.classification)}</p>
+                  {tx.classified_at && <p className="text-xs u-ok mt-1">Classée le {tx.classified_at.slice(0, 10)}</p>}
+                </div>
+                <button onClick={() => onClassify(tx, null)}
+                  className="text-xs font-medium u-ko hover:u-ko">Retirer ce classement</button>
+              </div>
+            ) : matched ? (
               <div>
                 <p className="text-xs uppercase tracking-wider u-muted mb-2">Matchée à</p>
                 <div className="u-ok-bg border u-line u-panel px-4 py-3 mb-4">
@@ -463,7 +519,7 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
                 {suggestions === null ? (
                   <p className="text-sm u-muted">Recherche de correspondances…</p>
                 ) : suggestions.length === 0 ? (
-                  <p className="text-sm u-muted">Aucune suggestion automatique. Vérifie que la facture correspondante existe.</p>
+                  <p className="text-sm u-muted">Aucune suggestion automatique. Si ce mouvement n’a pas de pièce — salaire, virement, frais bancaires — classe-le par nature ci-dessous.</p>
                 ) : (
                   <ul className="space-y-2">
                     {suggestions.map((s, i) => {
@@ -491,6 +547,69 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch }) {
                     })}
                   </ul>
                 )}
+
+                {/* Recherche manuelle. L'automatique ne propose que ce qu'il
+                    juge plausible ; quand il ne trouve rien, il faut pouvoir
+                    aller chercher la pièce et imposer le lien. */}
+                <div className="mt-6 pt-5" style={{ borderTop: `1px solid ${C.border}` }}>
+                  <p className="text-xs uppercase tracking-wider u-muted mb-3">Chercher une pièce à la main</p>
+                  <input value={q} onChange={e => setQ(e.target.value)}
+                    placeholder="Nom, n° de facture, montant…"
+                    style={{ width: '100%', padding: '9px 16px', borderRadius: R.pill, border: `1.5px solid ${C.outline}`,
+                      fontFamily: FONT, fontSize: 13.5, background: AL.white, color: AL.black, outline: 'none' }} />
+                  {chargeManuels ? (
+                    <p className="text-sm u-muted mt-3">Recherche…</p>
+                  ) : manuels && manuels.length === 0 ? (
+                    <p className="text-sm u-muted mt-3">Aucune pièce non rapprochée ne correspond.</p>
+                  ) : (
+                    <ul className="space-y-2 mt-3">
+                      {(manuels || []).map((m, i) => {
+                        const c = m.candidate
+                        const nom = c.supplier_name || c.client_name || c.merchant || 'Sans nom'
+                        return (
+                          <li key={`${m.type}-${c.id}-${i}`} className="border u-line u-panel p-3 cursor-pointer"
+                            onClick={() => onConfirm(tx, { type: m.type, candidate: c, score: null })}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-semibold u-muted uppercase">{TYPE_LABELS[m.type]}</span>
+                              {m.ecart === 0
+                                ? <span className="text-xs font-semibold u-ok">montant identique</span>
+                                : <span className="text-xs u-muted tabular-nums">écart {m.ecart > 0 ? '+' : ''}{fmtCHF(m.ecart)}</span>}
+                            </div>
+                            <div className="font-medium u-ink text-sm">{nom}</div>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-xs u-muted">
+                                {c.invoice_number ? `N° ${c.invoice_number} · ` : ''}{fmtDate(c.issue_date || c.date || c.due_date)}
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums">{fmtCHF(c.amount)} CHF</span>
+                            </div>
+                            {m.sensInverse && (
+                              <div className="text-[10px] mt-1" style={{ color: C.warning }}>
+                                ⚠ sens inverse — un {parseFloat(tx.amount) > 0 ? 'crédit' : 'débit'} ne solde normalement pas cette pièce
+                              </div>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Classement sans pièce. Un salaire ou un virement interne
+                    n'aura jamais de facture en face : il faut pouvoir les
+                    solder autrement que par un rapprochement. */}
+                <div className="mt-6 pt-5" style={{ borderTop: `1px solid ${C.border}` }}>
+                  <p className="text-xs uppercase tracking-wider u-muted mb-1">Classer sans pièce</p>
+                  <p className="text-xs u-muted mb-3">Le mouvement sort de « à matcher » et entre au journal comptable.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {NATURES.map(n => (
+                      <button key={n.cle} onClick={() => onClassify(tx, n.cle)} title={n.aide}
+                        style={{ fontFamily: FONT, fontSize: 12, padding: '6px 13px', borderRadius: R.pill,
+                          border: `1.5px solid ${C.outline}`, background: AL.white, color: AL.black, cursor: 'pointer' }}>
+                        {n.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
           </div>

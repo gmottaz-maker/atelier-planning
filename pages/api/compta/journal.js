@@ -21,7 +21,11 @@ export default async function handler(req, res) {
     supabase.from('customer_invoices').select('*, projects(name)').gte('issue_date', from).lte('issue_date', to),
     supabase.from('supplier_invoices').select('*').gte('issue_date', from).lte('issue_date', to),
     supabase.from('expenses').select('*').gte('date', from).lte('date', to),
-    supabase.from('bank_transactions').select('*').gte('booking_date', from).lte('booking_date', to).not('matched_to_type', 'is', null),
+    // Rapprochées à une pièce OU classées par nature (salaire, virement
+    // interne, frais bancaires…). Le filtre ne portait que sur le premier cas :
+    // les mouvements sans pièce n'entraient pas au journal.
+    supabase.from('bank_transactions').select('*').gte('booking_date', from).lte('booking_date', to)
+      .or('matched_to_type.not.is.null,classification.not.is.null'),
     supabase.from('account_mappings').select('*'),
   ])
   const err = [c, s, e, b, m].find(x => x.error)

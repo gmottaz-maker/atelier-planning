@@ -10,7 +10,9 @@ const supabase = getSupabaseServer()
 // complet, lourd et jamais affiché).
 const COLS = 'id, booking_date, value_date, amount, currency, description, reference, ' +
              'counterparty_name, counterparty_iban, account_iban, ' +
-             'matched_to_type, matched_to_id, matched_at, matched_by, match_confidence'
+             'matched_to_type, matched_to_id, matched_at, matched_by, match_confidence, ' +
+             // Nature d'un mouvement sans pièce (salaire, virement interne…).
+             'classification, classified_at, classified_by'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end()
