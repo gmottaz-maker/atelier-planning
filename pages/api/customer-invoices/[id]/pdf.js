@@ -6,6 +6,7 @@ import { SwissQRBill } from 'swissqrbill/svg'
 import { buildFactureHtml } from '../../../../lib/factureHtml'
 import { qrDocument } from '../../../../lib/docLayout'
 import { htmlToPdf } from '../../../../lib/htmlToPdf'
+import { contentDisposition } from '../../../../lib/contentDisposition'
 import { pdfFilename } from '../../../../lib/pdfFilename'
 
 // 60 s : les rendus sont sérialisés par conteneur (lib/htmlToPdf), une requête
@@ -67,7 +68,10 @@ export default async function handler(req, res) {
     // se comporter comme un téléchargement demandé par l'utilisateur.
     const disposition = req.query.download ? 'attachment' : 'inline'
     const nom = pdfFilename(docType, inv.projects?.name || inv.client_name)
-    res.setHeader('Content-Disposition', `${disposition}; filename="${nom}"`)
+    // Le nom porte celui du projet ou du client : « végétale », « Café… ».
+    // Un en-tête HTTP est en ASCII — sans encodage RFC 6266, les accents
+    // arrivaient en « ? ».
+    res.setHeader('Content-Disposition', contentDisposition(nom, disposition))
     // Chaque génération est unique : rien à mettre en cache, et un PDF servi
     // depuis le cache masquerait une correction de facture.
     res.setHeader('Cache-Control', 'no-store')

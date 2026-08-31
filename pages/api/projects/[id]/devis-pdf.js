@@ -4,6 +4,7 @@ import { getSupabaseServer } from '../../../../lib/supabase-server'
 import { requireUser } from '../../../../lib/requireAdmin'
 import { buildDevisHtml } from '../../../../lib/devisHtml'
 import { htmlToPdf } from '../../../../lib/htmlToPdf'
+import { contentDisposition } from '../../../../lib/contentDisposition'
 import { pdfFilename } from '../../../../lib/pdfFilename'
 
 export const config = { maxDuration: 30 }
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', 'application/pdf')
     // `?download=1` : téléchargement plutôt qu'ouverture dans le visualiseur.
     const disposition = req.query.download ? 'attachment' : 'inline'
-    res.setHeader('Content-Disposition', `${disposition}; filename="${pdfFilename('devis', project.name)}"`)
+    res.setHeader('Content-Disposition', contentDisposition(pdfFilename('devis', project.name), disposition))
     res.setHeader('Cache-Control', 'no-store')
     res.send(Buffer.from(pdf))
   } catch (e) {

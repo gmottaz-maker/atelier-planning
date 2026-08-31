@@ -2,6 +2,7 @@
 // Une ligne par : facture émise, facture fournisseur, frais.
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
+import { contentDisposition } from '../../../lib/contentDisposition'
 
 const supabase = getSupabaseServer()
 
@@ -103,6 +104,6 @@ export default async function handler(req, res) {
 
   const csv = '﻿' + lines.join('\n')  // BOM UTF-8 pour Excel
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-  res.setHeader('Content-Disposition', `attachment; filename="compta_${from}_${to}.csv"`)
+  res.setHeader('Content-Disposition', contentDisposition(`compta_${from}_${to}.csv`))
   res.send(csv)
 }

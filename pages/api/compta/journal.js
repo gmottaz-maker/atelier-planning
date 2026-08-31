@@ -3,6 +3,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { buildJournal, vatSummary, vatReturn, accountBalance } from '../../../lib/comptaJournal'
+import { contentDisposition } from '../../../lib/contentDisposition'
 
 const supabase = getSupabaseServer()
 
@@ -49,6 +50,6 @@ export default async function handler(req, res) {
   const csv = [cols.join(';'), ...rows].join('\r\n')
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-  res.setHeader('Content-Disposition', `attachment; filename="journal-${from}_${to}.csv"`)
+  res.setHeader('Content-Disposition', contentDisposition(`journal-${from}_${to}.csv`))
   return res.send('﻿' + csv)   // BOM pour Excel
 }
