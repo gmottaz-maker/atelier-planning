@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
-import { quoteStatusMeta } from '../lib/quoteStatus'
+import { quoteStatusMeta, quoteStripe } from '../lib/quoteStatus'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
@@ -132,11 +132,17 @@ function deadlineBucket(deadline) {
   return 'later'
 }
 
-// Colonnes Kanban : En retard · mois courant · +1 · +2 · Plus tard (mois nommés)
+// Colonnes Kanban : En cours · En retard · mois courant · +1 · +2 · Plus tard · En pause
 function buildKanbanColumns() {
   const now = new Date()
   const monthAccents = [C.warning, C.warning, C.success]
-  const cols = [{ key: 'overdue', label: 'En retard', accent: C.danger }]
+  // « En cours / livré » ouvre la liste : ce sont les projets sur lesquels on
+  // travaille aujourd'hui, ils passent avant tout ce qui n'est encore qu'une
+  // échéance. Les colonnes d'échéance suivent, du plus urgent au plus lointain.
+  const cols = [
+    { key: 'ongoing', label: 'En cours / livré', accent: C.warning },
+    { key: 'overdue', label: 'En retard',        accent: C.danger },
+  ]
   for (let i = 0; i < 3; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -144,7 +150,6 @@ function buildKanbanColumns() {
     cols.push({ key: ym, label: `${name.charAt(0).toUpperCase()}${name.slice(1)}`, accent: monthAccents[i] })
   }
   cols.push({ key: 'later', label: 'Plus tard', accent: C.muted })
-  cols.push({ key: 'ongoing', label: 'En cours / livré', accent: C.info })   // projets avec une phase
   cols.push({ key: 'suspended', label: 'En pause', accent: SUSPENDED_COLOR })     // projets suspendus
   return cols
 }
@@ -981,6 +986,14 @@ export default function Admin() {
       .filter(t => t.status === 'active')
       .sort((a, b) => (a.execution_date || '').localeCompare(b.execution_date || ''))[0]
     const s = statutProjet(project)
+    // Deux signaux, deux sens : le liseré HAUT dit l'échéance et la phase, la
+    // PASTILLE dit où en est l'offre. Elle vaut `null` quand il n'y a rien à
+    // signaler (offre envoyée, en attente de réponse) — on n'affiche alors
+    // rien du tout : l'avatar est aligné à droite, il ne bouge pas.
+    const offre = quoteStripe(project.quote_data)
+    const offreTitre = project.quote_data?.status
+      ? `Offre ${quoteStatusMeta(project.quote_data.status).label.toLowerCase()}`
+      : 'Offre à faire'
     const lienAction = { background: 'none', border: 'none', padding: 0, cursor: 'pointer',
       font: `12px ${FONT}`, color: C.muted, transition: 'color .15s ease' }
     const survolAction = {
@@ -993,7 +1006,7 @@ export default function Admin() {
         style={{ background: C.surface, borderRadius: R.panel, padding: 22, borderTop: `3px solid ${s.stripe}`,
           display: 'flex', flexDirection: 'column', gap: 14, fontFamily: FONT }}>
 
-        {/* En-tête : nom + client, avatar du responsable */}
+        {/* En-tête : nom + client, pastille d'offre, avatar du responsable */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <Link href={`/projects/${project.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textDecoration: 'none' }}>
             <span style={{ fontSize: 19, fontWeight: 500, lineHeight: 1.15, letterSpacing: '-.01em', color: AL.black }}>{project.name}</span>
@@ -1001,6 +1014,10 @@ export default function Admin() {
               {project.client}{incomplete ? ' — à compléter' : ''}
             </span>
           </Link>
+          {offre && (
+            <div title={offreTitre} aria-label={offreTitre}
+              style={{ width: 30, height: 30, borderRadius: R.pill, background: offre, flex: 'none' }} />
+          )}
           <div title={project.responsible}
             style={{ width: 30, height: 30, borderRadius: R.pill, background: AL.black, color: AL.white,
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 500, flex: 'none' }}>
