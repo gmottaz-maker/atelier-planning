@@ -13,15 +13,46 @@ import { fmtCHF } from '../lib/money'
 import { AL, C, FONT, R } from '../lib/theme'
 
 // Styles partagés — le système n'a qu'une bordure (le filet outline 1.5px) et
-// deux radius. Les sections de l'offre étaient chacune d'une couleur pastel
-// différente ; elles se distinguent maintenant par le titre et l'espacement.
+// deux radius.
+//
+// ── Une teinte par section ───────────────────────────────────────────────────
+// Une version précédente avait retiré les pastels au profit du seul titre. À
+// l'usage ça ne suffit pas : dans Fabrication, un item niché était un rectangle
+// blanc cerclé de noir EXACTEMENT comme la section qui le contient, et on ne
+// savait plus à quel niveau on se trouvait. La couleur revient, mais prise dans
+// les jetons et portée par trois choses seulement : le bandeau d'en-tête, le
+// titre, et les actions de la section.
+//
+// Ce sont des tons de REPÉRAGE, pas de statut : aucun ne veut dire « erreur »
+// ou « validé » ici, une offre n'a pas d'état ligne à ligne. Le corail est
+// volontairement absent — le système en fait un accent typographique, jamais un
+// aplat, et il ne passe pas le contraste sous 24px sur blanc.
+const TEINTES = {
+  management:     { fort: C.info,    doux: C.infoBg },
+  fabrication:    { fort: C.violet,  doux: C.violetBg },
+  subcontracting: { fort: C.warning, doux: C.warningBg },
+  logistics:      { fort: C.success, doux: C.successBg },
+}
+
 const sectionBox    = { background: C.surface, border: `1.5px solid ${C.outline}`, borderRadius: R.panel, overflow: 'hidden' }
 const sectionHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px' }
 const sectionTitle  = { fontSize: 16, fontWeight: 500, color: AL.black }
-const sectionTotal  = { fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums' }
+const sectionTotal  = { fontSize: 15, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums' }
 const chevron       = (ouvert) => ({ fontSize: 12, color: C.muted, display: 'inline-block', transform: ouvert ? 'none' : 'rotate(-90deg)', transition: 'transform .15s ease' })
-const subHeader     = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 16px', borderTop: `1px solid ${C.border}` }
-const subTitle      = { fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', color: C.muted }
+
+// L'item niché dans Fabrication est SUBORDONNÉ : filet fin et gris là où la
+// section porte le filet noir de 1.5px. C'est cette différence d'épaisseur,
+// plus que la couleur, qui dit lequel contient l'autre.
+const itemBox       = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden' }
+const itemHeader    = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: C.neutralBg }
+
+// Achats / Main d'œuvre / Éléments : c'étaient dix caractères gris de 10.5px
+// perdus au-dessus d'un tableau. Libellé noir et filet de séparation franc.
+// Pas d'aplat ici : le seul aplat gris d'un item doit rester SON en-tête,
+// sinon les deux niveaux se confondent — deux gris à 5 et 6 % ne se
+// distinguent pas, c'était le défaut du premier essai.
+const subHeader     = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '11px 16px', borderTop: `1.5px solid ${C.outline}` }
+const subTitle      = { fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', color: AL.black }
 
 const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
 
@@ -88,8 +119,8 @@ function CompositionElement({
   return (
     <div className="overflow-x-auto">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, padding: '8px 14px', borderTop: `1px solid ${C.border}` }}>
-        <button onClick={() => onAdd('purchases')} className="quote-action">+ Matériau</button>
-        <button onClick={() => onAdd('labor')} className="text-xs font-medium u-info hover:u-info">+ Main d'œuvre</button>
+        <button onClick={() => onAdd('purchases')} className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Matériau</button>
+        <button onClick={() => onAdd('labor')} className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Main d'œuvre</button>
       </div>
       <table className="w-full" style={{ minWidth: 760, tableLayout: 'fixed' }}>
         <thead>
@@ -294,7 +325,7 @@ export default function QuoteEditor({ value, onChange }) {
   // Une seule feuille locale : les états de survol et de focus des cellules ne
   // sont pas exprimables en style inline.
   const styleLocal = `
-    .quote-action { font-size: 12px; font-weight: 500; color: ${C.muted}; background: none; border: none; padding: 0; cursor: pointer; transition: color .15s ease; }
+    .quote-action { font-size: 12px; font-weight: 500; color: var(--qa, ${C.muted}); background: none; border: none; padding: 0; cursor: pointer; transition: color .15s ease; }
     .quote-action:hover { color: ${AL.black}; }
     .quote-td { border-top: 1px solid ${C.border}; }
     .quote-row:hover { background: ${C.hover}; }
@@ -323,11 +354,12 @@ export default function QuoteEditor({ value, onChange }) {
 
                     {/* ── Gestion projet ── */}
                     <div style={sectionBox}>
-                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.management ? 'none' : `1px solid ${C.border}` }}>
+                      <div style={{ ...sectionHeader, background: TEINTES.management.doux,
+                        borderBottom: collapsedSections.management ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('management')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={chevron(!collapsedSections.management)}>▾</span>
-                          <span style={sectionTitle}>Gestion projet</span>
+                          <span style={{ ...sectionTitle, color: TEINTES.management.fort }}>Gestion projet</span>
                         </button>
                         <div className="flex items-center gap-4">
                           <span style={sectionTotal}>{fmtCHF(managementTotal)} CHF</span>
@@ -335,7 +367,7 @@ export default function QuoteEditor({ value, onChange }) {
                             <>
                               <CatalogPicker kind="heure" onPick={it => appendManagementRow(toRateRow(it))} />
                               <button onClick={addManagementRow}
-                                className="quote-action">+ Ligne</button>
+                                className="quote-action" style={{ '--qa': TEINTES.management.fort }}>+ Ligne</button>
                             </>
                           )}
                         </div>
@@ -394,11 +426,12 @@ export default function QuoteEditor({ value, onChange }) {
 
                     {/* ── Fabrication (groupe d'items: Bar, Pergola, etc.) ── */}
                     <div style={sectionBox}>
-                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.fabrication ? 'none' : `1px solid ${C.border}` }}>
+                      <div style={{ ...sectionHeader, background: TEINTES.fabrication.doux,
+                        borderBottom: collapsedSections.fabrication ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('fabrication')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={chevron(!collapsedSections.fabrication)}>▾</span>
-                          <span style={sectionTitle}>Fabrication</span>
+                          <span style={{ ...sectionTitle, color: TEINTES.fabrication.fort }}>Fabrication</span>
                         </button>
                         <span style={sectionTotal}>{fmtCHF(itemsTotal)} CHF</span>
                       </div>
@@ -413,8 +446,8 @@ export default function QuoteEditor({ value, onChange }) {
                           const laborSub = (it.labor || []).reduce((s, r) => s + laborNet(r), 0)
                           const subTotal = purchSub + laborSub
                           return (
-                            <div key={it._uid || itemIdx} style={sectionBox}>
-                              <div style={{ ...sectionHeader, padding: '12px 16px', borderBottom: collapsedItems[it._uid] ? 'none' : `1px solid ${C.border}` }}>
+                            <div key={it._uid || itemIdx} style={itemBox}>
+                              <div style={{ ...itemHeader, borderBottom: collapsedItems[it._uid] ? 'none' : `1px solid ${C.border}` }}>
                                 <button type="button" onClick={() => toggleCollapsedItem(it._uid)}
                                   className="hover:opacity-70" title={collapsedItems[it._uid] ? 'Déplier' : 'Replier'}>
                                   <span style={chevron(!collapsedItems[it._uid])}>▾</span>
@@ -440,7 +473,7 @@ export default function QuoteEditor({ value, onChange }) {
                                   <span className="flex items-center gap-2">
                                     <CatalogPicker kind="article" onPick={it => appendItemRow(itemIdx, 'purchases', toPurchaseRow(it))} />
                                     <button onClick={() => addItemRow(itemIdx, 'purchases')}
-                                      className="quote-action">+ Ligne</button>
+                                      className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Ligne</button>
                                   </span>
                                 </div>
                             <div className="overflow-x-auto">
@@ -504,7 +537,7 @@ export default function QuoteEditor({ value, onChange }) {
                               <span className="flex items-center gap-2">
                                 <CatalogPicker kind="heure" onPick={it => appendItemRow(itemIdx, 'labor', toRateRow(it))} />
                                 <button onClick={() => addItemRow(itemIdx, 'labor')}
-                                  className="text-xs font-medium u-info hover:u-info">+ Ligne</button>
+                                  className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Ligne</button>
                               </span>
                             </div>
                             <div className="overflow-x-auto">
@@ -560,7 +593,7 @@ export default function QuoteEditor({ value, onChange }) {
                             <div style={subHeader}>
                               <h4 style={subTitle}>Éléments</h4>
                               <button onClick={() => addElement(itemIdx)}
-                                className="text-xs font-medium u-info hover:u-info">+ Élément</button>
+                                className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Élément</button>
                             </div>
                             {(it.elements || []).length === 0 ? (
                               <p className="px-4 py-2 text-xs u-muted">
@@ -618,11 +651,12 @@ export default function QuoteEditor({ value, onChange }) {
 
                     {/* ── Sous-traitance ── */}
                     <div style={sectionBox}>
-                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.subcontracting ? 'none' : `1px solid ${C.border}` }}>
+                      <div style={{ ...sectionHeader, background: TEINTES.subcontracting.doux,
+                        borderBottom: collapsedSections.subcontracting ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('subcontracting')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={chevron(!collapsedSections.subcontracting)}>▾</span>
-                          <span style={sectionTitle}>Sous-traitance</span>
+                          <span style={{ ...sectionTitle, color: TEINTES.subcontracting.fort }}>Sous-traitance</span>
                         </button>
                         <div className="flex items-center gap-4">
                           <span style={sectionTotal}>{fmtCHF(subcontractingTotal)} CHF</span>
@@ -630,7 +664,7 @@ export default function QuoteEditor({ value, onChange }) {
                             <>
                               <CatalogPicker kind="all" onPick={it => appendSubcontractingRow(toRateRow(it))} />
                               <button onClick={addSubcontractingRow}
-                                className="text-xs font-medium u-warn hover:u-warn">+ Ligne</button>
+                                className="quote-action" style={{ '--qa': TEINTES.subcontracting.fort }}>+ Ligne</button>
                             </>
                           )}
                         </div>
@@ -691,11 +725,12 @@ export default function QuoteEditor({ value, onChange }) {
 
                     {/* ── Logistique ── */}
                     <div style={sectionBox}>
-                      <div style={{ ...sectionHeader, borderBottom: collapsedSections.logistics ? 'none' : `1px solid ${C.border}` }}>
+                      <div style={{ ...sectionHeader, background: TEINTES.logistics.doux,
+                        borderBottom: collapsedSections.logistics ? 'none' : `1px solid ${C.border}` }}>
                         <button type="button" onClick={() => toggleCollapsedSection('logistics')}
                           className="flex items-center gap-2 flex-1 text-left hover:opacity-80">
                           <span style={chevron(!collapsedSections.logistics)}>▾</span>
-                          <span style={sectionTitle}>Logistique</span>
+                          <span style={{ ...sectionTitle, color: TEINTES.logistics.fort }}>Logistique</span>
                         </button>
                         <div className="flex items-center gap-4">
                           <span style={sectionTotal}>{fmtCHF(logisticsTotal)} CHF</span>
@@ -703,7 +738,7 @@ export default function QuoteEditor({ value, onChange }) {
                             <>
                               <CatalogPicker kind="all" onPick={it => appendLogisticsRow(toRateRow(it))} />
                               <button onClick={addLogisticsRow}
-                                className="text-xs font-medium u-info hover:u-info">+ Ligne</button>
+                                className="quote-action" style={{ '--qa': TEINTES.logistics.fort }}>+ Ligne</button>
                             </>
                           )}
                         </div>
