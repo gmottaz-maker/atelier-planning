@@ -970,6 +970,10 @@ export default function Admin() {
 
   const archivedProjects = projects.filter(p => p.status !== 'active')
   const inputClass = "w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line transition-colors u-surface"
+  // Un champ multiligne ne prend JAMAIS le rayon pill. À 999px sur une boîte de
+  // 140px de haut, les deux coins se rejoignent et le champ devient une ellipse.
+  // Les textareas sont des panneaux (15px), comme dans la modale logistique.
+  const textareaClass = inputClass.replace('u-pill', 'u-panel')
 
   // ── Carte de projet (vue cartes) ───────────────────────────────────────────
   // v2 : carte d'information dense, SANS imagerie. Le handoff a abandonné la
@@ -1198,7 +1202,7 @@ export default function Admin() {
                   <textarea rows={3} value={form.client_address || ''}
                     onChange={e => handleFieldChange('client_address', e.target.value)}
                     placeholder="Adresse postale (à l'att. de…, rue, NPA ville)"
-                    className={inputClass} style={{ marginTop: 6, resize: 'none' }} />
+                    className={textareaClass} style={{ marginTop: 6, resize: 'none' }} />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-3">
                   <label className="block text-xs font-medium u-muted mb-1.5 uppercase tracking-wide">Description courte (vue Atelier)</label>
@@ -1215,7 +1219,7 @@ export default function Admin() {
                     onChange={e => handleFieldChange('description', e.target.value)}
                     rows={6}
                     placeholder="Colle ici un mail, des infos détaillées, le brief client…"
-                    className="w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line transition-colors u-surface resize-y leading-relaxed"
+                    className={`${textareaClass} resize-y leading-relaxed`}
                     style={{ minHeight: 140 }}
                   />
                 </div>
