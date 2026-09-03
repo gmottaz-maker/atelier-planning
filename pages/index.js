@@ -1323,7 +1323,7 @@ export default function Admin() {
           {/* Titre display — le second mot en corail. C'est le seul endroit de
               l'écran où l'accent apparaît, et il est bien au-dessus de 24px. */}
           <h1 style={{ fontSize: '7vw', fontWeight: 400, lineHeight: 1, letterSpacing: '-.01em', margin: '24px 0 0', color: AL.black }}>
-            vos <span style={{ color: C.accent }}>projets</span>
+            nos <span style={{ color: C.accent }}>projets</span>
           </h1>
           <p style={{ fontSize: 18, color: C.muted, margin: '16px 0 40px' }}>
             {activeProjects.length} projet{activeProjects.length > 1 ? 's' : ''} actif{activeProjects.length > 1 ? 's' : ''}
@@ -1396,34 +1396,65 @@ export default function Admin() {
           ) : viewMode === 'gantt' ? (
             <GanttView projects={activeProjects} />
           ) : viewMode === 'kanban' ? (
-            <div className="flex gap-5 overflow-x-auto pb-4 -mx-4 px-4 md:-mx-10 md:px-10">
-              {(() => {
-                const kanbanCols = buildKanbanColumns()
-                return kanbanCols.map(col => {
-                  // Le rangement se fait sur la liste COMPLÈTE des colonnes :
-                  // `kanbanColumnKey` renvoie « Plus tard » quand le mois d'une
-                  // échéance n'est pas dans la liste. Filtrer avant de ranger
-                  // déplacerait des projets d'une colonne à l'autre.
-                  const colProjects = activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase, p.suspended) === col.key)
-                  // Une colonne vide ne montre plus « Aucun projet » : elle
-                  // disparaît. Le calcul est refait à chaque rendu, donc elle
-                  // revient d'elle-même dès qu'un projet tombe dans ce mois.
-                  if (colProjects.length === 0) return null
-                  return (
-                    <div key={col.key} className="flex-shrink-0 w-80">
-                      <div className="flex items-center gap-2 mb-4 px-1">
+            (() => {
+              const kanbanCols = buildKanbanColumns()
+              // Le rangement se fait sur la liste COMPLÈTE des colonnes :
+              // `kanbanColumnKey` renvoie « Plus tard » quand le mois d'une
+              // échéance n'est pas dans la liste. Filtrer avant de ranger
+              // déplacerait des projets d'une colonne à l'autre.
+              //
+              // Une colonne vide disparaît. Le calcul est refait à chaque rendu,
+              // donc elle revient d'elle-même dès qu'un projet tombe dans ce mois.
+              const colonnes = kanbanCols
+                .map(col => ({ ...col, projets: activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase, p.suspended) === col.key) }))
+                .filter(col => col.projets.length > 0)
+              const rangeesMax = Math.max(0, ...colonnes.map(c => c.projets.length))
+
+              // UNE SEULE grille pour tout le kanban, et non une grille par
+              // colonne. C'est ce qui donne la même hauteur à toutes les cartes,
+              // y compris d'une colonne à l'autre : `1fr` répété dans un
+              // conteneur sans hauteur définie donne à chaque rangée celle de la
+              // plus haute, et les rangées sont ici partagées par les colonnes.
+              //
+              // Le prix à payer est le placement EXPLICITE de chaque élément.
+              // Sans lui, `gridAutoFlow: column` remplirait les cases laissées
+              // libres par une colonne courte avec les cartes de la suivante.
+              //
+              // Aucun nombre magique et aucun contenu rogné : c'est la carte la
+              // plus haute de tout le kanban qui fixe la mesure. La carte s'y
+              // prête déjà — son bloc d'avancement porte `marginTop: auto`, donc
+              // la hauteur gagnée se place au-dessus de lui et le pied reste
+              // collé en bas.
+              return (
+                <div className="overflow-x-auto pb-4 -mx-4 px-4 md:-mx-10 md:px-10">
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${colonnes.length}, 320px)`,
+                    gridTemplateRows: `auto repeat(${rangeesMax}, 1fr)`,
+                    columnGap: 20, rowGap: 16,
+                    alignItems: 'stretch',
+                  }}>
+                    {colonnes.flatMap((col, ci) => [
+                      <div key={`t-${col.key}`} className="flex items-center gap-2 px-1"
+                        style={{ gridColumn: ci + 1, gridRow: 1, marginBottom: 0 }}>
                         <span className="w-2 h-2 u-pill flex-shrink-0" style={{ background: col.accent }} />
                         <h3 className="font-semibold u-ink text-sm">{col.label}</h3>
-                        <span className="text-xs u-muted tabular-nums">{colProjects.length}</span>
-                      </div>
-                      <div className="space-y-4">
-                        {colProjects.map(renderProjectCard)}
-                      </div>
-                    </div>
-                  )
-                })
-              })()}
-            </div>
+                        <span className="text-xs u-muted tabular-nums">{col.projets.length}</span>
+                      </div>,
+                      ...col.projets.map((p, ri) => (
+                        // `display: grid` et non `flex` : une grille à cellule
+                        // unique étire son enfant dans LES DEUX axes par défaut.
+                        // En flex, la carte se calerait sur la largeur de son
+                        // contenu — elle ne porte pas de largeur propre.
+                        <div key={p.id} style={{ gridColumn: ci + 1, gridRow: ri + 2, display: 'grid' }}>
+                          {renderProjectCard(p)}
+                        </div>
+                      )),
+                    ])}
+                  </div>
+                </div>
+              )
+            })()
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {/* En-tête de colonnes. Capitales assumées : le handoff excepte
