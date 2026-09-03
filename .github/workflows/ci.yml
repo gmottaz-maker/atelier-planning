@@ -26,6 +26,13 @@ jobs:
       - name: Installation déterministe
         run: npm ci
 
+      # Avant les tests : c'est le contrôle le plus rapide, et il attrape une
+      # classe d'erreur qu'aucun des suivants ne voit. `no-undef` a trouvé deux
+      # identifiants libres livrés en production — un dans l'envoi d'offre par
+      # e-mail, un dans le chemin d'erreur de l'import bancaire.
+      - name: Lint
+        run: npm run lint
+
       - name: Tests
         run: npm test
 

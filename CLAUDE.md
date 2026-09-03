@@ -541,10 +541,33 @@ rejoué depuis zéro.
 ## Contrôles automatiques
 
 ```bash
-npm test                # 328 tests, dont l'inventaire et la matrice d'autorisation
+npm run lint            # ESLint, `no-undef` seul — BLOQUANT en CI
+npm test                # tests unitaires, dont l'inventaire et la matrice d'autorisation
 npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```
+
+`eslint.config.mjs` est volontairement MINIMAL : une seule règle, `no-undef`.
+Elle n'est pas là pour le style mais pour l'IDENTIFIANT LIBRE, que ni le build
+ni les tests ne voient. Deux ont été livrés en production : `level` dans
+`pages/api/send-document.js` (l'envoi d'offre par e-mail échouait sur
+« Génération du PDF impossible »), et `logErreur` / `requestId` dans
+`pages/api/bank/import.js` (le chemin d'erreur de l'import CAMT aurait planté
+au moment précis où il servait). Next compile sans broncher dans les deux cas.
+
+Le jeu de règles reste court POUR que le lint puisse être bloquant sans
+chantier de remise à niveau. Ajouter des règles de style les rendrait
+bloquantes elles aussi : à faire après avoir nettoyé ce qu'elles signalent.
+Le greffon `react-hooks` est déclaré mais ses règles sont éteintes — sans lui,
+les `eslint-disable-next-line react-hooks/exhaustive-deps` déjà présents
+désignent une règle inconnue, ce qu'ESLint compte comme une erreur.
+
+**Le banc d'essai des routes n'applique AUCUNE contrainte de base.**
+`tests/helpers/routeHarness.js` simule Supabase : un `NULL` dans une colonne
+`NOT NULL` y passe sans bruit. Six tests du catalogue étaient verts pendant que
+la production renvoyait « Erreur interne » sur un `catalog_items.name` à `null`.
+Un test de route valide le code de la route, pas ce que la base en fera — quand
+une colonne a une contrainte, vérifier ce qui PART vers la base.
 
 `tests/rbac.test.js` mérite une mention : il ne teste pas un comportement mais
 tient l'**inventaire** des routes API et de leur niveau d'autorisation. Il
@@ -566,6 +589,7 @@ production. Deux pièges à connaître si tu ajoutes des cas :
   donc une seule fois à l'import. Le mock rend un proxy vers la base du test en
   cours, sinon toutes les routes resteraient figées sur la première.
 
-La CI (`.github/workflows/ci.yml`) exécute tests, build, audit des dépendances
-(bloquant sur « critical » seulement) et détection de secrets. Elle n'a accès
+La CI (`.github/workflows/ci.yml`) exécute lint, tests, build, audit des
+dépendances (bloquant sur « critical » seulement) et détection de secrets.
+Le lint passe en premier : c'est le contrôle le plus rapide. Elle n'a accès
 ni à la base ni aux secrets de production.
