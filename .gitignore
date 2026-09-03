@@ -27,3 +27,4 @@ seed-contacts.sql
 # l'application. Les bundles vivent en local ; leur README fait foi pour la spec.
 design_handoff_*/
 *.zip
+.claude/

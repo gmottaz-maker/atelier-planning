@@ -10,7 +10,15 @@ const EDITABLE = ['type', 'name', 'unit', 'vat_rate', 'purchase_price',
 const NUM = new Set(['vat_rate', 'purchase_price', 'margin', 'sale_price'])
 
 // Nettoie une valeur : '' → null ; champs numériques → number ou null.
+//
+// `name` est l'exception, et elle n'est pas cosmétique : la colonne est
+// TEXT NOT NULL (schema-catalog.sql). La chaîne vide y est une valeur
+// LÉGITIME — une ligne qu'on vient de créer et qu'on va nommer dans la
+// cellule — alors que null viole la contrainte. Sans cette exception,
+// créer une ligne vide, ou effacer le nom d'une ligne existante, part en
+// 23502 côté base, que l'utilisateur voit comme « Erreur interne ».
 function clean(k, v) {
+  if (k === 'name') return v == null ? '' : String(v)
   if (v === '' || v === undefined) return null
   if (NUM.has(k)) { const n = parseFloat(v); return isNaN(n) ? null : n }
   return v

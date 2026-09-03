@@ -28,15 +28,34 @@ const appeler = async (options = {}) => {
 // instantané pris avant l'insert, il lui faut donc de quoi répondre.
 const CATALOGUE = { catalog_items: [{ id: 1, type: 'article', name: 'Panneau 3 plis' }] }
 
+// Capture les requêtes construites par la route, pour inspecter ce qui part
+// VERS la base. Indispensable ici : le banc d'essai n'applique aucune
+// contrainte, donc un `name: null` y passerait sans bruit alors que la colonne
+// est TEXT NOT NULL en production — c'est exactement le bug qui est passé une
+// première fois entre les mailles.
+function capturerRequetes() {
+  const vraiFrom = base.from.bind(base)
+  const vues = []
+  base.from = (nom) => { const q = vraiFrom(nom); vues.push(q); return q }
+  return vues
+}
+
 describe('POST /api/catalog — créer un article', () => {
   // Le vrai bug : la page catalogue est un tableau qui s'édite sur place.
   // « + article » crée une ligne VIDE et le nom se tape ensuite dans la
   // cellule. Exiger le nom au POST rendait le bouton inutilisable.
   it('accepte une ligne sans nom — elle sera nommée dans la cellule', async () => {
     sous(ADMIN, CATALOGUE)
+    const vues = capturerRequetes()
     const res = await appeler({ method: 'POST', body: { type: 'article', name: '', unit: '', vat_rate: 8.1 } })
     expect(res.statusCode).toBe(201)
     expect(res.body?.error).toBeUndefined()
+    // `catalog_items.name` est TEXT NOT NULL : ce qui part doit être la chaîne
+    // vide, jamais null, sinon la base répond 23502 et l'écran dit
+    // « Erreur interne ».
+    const insere = vues.find(q => q._inserted)?._inserted?.[0]
+    expect(insere.name).toBe('')
+    expect(insere.name).not.toBeNull()
   })
 
   it('accepte aussi une ligne « heure » sans nom', async () => {
@@ -57,6 +76,15 @@ describe('POST /api/catalog — créer un article', () => {
     expect(cree.colonne_pirate).toBeUndefined()
     expect(cree.id).toBeUndefined()   // l'id vient de la base, jamais du corps
     expect(cree.archived).toBe(true)  // celle-là est dans la liste blanche
+  })
+
+  it('n\'envoie jamais name: null en effaçant la cellule (PATCH)', async () => {
+    sous(ADMIN, CATALOGUE)
+    const vues = capturerRequetes()
+    const res = await appeler({ method: 'PATCH', query: { id: '1' }, body: { name: '' } })
+    expect(res.statusCode).toBe(200)
+    const maj = vues.find(q => q._updated)?._updated
+    expect(maj.name).toBe('')
   })
 
   it('reste réservé à l\'admin', async () => {
