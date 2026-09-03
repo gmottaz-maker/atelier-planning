@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
-import { quoteStatusMeta, quoteStripe } from '../lib/quoteStatus'
+import { quoteStatusMeta, quoteStripe, offreAFaire } from '../lib/quoteStatus'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
@@ -995,6 +995,15 @@ export default function Admin() {
     // signaler (offre envoyée, en attente de réponse) — on n'affiche alors
     // rien du tout : l'avatar est aligné à droite, il ne bouge pas.
     const offre = quoteStripe(project.quote_data)
+    // Fond teinté quand rien n'est parti au client : ni offre, ni offre sortie
+    // du brouillon. La pastille dit l'état exact, le fond rend la carte
+    // repérable d'un coup d'œil dans une colonne de kanban.
+    //
+    // Bleu et non rouge : un projet sans offre n'est pas une anomalie, c'est du
+    // travail qui attend. Le rouge est déjà pris par le retard, sur le liseré
+    // haut et sur le badge — deux rouges de sens différents sur la même carte
+    // ne se lisent plus.
+    const aFaire = offreAFaire(project.quote_data)
     const offreTitre = project.quote_data?.status
       ? `Offre ${quoteStatusMeta(project.quote_data.status).label.toLowerCase()}`
       : 'Offre à faire'
@@ -1007,7 +1016,8 @@ export default function Admin() {
 
     return (
       <div key={project.id}
-        style={{ background: C.surface, borderRadius: R.panel, padding: 22, borderTop: `3px solid ${s.stripe}`,
+        style={{ background: aFaire ? C.infoBg : C.surface, borderRadius: R.panel, padding: 22,
+          borderTop: `3px solid ${s.stripe}`,
           display: 'flex', flexDirection: 'column', gap: 14, fontFamily: FONT }}>
 
         {/* En-tête : nom + client, pastille d'offre, avatar du responsable */}

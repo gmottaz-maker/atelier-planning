@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { QUOTE_STATUSES, quoteStatusMeta, quoteStripe } from '../lib/quoteStatus'
+import { QUOTE_STATUSES, quoteStatusMeta, quoteStripe, offreAFaire } from '../lib/quoteStatus'
 import { C } from '../lib/theme'
 
 describe('quoteStatusMeta', () => {
@@ -54,5 +54,32 @@ describe('quoteStripe — pastille d\'offre de la carte projet', () => {
     for (const s of [...QUOTE_STATUSES.map(q => ({ status: q.key })), null, {}]) {
       expect(attendus).toContain(quoteStripe(s))
     }
+  })
+})
+
+describe('offreAFaire — fond de la carte projet', () => {
+  it('vrai quand rien n\'est parti au client', () => {
+    expect(offreAFaire(null)).toBe(true)         // aucune offre
+    expect(offreAFaire(undefined)).toBe(true)
+    expect(offreAFaire({})).toBe(true)           // quote_data sans statut
+    expect(offreAFaire({ status: 'brouillon' })).toBe(true)
+  })
+
+  it('faux dès que l\'offre est sortie', () => {
+    expect(offreAFaire({ status: 'envoye' })).toBe(false)
+    expect(offreAFaire({ status: 'accepte' })).toBe(false)
+    expect(offreAFaire({ status: 'refuse' })).toBe(false)
+  })
+
+  // Le cas qui distingue ce signal de la pastille : « à corriger » appelle une
+  // action, mais l'offre est DÉJÀ partie une fois. La pastille la signale, le
+  // fond non — sans quoi le fond ne veut plus dire « rien n'est parti ».
+  it('faux pour « à corriger », que la pastille signale pourtant en rouge', () => {
+    expect(offreAFaire({ status: 'a_corriger' })).toBe(false)
+    expect(quoteStripe({ status: 'a_corriger' })).toBe(C.danger)
+  })
+
+  it('un statut inconnu n\'allume pas la carte', () => {
+    expect(offreAFaire({ status: 'zzz' })).toBe(false)
   })
 })
