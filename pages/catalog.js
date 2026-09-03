@@ -72,8 +72,13 @@ export default function Catalog() {
     .filter(it => typeFilter === 'all' ? true : it.type === typeFilter)
     .filter(it => !needle || [it.name, it.vendor, it.notes, it.unit].filter(Boolean).join(' ').toLowerCase().includes(needle))
 
-  const articles = filtered.filter(it => it.type !== 'heure')
-  const heures = filtered.filter(it => it.type === 'heure')
+  // Une ligne sans nom vient d'être créée : elle passe en tête. Le serveur trie
+  // par nom et PostgREST range les NULL en dernier — la nouvelle ligne
+  // atterrissait donc en bas d'un catalogue de cinquante articles, et le bouton
+  // avait l'air de ne rien faire.
+  const sansNomDabord = (a, b) => (a.name ? 1 : 0) - (b.name ? 1 : 0)
+  const articles = filtered.filter(it => it.type !== 'heure').sort(sansNomDabord)
+  const heures = filtered.filter(it => it.type === 'heure').sort(sansNomDabord)
 
   // Valeur affichée : brouillon en cours sinon valeur serveur
   const val = (it, k) => (draft[it.id] && k in draft[it.id]) ? draft[it.id][k] : (it[k] ?? '')

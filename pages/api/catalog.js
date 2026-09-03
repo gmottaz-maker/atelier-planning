@@ -60,8 +60,14 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({ ok: true, inserted, updated })
     }
+    // Pas de nom exigé ici, volontairement : la page catalogue est un tableau
+    // qui s'édite sur place. « + article » crée une ligne VIDE, et le nom se
+    // tape ensuite dans la cellule, qui part en PATCH. Exiger le nom au POST
+    // rendait donc le bouton inutilisable — c'était le bug.
+    //
+    // Le garde-fou reste sur l'import en masse quelques lignes plus haut : là,
+    // une ligne sans nom est une ligne de CSV vide, et elle est ignorée.
     const payload = pickPayload(req.body)
-    if (!payload.name) return res.status(400).json({ error: 'name requis' })
     const { data, error } = await supabase.from('catalog_items').insert(payload).select().single()
     if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
     return res.status(201).json(data)
