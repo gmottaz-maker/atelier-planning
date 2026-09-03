@@ -636,6 +636,9 @@ function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
   }
 
   const inputCls = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none"
+  // Rayon panneau (15px) pour les champs multilignes : à 999px les deux coins
+  // se rejoignent et le champ devient une ellipse. Dérivé, pour ne pas diverger.
+  const textareaCls = inputCls.replace('u-pill', 'u-panel')
 
   return (
     <>
@@ -740,7 +743,7 @@ function JustificatifDrawer({ row, people, accounts = [], onClose, onSaved }) {
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium u-muted mb-1">Description</label>
-                <textarea rows={2} className={inputCls} value={form.description} onChange={e => set('description', e.target.value)} />
+                <textarea rows={2} className={textareaCls} value={form.description} onChange={e => set('description', e.target.value)} />
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium u-muted mb-2">Mode de paiement</label>

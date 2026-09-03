@@ -108,6 +108,9 @@ export default function SendDocumentModal({ type, docId, mode, contactId, projec
 
   const lbl = 'block text-xs font-medium u-muted mb-1 uppercase tracking-wide'
   const inp = 'w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line'
+  // Rayon panneau (15px) pour les champs multilignes : à 999px les deux coins
+  // se rejoignent et le champ devient une ellipse. Dérivé, pour ne pas diverger.
+  const textareaCls = inp.replace('u-pill', 'u-panel')
 
   return (
     <div onMouseDown={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 16px', overflowY: 'auto' }}>
@@ -151,7 +154,7 @@ export default function SendDocumentModal({ type, docId, mode, contactId, projec
           </div>
           <div>
             <label className={lbl}>Message</label>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={8} className={inp} style={{ resize: 'vertical' }} />
+            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={8} className={textareaCls} style={{ resize: 'vertical' }} />
             <p className="text-xs u-muted mt-1">Placeholders dans un modèle : <code>{'{projet}'}</code> et <code>{'{numero}'}</code> (remplacés à la sélection).</p>
           </div>
           <div className="flex items-center gap-2 text-xs u-muted u-fill u-pill px-3 py-2">

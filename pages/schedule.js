@@ -1756,6 +1756,9 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
   }, [onClose, saving])
 
   const inputCls = "w-full px-3 py-2 border sch-line u-pill text-sm bg-white focus:sch-line focus:outline-none transition-colors"
+  // Rayon panneau (15px) pour les champs multilignes : à 999px les deux coins
+  // se rejoignent et le champ devient une ellipse. Dérivé, pour ne pas diverger.
+  const textareaCls = inputCls.replace('u-pill', 'u-panel')
 
   return (
     <>
@@ -1928,7 +1931,7 @@ function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onRe
               <label className="block text-xs font-medium sch-muted mb-1.5">Note</label>
               <textarea rows={2} placeholder="Détails supplémentaires…" value={form.description}
                 onChange={e => setForm(f=>({...f,description:e.target.value}))}
-                className={inputCls} style={{ resize: 'vertical' }} />
+                className={textareaCls} style={{ resize: 'vertical' }} />
             </div>
 
             {saveError && (

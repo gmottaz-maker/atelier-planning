@@ -65,6 +65,9 @@ export default function TaskFormDrawer({
   }, [onClose])
 
   const inputCls = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none transition-colors"
+  // Rayon panneau (15px) pour les champs multilignes : à 999px les deux coins
+  // se rejoignent et le champ devient une ellipse. Dérivé, pour ne pas diverger.
+  const textareaCls = inputCls.replace('u-pill', 'u-panel')
 
   return (
     <>
@@ -173,7 +176,7 @@ export default function TaskFormDrawer({
             <div>
               <label className="block text-xs font-medium u-muted mb-1.5">Note</label>
               <textarea rows={3} value={form.notes} onChange={e => set('notes', e.target.value)}
-                placeholder="Détail ou info utile…" className={inputCls}
+                placeholder="Détail ou info utile…" className={textareaCls}
                 style={{ resize: 'vertical' }} />
             </div>
 
