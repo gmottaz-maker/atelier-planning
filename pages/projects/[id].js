@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { defaultQuote } from '../../lib/quoteDefaults'
+import { useQuoteDefaults } from '../../lib/useQuoteDefaults'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
@@ -864,10 +866,23 @@ export default function ProjectPage() {
   // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], subcontracting:[], logistics:[], general_margin:'' }
   // general_margin (%) s'applique aux achats / sous-traitance sauf si une marge spécifique est définie sur la ligne (PAS la logistique)
   // Nouveau devis → pré-rempli avec un modèle par défaut (gestion + logistique)
+  const { reglages, loaded: reglagesCharges } = useQuoteDefaults()
+  // Vrai tant qu'aucune offre ENREGISTRÉE n'a été chargée pour ce projet.
+  const offreVierge = useRef(true)
   const [quote, setQuote] = useState(() => defaultQuote())
   const [quoteDirty, setQuoteDirty] = useState(false)
   const [quoteSaving, setQuoteSaving] = useState(false)
   const [quoteExpanded, setQuoteExpanded] = useState(false)
+
+  // Les tarifs réglés arrivent APRÈS le premier rendu — l'offre vierge du
+  // useState ci-dessus part donc sur les valeurs d'origine du code. On la
+  // re-sème dès qu'ils sont là, mais seulement si le projet n'a pas d'offre
+  // enregistrée ET que rien n'a été touché : autrement on écraserait soit un
+  // devis existant, soit ce que Guillaume vient de taper.
+  useEffect(() => {
+    if (!reglagesCharges || !offreVierge.current || quoteDirty) return
+    setQuote(defaultQuote(reglages))
+  }, [reglagesCharges, reglages, quoteDirty])
   // Collapse state — uid → true si replié (par défaut: tout est déplié)
   const [collapsedItems, setCollapsedItems] = useState({})
   const [collapsedSections, setCollapsedSections] = useState({}) // 'management' | 'fabrication' | 'subcontracting' | 'logistics'
@@ -929,6 +944,7 @@ export default function ProjectPage() {
                 status:         q.status || 'brouillon',
                 number:         q.number || '',
               })
+              offreVierge.current = false
               setQuoteExpanded(true)
             }
           // Migration silencieuse depuis l'ancien format { purchases, labor, logistics }
@@ -950,6 +966,7 @@ export default function ProjectPage() {
               number: q.number || '',
             }
             setQuote(migrated)
+            offreVierge.current = false
             setQuoteDirty(true)  // forcer un re-save dans le nouveau format
             setQuoteExpanded(true)
           }
@@ -1201,26 +1218,6 @@ export default function ProjectPage() {
   const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
 
   // Modèle par défaut d'un nouveau devis (gestion projet + logistique pré-remplies)
-  function defaultQuote() {
-    return {
-      management: [
-        { _uid: genRowUid(), item: 'Projet',                  description: 'Gestion de projet générale, correspondances, commandes', rate: '120', quantity: '', unit: 'heure(s)' },
-        { _uid: genRowUid(), item: 'Visuels & développement', description: 'Création de visuels, plans et développement tests',       rate: '140', quantity: '', unit: 'heure(s)' },
-        { _uid: genRowUid(), item: 'Visite sur place',        description: 'Visite sur place',                                          rate: '100', quantity: '', unit: 'heure(s)' },
-      ],
-      items: [],
-      subcontracting: [],
-      logistics: [
-        { _uid: genRowUid(), trajet: 'Trajet',    description: '', rate: '3',   quantity: '', unit: 'km',       margin: '' },
-        { _uid: genRowUid(), trajet: 'Montage',   description: '', rate: '100', quantity: '', unit: 'heure(s)', margin: '' },
-        { _uid: genRowUid(), trajet: 'Démontage', description: '', rate: '100', quantity: '', unit: 'heure(s)', margin: '' },
-      ],
-      general_margin: '20',
-      status: 'brouillon',
-      number: '',
-    }
-  }
-
   // ── Gestion (lignes de main d'œuvre globales) ──
 
   // ── Logistique ──
@@ -2318,6 +2315,7 @@ export default function ProjectPage() {
                     <QuoteEditor
                       value={quote}
                       onChange={q => { setQuote(q); setQuoteDirty(true) }}
+                      reglages={reglages}
                     />
                   </div>
                 )}

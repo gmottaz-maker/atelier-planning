@@ -1,11 +1,15 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser, requireAdmin } from '../../../lib/requireAdmin'
 import { erreurApi } from '../../../lib/apiError'
+import { DEFAUTS_OFFRE } from '../../../lib/quoteDefaults'
 
 const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
   // Repris de lib/paintCalc.js — hypothèses d'atelier, pas des données RUCO.
   paint_coefficients: null,
+  // Tarifs et marge d'une offre neuve. Le défaut vient de lib/quoteDefaults.js,
+  // qui fait foi — le dupliquer ici ferait diverger le formulaire du calcul.
+  quote_defaults: DEFAUTS_OFFRE,
   company_info: {
     name:    process.env.AMAZING_LAB_NAME    || 'Amazing Lab Sàrl',
     address: process.env.AMAZING_LAB_ADDRESS || "Rue de l'Ecluse 30",
@@ -28,7 +32,10 @@ const DEFAULTS = {
 // peinture. Partagés volontairement — si quelqu'un les recalibre après des
 // essais d'atelier, les chiffrages de toute l'équipe doivent en profiter.
 // Lecture pour tous, écriture admin, comme le reste de cette table.
-const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficients'])
+// `quote_defaults` : tarifs horaires et marge d'une offre neuve. Lecture pour
+// tous — la page projet en a besoin pour remplir une offre — écriture admin :
+// ce sont les prix de vente de l'atelier.
+const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficients', 'quote_defaults'])
 
 export default async function handler(req, res) {
   const { key } = req.query

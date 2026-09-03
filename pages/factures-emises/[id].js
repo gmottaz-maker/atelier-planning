@@ -14,7 +14,9 @@ import useIsAdmin from '../../lib/useIsAdmin'
 import adminFetch from '../../lib/adminFetch'
 import ContactPicker from '../../components/ContactPicker'
 import SendDocumentModal from '../../components/SendDocumentModal'
-import QuoteEditor, { defaultQuote } from '../../components/QuoteEditor'
+import QuoteEditor from '../../components/QuoteEditor'
+import { defaultQuote } from '../../lib/quoteDefaults'
+import { useQuoteDefaults } from '../../lib/useQuoteDefaults'
 import { computeQuoteTotal } from '../../lib/quoteTotals'
 import { invoiceTotals } from '../../lib/invoiceTotals'
 import { fmtCHF } from '../../lib/money'
@@ -37,6 +39,7 @@ export default function FactureEmisePage() {
   const [invoice, setInvoice]   = useState(null)
   const [projects, setProjects] = useState([])
   const [quote, setQuote]       = useState(null)
+  const { reglages, loaded: reglagesCharges } = useQuoteDefaults()
   const [form, setForm]         = useState({
     project_id: '', client_name: '', client_address: '', currency: 'CHF',
     vat_rate: '8.1', issue_date: today(), due_date: addDays(today(), 30),
@@ -58,7 +61,7 @@ export default function FactureEmisePage() {
   }
 
   useEffect(() => {
-    if (!router.isReady) return
+    if (!router.isReady || !reglagesCharges) return
     let cancelled = false
     ;(async () => {
       setLoading(true)
@@ -84,7 +87,7 @@ export default function FactureEmisePage() {
           discount_rate: inv.discount_rate ?? '',
           discount_amount: inv.discount_amount ?? '',
         })
-        setQuote(isGrouped(inv.quote_snapshot) ? inv.quote_snapshot : defaultQuote())
+        setQuote(isGrouped(inv.quote_snapshot) ? inv.quote_snapshot : defaultQuote(reglages))
         dueTouched.current = true
       } else {
         // Création : pré-remplissage depuis le projet passé en ?from=
@@ -92,15 +95,15 @@ export default function FactureEmisePage() {
         const p = (Array.isArray(prj) ? prj : []).find(x => String(x.id) === from)
         if (p) {
           setForm(f => ({ ...f, project_id: p.id, client_name: p.client || '', client_address: p.client_address || '' }))
-          setQuote(isGrouped(p.quote_data) ? p.quote_data : defaultQuote())
+          setQuote(isGrouped(p.quote_data) ? p.quote_data : defaultQuote(reglages))
         } else {
-          setQuote(defaultQuote())
+          setQuote(defaultQuote(reglages))
         }
       }
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [router.isReady, id])
+  }, [router.isReady, id, reglagesCharges])
 
   // Reprend le devis d'un projet (bouton « Reprendre l'offre »)
   function pickProject(pid) {
@@ -170,6 +173,9 @@ export default function FactureEmisePage() {
   if (user && !isAdmin) return null
 
   const input = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none"
+  // Rayon panneau (15px) pour les champs multilignes : à 999px les deux coins
+  // se rejoignent et le champ devient une ellipse. Dérivé, pour ne pas diverger.
+  const textareaCls = input.replace('u-pill', 'u-panel')
   const label = "block text-xs font-medium u-muted mb-1.5"
 
   return (
@@ -223,7 +229,7 @@ export default function FactureEmisePage() {
               </div>
               <div>
                 <label className={label}>Adresse</label>
-                <textarea rows={3} className={input} value={form.client_address}
+                <textarea rows={3} className={textareaCls} value={form.client_address}
                   onChange={e => set('client_address', e.target.value)}
                   placeholder="Société Sàrl&#10;Rue X 12&#10;1200 Genève" />
               </div>
@@ -276,14 +282,14 @@ export default function FactureEmisePage() {
               )}
               <div className="md:col-span-4">
                 <label className={label}>Notes</label>
-                <textarea rows={2} className={input} value={form.notes} onChange={e => set('notes', e.target.value)} />
+                <textarea rows={2} className={textareaCls} value={form.notes} onChange={e => set('notes', e.target.value)} />
               </div>
             </div>
           </div>
 
           {/* ── Positions : le même éditeur que l'offre ── */}
           <div className="space-y-6">
-            <QuoteEditor value={quote} onChange={q => { setQuote(q); setDirty(true) }} />
+            <QuoteEditor value={quote} onChange={q => { setQuote(q); setDirty(true) }} reglages={reglages} />
           </div>
 
           {/* ── Escompte sur toute la facture ── */}

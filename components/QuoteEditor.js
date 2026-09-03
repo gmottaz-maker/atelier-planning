@@ -10,6 +10,8 @@ import { useState } from 'react'
 import CatalogPicker, { toPurchaseRow, toRateRow } from './CatalogPicker'
 import QtyInput from './QtyInput'
 import { fmtCHF } from '../lib/money'
+import { genRowUid, genItemUid, copierItem } from '../lib/quoteLines'
+import { DEFAUTS_OFFRE, normaliserReglagesOffre } from '../lib/quoteDefaults'
 import { AL, C, FONT, R } from '../lib/theme'
 
 // Styles partagés — le système n'a qu'une bordure (le filet outline 1.5px) et
@@ -56,34 +58,10 @@ const subTitle      = { fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', 
 
 const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
 
-function genRowUid()  { return `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
-function genItemUid() { return `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` }
 function emptyPurchaseRow()      { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '', discount: '', discount_amount: '' } }
-function emptyLaborRow()         { return { _uid: genRowUid(), item: '', description: '', rate: '100', quantity: '', unit: '', discount: '', discount_amount: '' } }
+function emptyLaborRow(taux)     { return { _uid: genRowUid(), item: '', description: '', rate: taux, quantity: '', unit: '', discount: '', discount_amount: '' } }
 function emptyLogisticsRow()     { return { _uid: genRowUid(), trajet: '', description: '', rate: '', quantity: '', unit: '', margin: '', discount: '', discount_amount: '' } }
 function emptySubcontractingRow(){ return { _uid: genRowUid(), item: '', description: '', rate: '', quantity: '', unit: '', margin: '', discount: '', discount_amount: '' } }
-
-// Devis vierge : gestion de projet et logistique pré-remplies (mêmes valeurs
-// que la création d'une offre depuis un projet).
-export function defaultQuote() {
-  return {
-    management: [
-      { _uid: genRowUid(), item: 'Projet',                  description: 'Gestion de projet générale, correspondances, commandes', rate: '120', quantity: '', unit: 'heure(s)' },
-      { _uid: genRowUid(), item: 'Visuels & développement', description: 'Création de visuels, plans et développement tests',       rate: '140', quantity: '', unit: 'heure(s)' },
-      { _uid: genRowUid(), item: 'Visite sur place',        description: 'Visite sur place',                                        rate: '100', quantity: '', unit: 'heure(s)' },
-    ],
-    items: [],
-    subcontracting: [],
-    logistics: [
-      { _uid: genRowUid(), trajet: 'Trajet',    description: '', rate: '3',   quantity: '', unit: 'km',       margin: '' },
-      { _uid: genRowUid(), trajet: 'Montage',   description: '', rate: '100', quantity: '', unit: 'heure(s)', margin: '' },
-      { _uid: genRowUid(), trajet: 'Démontage', description: '', rate: '100', quantity: '', unit: 'heure(s)', margin: '' },
-    ],
-    general_margin: '20',
-    status: 'brouillon',
-    number: '',
-  }
-}
 
 // Bascule de visibilité d'une ligne dans le document envoyé au client.
 // La ligne reste dans le devis et dans TOUS les totaux : c'est un filtre
@@ -179,7 +157,11 @@ function CompositionElement({
   )
 }
 
-export default function QuoteEditor({ value, onChange }) {
+export default function QuoteEditor({ value, onChange, reglages }) {
+  // Repli sur les valeurs d'origine : cet éditeur sert aussi aux factures, où
+  // les réglages ne sont pas forcément chargés. Une ligne ajoutée à la main
+  // n'est jamais bloquée par un réglage manquant.
+  const tarifs = normaliserReglagesOffre(reglages || DEFAUTS_OFFRE)
   // Le bloc JSX ci-dessous provient de la page projet : on lui redonne
   // exactement les noms qu'il utilisait (quote / setQuote / setQuoteDirty)
   // pour qu'il fonctionne sans la moindre retouche.
@@ -218,7 +200,7 @@ export default function QuoteEditor({ value, onChange }) {
   }
 
   // ── Gestion ──
-  function addManagementRow()   { setQuote(q => ({ ...q, management: [...q.management, emptyLaborRow()] })); setQuoteDirty(true) }
+  function addManagementRow()   { setQuote(q => ({ ...q, management: [...q.management, emptyLaborRow(tarifs.taux_main_oeuvre)] })); setQuoteDirty(true) }
   function updateManagementRow(idx, field, v) { setQuote(q => ({ ...q, management: q.management.map((r, i) => i === idx ? { ...r, [field]: v } : r) })); setQuoteDirty(true) }
   const toggleRowHidden = (liste, idx) => {
     setQuote(q => ({ ...q, [liste]: (q[liste] || []).map((r, i) => i === idx ? { ...r, hidden: !r.hidden } : r) }))
@@ -240,11 +222,22 @@ export default function QuoteEditor({ value, onChange }) {
   function addItem() { setQuote(q => ({ ...q, items: [...q.items, { _uid: genItemUid(), name: '', purchases: [], labor: [] }] })); setQuoteDirty(true) }
   function updateItemName(idx, name) { setQuote(q => ({ ...q, items: q.items.map((it, i) => i === idx ? { ...it, name } : it) })); setQuoteDirty(true) }
   function removeItem(idx) { setQuote(q => ({ ...q, items: q.items.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
+
+  // La copie se pose JUSTE APRÈS l'originale, pas en fin de liste : sur une
+  // offre à dix items, on ne veut pas aller la rechercher tout en bas.
+  function duplicateItem(idx) {
+    setQuote(q => {
+      const items = [...q.items]
+      items.splice(idx + 1, 0, copierItem(q.items[idx]))
+      return { ...q, items }
+    })
+    setQuoteDirty(true)
+  }
   function addItemRow(itemIdx, kind) {
     // La composition sert au chiffrage : elle part masquée, on l'affiche au cas
     // par cas. Les lignes déjà en base n'ont pas ce marqueur et restent
     // visibles — les offres existantes ne changent pas d'apparence.
-    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()), hidden: true }
+    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true }
     setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx ? { ...it, [kind]: [...(it[kind] || []), empty] } : it) }))
     setQuoteDirty(true)
   }
@@ -268,7 +261,7 @@ export default function QuoteEditor({ value, onChange }) {
     majItem(itemIdx, it => ({ ...it, elements: (it.elements || []).filter((_, j) => j !== elIdx) }))
   }
   function addElementRow(itemIdx, elIdx, kind) {
-    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()), hidden: true }
+    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true }
     majElement(itemIdx, elIdx, el => ({ ...el, [kind]: [...(el[kind] || []), empty] }))
   }
   function updateElementRow(itemIdx, elIdx, kind, rowIdx, field, v) {
@@ -303,11 +296,11 @@ export default function QuoteEditor({ value, onChange }) {
   }
 
   // ── Lignes pré-remplies depuis le catalogue ──
-  function appendManagementRow(pre)     { setQuote(q => ({ ...q, management: [...q.management, { ...emptyLaborRow(), ...pre }] })); setQuoteDirty(true) }
+  function appendManagementRow(pre)     { setQuote(q => ({ ...q, management: [...q.management, { ...emptyLaborRow(tarifs.taux_main_oeuvre), ...pre }] })); setQuoteDirty(true) }
   function appendLogisticsRow(pre)      { setQuote(q => ({ ...q, logistics: [...q.logistics, { ...emptyLogisticsRow(), ...pre }] })); setQuoteDirty(true) }
   function appendSubcontractingRow(pre) { setQuote(q => ({ ...q, subcontracting: [...(q.subcontracting || []), { ...emptySubcontractingRow(), ...pre }] })); setQuoteDirty(true) }
   function appendItemRow(itemIdx, kind, pre) {
-    const base = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow()), hidden: true }
+    const base = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true }
     setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx ? { ...it, [kind]: [...(it[kind] || []), { ...base, ...pre }] } : it) }))
     setQuoteDirty(true)
   }
@@ -460,6 +453,9 @@ export default function QuoteEditor({ value, onChange }) {
                                   onChange={e => updateItemName(itemIdx, e.target.value)}
                                 />
                                 <span style={{ ...sectionTotal, whiteSpace: 'nowrap' }}>{fmtCHF(subTotal)} CHF</span>
+                                <button onClick={() => duplicateItem(itemIdx)}
+                                  className="quote-action" style={{ '--qa': TEINTES.fabrication.fort, whiteSpace: 'nowrap' }}
+                                  title="Dupliquer cet item avec toute sa composition">dupliquer</button>
                                 <button onClick={() => { if (confirm(`Supprimer l'item "${it.name || 'sans nom'}" ?`)) removeItem(itemIdx) }}
                                   className="quote-action" style={{ fontSize: 13 }} title="Supprimer cet item">✕</button>
                               </div>

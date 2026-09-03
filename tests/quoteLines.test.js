@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lignesDevis, totauxDevis, normaliserDevis } from '../lib/quoteLines'
+import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem } from '../lib/quoteLines'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { buildDevisHtml } from '../lib/devisHtml'
 
@@ -213,5 +213,86 @@ describe('document', () => {
   it('reprend le numéro saisi, sinon le repli année-mois-id', () => {
     expect(buildDevisHtml({ ...project, quote_data: { ...project.quote_data, number: '2026-042' } }, {})).toContain('2026-042')
     expect(buildDevisHtml(project, {})).toContain('0A2F')
+  })
+})
+
+describe('copierItem — duplication d\'un item de Fabrication', () => {
+  const original = () => ({
+    _uid: 'i_source',
+    name: 'Bar',
+    purchases: [
+      { _uid: 'r_a', description: 'Panneau 3 plis', unit_price: '80', quantity: '4', margin: '15' },
+      { _uid: 'r_b', description: 'Visserie', unit_price: '12', quantity: '1', hidden: true },
+    ],
+    labor: [{ _uid: 'r_c', description: 'Découpe', rate: '100', quantity: '6' }],
+    elements: [{
+      _uid: 'i_el',
+      name: 'Toiture',
+      purchases: [{ _uid: 'r_d', description: 'Bâche', unit_price: '200', quantity: '1', hidden: true }],
+      labor: [{ _uid: 'r_e', description: 'Pose', rate: '100', quantity: '2' }],
+    }],
+  })
+
+  // Tous les _uid d'une structure, à tous les niveaux.
+  const tousLesUid = (it) => [
+    it._uid,
+    ...(it.purchases || []).map(r => r._uid),
+    ...(it.labor || []).map(r => r._uid),
+    ...(it.elements || []).flatMap(el => [
+      el._uid,
+      ...(el.purchases || []).map(r => r._uid),
+      ...(el.labor || []).map(r => r._uid),
+    ]),
+  ]
+
+  it('ne réutilise AUCUN identifiant de la source', () => {
+    const src = original()
+    const copie = copierItem(src)
+    const avant = new Set(tousLesUid(src))
+    for (const uid of tousLesUid(copie)) {
+      expect(avant.has(uid)).toBe(false)
+    }
+  })
+
+  it('les identifiants de la copie sont tous distincts entre eux', () => {
+    const uids = tousLesUid(copierItem(original()))
+    expect(new Set(uids).size).toBe(uids.length)
+  })
+
+  it('ne modifie pas la source', () => {
+    const src = original()
+    const gele = JSON.stringify(src)
+    copierItem(src)
+    expect(JSON.stringify(src)).toBe(gele)
+  })
+
+  it('conserve les montants, les marges et le masquage', () => {
+    const copie = copierItem(original())
+    expect(copie.purchases.map(r => [r.description, r.unit_price, r.quantity, r.margin]))
+      .toEqual([['Panneau 3 plis', '80', '4', '15'], ['Visserie', '12', '1', undefined]])
+    expect(copie.purchases[1].hidden).toBe(true)
+    expect(copie.elements[0].purchases[0].hidden).toBe(true)
+    expect(copie.elements[0].name).toBe('Toiture')
+  })
+
+  // Le total est le vrai contrôle : une copie qui ne chiffre pas pareil n'est
+  // pas une copie.
+  it('chiffre exactement comme la source', () => {
+    const src = original()
+    expect(totalItem(copierItem(src), '20')).toBe(totalItem(src, '20'))
+  })
+
+  it('suffixe le nom, sauf quand il n\'y en a pas', () => {
+    expect(copierItem(original()).name).toBe('Bar (copie)')
+    expect(copierItem({ name: '' }).name).toBe('')
+    expect(copierItem({}).name).toBe('')
+  })
+
+  it('supporte un item sans élément ni composition', () => {
+    const copie = copierItem({ _uid: 'i_x', name: 'Vide' })
+    expect(copie.purchases).toEqual([])
+    expect(copie.labor).toEqual([])
+    expect(copie.elements).toEqual([])
+    expect(copie._uid).not.toBe('i_x')
   })
 })

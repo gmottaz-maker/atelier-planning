@@ -4,6 +4,8 @@ import { useAuth } from './_app'
 import { supabase } from '../lib/supabase'
 import NavBar from '../components/NavBar'
 import { useResponsibles } from '../lib/useResponsibles'
+import { useQuoteDefaults } from '../lib/useQuoteDefaults'
+import { REGLAGES_OFFRE } from '../lib/quoteDefaults'
 import useIsAdmin from '../lib/useIsAdmin'
 import { AL, C, FONT } from '../lib/theme'
 
@@ -63,6 +65,9 @@ export default function SettingsPage() {
 
         {/* Infos entreprise (admin only — pour les factures + QR-bill) */}
         {isAdmin && <CompanyInfoSection />}
+
+        {/* Offre (admin only — ce sont les prix de vente de l'atelier) */}
+        {isAdmin && <QuoteDefaultsSection />}
 
         {/* Sécurité */}
         <section>
@@ -306,6 +311,9 @@ function CompanyInfoSection() {
   }
 
   const inputCls = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none"
+  // Rayon panneau (15px) pour les champs multilignes : à 999px les deux coins
+  // se rejoignent et le champ devient une ellipse. Dérivé, pour ne pas diverger.
+  const textareaCls = inputCls.replace('u-pill', 'u-panel')
 
   return (
     <section>
@@ -376,7 +384,7 @@ function CompanyInfoSection() {
           </div>
           <div className="col-span-2 pt-2 border-t u-line">
             <label className="block text-xs font-medium u-muted mb-1">Conditions de paiement (pied de facture)</label>
-            <textarea rows={2} className={inputCls} value={form.payment_terms} onChange={e => set('payment_terms', e.target.value)} />
+            <textarea rows={2} className={textareaCls} value={form.payment_terms} onChange={e => set('payment_terms', e.target.value)} />
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 pt-2 border-t u-line">
@@ -388,6 +396,84 @@ function CompanyInfoSection() {
           </button>
         </div>
       </div>
+    </section>
+  )
+}
+
+// ─── Offre : tarifs et marge par défaut ──────────────────────────────────────
+// Ces valeurs remplissent une offre NEUVE. Elles sont copiées dans `quote_data`
+// à la création, donc les modifier ne retouche aucune offre déjà établie — ce
+// serait sinon réécrire rétroactivement des devis envoyés.
+function QuoteDefaultsSection() {
+  const { reglages, loaded, save } = useQuoteDefaults()
+  const [draft, setDraft] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  // Tant qu'on n'a rien touché, on affiche ce que le serveur a renvoyé — sinon
+  // un brouillon local figerait l'écran sur les valeurs d'avant le chargement.
+  const valeurs = draft ?? reglages
+  const dirty = draft !== null
+
+  function set(cle, v) { setDraft(d => ({ ...(d ?? reglages), [cle]: v })) }
+
+  async function commit() {
+    setSaving(true); setFeedback('')
+    try {
+      await save(valeurs)
+      setDraft(null)
+      setFeedback('Enregistré')
+      setTimeout(() => setFeedback(''), 2000)
+    } catch (e) {
+      setFeedback('Erreur : ' + e.message)
+    } finally { setSaving(false) }
+  }
+
+  const inputCls = "w-full px-3 py-2 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none text-right tabular-nums"
+
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h2 className="text-sm font-semibold u-ink">Offre</h2>
+        {dirty && (
+          <div className="flex items-center gap-3">
+            <button onClick={() => setDraft(null)} disabled={saving}
+              className="text-xs u-muted hover:u-ink transition-colors">annuler</button>
+            <button onClick={commit} disabled={saving}
+              className="text-xs font-medium px-3 py-1.5 u-pill text-white disabled:opacity-50"
+              style={{ background: AL.black }}>
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="text-xs u-muted mb-4">
+        Tarifs et marge d'une offre neuve. Ils sont copiés dans l'offre à sa création :
+        les modifier ici ne change aucune offre déjà établie, et chaque ligne reste
+        modifiable au cas par cas.
+      </p>
+      <div className="u-surface u-panel border u-line p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+          {REGLAGES_OFFRE.map(r => (
+            <div key={r.cle} className="flex items-center gap-3">
+              <label htmlFor={`offre-${r.cle}`} className="flex-1 text-sm u-ink">{r.label}</label>
+              <input
+                id={`offre-${r.cle}`}
+                type="number" step="0.01" min="0" inputMode="decimal"
+                className={inputCls} style={{ width: 96, flex: 'none' }}
+                value={valeurs[r.cle] ?? ''}
+                onChange={e => set(r.cle, e.target.value)}
+                disabled={!loaded}
+              />
+              <span className="text-xs u-muted whitespace-nowrap" style={{ width: 78 }}>{r.unite}</span>
+            </div>
+          ))}
+        </div>
+        {feedback && <p className="text-xs u-muted mt-4">{feedback}</p>}
+      </div>
+      <p className="text-xs u-muted mt-3">
+        Un champ laissé vide ou négatif retombe sur sa valeur d'origine à l'enregistrement.
+      </p>
     </section>
   )
 }
