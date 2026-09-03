@@ -57,7 +57,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!process.env.RESEND_API_KEY) return res.status(500).json({ error: 'RESEND_API_KEY manquant (config serveur).' })
 
-  const { type, id, mode, subject, message, to, cc } = req.body || {}
+  const { type, id, subject, message, to, cc } = req.body || {}
   if (!['devis', 'facture'].includes(type)) return res.status(400).json({ error: 'type invalide' })
   if (!id) return res.status(400).json({ error: 'id requis' })
   const toList = cleanEmails(to)
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
     if (type === 'devis') {
       const { data: project, error } = await supabase.from('projects').select('*').eq('id', id).single()
       if (error || !project) return res.status(404).json({ error: 'Projet introuvable' })
-      pdf = await htmlToPdf(buildDevisHtml(project, company, level))
+      pdf = await htmlToPdf(buildDevisHtml(project, company))
       filename = pdfFilename('devis', project.name)
       afterSend = async () => {
         const today = new Date().toISOString().slice(0, 10)
