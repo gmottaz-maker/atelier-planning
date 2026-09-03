@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem } from '../lib/quoteLines'
+import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem, deplacerLigne } from '../lib/quoteLines'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { buildDevisHtml } from '../lib/devisHtml'
 
@@ -294,5 +294,52 @@ describe('copierItem — duplication d\'un item de Fabrication', () => {
     expect(copie.labor).toEqual([])
     expect(copie.elements).toEqual([])
     expect(copie._uid).not.toBe('i_x')
+  })
+})
+
+describe('deplacerLigne — l\'ordre de saisie est l\'ordre du document', () => {
+  const l = () => [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+  const ids = arr => arr.map(x => x.id)
+
+  it('échange avec la voisine du dessus', () => {
+    expect(ids(deplacerLigne(l(), 1, -1))).toEqual(['b', 'a', 'c'])
+  })
+
+  it('échange avec la voisine du dessous', () => {
+    expect(ids(deplacerLigne(l(), 1, 1))).toEqual(['a', 'c', 'b'])
+  })
+
+  // Les boutons sont désactivés aux extrémités, mais la fonction ne doit pas
+  // dépendre de l'interface pour rester correcte.
+  it('ne fait rien aux bords de la liste', () => {
+    expect(ids(deplacerLigne(l(), 0, -1))).toEqual(['a', 'b', 'c'])
+    expect(ids(deplacerLigne(l(), 2, 1))).toEqual(['a', 'b', 'c'])
+  })
+
+  it('ne fait rien sur un index hors bornes', () => {
+    expect(ids(deplacerLigne(l(), -1, 1))).toEqual(['a', 'b', 'c'])
+    expect(ids(deplacerLigne(l(), 9, -1))).toEqual(['a', 'b', 'c'])
+  })
+
+  // Le vrai risque d'une réorganisation : perdre ou dupliquer une ligne.
+  it('conserve exactement les mêmes lignes, sans perte ni doublon', () => {
+    const avant = l()
+    for (const [idx, sens] of [[0, 1], [1, 1], [2, -1], [0, -1], [2, 1], [-1, 1], [5, -1]]) {
+      const apres = deplacerLigne(avant, idx, sens)
+      expect(apres).toHaveLength(avant.length)
+      expect(new Set(ids(apres))).toEqual(new Set(ids(avant)))
+    }
+  })
+
+  it('ne modifie pas le tableau d\'origine', () => {
+    const avant = l()
+    deplacerLigne(avant, 0, 1)
+    expect(ids(avant)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('tolère une liste absente ou vide', () => {
+    expect(deplacerLigne(undefined, 0, 1)).toBeUndefined()
+    expect(deplacerLigne([], 0, 1)).toEqual([])
+    expect(ids(deplacerLigne([{ id: 'a' }], 0, 1))).toEqual(['a'])
   })
 })

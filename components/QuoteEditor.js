@@ -10,7 +10,7 @@ import { useState } from 'react'
 import CatalogPicker, { toPurchaseRow, toRateRow } from './CatalogPicker'
 import QtyInput from './QtyInput'
 import { fmtCHF } from '../lib/money'
-import { genRowUid, genItemUid, copierItem } from '../lib/quoteLines'
+import { genRowUid, genItemUid, copierItem, deplacerLigne } from '../lib/quoteLines'
 import { DEFAUTS_OFFRE, normaliserReglagesOffre } from '../lib/quoteDefaults'
 import { AL, C, FONT, R } from '../lib/theme'
 
@@ -82,13 +82,33 @@ function OeilVisibilite({ masquee, onToggle }) {
 }
 
 
+// Monter / descendre une ligne. L'ordre de saisie est celui du document imprimé,
+// donc ces deux flèches font de la mise en page, pas du confort.
+//
+// `total` est la longueur de la liste À LAQUELLE la ligne appartient, qui n'est
+// pas toujours celle qu'on voit : dans la composition d'un élément, achats et
+// main d'œuvre sont affichés à la suite mais restent deux tableaux distincts.
+// Le dernier achat ne peut pas descendre sous la première heure — il changerait
+// de nature.
+function Reordonner({ idx, total, onDeplacer }) {
+  const btn = 'u-muted hover:u-ink disabled:opacity-25 text-[10px] leading-none'
+  return (
+    <>
+      <button type="button" className={btn} disabled={idx === 0}
+        onClick={() => onDeplacer(-1)} title="Monter cette ligne" aria-label="Monter cette ligne">▲</button>
+      <button type="button" className={btn} disabled={idx === total - 1}
+        onClick={() => onDeplacer(1)} title="Descendre cette ligne" aria-label="Descendre cette ligne">▼</button>
+    </>
+  )
+}
+
 // Composition d'un ÉLÉMENT : matériaux et heures qui le constituent.
 // Table volontairement plus compacte que celle d'un item — à ce niveau on
 // chiffre, on ne rédige pas l'offre. Les colonnes de calcul (marge, escompte)
 // restent présentes : c'est là que se fait le prix.
 function CompositionElement({
   element, generalMargin, fmtCHF, purchaseNet, laborNet, th, td, tdRO, txtCell, numCell, QUOTE_UNITS,
-  onAdd, onUpdate, onRemove, onToggleHidden,
+  onAdd, onUpdate, onRemove, onToggleHidden, onMove,
 }) {
   const lignes = [
     ...(element.purchases || []).map((r, i) => ({ r, i, kind: 'purchases' })),
@@ -145,7 +165,10 @@ function CompositionElement({
                 <td className={td + ' text-center'}>
                   <span className="inline-flex items-center gap-2">
                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => onToggleHidden(kind, i)} />
-                    <button onClick={() => onRemove(kind, i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
+                    <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Reordonner idx={i} total={(element[kind] || []).length} onDeplacer={sens => onMove(kind, i, sens)} />
+                      <button onClick={() => onRemove(kind, i)} className="u-muted hover:u-ko text-sm">×</button>
+                    </span>
                   </span>
                 </td>
               </tr>
@@ -207,21 +230,26 @@ export default function QuoteEditor({ value, onChange, reglages }) {
     setQuoteDirty(true)
   }
   function removeManagementRow(idx) { setQuote(q => ({ ...q, management: q.management.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
+  function moveManagementRow(idx, sens) { setQuote(q => ({ ...q, management: deplacerLigne(q.management, idx, sens) })); setQuoteDirty(true) }
 
   // ── Logistique ──
   function addLogisticsRow()    { setQuote(q => ({ ...q, logistics: [...q.logistics, emptyLogisticsRow()] })); setQuoteDirty(true) }
   function updateLogisticsRow(idx, field, v) { setQuote(q => ({ ...q, logistics: q.logistics.map((r, i) => i === idx ? { ...r, [field]: v } : r) })); setQuoteDirty(true) }
   function removeLogisticsRow(idx) { setQuote(q => ({ ...q, logistics: q.logistics.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
+  function moveLogisticsRow(idx, sens) { setQuote(q => ({ ...q, logistics: deplacerLigne(q.logistics, idx, sens) })); setQuoteDirty(true) }
 
   // ── Sous-traitance ──
   function addSubcontractingRow() { setQuote(q => ({ ...q, subcontracting: [...(q.subcontracting || []), emptySubcontractingRow()] })); setQuoteDirty(true) }
   function updateSubcontractingRow(idx, field, v) { setQuote(q => ({ ...q, subcontracting: (q.subcontracting || []).map((r, i) => i === idx ? { ...r, [field]: v } : r) })); setQuoteDirty(true) }
   function removeSubcontractingRow(idx) { setQuote(q => ({ ...q, subcontracting: (q.subcontracting || []).filter((_, i) => i !== idx) })); setQuoteDirty(true) }
+  function moveSubcontractingRow(idx, sens) { setQuote(q => ({ ...q, subcontracting: deplacerLigne(q.subcontracting || [], idx, sens) })); setQuoteDirty(true) }
 
   // ── Items (Bar, Pergola…) ──
   function addItem() { setQuote(q => ({ ...q, items: [...q.items, { _uid: genItemUid(), name: '', purchases: [], labor: [] }] })); setQuoteDirty(true) }
   function updateItemName(idx, name) { setQuote(q => ({ ...q, items: q.items.map((it, i) => i === idx ? { ...it, name } : it) })); setQuoteDirty(true) }
   function removeItem(idx) { setQuote(q => ({ ...q, items: q.items.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
+
+  function moveItem(idx, sens) { setQuote(q => ({ ...q, items: deplacerLigne(q.items, idx, sens) })); setQuoteDirty(true) }
 
   // La copie se pose JUSTE APRÈS l'originale, pas en fin de liste : sur une
   // offre à dix items, on ne veut pas aller la rechercher tout en bas.
@@ -267,6 +295,9 @@ export default function QuoteEditor({ value, onChange, reglages }) {
   function updateElementRow(itemIdx, elIdx, kind, rowIdx, field, v) {
     majElement(itemIdx, elIdx, el => ({ ...el, [kind]: el[kind].map((r, k) => k === rowIdx ? { ...r, [field]: v } : r) }))
   }
+  function moveElementRow(itemIdx, elIdx, kind, rowIdx, sens) {
+    majElement(itemIdx, elIdx, el => ({ ...el, [kind]: deplacerLigne(el[kind] || [], rowIdx, sens) }))
+  }
   function removeElementRow(itemIdx, elIdx, kind, rowIdx) {
     majElement(itemIdx, elIdx, el => ({ ...el, [kind]: el[kind].filter((_, k) => k !== rowIdx) }))
   }
@@ -288,6 +319,9 @@ export default function QuoteEditor({ value, onChange, reglages }) {
       labor: (it.labor || []).map(r => ({ ...r, hidden: masquer })),
     } : it) }))
     setQuoteDirty(true)
+  }
+  function moveItemRow(itemIdx, kind, rowIdx, sens) {
+    majItem(itemIdx, it => ({ ...it, [kind]: deplacerLigne(it[kind] || [], rowIdx, sens) }))
   }
   function removeItemRow(itemIdx, kind, rowIdx) {
     setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx
@@ -397,7 +431,10 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                 <td className={td + ' text-center'}>
                                   <span className="inline-flex items-center gap-2">
                                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('management', i)} />
-                                    <button onClick={() => removeManagementRow(i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                    <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Reordonner idx={i} total={quote.management.length} onDeplacer={sens => moveManagementRow(i, sens)} />
+                                      <button onClick={() => removeManagementRow(i)} className="u-muted hover:u-ko text-sm">×</button>
+                                    </span>
                                   </span>
                                 </td>
                               </tr>
@@ -453,6 +490,9 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                   onChange={e => updateItemName(itemIdx, e.target.value)}
                                 />
                                 <span style={{ ...sectionTotal, whiteSpace: 'nowrap' }}>{fmtCHF(subTotal)} CHF</span>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Reordonner idx={itemIdx} total={quote.items.length} onDeplacer={sens => moveItem(itemIdx, sens)} />
+                                </span>
                                 <button onClick={() => duplicateItem(itemIdx)}
                                   className="quote-action" style={{ '--qa': TEINTES.fabrication.fort, whiteSpace: 'nowrap' }}
                                   title="Dupliquer cet item avec toute sa composition">dupliquer</button>
@@ -507,7 +547,10 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                       <td className={td + ' text-center'}>
                                         <span className="inline-flex items-center gap-2">
                                           <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleItemRowHidden(itemIdx, 'purchases', i)} />
-                                          <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                          <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Reordonner idx={i} total={(it.purchases || []).length} onDeplacer={sens => moveItemRow(itemIdx, 'purchases', i, sens)} />
+                                            <button onClick={() => removeItemRow(itemIdx, 'purchases', i)} className="u-muted hover:u-ko text-sm">×</button>
+                                          </span>
                                         </span>
                                       </td>
                                     </tr>
@@ -565,7 +608,10 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                       <td className={td + ' text-center'}>
                                         <span className="inline-flex items-center gap-2">
                                           <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleItemRowHidden(itemIdx, 'labor', i)} />
-                                          <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                          <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Reordonner idx={i} total={(it.labor || []).length} onDeplacer={sens => moveItemRow(itemIdx, 'labor', i, sens)} />
+                                            <button onClick={() => removeItemRow(itemIdx, 'labor', i)} className="u-muted hover:u-ko text-sm">×</button>
+                                          </span>
                                         </span>
                                       </td>
                                     </tr>
@@ -622,6 +668,7 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                     onAdd={kind => addElementRow(itemIdx, elIdx, kind)}
                                     onUpdate={(kind, i, f, v) => updateElementRow(itemIdx, elIdx, kind, i, f, v)}
                                     onRemove={(kind, i) => removeElementRow(itemIdx, elIdx, kind, i)}
+                                    onMove={(kind, i, sens) => moveElementRow(itemIdx, elIdx, kind, i, sens)}
                                     onToggleHidden={(kind, i) => toggleElementRowHidden(itemIdx, elIdx, kind, i)}
                                   />
                                 </div>
@@ -699,7 +746,10 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                 <td className={td + ' text-center'}>
                                   <span className="inline-flex items-center gap-2">
                                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('subcontracting', i)} />
-                                    <button onClick={() => removeSubcontractingRow(i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                    <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Reordonner idx={i} total={(quote.subcontracting || []).length} onDeplacer={sens => moveSubcontractingRow(i, sens)} />
+                                      <button onClick={() => removeSubcontractingRow(i)} className="u-muted hover:u-ko text-sm">×</button>
+                                    </span>
                                   </span>
                                 </td>
                               </tr>
@@ -773,7 +823,10 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                 <td className={td + ' text-center'}>
                                   <span className="inline-flex items-center gap-2">
                                     <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('logistics', i)} />
-                                    <button onClick={() => removeLogisticsRow(i)} className="u-muted hover:u-ko opacity-0 group-hover:opacity-100 text-sm">×</button>
+                                    <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Reordonner idx={i} total={quote.logistics.length} onDeplacer={sens => moveLogisticsRow(i, sens)} />
+                                      <button onClick={() => removeLogisticsRow(i)} className="u-muted hover:u-ko text-sm">×</button>
+                                    </span>
                                   </span>
                                 </td>
                               </tr>
