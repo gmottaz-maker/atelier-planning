@@ -1,238 +1,203 @@
+// Annuaire des sociétés.
+//
+// La page listait une carte PAR PERSONNE : trente contacts donnaient trente
+// cartes, sans colonnes comparables, et on ne voyait pas les sociétés. Elle
+// liste maintenant des SOCIÉTÉS en lignes, avec ce qu'on veut savoir d'elles —
+// combien de personnes, combien de projets, le dernier en date.
+//
+// Les personnes n'ont pas disparu : elles sont sur la fiche de leur société, et
+// celles qui n'en ont aucune ont leur propre section en bas.
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import Link from 'next/link'
+import Head from 'next/head'
+import useSWR from 'swr'
 import { useAuth } from './_app'
 import useIsAdmin from '../lib/useIsAdmin'
-import { useRouter } from 'next/router'
-import useSWR from 'swr'
-import Head from 'next/head'
-import Link from 'next/link'
+import NavBar from '../components/NavBar'
 import { AL, C, FONT, MONO, R, initials } from '../lib/theme'
-import ButtonPill from '../components/ButtonPill'
-
-const Icon = ({ d, ...p }) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>{d}</svg>
-const EditIcon = <Icon d={<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" /></>} />
-const TagIcon  = <Icon d={<><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L3 13V3h10l7.59 7.59a2 2 0 0 1 0 2.82z" /><circle cx="7.5" cy="7.5" r="1" /></>} />
-const TrashIcon = <Icon d={<><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></>} />
-const ArchiveIcon = <Icon d={<><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></>} />
-
-function ActionBtn({ children, title, onClick, danger }) {
-  return (
-    <button title={title} onClick={onClick}
-      style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: R.pill, border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', flex: 'none' }}
-      onMouseEnter={e => { e.currentTarget.style.background = danger ? C.dangerBg : C.hover; e.currentTarget.style.color = danger ? C.danger : AL.black }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.muted }}>
-      {children}
-    </button>
-  )
-}
 
 const ROLE_TAGS = ['Client', 'Fournisseur']
-const catColor = t => t === 'Client' ? C.success : t === 'Fournisseur' ? C.warning : C.violet
-const catBg    = t => t === 'Client' ? C.successBg : t === 'Fournisseur' ? C.warningBg : C.violetBg
+const tonTag = t => t === 'Client' ? { fg: C.success, bg: C.successBg }
+  : t === 'Fournisseur' ? { fg: C.warning, bg: C.warningBg }
+  : { fg: C.violet, bg: C.violetBg }
+
+const moisAnnee = s => { const [y, m] = String(s || '').slice(0, 10).split('-'); return m ? `${m}.${y}` : '' }
 
 export default function Clients() {
-  // Réservé à l'admin : la barre latérale masque déjà l'entrée, mais la page
-  // restait atteignable par URL.
+  const router = useRouter()
   const { user } = useAuth()
   const isAdmin = useIsAdmin()
-  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
-  if (user && !isAdmin) return null
-  const router = useRouter()
-  const { data: contacts = [], isLoading, mutate } = useSWR('/api/contacts')
-  const list = Array.isArray(contacts) ? contacts : []
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin, router])
+
+  const { data: contacts, isLoading, mutate } = useSWR('/api/contacts')
+  // `?light=1` : on ne veut que le nom, la date et le lien vers le contact —
+  // pas les devis, qui pèsent 60 % de la réponse et portent les marges.
+  const { data: projets } = useSWR('/api/projects?light=1')
+
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState(null)          // null = toutes catégories | nom de tag
-  const [tagEditId, setTagEditId] = useState(null)
-  const [tagInput, setTagInput] = useState('')
-  const [showArchived, setShowArchived] = useState(false)
+  const [filtre, setFiltre] = useState('toutes')
 
-  const companies = list.filter(c => c.kind === 'company')
-  const persons   = list.filter(c => c.kind !== 'company')
-  const byId = Object.fromEntries(list.map(c => [String(c.id), c]))
-  const personsByParent = {}
-  const standalone = []
-  for (const p of persons) {
-    if (p.parent_id && byId[String(p.parent_id)]) (personsByParent[p.parent_id] ||= []).push(p)
-    else standalone.push(p)
-  }
-  const hasTag = (c, t) => !!c && (c.tags || []).includes(t)
+  if (user && !isAdmin) return null
 
-  async function patch(c, body) {
-    mutate(list.map(x => x.id === c.id ? { ...x, ...body } : x), false)
-    try { await fetch(`/api/contacts?id=${c.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) }
-    finally { mutate() }
-  }
-  function toggleTag(e, c, t) { e.preventDefault(); e.stopPropagation(); patch(c, { tags: hasTag(c, t) ? (c.tags || []).filter(x => x !== t) : [...(c.tags || []), t] }) }
-  function archive(e, c) { e.preventDefault(); e.stopPropagation(); patch(c, { archived: !c.archived }) }
-  function openTag(e, c) { e.preventDefault(); e.stopPropagation(); setTagEditId(tagEditId === c.id ? null : c.id); setTagInput('') }
-  function addTag(c, t) { const tag = (t || '').trim(); if (tag && !(c.tags || []).includes(tag)) patch(c, { tags: [...(c.tags || []), tag] }); setTagInput('') }
-  function removeTag(c, t) { patch(c, { tags: (c.tags || []).filter(x => x !== t) }) }
-  async function del(e, c) {
-    e.preventDefault(); e.stopPropagation()
-    if (!confirm(`Supprimer « ${c.name} » ?`)) return
-    mutate(list.filter(x => x.id !== c.id), false)
-    try { await fetch(`/api/contacts?id=${c.id}`, { method: 'DELETE' }) } finally { mutate() }
-  }
-  async function nouveau() {
-    const res = await fetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'company', name: 'Nouvelle société' }) })
-    const created = await res.json()
-    if (created?.id) router.push(`/clients/${created.id}`)
+  const liste = Array.isArray(contacts) ? contacts : []
+  const societes = liste.filter(c => c.kind === 'company')
+  const personnes = liste.filter(c => c.kind !== 'company')
+
+  const parSociete = {}
+  const sansSociete = []
+  const idsSocietes = new Set(societes.map(c => String(c.id)))
+  for (const p of personnes) {
+    if (p.parent_id && idsSocietes.has(String(p.parent_id))) (parSociete[p.parent_id] ||= []).push(p)
+    else sansSociete.push(p)
   }
 
-  // Cartes : 1 par personne si la société a des contacts, sinon 1 par société
-  const wanted = c => showArchived ? c.archived : !c.archived
-  const items = []
-  for (const co of companies) {
-    const kids = (personsByParent[co.id] || []).filter(wanted)
-    if (kids.length) kids.forEach(p => items.push({ c: p, company: co }))
-    else if (wanted(co)) items.push({ c: co, company: null })
+  // Un projet appartient à une société par son contact de facturation, ou à
+  // défaut par le nom saisi à la main — les projets d'avant les contacts n'ont
+  // que ça.
+  const projetsDe = (soc) => {
+    const tous = Array.isArray(projets) ? projets : []
+    const ids = new Set([String(soc.id), ...(parSociete[soc.id] || []).map(p => String(p.id))])
+    return tous.filter(pr => (pr.client_contact_id && ids.has(String(pr.client_contact_id)))
+      || (pr.client && soc.name && pr.client.trim().toLowerCase() === soc.name.trim().toLowerCase()))
   }
-  standalone.filter(wanted).forEach(p => items.push({ c: p, company: null }))
 
-  const needle = q.trim().toLowerCase()
-  function matchItem(it) {
-    const c = it.c, co = it.company
-    if (cat && !(hasTag(c, cat) || hasTag(co, cat))) return false
-    if (needle) {
-      const hay = [c.name, c.email, c.city, co?.name].filter(Boolean).join(' ').toLowerCase()
-      if (!hay.includes(needle)) return false
-    }
-    return true
+  const cherche = q.trim().toLowerCase()
+  const correspond = (c) => {
+    if (filtre === 'archivees') return !!c.archived
+    if (c.archived) return false
+    if (filtre === 'toutes') return true
+    return (c.tags || []).includes(filtre)
   }
-  const visible = items.filter(matchItem).sort((a, b) => {
-    const ka = (a.company?.name || a.c.name || '').toLowerCase()
-    const kb = (b.company?.name || b.c.name || '').toLowerCase()
-    return ka < kb ? -1 : ka > kb ? 1 : (a.c.name || '').localeCompare(b.c.name || '')
-  })
+  const visibles = societes
+    .filter(correspond)
+    .filter(c => !cherche || [c.name, c.city, ...(c.tags || []),
+      ...(parSociete[c.id] || []).map(p => p.name)].filter(Boolean).join(' ').toLowerCase().includes(cherche))
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
 
-  // Catégories (rail) : Client, Fournisseur, puis tags perso — avec compteurs sur contacts actifs
-  const activeContacts = list.filter(c => !c.archived)
-  const tagCount = t => activeContacts.filter(c => hasTag(c, t)).length
-  const customTags = [...new Set(activeContacts.flatMap(c => c.tags || []))].filter(t => !ROLE_TAGS.includes(t)).sort()
-  const categories = [...ROLE_TAGS, ...customTags]
-  const nArchived = list.filter(c => c.archived).length
-
-  function Ligne({ it }) {
-    const c = it.c, co = it.company
-    const isPerson = c.kind !== 'company'
-    const sub = isPerson ? (co?.name || 'Sans société') : (c.city || '—')
-    const nPersons = isPerson ? 0 : (personsByParent[String(c.id)] || []).length
-    const editing = tagEditId === c.id
-    return (
-      <div className="group" style={{ display: 'flex', flexDirection: 'column', borderTop: `1px solid ${C.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 4px' }}>
-          <Link href={`/clients/${c.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', color: AL.black }}>
-            {/* Rond pour une personne, carré adouci pour une société : la forme
-                dit le type, sans avoir à l'écrire. */}
-            <div style={{ width: 28, height: 28, borderRadius: isPerson ? '50%' : 6, background: C.neutralBg, color: C.muted,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>{initials(c.name)}</div>
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <span style={{ fontSize: 15, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-              <span style={{ fontSize: 12.5, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</span>
-            </div>
-          </Link>
-
-          <div style={{ display: 'flex', gap: 6, flex: 'none', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {/* Un rôle attribué est toujours visible ; un rôle NON attribué
-                n'apparaît qu'au survol de la ligne. Sinon chaque ligne porte
-                deux chips dont une inutile, et la colonne devient du bruit —
-                le prototype ne montre que les catégories réellement posées. */}
-            {ROLE_TAGS.map(rt => {
-              const active = hasTag(c, rt)
-              return (
-                <button key={rt} onClick={e => toggleTag(e, c, rt)}
-                  className={active ? undefined : 'opacity-0 group-hover:opacity-100 transition-opacity'}
-                  style={{ fontSize: 11, fontWeight: 500, letterSpacing: '.04em', padding: '3px 10px', borderRadius: R.pill, cursor: 'pointer', flex: 'none',
-                    fontFamily: FONT,
-                    color: active ? catColor(rt) : C.muted, background: active ? catBg(rt) : 'transparent',
-                    border: `1px solid ${active ? 'transparent' : C.border}` }}>{rt}</button>
-              )
-            })}
-            {(c.tags || []).filter(t => !ROLE_TAGS.includes(t)).map(t => (
-              <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 500, letterSpacing: '.04em',
-                color: C.violet, background: C.violetBg, padding: '3px 6px 3px 10px', borderRadius: R.pill }}>
-                {t}<button onClick={() => removeTag(c, t)} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
-              </span>
-            ))}
-          </div>
-
-          <span style={{ font: `11px ${MONO}`, color: C.muted, width: 32, textAlign: 'right', flex: 'none' }}>
-            {nPersons > 0 ? nPersons : ''}
-          </span>
-
-          <div style={{ display: 'flex', gap: 2, flex: 'none' }} className="opacity-0 group-hover:opacity-100 transition-opacity">
-            <ActionBtn title="Tagguer" onClick={e => openTag(e, c)}>{TagIcon}</ActionBtn>
-            <ActionBtn title="Modifier" onClick={() => router.push(`/clients/${c.id}`)}>{EditIcon}</ActionBtn>
-            <ActionBtn title={c.archived ? 'Désarchiver' : 'Archiver'} onClick={e => archive(e, c)}>{ArchiveIcon}</ActionBtn>
-            <ActionBtn title="Supprimer" danger onClick={e => del(e, c)}>{TrashIcon}</ActionBtn>
-          </div>
-        </div>
-
-        {editing && (
-          <div style={{ padding: '0 4px 12px' }}>
-            <input autoFocus list="tag-suggestions" value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addTag(c, tagInput); if (e.key === 'Escape') setTagEditId(null) }}
-              placeholder="Ajouter une catégorie (Entrée)…"
-              style={{ width: 280, padding: '6px 14px', borderRadius: R.pill, border: `1.5px dashed ${C.outline}`, font: `12px ${FONT}`, background: C.surface, outline: 'none' }} />
-          </div>
-        )}
-      </div>
-    )
+  async function creerSociete() {
+    const r = await fetch('/api/contacts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'company', name: 'Nouvelle société' }),
+    })
+    const d = await r.json()
+    if (d?.id) router.push(`/clients/${d.id}`)
+    else mutate()
   }
+
+  const th = { fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase',
+    color: C.muted, textAlign: 'left', padding: '0 12px 10px', borderBottom: `1.5px solid ${C.outline}` }
+  const td = { padding: '15px 12px', borderTop: `1px solid ${C.border}`, verticalAlign: 'middle' }
 
   return (
-    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
+    <div style={{ minHeight: '100vh', background: C.pageBg, fontFamily: FONT, color: C.ink }}>
       <Head><title>Contacts — Maze Project</title></Head>
-      <datalist id="tag-suggestions">{[...new Set(list.flatMap(c => c.tags || []))].sort().map(t => <option key={t} value={t} />)}</datalist>
+      <NavBar title="Contacts">
+        <button onClick={creerSociete}
+          style={{ padding: '8px 16px', borderRadius: R.pill, background: AL.black, color: AL.white,
+            border: 'none', font: `500 13px ${FONT}`, cursor: 'pointer' }}>
+          + société
+        </button>
+      </NavBar>
 
-      <main style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <h1 style={{ fontSize: 38, fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>Contacts</h1>
-          <p style={{ fontSize: 18, color: C.muted, margin: '12px 0 0' }}>
-            {companies.length} société{companies.length > 1 ? 's' : ''} · {persons.length} personne{persons.length > 1 ? 's' : ''}
-            {cat ? ` · ${cat.toLowerCase()}` : ''}
-          </p>
+      <main style={{ padding: '32px 40px 104px', maxWidth: 1600, margin: '0 auto' }}>
+        <h1 style={{ font: `500 34px ${FONT}`, letterSpacing: '-.02em', margin: '0 0 4px' }}>
+          nos <span style={{ color: C.accent }}>contacts</span>
+        </h1>
+        <p style={{ fontSize: 13, color: C.muted, margin: '0 0 22px' }}>
+          {societes.length} société{societes.length > 1 ? 's' : ''} · {personnes.length} personne{personnes.length > 1 ? 's' : ''}
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+          {[{ c: 'toutes', l: 'Toutes' }, ...ROLE_TAGS.map(t => ({ c: t, l: t + 's' })), { c: 'archivees', l: 'Archivées' }]
+            .map(f => (
+              <button key={f.c} onClick={() => setFiltre(f.c)}
+                style={{ padding: '6px 13px', borderRadius: R.pill, border: 'none', cursor: 'pointer', font: `500 12px ${FONT}`,
+                  ...(filtre === f.c ? { background: AL.black, color: AL.white } : { background: C.neutralBg, color: C.muted }) }}>
+                {f.l}
+              </button>
+            ))}
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="rechercher une société ou une personne…"
+            style={{ flex: 1, minWidth: 200, maxWidth: 320, padding: '7px 14px', borderRadius: R.pill,
+              border: `1px solid ${C.border}`, font: `13px ${FONT}`, outline: 'none' }} />
         </div>
 
-        {/* Recherche + catégories.
-            Le rail de 190px de la v1 disparaît : le prototype v2 met les
-            catégories en chips, ce qui rend la largeur au contenu. */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher…"
-              style={{ width: 220, padding: '9px 16px', borderRadius: R.pill, border: `1.5px solid ${C.outline}`,
-                fontFamily: FONT, fontSize: 13.5, background: C.surface, color: AL.black, outline: 'none' }} />
-
-            {[{ t: null, label: 'toutes', n: activeContacts.length }, ...categories.map(t => ({ t, label: t, n: tagCount(t) }))].map(item => {
-              const actif = cat === item.t
-              return (
-                <button key={item.label} onClick={() => setCat(actif && item.t ? null : item.t)}
-                  style={{ fontFamily: FONT, fontSize: 12, fontWeight: actif ? 500 : 400, padding: '6px 13px', borderRadius: R.pill,
-                    border: 'none', cursor: 'pointer',
-                    background: actif ? AL.black : C.neutralBg, color: actif ? AL.white : C.muted }}>
-                  {item.label}{item.n ? ` ${item.n}` : ''}
-                </button>
-              )
-            })}
-
-            <button onClick={() => setShowArchived(v => !v)}
-              style={{ fontFamily: FONT, fontSize: 12, padding: '6px 13px', borderRadius: R.pill, cursor: 'pointer',
-                border: `1.5px dashed ${C.outline}`, background: 'transparent',
-                color: showArchived ? AL.black : C.muted }}>
-              {showArchived ? '← actifs' : `archivés${nArchived ? ` ${nArchived}` : ''}`}
-            </button>
+        {isLoading ? <p style={{ fontSize: 13, color: C.muted }}>Chargement…</p> : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+              <thead><tr>
+                <th style={{ ...th, width: '30%' }}>société</th>
+                <th style={{ ...th, width: '18%' }}>tags</th>
+                <th style={{ ...th, width: '16%' }}>contacts</th>
+                <th style={{ ...th, width: '18%' }}>projets</th>
+                <th style={{ ...th, width: '18%' }}>dernier projet</th>
+              </tr></thead>
+              <tbody>
+                {visibles.map(soc => {
+                  const gens = parSociete[soc.id] || []
+                  const prj = projetsDe(soc)
+                  const enCours = prj.filter(p => p.status === 'active').length
+                  const dernier = [...prj].sort((a, b) => String(b.deadline || '').localeCompare(String(a.deadline || '')))[0]
+                  return (
+                    <tr key={soc.id}>
+                      <td style={td}>
+                        <Link href={`/clients/${soc.id}`} style={{ textDecoration: 'none', color: AL.black }}>
+                          <div style={{ fontSize: 16, fontWeight: 500 }}>{soc.name}</div>
+                          <div style={{ fontSize: 12.5, color: C.muted }}>{soc.city || '—'}</div>
+                        </Link>
+                      </td>
+                      <td style={td}>
+                        <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {(soc.tags || []).length === 0 && <span style={{ color: C.muted }}>—</span>}
+                          {(soc.tags || []).map(t => {
+                            const ton = tonTag(t)
+                            return (
+                              <span key={t} style={{ padding: '3px 10px', borderRadius: R.pill, fontSize: 11,
+                                fontWeight: 500, color: ton.fg, background: ton.bg, whiteSpace: 'nowrap' }}>{t}</span>
+                            )
+                          })}
+                        </span>
+                      </td>
+                      <td style={{ ...td, fontSize: 12.5, color: C.muted }}>
+                        {gens.length ? `${gens.length} personne${gens.length > 1 ? 's' : ''}` : '—'}
+                      </td>
+                      <td style={{ ...td, fontSize: 12.5, color: C.muted }}>
+                        {prj.length ? `${prj.length} projet${prj.length > 1 ? 's' : ''}${enCours ? ` · ${enCours} en cours` : ''}` : '—'}
+                      </td>
+                      <td style={{ ...td, fontSize: 13 }}>
+                        {dernier ? <>{dernier.name} <span style={{ color: C.muted, font: `12px ${MONO}` }}>{moisAnnee(dernier.deadline)}</span></>
+                          : <span style={{ color: C.muted }}>—</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {visibles.length === 0 && <p style={{ fontSize: 13, color: C.muted, paddingTop: 18 }}>Aucune société.</p>}
           </div>
+        )}
 
-          <ButtonPill onClick={nouveau}>+ nouveau contact</ButtonPill>
-        </div>
-
-        {isLoading ? (
-          <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Chargement…</p>
-        ) : visible.length === 0 ? (
-          <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Aucun contact.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {visible.map(it => <Ligne key={it.c.id} it={it} />)}
+        {/* Les personnes sans société ne doivent pas disparaître de l'annuaire
+            sous prétexte qu'il est désormais organisé par société. */}
+        {sansSociete.length > 0 && filtre !== 'archivees' && (
+          <div style={{ marginTop: 40 }}>
+            <h2 style={{ font: `500 10.5px ${MONO}`, letterSpacing: '.1em', textTransform: 'uppercase',
+              color: C.muted, margin: '0 0 12px' }}>
+              Personnes sans société ({sansSociete.length})
+            </h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {sansSociete.filter(p => !p.archived).map(p => (
+                <Link key={p.id} href={`/clients/${p.id}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 14px 8px 8px',
+                    borderRadius: R.pill, border: `1px solid ${C.border}`, textDecoration: 'none', color: AL.black }}>
+                  <span style={{ width: 26, height: 26, borderRadius: R.pill, background: AL.black, color: AL.white,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', font: `500 10px ${FONT}` }}>
+                    {initials(p.name)}
+                  </span>
+                  <span style={{ fontSize: 13 }}>{p.name}</span>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
       </main>

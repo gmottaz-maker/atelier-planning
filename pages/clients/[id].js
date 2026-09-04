@@ -1,229 +1,305 @@
-import { useState, useEffect, useRef } from 'react'
+// Fiche société — et fiche personne, la même page servant les deux.
+//
+// Reprend la mise en page de la fiche prospect : ce qu'on lit à gauche, ce
+// qu'on consulte à droite. L'ancienne version était un formulaire de quinze
+// champs empilés, où le nom de la société avait le même poids visuel que son
+// numéro de TVA.
+//
+// Une société convertie depuis un prospect affiche le JOURNAL de son
+// démarchage. C'est ce qui explique pourquoi ce client existe — par quel canal
+// il est arrivé, en combien de relances, sur quelle recommandation.
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import Link from 'next/link'
+import Head from 'next/head'
+import useSWR from 'swr'
 import { useAuth } from '../_app'
 import useIsAdmin from '../../lib/useIsAdmin'
-import { useRouter } from 'next/router'
-import useSWR from 'swr'
-import Head from 'next/head'
-import Link from 'next/link'
-import { C, FONT, MONO, R, initials } from '../../lib/theme'
+import NavBar from '../../components/NavBar'
+import { AL, C, FONT, MONO, R, initials } from '../../lib/theme'
+import { canal, source } from '../../lib/prospects'
 
-const inputStyle = {
-  width: '100%', padding: '8px 10px', borderRadius: 6, border: `1px solid ${C.border}`,
-  font: `13px ${FONT}`, background: C.surface, color: C.ink,
-}
-function Field({ label, children }) {
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <span style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>{label}</span>
-      {children}
-    </label>
-  )
-}
+const fmtJour = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}` : '' }
+const fmtDate = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}.${y}` : '—' }
+const tonTag = t => t === 'Client' ? { fg: C.success, bg: C.successBg }
+  : t === 'Fournisseur' ? { fg: C.warning, bg: C.warningBg }
+  : { fg: C.violet, bg: C.violetBg }
 
-export default function ContactDetail() {
-  // Réservé à l'admin : la barre latérale masque déjà l'entrée, mais la page
-  // restait atteignable par URL.
-  const { user } = useAuth()
-  const isAdmin = useIsAdmin()
-  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin])
-  if (user && !isAdmin) return null
+export default function FicheContact() {
   const router = useRouter()
   const { id } = router.query
-  const { data: contacts = [], mutate } = useSWR('/api/contacts')
-  const list = Array.isArray(contacts) ? contacts : []
-  const contact = list.find(c => String(c.id) === String(id))
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  useEffect(() => { if (user && !isAdmin) router.replace('/') }, [user, isAdmin, router])
 
-  const [form, setForm] = useState(null)
-  const [tagInput, setTagInput] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const loadedId = useRef(null)
+  const { data: contacts, mutate } = useSWR('/api/contacts')
+  const { data: projets } = useSWR('/api/projects?light=1')
+  // Le journal du démarchage, s'il y en a eu un. Filtré côté serveur : sans ça
+  // la fiche chargerait tous les prospects pour en garder un seul.
+  const { data: prospectsLies } = useSWR(id ? `/api/prospects?converted_to=${id}` : null)
 
-  useEffect(() => {
-    if (contact && loadedId.current !== contact.id) {
-      loadedId.current = contact.id
-      setForm({
-        name: contact.name || '', email: contact.email || '', phone: contact.phone || '',
-        website: contact.website || '', street: contact.street || '', zip: contact.zip || '', city: contact.city || '',
-        state: contact.state || '', country: contact.country || '', vat_number: contact.vat_number || '',
-        notes: contact.notes || '', tags: contact.tags || [], parent_id: contact.parent_id || null,
-        is_customer: !!contact.is_customer, is_supplier: !!contact.is_supplier,
-      })
-    }
-  }, [contact])
+  const [tagSaisie, setTagSaisie] = useState('')
 
-  const companies = list.filter(c => c.kind === 'company').sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-  const people = contact?.kind === 'company' ? list.filter(c => String(c.parent_id) === String(id)).sort((a, b) => (a.name || '').localeCompare(b.name || '')) : []
-  const allTags = [...new Set(list.flatMap(c => c.tags || []))].sort()
+  if (user && !isAdmin) return null
 
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })); setSaved(false) }
-  function addTag(t) {
-    const tag = t.trim()
-    if (!tag) return
-    if (!form.tags.includes(tag)) set('tags', [...form.tags, tag])
-    setTagInput('')
-  }
-  function removeTag(t) { set('tags', form.tags.filter(x => x !== t)) }
-
-  async function save() {
-    setSaving(true)
-    try {
-      await fetch(`/api/contacts?id=${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-      await mutate()
-      setSaved(true)
-    } finally { setSaving(false) }
-  }
-  async function addPerson() {
-    const res = await fetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'person', name: 'Nouveau contact', parent_id: Number(id) }) })
-    const created = await res.json()
-    await mutate()
-    if (created?.id) router.push(`/clients/${created.id}`)
-  }
-  async function remove() {
-    if (!confirm(`Supprimer « ${contact.name} » ?`)) return
-    await fetch(`/api/contacts?id=${id}`, { method: 'DELETE' })
-    await mutate()
-    router.push('/clients')
-  }
-  async function toggleArchive() {
-    await fetch(`/api/contacts?id=${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archived: !contact.archived }) })
-    await mutate()
-    router.push('/clients')
-  }
-
-  if (!contact || !form) {
+  const liste = Array.isArray(contacts) ? contacts : []
+  const c = liste.find(x => String(x.id) === String(id))
+  if (!c) {
     return (
-      <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT }}>
-        <main style={{ padding: '26px 32px' }}>
-          <Link href="/clients" style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textDecoration: 'none' }}>← CLIENTS</Link>
-          <p style={{ color: C.muted, fontSize: 13, marginTop: 20 }}>{contacts.length ? 'Contact introuvable.' : 'Chargement…'}</p>
-        </main>
+      <div style={{ minHeight: '100vh', background: C.pageBg, fontFamily: FONT }}>
+        <NavBar title="Contact" />
+        <main style={{ padding: 40 }}><p style={{ fontSize: 13, color: C.muted }}>Chargement…</p></main>
       </div>
     )
   }
 
-  const isCompany = contact.kind === 'company'
-  const parent = !isCompany && contact.parent_id ? list.find(c => String(c.id) === String(contact.parent_id)) : null
+  const estSociete = c.kind === 'company'
+  const societe = !estSociete && c.parent_id ? liste.find(x => String(x.id) === String(c.parent_id)) : null
+  const gens = estSociete
+    ? liste.filter(x => String(x.parent_id) === String(id)).sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    : []
+  const societes = liste.filter(x => x.kind === 'company').sort((a, b) => String(a.name).localeCompare(String(b.name)))
+  const demarchage = (Array.isArray(prospectsLies) ? prospectsLies : [])[0] || null
+
+  const idsRattaches = new Set([String(c.id), ...gens.map(p => String(p.id))])
+  const projetsLies = (Array.isArray(projets) ? projets : []).filter(pr =>
+    (pr.client_contact_id && idsRattaches.has(String(pr.client_contact_id)))
+    || (pr.client && c.name && pr.client.trim().toLowerCase() === c.name.trim().toLowerCase()))
+    .sort((a, b) => String(b.deadline || '').localeCompare(String(a.deadline || '')))
+
+  async function patch(champs) {
+    mutate(liste.map(x => x.id === c.id ? { ...x, ...champs } : x), false)
+    await fetch(`/api/contacts?id=${c.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(champs),
+    })
+    mutate()
+  }
+
+  async function ajouterPersonne() {
+    const r = await fetch('/api/contacts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'person', name: 'Nouveau contact', parent_id: Number(id) }),
+    })
+    const d = await r.json()
+    mutate()
+    if (d?.id) router.push(`/clients/${d.id}`)
+  }
+
+  const echanges = [...(demarchage?.prospect_interactions || [])]
+    .sort((a, b) => String(b.occurred_on).localeCompare(String(a.occurred_on)))
 
   return (
-    <div className="min-h-screen" style={{ background: C.pageBg, fontFamily: FONT, color: C.ink }}>
-      <Head><title>{contact.name} — Contacts</title></Head>
-      <main style={{ padding: '22px 32px 40px', maxWidth: 900 }}>
-        {/* Fil d'Ariane */}
-        <Link href="/clients" style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted, textDecoration: 'none' }}>
-          ← CLIENTS / {isCompany ? 'SOCIÉTÉ' : 'CONTACT'}
-        </Link>
+    <div style={{ minHeight: '100vh', background: C.pageBg, fontFamily: FONT, color: C.ink }}>
+      <Head><title>{c.name} — Contacts</title></Head>
+      <NavBar title={estSociete ? 'Société' : 'Contact'}>
+        <button onClick={() => patch({ archived: !c.archived })}
+          style={{ padding: '8px 16px', borderRadius: R.pill, background: 'none', cursor: 'pointer',
+            border: `1px solid ${C.border}`, color: C.muted, font: `500 13px ${FONT}` }}>
+          {c.archived ? 'Désarchiver' : 'Archiver'}
+        </button>
+      </NavBar>
 
-        {/* En-tête */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '14px 0 22px' }}>
-          <div style={{ width: 44, height: 44, borderRadius: isCompany ? 10 : '50%', background: C.ink, color: C.accentOnDark, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `13px ${MONO}`, fontWeight: 700, flex: 'none' }}>{initials(form.name)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <input value={form.name} onChange={e => set('name', e.target.value)}
-              style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.4px', border: 'none', background: 'transparent', color: C.ink, width: '100%', outline: 'none', fontFamily: FONT }} />
-            {parent && <Link href={`/clients/${parent.id}`} style={{ font: `11px ${MONO}`, color: C.muted, textDecoration: 'none' }}>↳ {parent.name}</Link>}
-          </div>
-          <button onClick={save} disabled={saving}
-            style={{ background: C.ink, color: C.accentOnDark, font: `600 12.5px ${FONT}`, padding: '9px 18px', borderRadius: R.pill, border: 'none', cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>
-            {saving ? 'Enregistrement…' : saved ? '✓ Enregistré' : 'Enregistrer'}
-          </button>
-        </div>
+      <main style={{ padding: '32px 40px 104px', maxWidth: 1400, margin: '0 auto' }}>
+        <Link href="/clients" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>← tous les contacts</Link>
 
-        {/* Rôles + tags */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['Client', 'Fournisseur'].map(rt => {
-              const active = form.tags.includes(rt)
-              const on = rt === 'Client' ? { fg: C.success, bg: C.successBg } : { fg: C.warning, bg: C.warningBg }
+        <div style={{ margin: '14px 0 22px' }}>
+          <ChampTitre valeur={c.name} onValider={v => patch({ name: v })} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            {!estSociete && (
+              <span style={{ fontSize: 13, color: C.muted }}>
+                {societe ? <>chez <Link href={`/clients/${societe.id}`} style={{ color: AL.black }}>{societe.name}</Link></> : 'sans société'}
+              </span>
+            )}
+            {estSociete && c.city && <span style={{ fontSize: 13, color: C.muted }}>{c.city}</span>}
+            {(c.tags || []).map(t => {
+              const ton = tonTag(t)
               return (
-                <button key={rt} onClick={() => active ? removeTag(rt) : addTag(rt)}
-                  style={{ font: `11px ${MONO}`, padding: '4px 12px', borderRadius: R.pill, cursor: 'pointer', textTransform: 'uppercase',
-                    color: active ? on.fg : C.faint, background: active ? on.bg : 'transparent', border: `1px solid ${active ? 'transparent' : C.border}` }}>{rt}</button>
+                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px',
+                  borderRadius: R.pill, fontSize: 11, fontWeight: 500, color: ton.fg, background: ton.bg }}>
+                  {t}
+                  <button onClick={() => patch({ tags: (c.tags || []).filter(x => x !== t) })}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: ton.fg, padding: 0, fontSize: 11 }}>✕</button>
+                </span>
               )
             })}
-          </div>
-          {/* Tags */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ font: `10px ${MONO}`, letterSpacing: '.1em', color: C.muted }}>TAGS</span>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              {form.tags.filter(t => t !== 'Client' && t !== 'Fournisseur').map(t => (
-                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: C.violet, background: C.violetBg, padding: '3px 6px 3px 10px', borderRadius: R.pill }}>
-                  {t}
-                  <button onClick={() => removeTag(t)} style={{ border: 'none', background: 'none', color: C.violet, cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
-                </span>
-              ))}
-              <input list="tag-suggestions" value={tagInput}
-                onChange={e => setTagInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput) } }}
-                onBlur={() => tagInput && addTag(tagInput)}
-                placeholder="+ tag (Entrée)"
-                style={{ ...inputStyle, width: 140, padding: '4px 8px' }} />
-              <datalist id="tag-suggestions">{allTags.map(t => <option key={t} value={t} />)}</datalist>
-            </div>
+            <input value={tagSaisie} onChange={e => setTagSaisie(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && tagSaisie.trim()) {
+                  patch({ tags: [...new Set([...(c.tags || []), tagSaisie.trim()])] }); setTagSaisie('')
+                }
+              }}
+              placeholder="+ tag"
+              style={{ width: 80, padding: '3px 10px', borderRadius: R.pill, border: `1px dashed ${C.border}`,
+                font: `11px ${FONT}`, outline: 'none', color: C.muted }} />
           </div>
         </div>
 
-        {/* Coordonnées */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: 16, marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-            <Field label="E-MAIL"><input style={inputStyle} value={form.email} onChange={e => set('email', e.target.value)} /></Field>
-            <Field label="TÉLÉPHONE"><input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} /></Field>
-            <Field label="SITE WEB"><input style={inputStyle} value={form.website} onChange={e => set('website', e.target.value)} /></Field>
-            <Field label="N° TVA"><input style={inputStyle} value={form.vat_number} onChange={e => set('vat_number', e.target.value)} /></Field>
-            <Field label="RUE"><input style={inputStyle} value={form.street} onChange={e => set('street', e.target.value)} /></Field>
-            <Field label="NPA"><input style={inputStyle} value={form.zip} onChange={e => set('zip', e.target.value)} /></Field>
-            <Field label="VILLE"><input style={inputStyle} value={form.city} onChange={e => set('city', e.target.value)} /></Field>
-            <Field label="RÉGION / CANTON"><input style={inputStyle} value={form.state} onChange={e => set('state', e.target.value)} /></Field>
-            <Field label="PAYS"><input style={inputStyle} value={form.country} onChange={e => set('country', e.target.value)} /></Field>
-            {!isCompany && (
-              <Field label="SOCIÉTÉ">
-                <select style={inputStyle} value={form.parent_id || ''} onChange={e => set('parent_id', e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">— aucune —</option>
-                  {companies.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
-                </select>
-              </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 28, alignItems: 'start' }}>
+          <div>
+            <Bloc titre={`Projets (${projetsLies.length})`}>
+              {projetsLies.length === 0
+                ? <p style={{ fontSize: 13, color: C.muted, padding: '14px 0' }}>Aucun projet rattaché.</p>
+                : projetsLies.map(pr => (
+                  <Link key={pr.id} href={`/projects/${pr.id}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+                      borderTop: `1px solid ${C.border}`, textDecoration: 'none', color: AL.black }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500 }}>{pr.name}</span>
+                    <span style={{ font: `12px ${MONO}`, color: C.muted }}>{fmtDate(pr.deadline)}</span>
+                    <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: R.pill,
+                      background: pr.status === 'active' ? C.neutralBg : 'transparent',
+                      color: pr.status === 'active' ? AL.black : C.muted }}>
+                      {pr.status === 'active' ? 'actif' : 'archivé'}
+                    </span>
+                  </Link>
+                ))}
+            </Bloc>
+
+            {demarchage && (
+              <div style={{ marginTop: 24 }}>
+                <Bloc titre="Comment ce client est arrivé">
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline',
+                    padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: 14, fontWeight: 500 }}>{source(demarchage.source)?.label || 'Source inconnue'}</span>
+                    {demarchage.source_detail && <span style={{ fontSize: 13, color: C.muted }}>{demarchage.source_detail}</span>}
+                    <span style={{ marginLeft: 'auto', fontSize: 12.5, color: C.muted }}>
+                      {echanges.length} échange{echanges.length > 1 ? 's' : ''} · converti le {fmtDate(demarchage.converted_at)}
+                    </span>
+                  </div>
+                  {echanges.map(x => (
+                    <div key={x.id} style={{ display: 'flex', gap: 14, padding: '12px 0', borderTop: `1px solid ${C.border}` }}>
+                      <div style={{ width: 52, flex: 'none', font: `12px ${MONO}`, color: C.muted }}>{fmtJour(x.occurred_on)}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: R.pill, background: canal(x.channel).couleur, flex: 'none' }} />
+                          <b style={{ fontSize: 13, fontWeight: 500 }}>{canal(x.channel).label}</b>
+                          {x.author && <span style={{ fontSize: 12, color: C.muted }}>· par {x.author}</span>}
+                        </span>
+                        {x.notes && <div style={{ fontSize: 13.5, lineHeight: 1.45, marginTop: 4 }}>{x.notes}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </Bloc>
+              </div>
             )}
           </div>
-        </div>
 
-        {/* Notes */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: 16, marginBottom: 16 }}>
-          <Field label="NOTES">
-            <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical', lineHeight: 1.5 }} value={form.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Conditions, interlocuteur clé, historique…" />
-          </Field>
-        </div>
+          <div>
+            {estSociete && (
+              <Panneau titre={`Personnes (${gens.length})`}>
+                {gens.map(p => (
+                  <Link key={p.id} href={`/clients/${p.id}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0',
+                      borderTop: `1px solid ${C.border}`, textDecoration: 'none', color: AL.black }}>
+                    <span style={{ width: 28, height: 28, borderRadius: R.pill, background: AL.black, color: AL.white,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', font: `500 10px ${FONT}`, flex: 'none' }}>
+                      {initials(p.name)}
+                    </span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 500 }}>{p.name}</span>
+                      <span style={{ display: 'block', fontSize: 11.5, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {[p.email, p.phone].filter(Boolean).join(' · ') || '—'}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+                {gens.length === 0 && <p style={{ fontSize: 12.5, color: C.muted }}>Aucune personne rattachée.</p>}
+                <button onClick={ajouterPersonne}
+                  style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer',
+                    font: `500 12px ${FONT}`, color: C.violet }}>
+                  + ajouter une personne
+                </button>
+              </Panneau>
+            )}
 
-        {/* Personnes de la société */}
-        {isCompany && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>Contacts</span>
-              <span style={{ font: `11px ${MONO}`, color: C.muted }}>{people.length}</span>
-              <div style={{ flex: 1 }} />
-              <button onClick={addPerson} style={{ font: `600 11.5px ${FONT}`, color: C.inkSecondary, background: 'none', border: `1px solid ${C.border}`, borderRadius: R.pill, padding: '6px 12px', cursor: 'pointer' }}>+ Ajouter une personne</button>
-            </div>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '4px 16px' }}>
-              {people.length === 0 ? (
-                <p style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>Aucune personne rattachée.</p>
-              ) : people.map((p, i) => (
-                <Link key={p.id} href={`/clients/${p.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: i === people.length - 1 ? 'none' : `1px solid ${C.divider}`, textDecoration: 'none', color: C.ink }}>
-                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: C.divider, color: C.inkSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', font: `9px ${MONO}`, fontWeight: 700, flex: 'none' }}>{initials(p.name)}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                    <div style={{ font: `10.5px ${MONO}`, color: C.muted }}>{[p.email, p.phone].filter(Boolean).join(' · ') || '—'}</div>
-                  </div>
-                  <span style={{ color: C.faintChevron, fontSize: 12 }}>→</span>
-                </Link>
-              ))}
-            </div>
+            {!estSociete && (
+              <Panneau titre="Société">
+                <select value={c.parent_id || ''} onChange={e => patch({ parent_id: e.target.value ? Number(e.target.value) : null })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: R.panel, border: `1px solid ${C.border}`,
+                    font: `14px ${FONT}`, outline: 'none', background: C.surface }}>
+                  <option value="">— sans société —</option>
+                  {societes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </Panneau>
+            )}
+
+            <Panneau titre="Coordonnées">
+              {[['E-mail', 'email'], ['Téléphone', 'phone'], ['Site', 'website'],
+                ['Adresse', 'street'], ['NPA', 'zip'], ['Ville', 'city'], ['Pays', 'country'],
+                ...(estSociete ? [['N° TVA', 'vat_number']] : [])]
+                .map(([label, cle]) => (
+                  <LigneEditable key={cle} label={label} valeur={c[cle]} onValider={v => patch({ [cle]: v })} />
+                ))}
+            </Panneau>
+
+            <Panneau titre="Notes">
+              <ZoneNotes valeur={c.notes} onValider={v => patch({ notes: v })} />
+            </Panneau>
           </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <button onClick={toggleArchive} style={{ font: `12px ${FONT}`, color: C.inkSecondary, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{contact.archived ? 'Désarchiver' : 'Archiver ce contact'}</button>
-          <button onClick={remove} style={{ font: `12px ${FONT}`, color: C.danger, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Supprimer</button>
         </div>
       </main>
     </div>
+  )
+}
+
+// ─── Sous-composants ────────────────────────────────────────────────────────
+
+function Bloc({ titre, children }) {
+  return (
+    <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, overflow: 'hidden' }}>
+      <div style={{ padding: '13px 18px', borderBottom: `1px solid ${C.border}` }}>
+        <h3 style={{ margin: 0, font: `500 15px ${FONT}` }}>{titre}</h3>
+      </div>
+      <div style={{ padding: '2px 18px 14px' }}>{children}</div>
+    </div>
+  )
+}
+
+function Panneau({ titre, children }) {
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '16px 18px', marginBottom: 18 }}>
+      <h4 style={{ margin: '0 0 12px', font: `500 10.5px ${MONO}`, letterSpacing: '.1em',
+        textTransform: 'uppercase', color: C.muted }}>{titre}</h4>
+      {children}
+    </div>
+  )
+}
+
+// Édition sur place, comme sur la fiche prospect : on clique, on tape, on
+// quitte le champ. L'ancienne fiche demandait un bouton « enregistrer » pour
+// corriger une faute dans un numéro de téléphone.
+function LigneEditable({ label, valeur, onValider }) {
+  const [v, setV] = useState(null)
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', fontSize: 13 }}>
+      <span style={{ color: C.muted, flex: 'none' }}>{label}</span>
+      <input value={v ?? (valeur || '')} onChange={e => setV(e.target.value)}
+        onBlur={() => { if (v !== null && v !== (valeur || '')) onValider(v); setV(null) }}
+        onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
+        placeholder="—"
+        style={{ flex: 1, minWidth: 0, textAlign: 'right', border: 'none', background: 'none',
+          font: `13px ${FONT}`, color: AL.black, outline: 'none' }} />
+    </div>
+  )
+}
+
+function ZoneNotes({ valeur, onValider }) {
+  const [v, setV] = useState(null)
+  return (
+    <textarea rows={4} value={v ?? (valeur || '')} onChange={e => setV(e.target.value)}
+      onBlur={() => { if (v !== null && v !== (valeur || '')) onValider(v); setV(null) }}
+      placeholder="Contexte, historique, ce qu'il ne faut pas oublier…"
+      style={{ width: '100%', padding: '9px 12px', borderRadius: R.panel, border: `1px solid ${C.border}`,
+        font: `13px ${FONT}`, outline: 'none', resize: 'vertical', lineHeight: 1.45 }} />
+  )
+}
+
+function ChampTitre({ valeur, onValider }) {
+  const [v, setV] = useState(null)
+  return (
+    <input value={v ?? (valeur || '')} onChange={e => setV(e.target.value)}
+      onBlur={() => { if (v !== null && v.trim() && v !== valeur) onValider(v.trim()); setV(null) }}
+      onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
+      style={{ width: '100%', border: 'none', background: 'none', outline: 'none',
+        font: `500 28px ${FONT}`, letterSpacing: '-.02em', color: AL.black, padding: 0 }} />
   )
 }
