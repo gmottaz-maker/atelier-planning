@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { effectiveStatus, DISPLAY_STATUSES, STATUS_ORDER } from '../lib/supplierStatus'
+import { effectiveStatus, DISPLAY_STATUSES, STATUS_ORDER, correspondAuFiltre } from '../lib/supplierStatus'
 
 const TODAY = '2026-07-17'
 
@@ -34,5 +34,53 @@ describe('effectiveStatus', () => {
       expect(DISPLAY_STATUSES[key]?.label).toBeTruthy()
       expect(DISPLAY_STATUSES[key]?.color).toMatch(/^#/)
     }
+  })
+})
+
+describe('correspondAuFiltre — filtres de la liste', () => {
+  const AUJ = '2026-09-04'
+  const enRetard   = { status: 'pending',      due_date: '2026-08-01' }
+  const aPayer     = { status: 'pending',      due_date: '2026-12-01' }
+  const sansDate   = { status: 'pending',      due_date: null }
+  const transmise  = { status: 'sent_to_bank', due_date: '2026-08-01' }
+  const payee      = { status: 'paid',         due_date: '2026-08-01' }
+  const toutes     = [enRetard, aPayer, sansDate, transmise, payee]
+  const gardees    = f => toutes.filter(i => correspondAuFiltre(i, f, AUJ))
+
+  // Le défaut corrigé : effectiveStatus rend « overdue » À LA PLACE de
+  // « pending », donc une égalité stricte sortait les factures en retard du
+  // filtre le plus utilisé.
+  it('« À payer » inclut les factures en retard', () => {
+    expect(correspondAuFiltre(enRetard, 'pending', AUJ)).toBe(true)
+    expect(gardees('pending')).toEqual([enRetard, aPayer, sansDate])
+  })
+
+  it('« En retard » n\'affiche QUE les factures en retard', () => {
+    expect(gardees('overdue')).toEqual([enRetard])
+  })
+
+  it('« À payer » n\'avale pas les transmises ni les payées', () => {
+    expect(correspondAuFiltre(transmise, 'pending', AUJ)).toBe(false)
+    expect(correspondAuFiltre(payee, 'pending', AUJ)).toBe(false)
+  })
+
+  it('les deux autres filtres restent des égalités', () => {
+    expect(gardees('sent_to_bank')).toEqual([transmise])
+    expect(gardees('paid')).toEqual([payee])
+  })
+
+  it('« Toutes » ne retire rien', () => {
+    expect(gardees('all')).toEqual(toutes)
+  })
+
+  // Une clé inconnue ne doit pas vider l'écran sans explication.
+  it('un filtre inconnu n\'ampute pas la liste', () => {
+    expect(gardees('zzz')).toEqual(toutes)
+  })
+
+  // Une facture transmise à la banque n'est jamais « en retard », même échue :
+  // l'ordre est parti, c'est déjà la règle d'effectiveStatus.
+  it('une transmise échue ne tombe pas dans « En retard »', () => {
+    expect(correspondAuFiltre(transmise, 'overdue', AUJ)).toBe(false)
   })
 })

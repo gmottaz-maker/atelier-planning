@@ -7,7 +7,7 @@ import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
 import { verifierTailleFichier, lireReponse } from '../lib/uploadLimit'
 import ContactPicker from '../components/ContactPicker'
-import { DISPLAY_STATUSES, STATUS_ORDER, effectiveStatus } from '../lib/supplierStatus'
+import { DISPLAY_STATUSES, STATUS_ORDER, effectiveStatus, correspondAuFiltre } from '../lib/supplierStatus'
 import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT } from '../lib/theme'
 
@@ -227,7 +227,7 @@ export default function FacturesFournisseurs() {
   }
 
   const visible = sortInvoices(
-    invoices.filter(inv => filter === 'all' ? true : dueStatus(inv) === filter),
+    invoices.filter(inv => correspondAuFiltre(inv, filter)),
     sort,
   )
   // Un clic bascule le sens, un clic sur une autre colonne repart en ascendant
@@ -362,7 +362,7 @@ export default function FacturesFournisseurs() {
           <p className="text-sm u-muted py-12 text-center">Chargement…</p>
         ) : visible.length === 0 ? (
           <div className="u-surface u-panel border u-line p-12 text-center">
-            <p className="text-sm u-muted">Aucune facture {filter === 'all' ? '' : ('— filtre : ' + filter)}.</p>
+            <p className="text-sm u-muted">Aucune facture {filter === 'all' ? '' : ('— filtre : ' + (DISPLAY_STATUSES[filter]?.label || filter))}.</p>
           </div>
         ) : (
           <div className="u-surface u-panel border u-line overflow-hidden">

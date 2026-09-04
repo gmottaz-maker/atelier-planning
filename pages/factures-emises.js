@@ -13,6 +13,7 @@ import { invoiceCopyBody } from '../lib/duplicateDoc'
 import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { factureArchivee } from '../lib/autoArchive'
+import { effectiveStatus, correspondAuFiltre } from '../lib/customerStatus'
 import ButtonPill from '../components/ButtonPill'
 
 const PINK = AL.black
@@ -95,13 +96,6 @@ function flattenQuote(q) {
   return { purchases, labor, logistics }
 }
 
-function effectiveStatus(inv) {
-  if (inv.status === 'paid' || inv.status === 'cancelled') return inv.status
-  if (inv.status === 'created') return 'created'
-  // envoyée / en attente : passe en retard si échéance dépassée
-  if (inv.due_date && new Date(inv.due_date) < new Date()) return 'overdue'
-  return inv.status === 'sent' ? 'sent' : 'pending'
-}
 
 export default function FacturesEmises() {
   const router = useRouter()
@@ -207,7 +201,7 @@ export default function FacturesEmises() {
 
   const visible = filter === 'archived' ? archivees
     : filter === 'all' ? courantes
-    : courantes.filter(inv => effectiveStatus(inv) === filter)
+    : courantes.filter(inv => correspondAuFiltre(inv, filter))
 
   // « En attente » et « en retard » répondaient à la même question — combien
   // reste-t-il à rentrer ? — en la coupant en deux. Un seul champ, « à
