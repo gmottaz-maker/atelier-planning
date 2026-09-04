@@ -9,7 +9,13 @@ import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
 
-export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
+// Vercel refuse tout corps de requête au-delà de 4,5 Mo, AVANT que cette
+// fonction démarre : `sizeLimit` ne peut qu'abaisser ce plafond, jamais le
+// relever. Annoncer 15 Mo ici promettait donc quelque chose d'impossible, et
+// le refus arrivait en texte brut — d'où un « Unexpected token 'R' » à l'écran.
+// La valeur est alignée sur la réalité pour que le développement local échoue
+// au même endroit que la production. Voir lib/uploadLimit.js.
+export const config = { api: { bodyParser: { sizeLimit: '4.5mb' } } }
 
 export default async function handler(req, res) {
   if (!(await requireAdmin(req, res))) return

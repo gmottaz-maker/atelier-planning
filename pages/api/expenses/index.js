@@ -9,7 +9,9 @@ import { learnMerchantAccount, lookupMerchantAccount } from '../../../lib/mercha
 import { validerFichier } from '../../../lib/fileType'
 import { erreurApi } from '../../../lib/apiError'
 
-export const config = { api: { bodyParser: { sizeLimit: '15mb' } } }
+// Plafond réel de l'hébergeur : 4,5 Mo par requête, appliqué avant que cette
+// fonction démarre. Voir lib/uploadLimit.js.
+export const config = { api: { bodyParser: { sizeLimit: '4.5mb' } } }
 
 const BUCKET = 'receipts'
 

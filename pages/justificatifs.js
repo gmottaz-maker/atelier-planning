@@ -5,6 +5,7 @@ import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
+import { verifierTailleFichier, lireReponse } from '../lib/uploadLimit'
 import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT } from '../lib/theme'
 
@@ -134,7 +135,10 @@ export default function Justificatifs() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const d = await r.json()
+      // Un 409 (doublon) est une réponse ATTENDUE, et toujours en JSON. Tout
+      // autre échec passe par lireReponse, qui sait qu'un refus de l'hébergeur
+      // arrive en texte brut et non en JSON.
+      const d = r.status === 409 ? await r.json() : await lireReponse(r)
       if (r.status === 409) {
         setProcessing(p => p.map(x => x.id === id ? {
           ...x, status: 'duplicate', duplicate: d.duplicate_of,
@@ -144,8 +148,9 @@ export default function Justificatifs() {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ...body, force: true }),
             })
-            const d2 = await r2.json()
-            if (d2.error) setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'error', error: d2.error } : xx))
+            let d2 = null, echec = null
+            try { d2 = await lireReponse(r2) } catch (e2) { echec = e2.message }
+            if (echec) setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'error', error: echec } : xx))
             else {
               setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'done', reconcile: d2.reconcile } : xx))
               load()
@@ -174,6 +179,10 @@ export default function Justificatifs() {
         try { usable = await toJpegIfHeic(file, kind) }
         catch { throw new Error('Conversion HEIC échouée — convertis la photo en JPEG et réessaie') }
       }
+      // Sur le fichier RÉELLEMENT envoyé : un HEIC converti en JPEG n'a plus la
+      // taille de l'original, dans un sens comme dans l'autre.
+      const taille = verifierTailleFichier(usable)
+      if (!taille.ok) throw new Error(taille.message)
       const base64 = await new Promise((resolve, reject) => {
         const r = new FileReader()
         r.onload = e => resolve(e.target.result.split(',')[1])
@@ -186,8 +195,7 @@ export default function Justificatifs() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64, mimeType: usable.type }),
       })
-      const scan = await scanRes.json()
-      if (scan.error) throw new Error(scan.error)
+      const scan = await lireReponse(scanRes)
       const found = Array.isArray(scan.receipts) ? scan.receipts : [scan]
       const list  = found.length > 0 ? found : [{}]
       const split = list.length > 1

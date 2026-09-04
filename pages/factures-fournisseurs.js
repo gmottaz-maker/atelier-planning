@@ -5,6 +5,7 @@ import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import adminFetch from '../lib/adminFetch'
+import { verifierTailleFichier, lireReponse } from '../lib/uploadLimit'
 import ContactPicker from '../components/ContactPicker'
 import { DISPLAY_STATUSES, STATUS_ORDER, effectiveStatus } from '../lib/supplierStatus'
 import { fmtCHF as fmtMontant } from '../lib/money'
@@ -133,7 +134,10 @@ export default function FacturesFournisseurs() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const d = await r.json()
+      // Un 409 (doublon) est une réponse ATTENDUE, et toujours en JSON. Tout
+      // autre échec passe par lireReponse, qui sait qu'un refus de l'hébergeur
+      // arrive en texte brut et non en JSON.
+      const d = r.status === 409 ? await r.json() : await lireReponse(r)
       if (r.status === 409) {
         setProcessing(p => p.map(x => x.id === id ? {
           ...x, status: 'duplicate',
@@ -144,9 +148,10 @@ export default function FacturesFournisseurs() {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ...body, force: true }),
             })
-            const d2 = await r2.json()
-            if (d2.error) {
-              setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'error', error: d2.error } : xx))
+            let echec = null
+            try { await lireReponse(r2) } catch (e2) { echec = e2.message }
+            if (echec) {
+              setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'error', error: echec } : xx))
             } else {
               setProcessing(pp => pp.map(xx => xx.id === id ? { ...xx, status: 'done' } : xx))
               load()
@@ -172,6 +177,14 @@ export default function FacturesFournisseurs() {
     const isPdf   = file.type === 'application/pdf'
     if (!isImage && !isPdf) return
     const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    // Vérifié AVANT de lire le fichier : encoder 8 Mo en base64 pour se faire
+    // refuser ensuite fait patienter pour rien.
+    const taille = verifierTailleFichier(file)
+    if (!taille.ok) {
+      setProcessing(p => [...p, { id, name: file.name, status: 'error', error: taille.message }])
+      setTimeout(() => setProcessing(p => p.filter(x => x.id !== id)), 10000)
+      return
+    }
     setProcessing(p => [...p, { id, name: file.name, status: 'reading' }])
     try {
       const base64 = await new Promise((resolve, reject) => {
@@ -187,8 +200,7 @@ export default function FacturesFournisseurs() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64, mimeType: file.type }),
       })
-      const scan = await scanRes.json()
-      if (scan.error) throw new Error(scan.error)
+      const scan = await lireReponse(scanRes)
       // Si l'OCR n'a rien reconnu, on crée quand même une facture à compléter à la main.
       const found = Array.isArray(scan.invoices) ? scan.invoices : [scan]
       const list  = found.length > 0 ? found : [{}]
