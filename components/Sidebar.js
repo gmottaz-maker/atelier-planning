@@ -5,6 +5,7 @@ import { useAuth } from '../pages/_app'
 import useIsAdmin from '../lib/useIsAdmin'
 import { AL, C, FONT, MONO, R, initials } from '../lib/theme'
 import MazeLockup from './MazeLockup'
+import { VERSION } from '../lib/version'
 
 export const SIDEBAR_WIDTH = 224
 
@@ -185,6 +186,15 @@ export default function Sidebar() {
           </div>
         </div>
       )}
+
+      {/* Version déployée. Figée au build, donc elle change EXACTEMENT quand un
+          déploiement passe : le SHA se compare au dernier commit sur GitHub, et
+          l'heure tranche quand deux déploiements portent le même commit. */}
+      <div title="Version déployée — commit et heure du build"
+        style={{ font: `9.5px ${MONO}`, color: C.muted, letterSpacing: '.06em',
+          padding: '14px 16px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {VERSION}
+      </div>
     </aside>
   )
 }
