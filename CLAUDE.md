@@ -37,8 +37,11 @@ pages/
   outils/index.js      — Index des outils d'atelier
   outils/peintures.js  — Peintures RUCO : sélecteur + chiffrage (section dédiée)
   peintures.js         — Redirection vers /outils/peintures (anciens signets)
-  clients.js           — Contacts et entreprises
-  clients/[id].js      — Fiche contact
+  clients.js           — Annuaire des SOCIÉTÉS (lignes) + personnes sans société
+  clients/[id].js      — Fiche société ou personne ; affiche le journal de
+                         démarchage si la société vient d'un prospect converti
+  prospects.js         — (admin) Prospection : liste triée par relance due
+  prospects/[id].js    — (admin) Fiche prospect : journal, relances, conversion
   catalog.js           — Catalogue d'articles et d'heures
   projects/[id].js     — Fiche projet : tâches, logistique, offre, fichiers
   projects/[id]/devis.js — Aperçu imprimable de l'offre
@@ -65,6 +68,7 @@ pages/
     kdrive/            — Navigation, téléchargement et vignettes kDrive
     push/              — Notifications push
     send-document.js   — Envoi d'une offre ou facture par e-mail (Resend)
+    prospects/         — Prospection : fiche, personnes, journal, conversion
     accounts.js, catalog.js, contacts.js, email-templates.js, work-*.js, …
 
 components/
@@ -105,7 +109,9 @@ lib/
   merchantAccounts.js    — Apprentissage commerçant → compte comptable
   storageInvoice.js · storageBilling.js · invoiceNumber.js — Facturation
   kdrive.js · receipts.js — Stockage des fichiers
-  projectPhase.js · supplierStatus.js · taskCategories.js — Modèles de statut
+  projectPhase.js · supplierStatus.js · customerStatus.js · taskCategories.js — Statuts
+  prospects.js           — Prospection : étapes, canaux, sources, calcul des relances
+  aujourdhui.js          — Date du jour en YYYY-MM-DD (source unique, voir plus bas)
   todoist.js · googleCalendar.js · push-server.js · adminFetch.js
 
 tests/                   — Vitest (npm test) : calculs, parsing, nommage, autorisations
@@ -330,6 +336,46 @@ renvois, sans quoi un vernis intérieur ressort comme extérieur).
 
 ---
 
+## Prospection (`/prospects`)
+
+Base **séparée** de `contacts`, et non un drapeau dessus. Un prospect n'a ni
+facture ni projet, et ce qu'on veut savoir de lui — par quel canal on l'a
+touché, quand le relancer, d'où il vient — n'a rien à voir avec un client. Un
+drapeau aurait traîné les colonnes de facturation vides dans tous les écrans de
+démarchage, et inversement.
+
+Trois tables (`schema-prospects.sql`, jouée) : `prospects`, `prospect_people`,
+`prospect_interactions`. Le calcul vit dans `lib/prospects.js`.
+
+**La relance vit sur l'ÉCHANGE, pas sur la fiche.** « Appelé le 3, je rappelle
+le 17 » : la prochaine relance d'un prospect est la plus proche non honorée. Un
+champ posé sur la fiche est un champ qu'on oublie de mettre à jour ; une ligne
+de journal, non — et elle garde la trace des relances déjà faites. Entre deux
+retards, c'est le plus ANCIEN qui remonte : deux relances en retard ne se
+traitent pas en parallèle.
+
+**Le canal appartient à l'échange**, pas au prospect : on appelle, puis on
+relance par mail. C'est aussi ce qui finit par dire ce qui marche.
+
+**Pas d'étape « offre envoyée »** : le démarchage se fait avec une présentation.
+L'offre vient après, quand le prospect est devenu client et a un projet — elle
+vit alors dans la fiche projet.
+
+**La conversion ne détruit rien.** Elle crée la société dans `contacts`, y
+recopie les personnes, et sort le prospect des listes — mais sa ligne survit
+avec `converted_to_contact_id`. C'est ce lien qui garde l'historique du
+démarchage, et ce que la fiche cliente relit via `?converted_to=`. Supprimer un
+prospect converti est refusé pour cette raison. L'opération n'est PAS atomique,
+faute de fonction PostgreSQL dédiée : l'ordre des écritures est choisi pour
+qu'un échec laisse un état rattrapable, et le message le dit.
+
+**Les listes fermées sont doublées d'un `CHECK` en base.** Étapes, canaux et
+sources sont contraints des deux côtés — c'est une divergence de vocabulaire
+entre code et base qui avait rendu les factures clientes irrapprochables
+pendant des mois (cf. `loadCandidates`).
+
+---
+
 ## Git / déploiement
 
 **Ne jamais mettre de jeton dans l'URL du remote.** Un PAT écrit dans
@@ -486,6 +532,14 @@ puis concaténé par `htmlToPdf(html, annexe)`. Les pages CSS nommées
 (`@page bulletin { margin: 0 }`) auraient évité ça, mais Chrome ne les honore
 pas — vérifié, il insère une page blanche.
 
+**La date du jour a une source unique** (`lib/aujourdhui.js`), et les échéances
+se comparent en chaînes `YYYY-MM-DD`. `new Date('2026-09-04') < new Date()`
+compare un instant UTC à l'heure locale : en Suisse d'été, minuit UTC du jour
+d'échéance tombe à 02h00 locales, et la facture était déclarée en retard le jour
+même où elle est due. Le défaut a vécu des mois dans `factures-emises`, alors
+que `supplierStatus` comparait déjà des chaînes avec le commentaire qui
+l'explique — c'est la duplication du calcul qui les avait fait diverger.
+
 **Les montants ne passent pas par `Intl`** (`lib/money.js`). Le séparateur de
 milliers de `fr-CH` dépend de la version d'ICU embarquée dans Node : la CI et
 le poste de développement ne produisaient pas le même texte, et surtout, le
@@ -523,6 +577,9 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-integrite-financiere.sql` | `reconcile_match()`, `next_invoice_number()`, `storage_billing_key`, index d'unicité | en fin de fichier |
 | `schema-work-slots.sql` | table `work_slots` (planning par demi-journée) | `DROP TABLE work_slots;` |
 | `schema-bank-classification.sql` | `bank_transactions.classification` + comptes par défaut (salaires, virements internes) | en fin de fichier |
+
+`schema-prospects.sql` (les trois tables de prospection) a été jouée le
+4 septembre 2026 et vérifiée par `check:db`.
 
 **Toute migration ajoutée ici doit aussi recevoir une sonde dans
 `scripts/check-db.mjs`.** `schema-work-slots.sql` est resté six semaines hors
