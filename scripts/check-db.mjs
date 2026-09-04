@@ -34,6 +34,11 @@ const sb = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.SUPABASE_SERVICE_ROLE_KEY)
 // Chaque contrôle : { nom, fichier de migration, sonde renvoyant true/false }
 const CONTROLES = [
   {
+    nom: 'prospects : champs du fichier de démarchage',
+    migration: 'schema-prospects-fichier.sql',
+    sonde: async () => !(await sb.from('prospects').select('priority, zone, angle, target_role').limit(1)).error,
+  },
+  {
     nom: 'prospects (+ personnes, journal)',
     migration: 'schema-prospects.sql',
     sonde: async () => {
