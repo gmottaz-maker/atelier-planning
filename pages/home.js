@@ -4,6 +4,7 @@ import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useAuth } from './_app'
 import { AL, C, CAL_CAT, FONT, MONO, R } from '../lib/theme'
+import { jourLocal } from '../lib/aujourdhui'
 
 const TARGET_CALS = ['Montage extérieur', 'Entretien', 'Production atelier', 'Visite et meeting']
 
@@ -19,7 +20,9 @@ function toDateStr(date) {
 }
 function isCompletedToday(task) {
   if (task.status !== 'completed' || !task.completed_at) return false
-  return task.completed_at.split('T')[0] === toDateStr(today())
+  // jourLocal et non split('T') : completed_at est en UTC, et une tâche
+  // cochée après 22h aurait compté pour le lendemain.
+  return jourLocal(task.completed_at) === toDateStr(today())
 }
 function endOfWeek() {
   const d = today()

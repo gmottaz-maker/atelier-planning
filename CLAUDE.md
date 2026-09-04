@@ -604,6 +604,15 @@ npm run check:secrets   # balaie les fichiers suivis par git (tourne en CI)
 npm run check:db        # vérifie que les migrations attendues sont en base
 ```
 
+**Les tests tournent en `TZ=Europe/Zurich`**, fixé dans le script `test`. Ce
+n'est pas un détail de confort : la moitié des calculs de date de cette
+application dépendent du fuseau LOCAL, parce qu'ils répondent à des questions
+vécues — « est-ce en retard aujourd'hui ? », « cette tâche a-t-elle été
+terminée aujourd'hui ? ». Ces calculs tournent dans le NAVIGATEUR, donc à
+Zurich ; la CI, elle, tourne en UTC. Sans ce réglage, un test qui décrit
+correctement le comportement suisse échoue en CI, et un test écrit sous UTC
+laisse passer le décalage de deux heures qui a déjà mordu deux fois.
+
 `eslint.config.mjs` est volontairement MINIMAL : une seule règle, `no-undef`.
 Elle n'est pas là pour le style mais pour l'IDENTIFIANT LIBRE, que ni le build
 ni les tests ne voient. Deux ont été livrés en production : `level` dans

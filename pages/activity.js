@@ -4,6 +4,7 @@ import Head from 'next/head'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import { AL, C, FONT } from '../lib/theme'
+import { jourLocal } from '../lib/aujourdhui'
 
 const PINK = AL.black
 const PERSON_COLORS = {
@@ -38,7 +39,9 @@ function timeAgo(dateStr) {
 function groupByDay(entries) {
   const groups = {}
   entries.forEach(e => {
-    const day = e.created_at.split('T')[0]
+    // Le regroupement par jour suit l'heure LOCALE : sinon une action de
+    // 23h apparaît sous la date du lendemain.
+    const day = jourLocal(e.created_at)
     if (!groups[day]) groups[day] = []
     groups[day].push(e)
   })

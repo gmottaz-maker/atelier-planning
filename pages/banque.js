@@ -8,6 +8,7 @@ import adminFetch from '../lib/adminFetch'
 import { matchesQuery, normalize } from '../lib/textSearch'
 import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT, R } from '../lib/theme'
+import { jourLocal } from '../lib/aujourdhui'
 
 // Un rapprochement porte sur trois natures de pièce, et le mot compte : une
 // facture est soldée, un frais est seulement rattaché à son débit.
@@ -564,7 +565,7 @@ function MatchDrawer({ tx, suggestions, onClose, onConfirm, onUnmatch, onClassif
                 <p className="text-xs uppercase tracking-wider u-muted mb-2">Matchée à</p>
                 <div className="u-ok-bg border u-line u-panel px-4 py-3 mb-4">
                   <p className="text-sm font-semibold u-ok">{TYPE_LABELS[tx.matched_to_type]} #{tx.matched_to_id}</p>
-                  <p className="text-xs u-ok mt-1">Matché le {tx.matched_at?.slice(0, 10)}</p>
+                  <p className="text-xs u-ok mt-1">Matché le {jourLocal(tx.matched_at)}</p>
                 </div>
                 <button onClick={() => onUnmatch(tx)}
                   className="text-xs font-medium u-ko hover:u-ko">Annuler ce matching</button>

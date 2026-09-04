@@ -18,6 +18,7 @@ import useIsAdmin from '../../lib/useIsAdmin'
 import NavBar from '../../components/NavBar'
 import { AL, C, FONT, MONO, R, initials } from '../../lib/theme'
 import { canal, source } from '../../lib/prospects'
+import { jourLocal } from '../../lib/aujourdhui'
 
 const fmtJour = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}` : '' }
 const fmtDate = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}.${y}` : '—' }
@@ -162,7 +163,7 @@ export default function FicheContact() {
                     <span style={{ fontSize: 14, fontWeight: 500 }}>{source(demarchage.source)?.label || 'Source inconnue'}</span>
                     {demarchage.source_detail && <span style={{ fontSize: 13, color: C.muted }}>{demarchage.source_detail}</span>}
                     <span style={{ marginLeft: 'auto', fontSize: 12.5, color: C.muted }}>
-                      {echanges.length} échange{echanges.length > 1 ? 's' : ''} · converti le {fmtDate(demarchage.converted_at)}
+                      {echanges.length} échange{echanges.length > 1 ? 's' : ''} · converti le {fmtDate(jourLocal(demarchage.converted_at))}
                     </span>
                   </div>
                   {echanges.map(x => (

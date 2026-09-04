@@ -7,6 +7,7 @@ import TaskFormDrawer from '../components/TaskFormDrawer'
 import { AL, C, FONT, MONO, R, personChip } from '../lib/theme'
 import ButtonPill from '../components/ButtonPill'
 import useIsAdmin from '../lib/useIsAdmin'
+import { jourLocal } from '../lib/aujourdhui'
 
 const PINK = AL.black
 const PEOPLE = ['Arnaud', 'Guillaume', 'Gabin', 'non défini']  // valeur par défaut, surchargée par useResponsibles()
@@ -126,7 +127,9 @@ function formatDate(str) {
 // Une tâche terminée aujourd'hui reste visible jusqu'à demain
 function isCompletedToday(task) {
   if (task.status !== 'completed' || !task.completed_at) return false
-  const completedDay = task.completed_at.split('T')[0]
+  // jourLocal et non split('T') : completed_at est en UTC, et une tâche
+  // cochée après 22h aurait compté pour le lendemain.
+  const completedDay = jourLocal(task.completed_at)
   return completedDay === toDateStr(today())
 }
 
