@@ -49,6 +49,7 @@ export default function Banque() {
   const [filter, setFilter]   = useState('unmatched') // unmatched | matched | all
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState(null)
+  const [rapprochant, setRapprochant] = useState(false)
   const [selected, setSelected] = useState(null)
   const [suggestions, setSuggestions] = useState(null)  // null = en cours, [] = aucune
   const [q, setQ] = useState('')                        // recherche libre
@@ -112,6 +113,28 @@ export default function Banque() {
       setImportResult({ error: e.message })
     } finally {
       setImporting(false)
+    }
+  }
+
+  // Relance le rapprochement sans relevé à importer. Utile après avoir saisi une
+  // pièce en retard, ou quand le moteur de rapprochement a changé : il balaie
+  // TOUTES les transactions libres, pas seulement celles d'un import.
+  //
+  // Sans danger à répéter : l'opération n'établit que des liens, elle n'en
+  // défait aucun, et le serveur refuse une transaction déjà rapprochée.
+  async function relancerRapprochement() {
+    setRapprochant(true)
+    setImportResult(null)
+    try {
+      const r = await adminFetch('/api/bank/reconcile', { method: 'POST' })
+      const d = await r.json()
+      if (d.error) { setImportResult({ error: d.error }); return }
+      setImportResult({ ...d, rapprochementSeul: true })
+      load()
+    } catch (e) {
+      setImportResult({ error: e.message })
+    } finally {
+      setRapprochant(false)
     }
   }
 
@@ -233,6 +256,12 @@ export default function Banque() {
       <Head><title>Maze Project — Banque</title></Head>
 
       <NavBar title="Banque">
+        <button type="button" onClick={relancerRapprochement} disabled={rapprochant || importing}
+          title="Confronte toutes les transactions non rapprochées aux pièces disponibles, sans importer de relevé"
+          className="px-4 py-2 text-sm font-medium u-pill border u-line disabled:opacity-50"
+          style={{ background: 'none', color: C.ink }}>
+          {rapprochant ? 'Rapprochement…' : 'Relancer le rapprochement'}
+        </button>
         <label className="px-4 py-2 text-sm font-medium u-pill text-white cursor-pointer"
           style={{ background: PINK }}>
           {importing ? 'Import…' : 'Importer relevé (CAMT.053)'}
@@ -251,7 +280,14 @@ export default function Banque() {
               `Erreur : ${importResult.error}`
             ) : (
               <>
-                <div>{`${importResult.inserted} transaction(s) importée(s) · ${importResult.duplicates} doublon(s) ignoré(s) · ${importResult.total} total`}</div>
+                {!importResult.rapprochementSeul && (
+                  <div>{`${importResult.inserted} transaction(s) importée(s) · ${importResult.duplicates} doublon(s) ignoré(s) · ${importResult.total} total`}</div>
+                )}
+                {/* Une relance qui ne trouve rien doit le DIRE : un panneau vide
+                    laisserait croire que le bouton n'a pas fonctionné. */}
+                {importResult.rapprochementSeul && !importResult.reconciled?.length && !importResult.ambiguous && (
+                  <div>Aucun nouveau rapprochement — tout ce qui pouvait l'être l'est déjà.</div>
+                )}
                 {importResult.reconciled?.length > 0 && (
                   <div className="pt-1 border-t u-line/60">
                     <div className="font-semibold mb-1">
