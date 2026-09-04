@@ -9,6 +9,7 @@
     "test": "TZ=Europe/Zurich vitest run",
     "test:watch": "TZ=Europe/Zurich vitest",
     "lint": "eslint .",
+    "check:audit": "node scripts/check-audit.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:db": "node scripts/check-db.mjs",
     "check:style": "node scripts/check-style.mjs"

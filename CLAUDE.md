@@ -656,6 +656,17 @@ production. Deux pièges à connaître si tu ajoutes des cas :
   cours, sinon toutes les routes resteraient figées sur la première.
 
 La CI (`.github/workflows/ci.yml`) exécute lint, tests, build, audit des
-dépendances (bloquant sur « critical » seulement) et détection de secrets.
-Le lint passe en premier : c'est le contrôle le plus rapide. Elle n'a accès
+dépendances et détection de secrets. Le lint passe en premier : c'est le
+contrôle le plus rapide.
+
+**L'audit distingue « faille critique » de « npm injoignable »**
+(`scripts/check-audit.mjs`). Le 4 septembre 2026, l'endpoint d'audit de npm a
+répondu 503 : `npm audit` a attendu SEPT minutes puis échoué, et deux builds
+sont partis au rouge sur du code sain. Le script réessaie trois fois, borne
+l'attente à 90 s, et sépare les deux cas — une faille critique en production
+bloque, un registre injoignable produit un avertissement et laisse passer. Ce
+n'est pas un laisser-passer : le contrôle repasse au build suivant, et bloquer
+un correctif urgent parce que npm a le hoquet coûte plus cher que de reporter
+de quelques heures. C'est le même arbitrage que « bloquant sur critical
+seulement » et pas sur « high ». Elle n'a accès
 ni à la base ni aux secrets de production.

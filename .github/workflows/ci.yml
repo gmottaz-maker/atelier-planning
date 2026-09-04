@@ -45,8 +45,14 @@ jobs:
 
       # Bloque sur « critical » seulement : une alerte « high » dans une
       # dépendance imbriquée de Next ne doit pas empêcher de livrer un correctif.
+      #
+      # Passé par un script plutôt qu'en une ligne : le 4 septembre 2026,
+      # l'endpoint d'audit de npm a répondu 503, `npm audit` a attendu sept
+      # minutes puis échoué, et deux builds sont partis au rouge sur du code
+      # sain. Le script réessaie, borne l'attente, et distingue « faille
+      # critique » (bloquant) de « npm injoignable » (avertissement).
       - name: Audit des dépendances
-        run: npm audit --omit=dev --audit-level=critical
+        run: npm run check:audit
 
       - name: Détection de secrets
         run: npm run check:secrets
