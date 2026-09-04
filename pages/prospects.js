@@ -71,7 +71,7 @@ export default function ProspectsPage() {
         </button>
       </NavBar>
 
-      <main style={{ padding: '32px 40px 104px', maxWidth: 1600, margin: '0 auto' }}>
+      <main style={{ padding: '32px 24px 104px' }}>
         <h1 style={{ font: `500 34px ${FONT}`, letterSpacing: '-.02em', margin: '0 0 4px' }}>
           nos <span style={{ color: C.accent }}>prospects</span>
         </h1>

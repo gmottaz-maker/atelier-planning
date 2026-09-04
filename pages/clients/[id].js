@@ -100,7 +100,7 @@ export default function FicheContact() {
         </button>
       </NavBar>
 
-      <main style={{ padding: '32px 40px 104px', maxWidth: 1400, margin: '0 auto' }}>
+      <main style={{ padding: '32px 24px 104px', maxWidth: 1500, margin: '0 auto' }}>
         <Link href="/clients" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>← tous les contacts</Link>
 
         <div style={{ margin: '14px 0 22px' }}>
