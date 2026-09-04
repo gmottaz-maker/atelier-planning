@@ -9,6 +9,14 @@ import { matchesQuery, normalize } from '../lib/textSearch'
 import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT, R } from '../lib/theme'
 
+// Un rapprochement porte sur trois natures de pièce, et le mot compte : une
+// facture est soldée, un frais est seulement rattaché à son débit.
+const LIBELLE_PIECE = {
+  customer_invoice: 'facture client',
+  supplier_invoice: 'facture fournisseur',
+  expense:          'frais',
+}
+
 const PINK = AL.black
 
 function fmtCHF(n) {
@@ -247,12 +255,24 @@ export default function Banque() {
                 {importResult.reconciled?.length > 0 && (
                   <div className="pt-1 border-t u-line/60">
                     <div className="font-semibold mb-1">
-                      {importResult.reconciled.length} facture(s) fournisseur passée(s) en payée :
+                      {importResult.reconciled.length} pièce(s) rapprochée(s) :
                     </div>
+                    {/* Le libellé disait « facture fournisseur » en dur. Le
+                        rapprochement solde aussi des factures CLIENTES et lie
+                        des frais, qui ne se « soldent » pas — leur ligne existe
+                        déjà au journal.
+
+                        Les trois champs lus ici n'existaient pas non plus :
+                        applyMatch renvoie { type, candidate_id, label, number },
+                        pas supplier_name / invoice_number / invoice_id. Le
+                        récapitulatif affichait donc des lignes vides, avec une
+                        clé React indéfinie. */}
                     <ul className="space-y-0.5">
                       {importResult.reconciled.map(r => (
-                        <li key={r.invoice_id} className="text-xs">
-                          {r.supplier_name}{r.invoice_number ? ` · n° ${r.invoice_number}` : ''} — {Number(r.amount).toFixed(2)} CHF, payée le {r.paid_at}
+                        <li key={`${r.type}-${r.candidate_id}`} className="text-xs">
+                          {LIBELLE_PIECE[r.type] || 'pièce'} · {r.label}
+                          {r.number ? ` · n° ${r.number}` : ''} — {Number(r.amount).toFixed(2)} CHF
+                          {r.paid_at ? `, le ${r.paid_at}` : ''}
                         </li>
                       ))}
                     </ul>
