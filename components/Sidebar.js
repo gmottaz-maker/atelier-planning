@@ -27,6 +27,10 @@ const MAIN_ITEMS = [
 const FIN_TOP = [
   { href: '/finances', label: 'tableau de bord' },
   { href: '/clients',  label: 'contacts' },
+  // La prospection est une base SÉPARÉE des contacts : ce qu'on veut savoir
+  // d'un prospect (canal, relance, provenance) n'a rien à voir avec ce qu'on
+  // veut d'un client (facturation, projets). Deux entrées, donc.
+  { href: '/prospects', label: 'prospects' },
   { href: '/catalog',  label: 'catalogue' },
   { href: '/stockage', label: 'stockage' },
 ]

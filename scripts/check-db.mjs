@@ -34,6 +34,18 @@ const sb = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.SUPABASE_SERVICE_ROLE_KEY)
 // Chaque contrôle : { nom, fichier de migration, sonde renvoyant true/false }
 const CONTROLES = [
   {
+    nom: 'prospects (+ personnes, journal)',
+    migration: 'schema-prospects.sql',
+    sonde: async () => {
+      // Les trois tables ensemble : la migration les crée d'un bloc, et une
+      // seule qui manque suffit à casser les écrans de prospection.
+      for (const t of ['prospects', 'prospect_people', 'prospect_interactions']) {
+        if ((await sb.from(t).select('id').limit(1)).error) return false
+      }
+      return true
+    },
+  },
+  {
     nom: 'profiles.role',
     migration: 'schema-profiles-role.sql',
     sonde: async () => !(await sb.from('profiles').select('role').limit(1)).error,
