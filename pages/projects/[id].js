@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { defaultQuote } from '../../lib/quoteDefaults'
+import { defaultQuote, doitSemerOffreVierge } from '../../lib/quoteDefaults'
 import { useQuoteDefaults } from '../../lib/useQuoteDefaults'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
@@ -876,13 +876,29 @@ export default function ProjectPage() {
 
   // Les tarifs réglés arrivent APRÈS le premier rendu — l'offre vierge du
   // useState ci-dessus part donc sur les valeurs d'origine du code. On la
-  // re-sème dès qu'ils sont là, mais seulement si le projet n'a pas d'offre
-  // enregistrée ET que rien n'a été touché : autrement on écraserait soit un
-  // devis existant, soit ce que Guillaume vient de taper.
+  // re-sème dès qu'ils sont là.
+  //
+  // UNE SEULE FOIS. La version précédente dépendait de `quoteDirty` : comme
+  // enregistrer remet ce drapeau à faux, l'effet se relançait APRÈS la
+  // sauvegarde et remplaçait l'offre par un devis vide. Deux offres ont été
+  // perdues ainsi. `semeFait` rend ce retour en arrière impossible, et
+  // `quoteDirty` sort des dépendances — il est lu par référence, pour que sa
+  // remise à zéro ne puisse plus rien déclencher.
+  const semeFait = useRef(false)
+  const quoteDirtyRef = useRef(false)
+  useEffect(() => { quoteDirtyRef.current = quoteDirty }, [quoteDirty])
+
   useEffect(() => {
-    if (!reglagesCharges || !offreVierge.current || quoteDirty) return
+    const semer = doitSemerOffreVierge({
+      tarifsCharges: reglagesCharges,
+      dejaSeme: semeFait.current,
+      offreEnregistree: !offreVierge.current,
+      offreTouchee: quoteDirtyRef.current,
+    })
+    if (!semer) return
+    semeFait.current = true
     setQuote(defaultQuote(reglages))
-  }, [reglagesCharges, reglages, quoteDirty])
+  }, [reglagesCharges, reglages])
   // Collapse state — uid → true si replié (par défaut: tout est déplié)
   const [collapsedItems, setCollapsedItems] = useState({})
   const [collapsedSections, setCollapsedSections] = useState({}) // 'management' | 'fabrication' | 'subcontracting' | 'logistics'

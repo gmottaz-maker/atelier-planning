@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   REGLAGES_OFFRE, DEFAUTS_OFFRE, normaliserReglagesOffre, defaultQuote,
+  doitSemerOffreVierge,
 } from '../lib/quoteDefaults'
 
 describe('normaliserReglagesOffre', () => {
@@ -93,5 +94,52 @@ describe('defaultQuote', () => {
   it('laisse les quantités vides — c\'est le chiffrage qui les pose', () => {
     const q = defaultQuote()
     for (const l of [...q.management, ...q.logistics]) expect(l.quantity).toBe('')
+  })
+})
+
+// Cette fonction existe parce que la condition, écrite à la main dans un
+// useEffect, a effacé DEUX offres. Chaque cas ci-dessous correspond à un
+// moment réel de la vie d'un devis.
+describe('doitSemerOffreVierge', () => {
+  const cas = (o = {}) => doitSemerOffreVierge({
+    tarifsCharges: true, dejaSeme: false, offreEnregistree: false, offreTouchee: false, ...o,
+  })
+
+  it('sème sur un projet neuf, une fois les tarifs chargés', () => {
+    expect(cas()).toBe(true)
+  })
+
+  it('attend les tarifs plutôt que de semer les valeurs du code', () => {
+    expect(cas({ tarifsCharges: false })).toBe(false)
+  })
+
+  it('n\'écrase jamais une offre déjà enregistrée', () => {
+    expect(cas({ offreEnregistree: true })).toBe(false)
+  })
+
+  it('n\'écrase jamais ce qui vient d\'être tapé', () => {
+    expect(cas({ offreTouchee: true })).toBe(false)
+  })
+
+  // LE bug : enregistrer remet « touchée » à faux. Sans `dejaSeme`, l'effet se
+  // relançait juste après la sauvegarde, sur un projet toujours considéré
+  // comme « sans offre enregistrée », et remplaçait le travail par un vide.
+  it('ne sème pas une seconde fois après un enregistrement', () => {
+    // L'état exact au retour du serveur : plus rien n'est « touché », le
+    // projet n'a pas encore été rechargé, mais on a déjà semé.
+    expect(cas({ dejaSeme: true, offreTouchee: false, offreEnregistree: false })).toBe(false)
+  })
+
+  it('« déjà semé » l\'emporte sur toutes les autres conditions', () => {
+    expect(cas({ dejaSeme: true })).toBe(false)
+    expect(cas({ dejaSeme: true, tarifsCharges: false })).toBe(false)
+    expect(cas({ dejaSeme: true, offreEnregistree: true })).toBe(false)
+  })
+
+  it('reste réessayable tant que les tarifs ne sont pas là', () => {
+    // Le drapeau « déjà semé » ne doit être posé qu'au moment où l'on sème
+    // vraiment, sinon un premier passage trop tôt condamnerait le suivant.
+    expect(cas({ tarifsCharges: false })).toBe(false)
+    expect(cas({ tarifsCharges: true })).toBe(true)
   })
 })
