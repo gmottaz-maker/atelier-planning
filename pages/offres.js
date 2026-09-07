@@ -218,9 +218,31 @@ export default function Offres() {
                 <span style={{ font: `10.5px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
                   {groupe.items.length} offre{groupe.items.length > 1 ? 's' : ''}
                 </span>
-                <span style={{ marginLeft: 'auto', fontSize: 14, fontWeight: 500, color: AL.black,
-                  fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtCHF(groupe.total)} CHF
+                {/* Deux totaux, parce que ce sont deux questions : ce qui est
+                    acquis, et ce qui est encore en jeu. Le refusé ne compte
+                    dans ni l'un ni l'autre, et n'apparaît que s'il existe —
+                    mais il apparaît, sinon la somme des lignes du groupe ne
+                    correspondrait à rien d'affiché. */}
+                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 14,
+                  fontVariantNumeric: 'tabular-nums', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {groupe.valide > 0 && (
+                    <span style={{ fontSize: 14, fontWeight: 500, color: C.success }}>
+                      {fmtCHF(groupe.valide)} <span style={{ fontSize: 11, fontWeight: 400 }}>acceptées</span>
+                    </span>
+                  )}
+                  {groupe.enAttente > 0 && (
+                    <span style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>
+                      {fmtCHF(groupe.enAttente)} <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>en attente</span>
+                    </span>
+                  )}
+                  {groupe.refuse > 0 && (
+                    <span style={{ fontSize: 12.5, color: C.muted }}>
+                      {fmtCHF(groupe.refuse)} <span style={{ fontSize: 11 }}>refusées</span>
+                    </span>
+                  )}
+                  {groupe.valide === 0 && groupe.enAttente === 0 && groupe.refuse === 0 && (
+                    <span style={{ fontSize: 13, color: C.muted }}>—</span>
+                  )}
                 </span>
               </div>,
               ...groupe.items.map((o, rang) => {

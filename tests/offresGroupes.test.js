@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { grouperParClient } from '../lib/offres'
 
-const o = (client, name, total = 0) => ({ p: { client, name }, total })
+const o = (client, name, total = 0, status = 'envoye') => ({ p: { client, name }, total, status })
 
 describe('grouperParClient', () => {
   it('rassemble les offres d\'un même client', () => {
@@ -22,10 +22,54 @@ describe('grouperParClient', () => {
     expect(g[0].items.map(x => x.p.name)).toEqual(['premier', 'deuxième', 'troisième'])
   })
 
-  it('additionne le montant du groupe', () => {
-    const g = grouperParClient([o('X', 'a', 1200.5), o('X', 'b', 800), o('Y', 'c', 99)])
-    expect(g.find(x => x.client === 'X').total).toBe(2000.5)
-    expect(g.find(x => x.client === 'Y').total).toBe(99)
+  // Deux totaux, parce que ce sont deux questions : ce qui est acquis, et ce
+  // qui est encore en jeu. Les additionner donnait un chiffre qui ne répondait
+  // à ni l'une ni l'autre.
+  it('sépare l\'accepté de ce qui est encore en circulation', () => {
+    const g = grouperParClient([
+      o('X', 'a', 1000, 'accepte'),
+      o('X', 'b', 500, 'envoye'),
+      o('X', 'c', 300, 'brouillon'),
+      o('X', 'd', 200, 'a_corriger'),
+    ])
+    expect(g[0].valide).toBe(1000)
+    expect(g[0].enAttente).toBe(1000)   // envoyé + brouillon + à corriger
+  })
+
+  // Une offre refusée n'est ni acquise ni en jeu : elle ne doit gonfler aucun
+  // des deux chiffres.
+  it('exclut le refusé des deux totaux', () => {
+    const g = grouperParClient([
+      o('X', 'a', 1000, 'accepte'),
+      o('X', 'b', 500, 'envoye'),
+      o('X', 'perdue', 9999, 'refuse'),
+    ])
+    expect(g[0].valide).toBe(1000)
+    expect(g[0].enAttente).toBe(500)
+    expect(g[0].refuse).toBe(9999)
+  })
+
+  // Le refusé est compté à part et non ignoré : sans lui, la somme des lignes
+  // affichées ne correspondrait à rien de visible dans le bandeau.
+  it('les trois totaux couvrent toutes les lignes du groupe', () => {
+    const offres = [
+      o('X', 'a', 100, 'accepte'), o('X', 'b', 200, 'envoye'),
+      o('X', 'c', 300, 'brouillon'), o('X', 'd', 400, 'refuse'),
+      o('X', 'e', 500, 'a_corriger'),
+    ]
+    const g = grouperParClient(offres)[0]
+    expect(g.valide + g.enAttente + g.refuse).toBe(1500)
+  })
+
+  it('un statut inconnu compte comme en attente, jamais comme acquis', () => {
+    const g = grouperParClient([o('X', 'a', 700, 'zzz'), o('X', 'b', 100, undefined)])
+    expect(g[0].valide).toBe(0)
+    expect(g[0].enAttente).toBe(800)
+  })
+
+  it('un groupe sans montant rend trois zéros', () => {
+    const g = grouperParClient([o('X', 'a')])
+    expect([g[0].valide, g[0].enAttente, g[0].refuse]).toEqual([0, 0, 0])
   })
 
   it('classe les clients par ordre alphabétique', () => {
