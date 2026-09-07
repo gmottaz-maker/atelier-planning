@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import useSWR from 'swr'
 import { fmtCHF } from '../lib/money'
 import { AL, C, FONT, R } from '../lib/theme'
+import { construireArbre, articlesDe, cheminDe } from '../lib/catalogCategories'
 
 const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
 
@@ -35,9 +36,12 @@ export function toRateRow(item) {
 // kind: 'article' | 'heure' | 'all'. onPick(item) reçoit l'article brut.
 export default function CatalogPicker({ kind = 'all', onPick, label = '+ Catalogue' }) {
   const { data: items = [] } = useSWR('/api/catalog')
+  const { data: cats = [] } = useSWR('/api/catalog-categories')
   const list = Array.isArray(items) ? items : []
+  const categories = Array.isArray(cats) ? cats : []
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [categorie, setCategorie] = useState(null)
   const boxRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -49,13 +53,29 @@ export default function CatalogPicker({ kind = 'all', onPick, label = '+ Catalog
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 0) }, [open])
 
   const needle = q.trim().toLowerCase()
-  const matches = list
+  const duType = list
     .filter(it => !it.archived)
     .filter(it => kind === 'all' ? true : kind === 'heure' ? it.type === 'heure' : it.type !== 'heure')
+
+  // L'arbre se construit sur ce que le sélecteur peut proposer, pas sur tout le
+  // catalogue : proposer « Bois » dans un sélecteur d'heures n'aurait pas de sens.
+  const arbre = construireArbre(categories, duType)
+
+  // La recherche PASSE OUTRE la catégorie : quand on tape, on cherche partout.
+  // Rester enfermé dans une catégorie alors qu'on tape un nom précis est le
+  // genre de piège qui fait croire que l'article n'existe pas.
+  const matches = (needle ? duType : articlesDe(categorie, duType, categories))
     .filter(it => !needle || [it.name, it.vendor, it.notes, it.unit].filter(Boolean).join(' ').toLowerCase().includes(needle))
     .slice(0, 60)
 
-  function choose(it) { onPick(it); setOpen(false); setQ('') }
+  function choose(it) {
+    onPick(it)
+    setOpen(false); setQ(''); setCategorie(null)
+    // Mesure de l'usage : c'est ce qui fait remonter les catégories les plus
+    // sollicitées. Volontairement sans `await` ni gestion d'erreur — un
+    // compteur qui rate ne doit ni ralentir l'insertion ni la faire échouer.
+    fetch(`/api/catalog?used=${it.id}`, { method: 'POST' }).catch(() => {})
+  }
 
   const dd = { position: 'absolute', top: '100%', right: 0, marginTop: 4, width: 320, background: AL.white, border: '1px solid rgba(12,12,12,.08)', borderRadius: R.panel, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 60 }
 
@@ -71,6 +91,32 @@ export default function CatalogPicker({ kind = 'all', onPick, label = '+ Catalog
             <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher dans le catalogue…"
               style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid rgba(12,12,12,.08)', fontSize: 13, outline: 'none' }} />
           </div>
+          {/* Parcourir par catégorie : sur un catalogue de trois cents lignes, on
+              ne se souvient pas du nom exact, mais on sait que c'est du bois.
+              Masqué dès qu'on tape — la recherche cherche partout. */}
+          {!needle && arbre.length > 0 && (
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', padding: '8px 8px 4px',
+              borderBottom: '1px solid rgba(12,12,12,.06)' }}>
+              <PastilleCat actif={categorie === null} onClick={() => setCategorie(null)}>tout</PastilleCat>
+              {arbre.map(c => (
+                <span key={c.id} style={{ display: 'contents' }}>
+                  <PastilleCat actif={String(categorie) === String(c.id)} onClick={() => setCategorie(c.id)}>
+                    {c.name}
+                  </PastilleCat>
+                  {String(categorie) === String(c.id) && c.enfants.map(e => (
+                    <PastilleCat key={e.id} sous actif={false} onClick={() => setCategorie(e.id)}>
+                      {e.name}
+                    </PastilleCat>
+                  ))}
+                </span>
+              ))}
+              {categorie && !arbre.some(c => String(c.id) === String(categorie)) && (
+                <PastilleCat actif onClick={() => setCategorie(null)}>
+                  {cheminDe(categorie, categories) || 'catégorie'}
+                </PastilleCat>
+              )}
+            </div>
+          )}
           <div style={{ maxHeight: 280, overflowY: 'auto' }}>
             {matches.length === 0 ? (
               <div style={{ padding: '12px', fontSize: 13, color: C.muted }}>Aucun article.</div>
@@ -94,5 +140,18 @@ export default function CatalogPicker({ kind = 'all', onPick, label = '+ Catalog
         </div>
       )}
     </div>
+  )
+}
+
+function PastilleCat({ children, actif, sous, onClick }) {
+  return (
+    <button type="button" onClick={onClick}
+      style={{ padding: '3px 9px', borderRadius: R.pill, border: 'none', cursor: 'pointer',
+        font: `500 11px ${FONT}`, whiteSpace: 'nowrap',
+        ...(actif ? { background: AL.black, color: AL.white }
+          : sous ? { background: 'rgba(12,12,12,.06)', color: C.muted, marginLeft: 6 }
+          : { background: 'rgba(12,12,12,.06)', color: C.muted }) }}>
+      {sous ? `↳ ${children}` : children}
+    </button>
   )
 }

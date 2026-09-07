@@ -34,6 +34,16 @@ const sb = createClient(e.NEXT_PUBLIC_SUPABASE_URL, e.SUPABASE_SERVICE_ROLE_KEY)
 // Chaque contrôle : { nom, fichier de migration, sonde renvoyant true/false }
 const CONTROLES = [
   {
+    nom: 'catalogue : catégories et mesure d\'usage',
+    migration: 'schema-catalog-categories.sql',
+    sonde: async () => {
+      if ((await sb.from('catalog_categories').select('id, parent_id').limit(1)).error) return false
+      if ((await sb.from('catalog_items').select('category_id, usage_count').limit(1)).error) return false
+      // La fonction d'incrément : un id inexistant ne met rien à jour.
+      return !(await sb.rpc('catalog_item_used', { p_id: -1 })).error
+    },
+  },
+  {
     nom: 'prospects : champs du fichier de démarchage',
     migration: 'schema-prospects-fichier.sql',
     sonde: async () => !(await sb.from('prospects').select('priority, zone, angle, target_role').limit(1)).error,

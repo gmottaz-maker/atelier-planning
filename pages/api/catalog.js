@@ -5,7 +5,7 @@ import { erreurApi } from '../../lib/apiError'
 const supabase = getSupabaseServer()
 
 const EDITABLE = ['type', 'name', 'unit', 'vat_rate', 'purchase_price',
-  'margin', 'sale_price', 'vendor', 'notes', 'archived']
+  'margin', 'sale_price', 'vendor', 'notes', 'archived', 'category_id']
 
 const NUM = new Set(['vat_rate', 'purchase_price', 'margin', 'sale_price'])
 
@@ -39,6 +39,18 @@ export default async function handler(req, res) {
       .from('catalog_items').select('*').order('name', { ascending: true })
     if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog' })
     return res.status(200).json(data)
+  }
+
+  // ── POST ?used=<id> : un article vient d'être inséré dans une offre ──
+  //
+  // L'usage n'est pas un champ qu'on saisit : c'est une mesure. Il reste donc
+  // hors de la liste blanche EDITABLE, et passe par cette route et la fonction
+  // PostgreSQL, qui incrémente de façon atomique — deux insertions simultanées
+  // depuis deux onglets ne doivent pas se perdre l'une l'autre.
+  if (req.method === 'POST' && req.query.used) {
+    const { error } = await supabase.rpc('catalog_item_used', { p_id: Number(req.query.used) })
+    if (error) return erreurApi(req, res, 'internal', error, { route: 'catalog/used' })
+    return res.status(200).json({ ok: true })
   }
 
   // ── POST : créer un article, ou import bulk (?bulk=1) ──

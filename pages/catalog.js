@@ -5,6 +5,9 @@ import useIsAdmin from '../lib/useIsAdmin'
 import useSWR from 'swr'
 import Head from 'next/head'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
+import {
+  SANS_CATEGORIE, construireArbre, nbSansCategorie, articlesDe, impactSuppression,
+} from '../lib/catalogCategories'
 
 const UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'm³', 'km', 'PAN', 'pce', 'forfait', 'kg', 'l']
 const CSV_COLS = ['id', 'type', 'name', 'unit', 'vat_rate', 'purchase_price', 'margin', 'sale_price', 'vendor', 'notes']
@@ -58,7 +61,10 @@ export default function Catalog() {
   useEffect(() => { if (user && !isAdmin) gateRouter.replace('/') }, [user, isAdmin])
   if (user && !isAdmin) return null
   const { data: items = [], isLoading, mutate } = useSWR('/api/catalog')
+  const { data: cats = [], mutate: mutateCats } = useSWR('/api/catalog-categories')
   const list = Array.isArray(items) ? items : []
+  const categories = Array.isArray(cats) ? cats : []
+  const [selection, setSelection] = useState(null)   // null | id de catégorie | SANS_CATEGORIE
   const [q, setQ] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')   // all | article | heure
   const [showArchived, setShowArchived] = useState(false)
@@ -66,10 +72,62 @@ export default function Catalog() {
   const [importMsg, setImportMsg] = useState('')
   const fileRef = useRef(null)
 
+  async function creerCategorie(parent_id = null) {
+    const nom = prompt(parent_id ? 'Nom de la sous-catégorie' : 'Nom de la catégorie')
+    if (!nom || !nom.trim()) return
+    const r = await fetch('/api/catalog-categories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nom.trim(), parent_id }),
+    })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) return alert(d.error || `Erreur ${r.status}`)
+    mutateCats()
+  }
+
+  async function renommerCategorie(cat) {
+    const nom = prompt('Renommer la catégorie', cat.name)
+    if (!nom || !nom.trim() || nom.trim() === cat.name) return
+    const r = await fetch(`/api/catalog-categories?id=${cat.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nom.trim() }),
+    })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) return alert(d.error || `Erreur ${r.status}`)
+    mutateCats()
+  }
+
+  // La suppression emporte les sous-catégories ET les articles. C'est le
+  // comportement choisi, et rien ne le restaure : la confirmation NOMME donc
+  // ce qui va disparaître. « Êtes-vous sûr ? » ne renseigne personne.
+  async function supprimerCategorie(cat) {
+    const impact = impactSuppression(cat.id, categories, list)
+    const perdu = [
+      impact.sousCategories && `${impact.sousCategories} sous-catégorie${impact.sousCategories > 1 ? 's' : ''}`,
+      impact.articles && `${impact.articles} article${impact.articles > 1 ? 's' : ''}`,
+    ].filter(Boolean).join(' et ')
+    const message = perdu
+      ? `Supprimer « ${cat.name} » ?\n\nCela supprimera aussi ${perdu}. Cette action est DÉFINITIVE — rien ne les restaure.`
+      : `Supprimer « ${cat.name} » ? Elle est vide.`
+    if (!confirm(message)) return
+    const r = await fetch(`/api/catalog-categories?id=${cat.id}`, { method: 'DELETE' })
+    if (!r.ok) { const d = await r.json().catch(() => ({})); return alert(d.error || `Erreur ${r.status}`) }
+    if (String(selection) === String(cat.id)) setSelection(null)
+    mutateCats(); mutate()
+  }
+
   const needle = q.trim().toLowerCase()
-  const filtered = list
+
+  // L'arbre se construit sur les articles filtrés par TYPE et archivage, mais
+  // pas par la sélection de catégorie ni la recherche : sinon les compteurs
+  // changeraient à chaque frappe, et une catégorie disparaîtrait au moment
+  // précis où on la sélectionne.
+  const pourArbre = list
     .filter(it => showArchived ? true : !it.archived)
     .filter(it => typeFilter === 'all' ? true : it.type === typeFilter)
+  const arbre = construireArbre(categories, pourArbre)
+  const orphelins = nbSansCategorie(pourArbre)
+
+  const filtered = articlesDe(selection, pourArbre, categories)
     .filter(it => !needle || [it.name, it.vendor, it.notes, it.unit].filter(Boolean).join(' ').toLowerCase().includes(needle))
 
   // Une ligne sans nom vient d'être créée : elle passe en tête. Le serveur trie
@@ -112,7 +170,10 @@ export default function Catalog() {
   }
 
   async function addItem(type) {
-    const body = { type, name: '', unit: type === 'heure' ? 'heure(s)' : '', vat_rate: 8.1 }
+    // Créé DANS la catégorie sélectionnée : ajouter un article depuis
+    // « Bois › Panneaux » puis devoir le ranger serait absurde.
+    const dansCategorie = selection && selection !== SANS_CATEGORIE ? Number(selection) : null
+    const body = { type, name: '', unit: type === 'heure' ? 'heure(s)' : '', vat_rate: 8.1, category_id: dansCategorie }
     const r = await fetch('/api/catalog', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     await r.json(); mutate()
   }
@@ -188,23 +249,125 @@ export default function Catalog() {
         {isLoading ? (
           <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Chargement…</p>
         ) : (
-          <>
-            {(typeFilter === 'all' || typeFilter === 'article') && (
-              <CatalogTable title="Articles" type="article" rows={articles}
-                val={val} setD={setD} commit={commit} commitNow={commitNow} remove={remove} addItem={addItem} />
-            )}
-            {(typeFilter === 'all' || typeFilter === 'heure') && (
-              <CatalogTable title="Heures" type="heure" rows={heures}
-                val={val} setD={setD} commit={commit} commitNow={commitNow} remove={remove} addItem={addItem} />
-            )}
-          </>
+          <div style={{ display: 'grid', gridTemplateColumns: '236px minmax(0,1fr)', gap: 22, alignItems: 'start' }}>
+            <ArbreCategories
+              arbre={arbre} orphelins={orphelins} total={pourArbre.length}
+              selection={selection} onSelect={setSelection}
+              onCreer={creerCategorie} onRenommer={renommerCategorie} onSupprimer={supprimerCategorie} />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+              {(typeFilter === 'all' || typeFilter === 'article') && (
+                <CatalogTable title="Articles" type="article" rows={articles}
+                  val={val} setD={setD} commit={commit} commitNow={commitNow} remove={remove} addItem={addItem}
+                  categories={categories} montrerCategorie={selection === null} />
+              )}
+              {(typeFilter === 'all' || typeFilter === 'heure') && (
+                <CatalogTable title="Heures" type="heure" rows={heures}
+                  val={val} setD={setD} commit={commit} commitNow={commitNow} remove={remove} addItem={addItem}
+                  categories={categories} montrerCategorie={selection === null} />
+              )}
+            </div>
+          </div>
         )}
       </main>
     </div>
   )
 }
 
-function CatalogTable({ title, type, rows, val, setD, commit, commitNow, remove, addItem }) {
+// L'arbre sert de FILTRE et ne se déplie pas : avec une dizaine de catégories,
+// un accordéon ajoute un clic à chaque consultation sans rien économiser.
+//
+// Une catégorie vide sous le filtre courant a déjà été retirée par
+// `construireArbre` — c'est ce qui évite d'avoir à typer les catégories
+// (« Bois » n'a rien à faire dans l'arbre quand on regarde les heures).
+function ArbreCategories({ arbre, orphelins, total, selection, onSelect, onCreer, onRenommer, onSupprimer }) {
+  const ligne = (actif, decale) => ({
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+    padding: decale ? '6px 9px 6px 25px' : '6px 9px', borderRadius: R.pill, cursor: 'pointer',
+    border: 'none', font: `${decale ? 400 : 500} ${decale ? 13 : 13.5}px ${FONT}`,
+    background: actif ? C.ink : 'transparent', color: actif ? AL.white : C.ink,
+  })
+  const compte = (actif) => ({ marginLeft: 'auto', font: `11.5px ${MONO}`,
+    color: actif ? 'rgba(255,255,255,.7)' : C.muted })
+
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '12px 8px' }}>
+      <h4 style={{ margin: '2px 8px 10px', font: `500 10.5px ${MONO}`, letterSpacing: '.1em',
+        textTransform: 'uppercase', color: C.muted }}>Catégories</h4>
+
+      <button onClick={() => onSelect(null)} style={ligne(selection === null, false)}>
+        Tout le catalogue <span style={compte(selection === null)}>{total}</span>
+      </button>
+
+      <div style={{ height: 1, background: C.divider, margin: '9px 8px' }} />
+
+      {arbre.map(cat => {
+        const actif = String(selection) === String(cat.id)
+        return (
+          <div key={cat.id} className="group">
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <button onClick={() => onSelect(cat.id)} style={ligne(actif, false)}>
+                {cat.name} <span style={compte(actif)}>{cat.nb}</span>
+              </button>
+              <span style={{ display: 'flex', gap: 2, opacity: 0, flex: 'none' }} className="group-hover:opacity-100">
+                <BoutonMini titre="Ajouter une sous-catégorie" onClick={() => onCreer(cat.id)}>+</BoutonMini>
+                <BoutonMini titre="Renommer" onClick={() => onRenommer(cat)}>✎</BoutonMini>
+                <BoutonMini titre="Supprimer" danger onClick={() => onSupprimer(cat)}>×</BoutonMini>
+              </span>
+            </div>
+            {cat.enfants.map(e => {
+              const actifE = String(selection) === String(e.id)
+              return (
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center' }} className="group/e">
+                  <button onClick={() => onSelect(e.id)} style={ligne(actifE, true)}>
+                    {e.name} <span style={compte(actifE)}>{e.nb}</span>
+                  </button>
+                  <span style={{ display: 'flex', gap: 2, opacity: 0, flex: 'none' }} className="group-hover/e:opacity-100">
+                    <BoutonMini titre="Renommer" onClick={() => onRenommer(e)}>✎</BoutonMini>
+                    <BoutonMini titre="Supprimer" danger onClick={() => onSupprimer(e)}>×</BoutonMini>
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+
+      {/* Les articles non rangés restent VISIBLES : sans cette entrée, ils
+          n'apparaîtraient que dans « Tout le catalogue » et on oublierait de
+          les classer. */}
+      {orphelins > 0 && (
+        <button onClick={() => onSelect(SANS_CATEGORIE)}
+          style={{ ...ligne(selection === SANS_CATEGORIE, false),
+            color: selection === SANS_CATEGORIE ? AL.white : C.muted }}>
+          Sans catégorie <span style={compte(selection === SANS_CATEGORIE)}>{orphelins}</span>
+        </button>
+      )}
+
+      <div style={{ height: 1, background: C.divider, margin: '9px 8px' }} />
+      <button onClick={() => onCreer(null)}
+        style={{ padding: '6px 9px', background: 'none', border: 'none', cursor: 'pointer',
+          font: `500 12px ${FONT}`, color: C.violet }}>
+        + catégorie
+      </button>
+    </div>
+  )
+}
+
+function BoutonMini({ children, titre, onClick, danger }) {
+  return (
+    <button title={titre} onClick={onClick}
+      style={{ width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: R.pill, border: 'none', background: 'transparent', color: C.muted,
+        cursor: 'pointer', fontSize: 12, flex: 'none' }}
+      onMouseEnter={e => { e.currentTarget.style.color = danger ? C.danger : AL.black }}
+      onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
+      {children}
+    </button>
+  )
+}
+
+function CatalogTable({ title, type, rows, val, setD, commit, commitNow, remove, addItem, categories, montrerCategorie }) {
   const th = { font: `500 10px ${MONO}`, letterSpacing: '.06em', color: C.muted, textTransform: 'uppercase', padding: '8px 8px', textAlign: 'left', whiteSpace: 'nowrap' }
   const thR = { ...th, textAlign: 'right' }
   const cell = { padding: '2px 4px', borderTop: `1px solid ${C.divider}` }
@@ -235,8 +398,9 @@ function CatalogTable({ title, type, rows, val, setD, commit, commitNow, remove,
           <table style={{ width: '100%', minWidth: 880, borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ ...th, width: '22%' }}>Nom</th>
-                <th style={{ ...th, width: '10%' }}>Unité</th>
+                <th style={{ ...th, width: montrerCategorie ? '20%' : '24%' }}>Nom</th>
+                {montrerCategorie && <th style={{ ...th, width: '14%' }}>Catégorie</th>}
+                <th style={{ ...th, width: '9%' }}>Unité</th>
                 {!isHeure && <th style={{ ...thR, width: '9%' }}>Prix achat</th>}
                 {!isHeure && <th style={{ ...thR, width: '7%' }}>Marge %</th>}
                 <th style={{ ...thR, width: '9%' }}>{isHeure ? 'Tarif' : 'Prix vente'}</th>
@@ -249,7 +413,26 @@ function CatalogTable({ title, type, rows, val, setD, commit, commitNow, remove,
             <tbody>
               {rows.map(it => (
                 <tr key={it.id} className="group" style={{ opacity: it.archived ? 0.5 : 1 }}>
-                  <td style={{ ...cell, width: '22%' }}>{field(it, 'name', { ...inp, fontWeight: 600 }, 'text', 'Nom')}</td>
+                  <td style={cell}>{field(it, 'name', { ...inp, fontWeight: 600 }, 'text', 'Nom')}</td>
+                  {/* La colonne n'apparaît que sur « Tout le catalogue » : dans
+                      « Bois › Panneaux », la répéter sur chaque ligne ne dit
+                      rien. Un select plutôt qu'un champ libre — c'est tout
+                      l'intérêt d'avoir une table de catégories. */}
+                  {montrerCategorie && (
+                    <td style={cell}>
+                      <select value={it.category_id || ''} style={{ ...inp, cursor: 'pointer' }}
+                        onChange={e => commitNow(it, 'category_id', e.target.value ? Number(e.target.value) : null)}>
+                        <option value="">— sans catégorie —</option>
+                        {(categories || []).filter(c => !c.parent_id).map(parent => (
+                          <optgroup key={parent.id} label={parent.name}>
+                            <option value={parent.id}>{parent.name}</option>
+                            {(categories || []).filter(c => String(c.parent_id) === String(parent.id))
+                              .map(e => <option key={e.id} value={e.id}>{`  ${e.name}`}</option>)}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </td>
+                  )}
                   <td style={cell}>
                     <input list="catalog-units" value={val(it, 'unit')} placeholder="unité"
                       onChange={e => setD(it.id, 'unit', e.target.value)} onBlur={() => commit(it, 'unit')} style={inp} />
