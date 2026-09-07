@@ -206,24 +206,30 @@ export default function Offres() {
               <span>statut / envoi offre</span><span>offre</span><span>facture</span><span style={{ textAlign: 'right' }}>actions</span>
             </div>
             {grouperParClient(shown).flatMap(groupe => [
+              // Un BANDEAU plein, pas un simple filet : les lignes en portent
+              // déjà un, et deux traits de même épaisseur ne disent pas
+              // lequel ouvre une section. L'aplat, lui, se voit d'un coup
+              // d'œil en faisant défiler.
               <div key={`g-${groupe.client}`}
                 style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 940,
-                  padding: '26px 4px 8px', borderTop: `1px solid ${C.border}` }}>
-                <span style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>{groupe.client}</span>
+                  marginTop: 28, padding: '11px 16px', borderRadius: R.panel,
+                  background: C.neutralBg }}>
+                <span style={{ fontSize: 15, fontWeight: 500, color: AL.black }}>{groupe.client}</span>
                 <span style={{ font: `10.5px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
                   {groupe.items.length} offre{groupe.items.length > 1 ? 's' : ''}
                 </span>
-                <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 500, color: C.muted,
+                <span style={{ marginLeft: 'auto', fontSize: 14, fontWeight: 500, color: AL.black,
                   fontVariantNumeric: 'tabular-nums' }}>
                   {fmtCHF(groupe.total)} CHF
                 </span>
               </div>,
-              ...groupe.items.map(o => {
+              ...groupe.items.map((o, rang) => {
               const sm = quoteStatusMeta(o.status)
               const autoRef = `${new Date().getFullYear()}-${String(o.p.id).slice(-4).toUpperCase()}`
               const inv = o.invoice
               return (
-                <div key={o.p.id} style={{ ...ligne, minWidth: 940 }}>
+                <div key={o.p.id}
+                  style={{ ...ligne, minWidth: 940, ...(rang === 0 ? { borderTop: 'none' } : {}) }}>
 
                   <Link href={`/projects/${o.p.id}`} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, textDecoration: 'none' }}>
                     <span style={{ fontSize: 14.5, fontWeight: 500, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.p.name}</span>
