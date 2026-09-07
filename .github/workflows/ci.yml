@@ -14,11 +14,16 @@ jobs:
   qualite:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # v7 et non v5 : les majeures de ces deux actions ne changent que leur
+      # runtime Node, leur passage en ESM et leurs dépendances — aucun des
+      # paramètres utilisés ici. S'arrêter à v5 aurait laissé deux majeures de
+      # retard le jour même. Le v4 était forcé sur Node 24 par le runner et
+      # affichait un avertissement de dépréciation à chaque build.
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0        # nécessaire au balayage de secrets sur l'historique du diff
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
