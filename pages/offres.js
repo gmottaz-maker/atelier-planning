@@ -14,6 +14,9 @@ import { fmtCHF } from '../lib/money'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { offreArchivee } from '../lib/autoArchive'
 import ButtonPill from '../components/ButtonPill'
+import { grouperParClient } from '../lib/offres'
+
+const fmtJour = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}.${y}` : '' }
 
 export default function Offres() {
   const router = useRouter()
@@ -199,10 +202,23 @@ export default function Offres() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', overflowX: 'auto' }}>
             <div style={{ ...enTete, minWidth: 940 }}>
-              <span>client / projet</span><span>n°</span><span style={{ textAlign: 'right' }}>montant</span>
+              <span>projet</span><span>n°</span><span style={{ textAlign: 'right' }}>montant</span>
               <span>statut / envoi offre</span><span>offre</span><span>facture</span><span style={{ textAlign: 'right' }}>actions</span>
             </div>
-            {shown.map(o => {
+            {grouperParClient(shown).flatMap(groupe => [
+              <div key={`g-${groupe.client}`}
+                style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 940,
+                  padding: '26px 4px 8px', borderTop: `1px solid ${C.border}` }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>{groupe.client}</span>
+                <span style={{ font: `10.5px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
+                  {groupe.items.length} offre{groupe.items.length > 1 ? 's' : ''}
+                </span>
+                <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 500, color: C.muted,
+                  fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtCHF(groupe.total)} CHF
+                </span>
+              </div>,
+              ...groupe.items.map(o => {
               const sm = quoteStatusMeta(o.status)
               const autoRef = `${new Date().getFullYear()}-${String(o.p.id).slice(-4).toUpperCase()}`
               const inv = o.invoice
@@ -211,7 +227,9 @@ export default function Offres() {
 
                   <Link href={`/projects/${o.p.id}`} style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, textDecoration: 'none' }}>
                     <span style={{ fontSize: 14.5, fontWeight: 500, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.p.name}</span>
-                    <span style={{ fontSize: 12.5, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.p.client}</span>
+                    <span style={{ fontSize: 12.5, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {o.p.deadline ? `échéance ${fmtJour(o.p.deadline)}` : 'sans échéance'}
+                    </span>
                   </Link>
 
                   <span style={{ fontSize: 12.5, fontFamily: MONO, color: C.muted }}>{o.number || autoRef}</span>
@@ -268,7 +286,8 @@ export default function Offres() {
                   </div>
                 </div>
               )
-            })}
+              }),
+            ])}
           </div>
         )}
       </main>
