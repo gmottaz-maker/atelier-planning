@@ -39,12 +39,15 @@ const nextConfig = {
   },
   // Inclut le binaire Chromium (@sparticuz/chromium) dans les fonctions PDF —
   // les .br sont lus à l'exécution, donc pas tracés automatiquement par Next.
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/customer-invoices/[id]/pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
-      '/api/projects/[id]/devis-pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
-      '/api/send-document': ['./node_modules/@sparticuz/chromium/bin/**'],
-    },
+  //
+  // Clé de PREMIER niveau depuis Next 15 : sous `experimental`, elle est
+  // ignorée en silence et le build reste vert. Le Chromium ne partirait alors
+  // plus avec les fonctions, et les PDF (devis, factures, envois) tomberaient
+  // en production seulement.
+  outputFileTracingIncludes: {
+    '/api/customer-invoices/[id]/pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
+    '/api/projects/[id]/devis-pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
+    '/api/send-document': ['./node_modules/@sparticuz/chromium/bin/**'],
   },
 }
 
