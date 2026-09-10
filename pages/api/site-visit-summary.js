@@ -1,5 +1,6 @@
 import { requireUser } from '../../lib/requireAdmin'
 import { fetchTimeout, DELAI_IA } from '../../lib/fetchTimeout'
+import { MODELE_RAPIDE } from '../../lib/modelesClaude'
 export default async function handler(req, res) {
   if (!(await requireUser(req, res))) return
   if (req.method !== 'POST') return res.status(405).end()
@@ -50,7 +51,7 @@ ${visitText}`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-haiku-20241022',
+        model: MODELE_RAPIDE,
         max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }],
       }),

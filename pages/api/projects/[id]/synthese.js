@@ -1,7 +1,7 @@
 import { getSupabaseServer } from '../../../../lib/supabase-server'
 import { requireUser } from '../../../../lib/requireAdmin'
 import { erreurApi } from '../../../../lib/apiError'
-import { classerErreurScan } from '../../../../lib/scanErreur'
+import { classerErreurSynthese } from '../../../../lib/scanErreur'
 import { jourLocal } from '../../../../lib/aujourdhui'
 import { assemblerMatiere, genererSynthese } from '../../../../lib/synthese'
 
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
   } catch (e) {
     // Crédit épuisé, clé invalide, surcharge : le message dit quoi faire, et à
     // qui. Le dump lui-même n'est pas affecté.
-    const { passager, message } = classerErreurScan(e)
+    const { passager, message } = classerErreurSynthese(e)
     return res.status(passager ? 503 : 502).json({ error: message, passager })
   }
 
