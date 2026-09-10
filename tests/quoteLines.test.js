@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem, deplacerLigne } from '../lib/quoteLines'
+import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem, deplacerLigne, libelleEscompte } from '../lib/quoteLines'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { buildDevisHtml } from '../lib/devisHtml'
 
@@ -166,11 +166,88 @@ describe('barème', () => {
     expect(totauxDevis(q).logistique).toBe(105)
   })
 
-  it('déduit l\'escompte et le signale dans la description', () => {
+  // L'escompte n'était qu'un suffixe gris collé à la description, et la ligne
+  // portait directement le montant NET : Prix × Qté ne retombait pas sur le
+  // sous-total affiché, et le client lisait un écart inexpliqué là où on lui
+  // faisait un geste. Il occupe désormais ses propres lignes.
+  describe('escompte sur une position', () => {
     const q = { management: [{ item: 'Projet', description: 'Suivi', rate: 100, quantity: 2, discount: 10 }] }
-    const l = lignes(lignesDevis(q))[0]
-    expect(l.total).toBe(180)
-    expect(l.desc).toContain('escompte')
+
+    it('donne trois lignes : le plein, ce qu\'on retire, le net', () => {
+      const l = lignes(lignesDevis(q, { fmtCHF: n => n.toFixed(2) }))
+      expect(l.map(x => [x.role, x.total])).toEqual([
+        ['prestation', 200],
+        ['escompte', -20],
+        ['net', 180],
+      ])
+    })
+
+    it('le calcul de la première ligne se vérifie à l\'œil', () => {
+      const [tete] = lignes(lignesDevis(q))
+      expect(tete.price * 2).toBe(tete.total)
+    })
+
+    it('ne touche pas au total du devis', () => {
+      expect(totauxDevis(q).total).toBe(180)
+      expect(totauxDevis(q).gestion).toBe(180)
+    })
+
+    it('ne parasite plus la description', () => {
+      expect(lignes(lignesDevis(q))[0].desc).toBe('Suivi')
+    })
+
+    it('sans escompte, une seule ligne comme avant', () => {
+      const sans = { management: [{ item: 'Projet', rate: 100, quantity: 2 }] }
+      expect(lignes(lignesDevis(sans)).map(x => x.role)).toEqual(['prestation'])
+    })
+
+    it('nomme le taux, le montant fixe, ou les deux', () => {
+      const f = n => n.toFixed(2)
+      expect(libelleEscompte({ discount: 20 }, f)).toBe('Escompte 20 %')
+      expect(libelleEscompte({ discount_amount: 50 }, f)).toBe('Escompte 50.00 CHF')
+      expect(libelleEscompte({ discount: 10, discount_amount: 50 }, f)).toBe('Escompte 10 % + 50.00 CHF')
+      expect(libelleEscompte({}, f)).toBe('Escompte')
+    })
+
+    it('écrit la virgule décimale du taux à la suisse', () => {
+      expect(libelleEscompte({ discount: 12.5 })).toBe('Escompte 12,5 %')
+    })
+
+    it('vaut pour toutes les sections, pas seulement la gestion', () => {
+      const partout = {
+        management:     [{ item: 'G', rate: 100, quantity: 1, discount: 10 }],
+        subcontracting: [{ item: 'S', rate: 100, quantity: 1, discount: 10 }],
+        logistics:      [{ trajet: 'L', rate: 100, quantity: 1, discount: 10 }],
+        items: [{ name: 'I', labor: [{ description: 'a', rate: 100, quantity: 1, discount: 10 }] }],
+      }
+      const roles = lignes(lignesDevis(partout)).filter(x => x.role === 'escompte')
+      expect(roles).toHaveLength(4)
+      for (const r of roles) expect(r.total).toBe(-10)
+    })
+
+    // Un escompte de 100 % ramène la position à zéro : la ligne « net » doit
+    // exister quand même, sans quoi on lit un plein tarif sans contrepartie.
+    it('supporte un escompte de 100 %', () => {
+      const gratuit = { management: [{ item: 'Visite', rate: 250, quantity: 1, discount: 100 }] }
+      expect(lignes(lignesDevis(gratuit)).map(x => [x.role, x.total])).toEqual([
+        ['prestation', 250], ['escompte', -250], ['net', 0],
+      ])
+    })
+
+    it('borne à zéro : un escompte fixe supérieur au montant ne rend rien', () => {
+      const trop = { management: [{ item: 'X', rate: 100, quantity: 1, discount_amount: 400 }] }
+      const l = lignes(lignesDevis(trop))
+      expect(l.find(x => x.role === 'net').total).toBe(0)
+      expect(l.find(x => x.role === 'escompte').total).toBe(-100)
+    })
+
+    // La position et son escompte forment un bloc : le filet de séparation ne
+    // doit pas passer au milieu.
+    it('marque la tête de bloc pour que le filet soit reporté sous le net', () => {
+      expect(lignes(lignesDevis(q))[0].escompte).toBe(true)
+      const sans = { management: [{ item: 'Projet', rate: 100, quantity: 2 }] }
+      expect(lignes(lignesDevis(sans))[0].escompte).toBeUndefined()
+    })
   })
 
   it('reste la seule source du barème — computeQuoteTotal en dépend', () => {
@@ -208,6 +285,24 @@ describe('document', () => {
     const html = buildDevisHtml(masque, {})
     expect(html).not.toContain('Projet')
     expect(html).toContain("2'040,00 CHF")   // le total ne bouge pas
+  })
+
+  // Sur le PDF envoyé au client, la colonne Prix montrait le tarif plein et le
+  // sous-total le montant remisé : 2 h × 120.— affichait 192.—, sans qu'aucun
+  // chiffre n'explique l'écart. Le rabais consenti passait pour une erreur.
+  it('imprime l\'escompte, et le calcul de la ligne se vérifie', () => {
+    const remise = JSON.parse(JSON.stringify(project))
+    remise.quote_data.management[0].discount = 20
+    const html = buildDevisHtml(remise, {})
+    expect(html).toContain('Escompte 20 %')
+    expect(html).toContain('− 48,00')     // ce que le rabais retire
+    expect(html).toContain('240,00')      // le plein, qui vaut bien 2 × 120
+    expect(html).toContain('192,00')      // le net de la position
+    expect(html).toContain("1'992,00 CHF") // sous-total du devis, remise déduite
+  })
+
+  it('n\'imprime rien de tel sans escompte', () => {
+    expect(buildDevisHtml(project, {})).not.toContain('Escompte')
   })
 
   it('reprend le numéro saisi, sinon le repli année-mois-id', () => {
