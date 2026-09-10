@@ -25,6 +25,9 @@ import {
   parseTimeRange, combineTime, fmtTimeDisplay, fmtTaskDate,
 } from '../../lib/projectHelpers'
 import { fmtCHF } from '../../lib/money'
+import { jourLocal } from '../../lib/aujourdhui'
+import { verifierTailleFichier, lireReponse } from '../../lib/uploadLimit'
+import { estAudio, estImage, libelleEntree, messageTranscription, nomLisible } from '../../lib/dump'
 import { champsCommande, majCommande } from '../../lib/commandes'
 import { champsSousTraitance, majSousTraitance } from '../../lib/sousTraitance'
 
@@ -89,6 +92,148 @@ function TimeRangeInput({ value, onChange }) {
         className={inp} style={{ fontSize: 14 }} />
     </div>
   )
+}
+
+// ─── ContenuEntree ────────────────────────────────────────────────────────────
+// Ce qu'une entrée du dump montre sous son texte : une photo s'affiche, un
+// vocal s'écoute, un lien se présente, tout le reste se télécharge.
+function ContenuEntree({ entree: u }) {
+  const src = `/api/update-file?updateId=${u.id}`
+
+  if (u.url) {
+    return (
+      <div className="mt-2">
+        <a href={u.url} target="_blank" rel="noopener noreferrer"
+          className="block border u-line u-panel p-3 hover:u-fill transition-colors"
+          style={{ textDecoration: 'none' }}>
+          <span className="block u-ink font-medium" style={{ fontSize: 14 }}>
+            {u.url_titre || u.url}
+          </span>
+          <span className="block u-muted mt-0.5" style={{ fontSize: 11.5, wordBreak: 'break-all' }}>{u.url}</span>
+          {u.url_extrait && (
+            <span className="block u-muted mt-1.5" style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+              {u.url_extrait.slice(0, 280)}{u.url_extrait.length > 280 ? '…' : ''}
+            </span>
+          )}
+        </a>
+      </div>
+    )
+  }
+
+  if (!u.file_kdrive_id) return null
+
+  if (estImage(u.file_mime_type)) {
+    return (
+      <div className="mt-3">
+        <a href={src} target="_blank" rel="noopener">
+          <img src={src} alt={nomLisible(u.file_filename)}
+            style={{ maxHeight: 320, maxWidth: '100%', borderRadius: R.panel, border: `1px solid ${C.border}` }} />
+        </a>
+      </div>
+    )
+  }
+
+  if (estAudio(u.file_mime_type)) {
+    const souci = messageTranscription(u.transcription_etat)
+    return (
+      <div className="mt-3">
+        <audio controls preload="none" src={src} style={{ width: '100%', maxWidth: 420 }} />
+        {u.transcription && (
+          <p className="mt-2 u-ink whitespace-pre-wrap leading-relaxed"
+            style={{ fontSize: 13.5, borderLeft: `1.5px solid ${C.border}`, paddingLeft: 12 }}>
+            {u.transcription}
+          </p>
+        )}
+        {souci && <p className="mt-2 u-muted" style={{ fontSize: 12 }}>{souci}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3">
+      <a href={src} target="_blank" rel="noopener"
+        className="inline-block border u-line u-pill px-3 py-1.5 u-ink hover:u-fill transition-colors"
+        style={{ fontSize: 13, textDecoration: 'none' }}>
+        {nomLisible(u.file_filename) || 'pièce jointe'}
+      </a>
+    </div>
+  )
+}
+
+// ─── SynthesePanel ────────────────────────────────────────────────────────────
+// La synthèse est refaite à chaque dépôt : elle n'est donc jamais modifiable à
+// la main — une correction serait écrasée au dépôt suivant, ce qui est pire
+// que pas de correction du tout. Le bouton sert aux cas où l'appel a échoué.
+function SynthesePanel({ synthese, le, entrees, total, enCours, erreur, ouverte, onBasculer, onRegenerer }) {
+  if (!synthese && !enCours && !erreur && !total) return null
+
+  return (
+    <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: 20, background: C.surface }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0, fontFamily: FONT, fontSize: 17, fontWeight: 500, color: AL.black }}>Synthèse</h2>
+          <span style={{ fontSize: 12, color: C.muted }}>
+            {enCours ? 'mise à jour…'
+              : le ? `${entrees || 0} entrée${(entrees || 0) > 1 ? 's' : ''} · ${fmtDate(jourLocal(le))}`
+              : 'pas encore générée'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+          {!enCours && (
+            <button onClick={onRegenerer}
+              style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+                fontSize: 13, fontFamily: FONT, color: C.muted }}
+              onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+              onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
+              refaire
+            </button>
+          )}
+          {synthese && (
+            <button onClick={onBasculer}
+              style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+                fontSize: 13, fontFamily: FONT, color: C.muted }}
+              onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
+              onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
+              {ouverte ? 'replier' : 'déplier'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {erreur && <p style={{ margin: '12px 0 0', fontSize: 13, color: C.danger }}>{erreur}</p>}
+
+      {synthese && ouverte && (
+        <div className="mt-3 u-ink" style={{ fontSize: 14, lineHeight: 1.6 }}>
+          {rendreSynthese(synthese)}
+        </div>
+      )}
+
+      {!synthese && !erreur && !enCours && total > 0 && (
+        <p style={{ margin: '12px 0 0', fontSize: 13, color: C.muted }}>
+          Rien à résumer pour l'instant.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// Le modèle rend du gras Markdown pour les titres de section, et rien d'autre.
+// Un rendu Markdown complet serait une dépendance et une surface d'injection
+// pour trois astérisques.
+function rendreSynthese(texte) {
+  return String(texte).split('\n').map((ligne, i) => {
+    const titre = ligne.match(/^\*\*(.+?)\*\*\s*(.*)$/)
+    if (titre) {
+      return (
+        <p key={i} style={{ margin: i === 0 ? '0 0 4px' : '14px 0 4px' }}>
+          <strong style={{ fontWeight: 600 }}>{titre[1]}</strong>
+          {titre[2] ? ` ${titre[2]}` : ''}
+        </p>
+      )
+    }
+    if (!ligne.trim()) return null
+    return <p key={i} style={{ margin: '0 0 4px' }}>{ligne}</p>
+  })
 }
 
 // ─── EditTaskModal ────────────────────────────────────────────────────────────
@@ -1004,13 +1149,17 @@ export default function ProjectPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
-  // Updates state
+  // Dump state — le fil accepte texte, fichiers, vocaux et liens
   const [updates, setUpdates] = useState([])
   const [newUpdate, setNewUpdate] = useState('')
-  const [newUpdateImage, setNewUpdateImage] = useState(null) // { base64, mime_type, filename, preview }
+  const [newUpdateFile, setNewUpdateFile] = useState(null) // { base64, filename, mime_type, preview, size }
   const [postingUpdate, setPostingUpdate] = useState(false)
   const [updateError, setUpdateError] = useState('')
+  const [updateNotice, setUpdateNotice] = useState('')
   const [updateDragging, setUpdateDragging] = useState(false)
+  const [syntheseEnCours, setSyntheseEnCours] = useState(false)
+  const [syntheseErreur, setSyntheseErreur] = useState('')
+  const [syntheseOuverte, setSyntheseOuverte] = useState(true)
 
   // Quote state — structure: { management:[], items:[{ _uid, name, purchases:[], labor:[] }], subcontracting:[], logistics:[], general_margin:'' }
   // general_margin (%) s'applique aux achats / sous-traitance sauf si une marge spécifique est définie sur la ligne (PAS la logistique)
@@ -1473,11 +1622,13 @@ export default function ProjectPage() {
     return `${(b / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  // ── Updates helpers ──────────────────────────────────────────────────────
-  async function pickUpdateImage(file) {
+  // ── Dump helpers ─────────────────────────────────────────────────────────
+  // Tout type accepté par le dump : le contrôle réel se fait côté serveur sur
+  // la signature binaire, ici on ne fait qu'épargner un envoi voué à l'échec.
+  async function pickUpdateFile(file) {
     if (!file) return
-    if (!file.type.startsWith('image/')) { setUpdateError('Image uniquement'); return }
-    if (file.size > 10 * 1024 * 1024) { setUpdateError('Image trop grande (max 10 MB)'); return }
+    const taille = verifierTailleFichier(file)
+    if (!taille.ok) { setUpdateError(taille.message); return }
     setUpdateError('')
     const dataUrl = await new Promise((resolve, reject) => {
       const r = new FileReader()
@@ -1485,26 +1636,29 @@ export default function ProjectPage() {
       r.onerror = reject
       r.readAsDataURL(file)
     })
-    setNewUpdateImage({
+    setNewUpdateFile({
       base64: dataUrl.split(',')[1],
       mime_type: file.type,
-      filename: `update_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-      preview: dataUrl,
+      filename: `dump_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+      preview: file.type.startsWith('image/') ? dataUrl : null,
+      nomAffiche: file.name,
+      size: file.size,
     })
   }
 
   async function postUpdate() {
-    if (!newUpdate.trim()) return
+    if (!newUpdate.trim() && !newUpdateFile) return
     setPostingUpdate(true)
     setUpdateError('')
+    setUpdateNotice('')
     try {
       const body = {
         author: currentUser || 'Inconnu',
         content: newUpdate.trim(),
-        image: newUpdateImage ? {
-          base64: newUpdateImage.base64,
-          mime_type: newUpdateImage.mime_type,
-          filename: newUpdateImage.filename,
+        file: newUpdateFile ? {
+          base64: newUpdateFile.base64,
+          mime_type: newUpdateFile.mime_type,
+          filename: newUpdateFile.filename,
         } : null,
       }
       const r = await fetch(`/api/projects/${id}/updates`, {
@@ -1512,11 +1666,13 @@ export default function ProjectPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const data = await r.json()
+      const data = await lireReponse(r).catch(e => ({ error: e.message }))
       if (data.error) { setUpdateError(data.error); return }
       setUpdates(prev => [data, ...prev])
       setNewUpdate('')
-      setNewUpdateImage(null)
+      setNewUpdateFile(null)
+      if (data.avertissement) setUpdateNotice(data.avertissement)
+      regenererSynthese()
     } catch (e) {
       setUpdateError('Erreur lors de la publication')
     } finally {
@@ -1525,13 +1681,31 @@ export default function ProjectPage() {
   }
 
   async function deleteUpdate(updateId) {
-    if (!confirm('Supprimer cette mise à jour ?')) return
+    if (!confirm('Supprimer cette entrée ?')) return
     setUpdates(prev => prev.filter(u => u.id !== updateId))
     await fetch(`/api/projects/${id}/updates`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updateId }),
     })
+    regenererSynthese()
+  }
+
+  // La synthèse est refaite à chaque dépôt. L'appel n'est pas attendu par
+  // l'écran : l'entrée apparaît tout de suite, le résumé se met à jour après.
+  async function regenererSynthese() {
+    setSyntheseEnCours(true)
+    setSyntheseErreur('')
+    try {
+      const r = await fetch(`/api/projects/${id}/synthese`, { method: 'POST' })
+      const data = await r.json()
+      if (data.error) { setSyntheseErreur(data.error); return }
+      setProject(p => p ? { ...p, ...data } : p)
+    } catch (e) {
+      setSyntheseErreur('Synthèse indisponible pour le moment')
+    } finally {
+      setSyntheseEnCours(false)
+    }
   }
 
   function fmtRelative(iso) {
@@ -1726,11 +1900,24 @@ export default function ProjectPage() {
           </div>
         </div>
 
+        {/* ── Synthèse ── */}
+        <SynthesePanel
+          synthese={project.synthese}
+          le={project.synthese_le}
+          entrees={project.synthese_entrees}
+          total={updates.length}
+          enCours={syntheseEnCours}
+          erreur={syntheseErreur}
+          ouverte={syntheseOuverte}
+          onBasculer={() => setSyntheseOuverte(o => !o)}
+          onRegenerer={regenererSynthese}
+        />
+
         {/* ── Mises à jour ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
             <h2 style={h2Style}>Mises à jour</h2>
-            <span style={{ fontSize: 12, color: C.muted }}>{updates.length} note{updates.length > 1 ? 's' : ''}</span>
+            <span style={{ fontSize: 12, color: C.muted }}>{updates.length} entrée{updates.length > 1 ? 's' : ''}</span>
           </div>
 
           {/* Zone de saisie : une seule bordure, le filet outline de 1.5px */}
@@ -1742,43 +1929,51 @@ export default function ProjectPage() {
             onDrop={e => {
               e.preventDefault(); setUpdateDragging(false)
               const file = e.dataTransfer.files?.[0]
-              if (file && file.type.startsWith('image/')) pickUpdateImage(file)
+              if (file) pickUpdateFile(file)
             }}>
             <textarea
               value={newUpdate}
               onChange={e => setNewUpdate(e.target.value)}
-              placeholder="Téléphone client, mail, changement de scope, photo chantier… (glisser-déposer une image OK)"
+              placeholder="Téléphone client, mail recopié, lien, changement de scope… Glisse ici une photo, un PDF ou un message vocal."
               rows={3}
               style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', minHeight: 64,
                 fontFamily: FONT, fontSize: 14, lineHeight: 1.45, color: AL.black, background: 'transparent' }}
             />
-            {newUpdateImage && (
+            {newUpdateFile && (
               <div className="mt-3 relative inline-block">
-                <img src={newUpdateImage.preview} alt="" style={{ maxHeight: 160, borderRadius: R.panel }} />
+                {newUpdateFile.preview ? (
+                  <img src={newUpdateFile.preview} alt="" style={{ maxHeight: 160, borderRadius: R.panel }} />
+                ) : (
+                  <span style={{ display: 'inline-block', padding: '8px 34px 8px 12px', border: `1px solid ${C.border}`,
+                    borderRadius: R.pill, fontSize: 13, color: AL.black }}>
+                    {newUpdateFile.nomAffiche} · {fmtSize(newUpdateFile.size)}
+                  </span>
+                )}
                 <button
-                  onClick={() => setNewUpdateImage(null)}
+                  onClick={() => setNewUpdateFile(null)}
                   className="absolute top-1 right-1 w-6 h-6 u-pill bg-black/60 text-white text-xs flex items-center justify-center hover:bg-black"
                   type="button">×</button>
               </div>
             )}
             {updateError && <p style={{ margin: '8px 0 0', fontSize: 12, color: C.danger }}>{updateError}</p>}
+            {updateNotice && <p style={{ margin: '8px 0 0', fontSize: 12, color: C.warning }}>{updateNotice}</p>}
             <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <label style={{ fontSize: 13, color: C.muted, cursor: 'pointer' }}
                 onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
                 onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
-                joindre une image
-                <input type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={e => { pickUpdateImage(e.target.files?.[0]); e.target.value = '' }} />
+                joindre un fichier
+                <input type="file" accept="image/*,application/pdf,audio/*" style={{ display: 'none' }}
+                  onChange={e => { pickUpdateFile(e.target.files?.[0]); e.target.value = '' }} />
               </label>
-              <ButtonPill onClick={postUpdate} disabled={postingUpdate || !newUpdate.trim()}>
-                {postingUpdate ? 'publication…' : 'publier'}
+              <ButtonPill onClick={postUpdate} disabled={postingUpdate || (!newUpdate.trim() && !newUpdateFile)}>
+                {postingUpdate ? 'dépôt…' : 'déposer'}
               </ButtonPill>
             </div>
           </div>
 
           {/* Timeline */}
           {updates.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: C.muted }}>Aucune mise à jour. Note ici les téléphones, mails ou décisions au fil du projet.</p>
+            <p style={{ margin: 0, fontSize: 13, color: C.muted }}>Rien de déposé. Jette ici les téléphones, mails, liens, PDF et vocaux du projet — la synthèse se fait toute seule.</p>
           ) : (
             <ol className="space-y-3">
               {updates.map(u => {
@@ -1796,6 +1991,9 @@ export default function ProjectPage() {
                           <div className="flex items-baseline gap-2 flex-wrap">
                             <span className="font-semibold u-ink" style={{ fontSize: 14 }}>{u.author}</span>
                             <span className="text-xs u-muted">{fmtRelative(u.created_at)}</span>
+                            {libelleEntree(u) !== 'note' && (
+                              <span className="text-xs" style={{ color: C.muted }}>· {libelleEntree(u)}</span>
+                            )}
                           </div>
                           {isAdmin && (
                             <button onClick={() => deleteUpdate(u.id)}
@@ -1804,17 +2002,12 @@ export default function ProjectPage() {
                             </button>
                           )}
                         </div>
-                        <p className="mt-1.5 u-ink whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
-                          {u.content}
-                        </p>
-                        {u.image_kdrive_id && (
-                          <div className="mt-3">
-                            <a href={`/api/update-image?updateId=${u.id}`} target="_blank" rel="noopener">
-                              <img src={`/api/update-image?updateId=${u.id}`} alt={u.image_filename || ''}
-                                style={{ maxHeight: 320, maxWidth: '100%', borderRadius: R.panel, border: `1px solid ${C.border}` }} />
-                            </a>
-                          </div>
+                        {u.content && !u.url && (
+                          <p className="mt-1.5 u-ink whitespace-pre-wrap leading-relaxed" style={{ fontSize: 14 }}>
+                            {u.content}
+                          </p>
                         )}
+                        <ContenuEntree entree={u} />
                       </div>
                     </div>
                   </li>

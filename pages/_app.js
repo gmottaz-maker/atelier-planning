@@ -26,7 +26,7 @@ const PINK = AL.black
 // On injecte le token une seule fois ici (couvre fetch direct, SWR, adminFetch)
 // plutôt que de modifier chaque call-site.
 // Le cookie sert aux requêtes qui ne passent pas par fetch (<img src>, <a href>
-// vers /api/kdrive/thumbnail, /api/update-image, PDF…) : SameSite=Lax bloque
+// vers /api/kdrive/thumbnail, /api/update-file, <audio src>, PDF…) : SameSite=Lax bloque
 // les POST cross-site, et le token est déjà accessible au JS via localStorage
 // donc le cookie n'élargit pas la surface XSS.
 function syncAuthCookie(session) {
