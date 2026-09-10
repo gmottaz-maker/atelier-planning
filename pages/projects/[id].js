@@ -25,6 +25,8 @@ import {
   parseTimeRange, combineTime, fmtTimeDisplay, fmtTaskDate,
 } from '../../lib/projectHelpers'
 import { fmtCHF } from '../../lib/money'
+import { champsCommande, majCommande } from '../../lib/commandes'
+import { champsSousTraitance, majSousTraitance } from '../../lib/sousTraitance'
 
 const PINK = AL.black
 
@@ -243,55 +245,27 @@ function TaskItem({ task, onToggle, onEdit }) {
   )
 }
 
-// ─── AddCommandeForm ──────────────────────────────────────────────────────────
-function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
+// ─── ChampsCommande ───────────────────────────────────────────────────────────
+// Partagés par l'ajout et la modification : les deux formulaires ne peuvent
+// pas diverger.
+const inpCommande = "px-2.5 py-1.5 border u-line u-panel text-sm u-surface w-full"
+const lblCommande = "block text-[10px] u-muted mb-0.5"
+
+function ChampsCommande({ form, setForm, autoFocus }) {
   const { responsibles } = useResponsibles()
   const vendorSuggestions = useSuggestions('vendor')
-  const [form, setForm] = useState({
-    article: '',
-    quantity: '',
-    vendor: '',
-    order_date: '',
-    expected_date: '',
-    responsible: currentUser || DEFAULT_RESPONSIBLE,
-  })
-  const [saving, setSaving] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!form.article.trim()) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
-        body: JSON.stringify({
-          title: form.article.trim(),
-          responsible: form.responsible,
-          execution_date: form.expected_date || form.order_date || null,
-          project_id: projectId,
-          category: 'commande',
-          category_data: {
-            quantity: form.quantity.trim() || null,
-            vendor: form.vendor.trim() || null,
-            order_date: form.order_date || null,
-            expected_date: form.expected_date || null,
-          },
-        }),
-      })
-      const task = await res.json()
-      if (task.id) onAdd(task)
-    } catch (err) { console.error(err) }
-    setSaving(false)
-  }
-
-  const inp = "px-2.5 py-1.5 border u-line u-panel text-sm u-surface w-full"
-  const lbl = "block text-[10px] u-muted mb-0.5"
+  const inp = inpCommande
+  const lbl = lblCommande
+  // Un responsable absent de la liste (ancien collaborateur, « Sous-traitant »)
+  // laisserait le select vide et le réassignerait en douce à l'enregistrement.
+  const choix = !form.responsible || responsibles.includes(form.responsible)
+    ? responsibles
+    : [form.responsible, ...responsibles]
   return (
-    <form onSubmit={handleSubmit} className="pt-2 pb-1 space-y-2">
+    <>
       <div>
         <label className={lbl}>Article *</label>
-        <input autoFocus type="text" value={form.article}
+        <input autoFocus={autoFocus} type="text" value={form.article}
           onChange={e => setForm(f => ({ ...f, article: e.target.value }))}
           placeholder="ex: Vis M6 inox" className={inp} style={{ fontSize: 14 }} />
       </div>
@@ -333,14 +307,101 @@ function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
         <select value={form.responsible}
           onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))}
           className={inp} style={{ fontSize: 14 }}>
-          {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
+          {choix.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
       </div>
+    </>
+  )
+}
+
+// ─── AddCommandeForm ──────────────────────────────────────────────────────────
+function AddCommandeForm({ projectId, currentUser, onAdd, onCancel }) {
+  const [form, setForm] = useState({
+    article: '',
+    quantity: '',
+    vendor: '',
+    order_date: '',
+    expected_date: '',
+    responsible: currentUser || DEFAULT_RESPONSIBLE,
+  })
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.article.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify({
+          title: form.article.trim(),
+          responsible: form.responsible,
+          execution_date: form.expected_date || form.order_date || null,
+          project_id: projectId,
+          category: 'commande',
+          category_data: {
+            quantity: form.quantity.trim() || null,
+            vendor: form.vendor.trim() || null,
+            order_date: form.order_date || null,
+            expected_date: form.expected_date || null,
+          },
+        }),
+      })
+      const task = await res.json()
+      if (task.id) onAdd(task)
+    } catch (err) { console.error(err) }
+    setSaving(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="pt-2 pb-1 space-y-2">
+      <ChampsCommande form={form} setForm={setForm} autoFocus />
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !form.article.trim()}
           className="px-3 py-1.5 u-panel text-xs font-semibold text-white disabled:opacity-50"
           style={{ background: PINK }}>
           {saving ? '…' : 'Ajouter'}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-3 py-1.5 u-panel text-xs font-semibold u-muted border u-line">
+          Annuler
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── EditCommandeForm ─────────────────────────────────────────────────────────
+function EditCommandeForm({ task, currentUser, onSave, onCancel }) {
+  const [form, setForm] = useState(() => champsCommande(task))
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.article.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify({ prev_status: task.status, ...majCommande(task, form) }),
+      })
+      const updated = await res.json()
+      if (updated.id) { onSave(updated); onCancel() }
+    } catch (err) { console.error(err) }
+    setSaving(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="py-3 border-b last:border-b-0 space-y-2"
+      style={{ borderColor: C.border }}>
+      <ChampsCommande form={form} setForm={setForm} autoFocus />
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={saving || !form.article.trim()}
+          className="px-3 py-1.5 u-panel text-xs font-semibold text-white disabled:opacity-50"
+          style={{ background: PINK }}>
+          {saving ? '…' : 'Enregistrer'}
         </button>
         <button type="button" onClick={onCancel}
           className="px-3 py-1.5 u-panel text-xs font-semibold u-muted border u-line">
@@ -359,6 +420,7 @@ function CommandeItem({ task, currentUser, onUpdate, onDelete }) {
   const isReceived = task.status === 'completed' || !!data.received_at
   const [saving, setSaving] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   async function confirmReceived(storageLocation) {
     if (saving) return
@@ -410,6 +472,17 @@ function CommandeItem({ task, currentUser, onUpdate, onDelete }) {
     onDelete(task.id)
   }
 
+  if (editing) {
+    return (
+      <EditCommandeForm
+        task={task}
+        currentUser={currentUser}
+        onSave={onUpdate}
+        onCancel={() => setEditing(false)}
+      />
+    )
+  }
+
   return (
     <>
       <div className="py-3 border-b last:border-b-0" style={{ borderColor: C.border }}>
@@ -448,6 +521,9 @@ function CommandeItem({ task, currentUser, onUpdate, onDelete }) {
                 Annuler
               </button>
             )}
+            <button onClick={() => setEditing(true)} className="text-xs u-muted hover:u-ink">
+              Modifier
+            </button>
             <button onClick={remove} className="text-xs u-muted hover:u-ko">✕</button>
           </div>
         </div>
@@ -544,10 +620,58 @@ function StorageLocationPicker({ onConfirm, onCancel, saving }) {
   )
 }
 
-// ─── AddSousTraitanceForm ─────────────────────────────────────────────────────
-function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
+// ─── ChampsSousTraitance ──────────────────────────────────────────────────────
+// Partagés par l'ajout et la modification : les deux formulaires ne peuvent
+// pas diverger.
+const inpSousTraitance = "px-2.5 py-1.5 border u-line u-panel text-sm u-surface w-full"
+
+function ChampsSousTraitance({ form, setForm, autoFocus }) {
   const { responsibles } = useResponsibles()
   const subSuggestions = useSuggestions('subcontractor')
+  const inp = inpSousTraitance
+  // Un responsable absent de la liste (ancien collaborateur, « Sous-traitant »)
+  // laisserait le select vide et le réassignerait en douce à l'enregistrement.
+  const choix = !form.responsible || responsibles.includes(form.responsible)
+    ? responsibles
+    : [form.responsible, ...responsibles]
+  return (
+    <>
+      <input autoFocus={autoFocus} type="text" value={form.title}
+        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+        placeholder="Que sous-traiter ? (ex: Découpe panneaux)" className={inp} style={{ fontSize: 14 }} />
+      <AutocompleteInput
+        value={form.subcontractor}
+        onChange={v => setForm(f => ({ ...f, subcontractor: v }))}
+        suggestions={subSuggestions}
+        placeholder="Sous-traitant"
+        className={inp}
+        style={{ fontSize: 14 }}
+      />
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-[10px] u-muted mb-0.5">Dépose</label>
+          <input type="date" value={form.drop_date}
+            onChange={e => setForm(f => ({ ...f, drop_date: e.target.value }))}
+            className={inp} style={{ fontSize: 14 }} />
+        </div>
+        <div className="flex-1">
+          <label className="block text-[10px] u-muted mb-0.5">Récupération prévue</label>
+          <input type="date" value={form.expected_pickup_date}
+            onChange={e => setForm(f => ({ ...f, expected_pickup_date: e.target.value }))}
+            className={inp} style={{ fontSize: 14 }} />
+        </div>
+      </div>
+      <select value={form.responsible}
+        onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))}
+        className={inp} style={{ fontSize: 14 }}>
+        {choix.map(r => <option key={r} value={r}>{r}</option>)}
+      </select>
+    </>
+  )
+}
+
+// ─── AddSousTraitanceForm ─────────────────────────────────────────────────────
+function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
   const [form, setForm] = useState({
     title: '',
     subcontractor: '',
@@ -584,44 +708,54 @@ function AddSousTraitanceForm({ projectId, currentUser, onAdd, onCancel }) {
     setSaving(false)
   }
 
-  const inp = "px-2.5 py-1.5 border u-line u-panel text-sm u-surface w-full"
   return (
     <form onSubmit={handleSubmit} className="pt-2 pb-1 space-y-2">
-      <input autoFocus type="text" value={form.title}
-        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-        placeholder="Que sous-traiter ? (ex: Découpe panneaux)" className={inp} style={{ fontSize: 14 }} />
-      <AutocompleteInput
-        value={form.subcontractor}
-        onChange={v => setForm(f => ({ ...f, subcontractor: v }))}
-        suggestions={subSuggestions}
-        placeholder="Sous-traitant"
-        className={inp}
-        style={{ fontSize: 14 }}
-      />
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block text-[10px] u-muted mb-0.5">Dépose</label>
-          <input type="date" value={form.drop_date}
-            onChange={e => setForm(f => ({ ...f, drop_date: e.target.value }))}
-            className={inp} style={{ fontSize: 14 }} />
-        </div>
-        <div className="flex-1">
-          <label className="block text-[10px] u-muted mb-0.5">Récupération prévue</label>
-          <input type="date" value={form.expected_pickup_date}
-            onChange={e => setForm(f => ({ ...f, expected_pickup_date: e.target.value }))}
-            className={inp} style={{ fontSize: 14 }} />
-        </div>
-      </div>
-      <select value={form.responsible}
-        onChange={e => setForm(f => ({ ...f, responsible: e.target.value }))}
-        className={inp} style={{ fontSize: 14 }}>
-        {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
-      </select>
+      <ChampsSousTraitance form={form} setForm={setForm} autoFocus />
       <div className="flex gap-2 pt-1">
         <button type="submit" disabled={saving || !form.title.trim()}
           className="px-3 py-1.5 u-panel text-xs font-semibold text-white disabled:opacity-50"
           style={{ background: PINK }}>
           {saving ? '…' : 'Ajouter'}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-3 py-1.5 u-panel text-xs font-semibold u-muted border u-line">
+          Annuler
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ─── EditSousTraitanceForm ────────────────────────────────────────────────────
+function EditSousTraitanceForm({ task, currentUser, onSave, onCancel }) {
+  const [form, setForm] = useState(() => champsSousTraitance(task))
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.title.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify({ prev_status: task.status, ...majSousTraitance(task, form) }),
+      })
+      const updated = await res.json()
+      if (updated.id) { onSave(updated); onCancel() }
+    } catch (err) { console.error(err) }
+    setSaving(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="py-3 border-b last:border-b-0 space-y-2"
+      style={{ borderColor: C.border }}>
+      <ChampsSousTraitance form={form} setForm={setForm} autoFocus />
+      <div className="flex gap-2 pt-1">
+        <button type="submit" disabled={saving || !form.title.trim()}
+          className="px-3 py-1.5 u-panel text-xs font-semibold text-white disabled:opacity-50"
+          style={{ background: PINK }}>
+          {saving ? '…' : 'Enregistrer'}
         </button>
         <button type="button" onClick={onCancel}
           className="px-3 py-1.5 u-panel text-xs font-semibold u-muted border u-line">
@@ -639,6 +773,7 @@ function SousTraitanceItem({ task, currentUser, onUpdate, onDelete, onAddTask })
   const isDone = task.status === 'completed' || !!data.picked_up_at
   const [saving, setSaving] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   async function transition(payload) {
     if (saving) return
@@ -765,6 +900,17 @@ function SousTraitanceItem({ task, currentUser, onUpdate, onDelete, onAddTask })
   const stateLabel = isDone ? 'À l\'atelier' : isReady ? 'Prêt à récupérer' : 'Chez le sous-traitant'
   const stateColor = isDone ? C.success : isReady ? C.warning : C.muted
 
+  if (editing) {
+    return (
+      <EditSousTraitanceForm
+        task={task}
+        currentUser={currentUser}
+        onSave={onUpdate}
+        onCancel={() => setEditing(false)}
+      />
+    )
+  }
+
   return (
     <>
     <div className="py-3 border-b last:border-b-0" style={{ borderColor: C.border }}>
@@ -809,6 +955,9 @@ function SousTraitanceItem({ task, currentUser, onUpdate, onDelete, onAddTask })
               Annuler
             </button>
           )}
+          <button onClick={() => setEditing(true)} className="text-xs u-muted hover:u-ink">
+            Modifier
+          </button>
           <button onClick={remove} className="text-xs u-muted hover:u-ko">✕</button>
         </div>
       </div>
