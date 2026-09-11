@@ -418,6 +418,14 @@ ligne d'un collègue lui répond 404. L'admin saisit pour les autres — c'est l
 qui reportera les feuilles scannées — et lui seul exporte : l'export est le
 relevé d'activité de toute l'équipe.
 
+**Chaque activité a un tarif de vente et un coût de revient à l'heure.** NULL
+veut dire « pas renseigné », jamais zéro : une heure sur une activité sans coût
+est signalée et écartée du calcul, pas comptée gratuite. Le coût de revient
+n'est lu que par l'admin — `/api/activites` ne le SÉLECTIONNE pas pour un
+membre, un filtre côté page ne protégerait rien. Renommer un libellé est permis ;
+changer le SENS d'un code ne l'est pas, une nouvelle activité prend un nouveau
+code.
+
 **La rentabilité compare au prix de REVIENT** (`lib/rentabilite.js`, bloc admin
 en bas de la fiche projet). Le prévu se lit sur l'offre AVANT marge et escompte
 — prix d'achat × quantité, tarif de sous-traitance × quantité — parce que c'est
@@ -636,6 +644,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-bank-classification.sql` | `bank_transactions.classification` + comptes par défaut (salaires, virements internes) | en fin de fichier |
 | `schema-heures.sql` | `projects.numero`, tables `activites` et `heures` | en fin de fichier |
 | `schema-project-couts.sql` | table `project_couts` (coûts réels saisis par projet) | en fin de fichier |
+| `schema-activites-tarifs.sql` | `activites.tarif_vente`, `activites.cout_revient` | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

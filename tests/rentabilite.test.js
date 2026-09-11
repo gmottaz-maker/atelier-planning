@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { prevuDevis, reelProjet, comparaison, validerCout, montant } from '../lib/rentabilite'
+import { prevuDevis, reelProjet, comparaison, validerCout, montant, mainOeuvreReelle, margeReelle } from '../lib/rentabilite'
 
 const devis = {
   general_margin: 30,
@@ -103,5 +103,46 @@ describe('validerCout', () => {
   it('ne laisse passer aucun champ inattendu', () => {
     const v = validerCout({ categorie: 'autre', libelle: 'x', montant_ht: 10, project_id: 'autre', created_by: 'Pirate', id: 3 })
     expect(Object.keys(v.valeur).sort()).toEqual(['categorie', 'date', 'fournisseur', 'libelle', 'montant_ht'])
+  })
+})
+
+describe('mainOeuvreReelle', () => {
+  const activites = [
+    { code: 2, libelle: 'CNC', cout_revient: '95.00', tarif_vente: '140.00' },
+    { code: 8, libelle: 'Peinture', cout_revient: 70, tarif_vente: 100 },
+    { code: 5, libelle: 'Assemblage', cout_revient: null, tarif_vente: 100 },
+  ]
+  const heures = [
+    { activite: 8, minutes: 240 }, { activite: 8, minutes: 90 },
+    { activite: 2, minutes: 60 },
+    { activite: 5, minutes: 120 },
+  ]
+  const mo = mainOeuvreReelle(heures, activites)
+
+  it('valorise chaque activité à son coût et à son tarif', () => {
+    expect(mo.lignes[0]).toEqual({ code: 8, libelle: 'Peinture', minutes: 330, cout: 385, vente: 550 })
+    expect(mo.lignes.find(l => l.code === 2)).toMatchObject({ cout: 95, vente: 140 })
+  })
+  // Une heure sans coût n'est pas une heure gratuite.
+  it('écarte et signale les heures d\'une activité sans coût', () => {
+    expect(mo.lignes.find(l => l.code === 5)).toMatchObject({ cout: null, vente: 200 })
+    expect(mo.minutesSansCout).toBe(120)
+    expect(mo.cout).toBe(480)
+  })
+  it('nomme une activité inconnue plutôt que de planter', () => {
+    expect(mainOeuvreReelle([{ activite: 42, minutes: 60 }], []).lignes[0]).toMatchObject({ libelle: 'activité 42', cout: null })
+  })
+})
+
+describe('margeReelle', () => {
+  it('retranche tout ce qui a été dépensé du prix de l\'offre', () => {
+    expect(margeReelle(5000, { materiel: 1200, sous_traitance: 300, autre: 50 }, 1450))
+      .toEqual({ vente: 5000, couts: 3000, marge: 2000, pct: 40 })
+  })
+  it('rend une marge négative quand on a perdu de l\'argent', () => {
+    expect(margeReelle(1000, { materiel: 900 }, 300)).toMatchObject({ marge: -200, pct: -20 })
+  })
+  it('ne calcule pas de pourcentage sur une offre à zéro', () => {
+    expect(margeReelle(0, {}, 0).pct).toBe(null)
   })
 })

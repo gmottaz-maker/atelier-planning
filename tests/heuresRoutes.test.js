@@ -231,3 +231,56 @@ describe('/api/activites', () => {
     expect(c.maj()).toEqual({ actif: false })
   })
 })
+
+describe('/api/activites — tarifs', () => {
+  // Le banc d'essai ignore la liste de colonnes : on inspecte donc ce que la
+  // route DEMANDE à la base, pas ce qu'elle reçoit.
+  function colonnesDemandees() {
+    const vrai = base.from.bind(base)
+    const demandes = []
+    base.from = (nom) => {
+      const q = vrai(nom)
+      const select = q.select
+      // La chaîne d'authentification lit `profiles` d'abord : seule la
+      // requête sur `activites` nous intéresse.
+      q.select = (cols) => { if (nom === 'activites') demandes.push(cols); return select(cols) }
+      return q
+    }
+    return demandes
+  }
+
+  it('n\'envoie jamais le coût de revient à un membre', async () => {
+    sous(MEMBRE)
+    const demandes = colonnesDemandees()
+    await appeler('activites', { method: 'GET' })
+    expect(demandes[0]).toContain('tarif_vente')
+    expect(demandes[0]).not.toContain('cout_revient')
+  })
+
+  it('l\'envoie à l\'admin', async () => {
+    sous(ADMIN)
+    const demandes = colonnesDemandees()
+    await appeler('activites', { method: 'GET' })
+    expect(demandes[0]).toContain('cout_revient')
+  })
+
+  it('enregistre un tarif et un coût tapés à la suisse', async () => {
+    sous(ADMIN)
+    const c = capturer()
+    const res = await appeler('activites', { method: 'PATCH', body: { code: 8, tarif_vente: '110', cout_revient: "72,50" } })
+    expect(res.statusCode).toBe(200)
+    expect(c.maj()).toEqual({ tarif_vente: 110, cout_revient: 72.5 })
+  })
+
+  it('renomme sans jamais toucher au code', async () => {
+    sous(ADMIN)
+    const c = capturer()
+    await appeler('activites', { method: 'PATCH', body: { code: 8, libelle: 'Peinture', code_nouveau: 30 } })
+    expect(c.maj()).toEqual({ libelle: 'Peinture' })
+  })
+
+  it('refuse un coût négatif', async () => {
+    sous(ADMIN)
+    expect((await appeler('activites', { method: 'PATCH', body: { code: 8, cout_revient: '-3' } })).statusCode).toBe(400)
+  })
+})

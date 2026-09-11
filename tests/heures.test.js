@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   normaliserHeure, versMinutes, duree, formatDuree, enHeures, validerEntree,
   chevauche, chevauchements, totalPar, lignesExport, versCSV, validerActivite, DUREE_MAX,
+  lireTarif, validerMajActivite,
 } from '../lib/heures'
 
 const ACT = [
@@ -150,8 +151,8 @@ describe('export', () => {
 
 describe('validerActivite', () => {
   it('accepte une activité nouvelle', () => {
-    expect(validerActivite({ code: 16, libelle: ' Gravure ', famille: 'atelier' }, ACT))
-      .toEqual({ ok: true, valeur: { code: 16, libelle: 'Gravure', famille: 'atelier' } })
+    expect(validerActivite({ code: 16, libelle: ' Gravure ', famille: 'atelier', tarif_vente: '120,50' }, ACT))
+      .toEqual({ ok: true, valeur: { code: 16, libelle: 'Gravure', famille: 'atelier', tarif_vente: 120.5, cout_revient: null } })
   })
   it('ne réattribue jamais un code, même désactivé', () => {
     expect(validerActivite({ code: 9, libelle: 'Autre', famille: 'atelier' }, ACT).erreur).toMatch(/jamais réattribué/)
@@ -160,5 +161,43 @@ describe('validerActivite', () => {
     expect(validerActivite({ code: 100, libelle: 'x', famille: 'atelier' }, ACT).ok).toBe(false)
     expect(validerActivite({ code: 17, libelle: '  ', famille: 'atelier' }, ACT).ok).toBe(false)
     expect(validerActivite({ code: 17, libelle: 'x', famille: 'cuisine' }, ACT).ok).toBe(false)
+  })
+})
+
+describe('tarifs des activités', () => {
+  it('lit un tarif tel qu\'on le tape', () => {
+    expect(lireTarif('120')).toEqual({ ok: true, valeur: 120 })
+    expect(lireTarif('120,50')).toEqual({ ok: true, valeur: 120.5 })
+    expect(lireTarif("1'200")).toEqual({ ok: true, valeur: 1200 })
+    expect(lireTarif(0)).toEqual({ ok: true, valeur: 0 })
+  })
+  // Un coût inconnu compté à zéro gonflerait la marge en silence.
+  it('rend null pour un champ vide, jamais zéro', () => {
+    expect(lireTarif('')).toEqual({ ok: true, valeur: null })
+    expect(lireTarif(null)).toEqual({ ok: true, valeur: null })
+  })
+  it('refuse un tarif négatif ou illisible', () => {
+    for (const v of ['-5', 'abc', '99999']) expect(lireTarif(v).ok, v).toBe(false)
+  })
+})
+
+describe('validerMajActivite', () => {
+  it('ne renvoie que les champs présents', () => {
+    expect(validerMajActivite({ cout_revient: '72.5' })).toEqual({ ok: true, valeur: { cout_revient: 72.5 } })
+    expect(validerMajActivite({ libelle: ' Peinture ', famille: 'finitions' }))
+      .toEqual({ ok: true, valeur: { libelle: 'Peinture', famille: 'finitions' } })
+  })
+  it('laisse effacer un tarif', () => {
+    expect(validerMajActivite({ tarif_vente: '' }).valeur).toEqual({ tarif_vente: null })
+  })
+  it('ne touche jamais au code', () => {
+    const v = validerMajActivite({ code: 5, code_nouveau: 7, actif: false })
+    expect(v.valeur).toEqual({ actif: false })
+  })
+  it('refuse un libellé vide, une famille inconnue, un tarif invalide, ou rien', () => {
+    expect(validerMajActivite({ libelle: ' ' }).ok).toBe(false)
+    expect(validerMajActivite({ famille: 'cuisine' }).ok).toBe(false)
+    expect(validerMajActivite({ cout_revient: '-1' }).erreur).toMatch(/Coût de revient/)
+    expect(validerMajActivite({}).ok).toBe(false)
   })
 })

@@ -114,6 +114,11 @@ const CONTROLES = [
     migration: 'schema-project-couts.sql',
     sonde: async () => !(await sb.from('project_couts').select('id, montant_ht').limit(1)).error,
   },
+  {
+    nom: 'activités : tarif de vente et coût de revient',
+    migration: 'schema-activites-tarifs.sql',
+    sonde: async () => !(await sb.from('activites').select('tarif_vente, cout_revient').limit(1)).error,
+  },
 ]
 
 let manquants = 0

@@ -270,7 +270,7 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
   const [du, setDu] = useState(`${aujourdhui.slice(0, 7)}-01`)
   const [au, setAu] = useState(aujourdhui)
   const [qui, setQui] = useState('')
-  const [nouvelle, setNouvelle] = useState({ code: '', libelle: '', famille: 'atelier' })
+  const [nouvelle, setNouvelle] = useState({ code: '', libelle: '', famille: 'atelier', tarif_vente: '', cout_revient: '' })
   const [erreur, setErreur] = useState('')
   const { mutate } = useSWR('/api/activites')
 
@@ -287,8 +287,11 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
     return true
   }
 
+  const entete = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 500 }
+  const COLONNES = '40px minmax(140px, 2fr) 130px 100px 100px 70px auto'
+
   return (
-    <section style={{ marginTop: 48, display: 'grid', gap: 32, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+    <section style={{ marginTop: 48, display: 'flex', flexDirection: 'column', gap: 40 }}>
       <div>
         <div style={{ ...microLabel, marginBottom: 10 }}>export</div>
         <p style={{ fontSize: 13, color: C.muted, margin: '0 0 12px' }}>
@@ -302,15 +305,13 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
             <option value="">toute l'équipe</option>
             {personnes.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
-        </div>
-        <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
           <a href={`/api/heures/export?${params}`}
             style={{ padding: '8px 18px', borderRadius: R.pill, background: AL.black, color: AL.white,
               font: `500 13px ${FONT}`, textDecoration: 'none' }}>
             télécharger le CSV
           </a>
           <a href={`/api/heures/export?${params}&format=json`} target="_blank" rel="noopener"
-            style={{ ...lien, alignSelf: 'center', textDecoration: 'none' }}>
+            style={{ ...lien, textDecoration: 'none' }}>
             voir en JSON
           </a>
         </div>
@@ -318,37 +319,105 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
 
       <div>
         <div style={{ ...microLabel, marginBottom: 10 }}>activités</div>
-        <p style={{ fontSize: 13, color: C.muted, margin: '0 0 12px' }}>
-          Un code ne change jamais et n'est jamais repris : une feuille scannée doit garder son sens des années
-          plus tard. Une activité qui ne sert plus se désactive.
+        <p style={{ fontSize: 13, color: C.muted, margin: '0 0 12px', maxWidth: 760 }}>
+          Le <strong style={{ fontWeight: 500, color: AL.black }}>tarif</strong> est ce que tu factures une heure ; le{' '}
+          <strong style={{ fontWeight: 500, color: AL.black }}>coût</strong>, ce qu'elle te coûte (salaire, charges,
+          machine, frais généraux) — lui seul donne la marge réelle, et il n'est visible que par les admins. Un champ
+          vide veut dire « pas encore renseigné », jamais zéro. Renommer un libellé, oui ; changer le sens d'un code,
+          non : une nouvelle activité prend un nouveau code.
         </p>
-        <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden' }}>
-          {activites.map(a => (
-            <div key={a.code} style={{ display: 'grid', gridTemplateColumns: '36px minmax(0, 1fr) 90px auto', gap: 10,
-              alignItems: 'baseline', padding: '8px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13,
-              color: a.actif ? AL.black : C.muted }}>
-              <span style={{ fontFamily: MONO }}>{a.code}</span>
-              <span style={{ textDecoration: a.actif ? 'none' : 'line-through' }}>{a.libelle}</span>
-              <span style={{ color: C.muted, fontSize: 12 }}>{LIBELLES_FAMILLE[a.famille] || a.famille}</span>
-              <button style={lien} onClick={() => envoyer('PATCH', { code: a.code, actif: !a.actif })}>
-                {a.actif ? 'désactiver' : 'réactiver'}
-              </button>
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflowX: 'auto' }}>
+          <div style={{ minWidth: 700 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: COLONNES, gap: 10, padding: '10px 14px', ...entete }}>
+              <span>n°</span><span>libellé</span><span>famille</span>
+              <span style={{ textAlign: 'right' }}>tarif / h</span><span style={{ textAlign: 'right' }}>coût / h</span>
+              <span style={{ textAlign: 'right' }}>marge</span><span />
             </div>
-          ))}
+            {activites.map(a => (
+              <LigneActivite key={a.code} activite={a} colonnes={COLONNES}
+                onEnregistrer={corps => envoyer('PATCH', { code: a.code, ...corps })} />
+            ))}
+          </div>
         </div>
-        <form onSubmit={async e => { e.preventDefault(); if (await envoyer('POST', { ...nouvelle, code: Number(nouvelle.code) })) setNouvelle({ code: '', libelle: '', famille: nouvelle.famille }) }}
-          style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+
+        <form onSubmit={async e => {
+          e.preventDefault()
+          if (await envoyer('POST', { ...nouvelle, code: Number(nouvelle.code) })) {
+            setNouvelle(n => ({ code: '', libelle: '', famille: n.famille, tarif_vente: '', cout_revient: '' }))
+          }
+        }} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
           <input type="number" min={1} max={99} required placeholder="n°" value={nouvelle.code}
             onChange={e => setNouvelle(n => ({ ...n, code: e.target.value }))} style={{ ...champ, width: 70, fontFamily: MONO }} />
           <input required placeholder="libellé" value={nouvelle.libelle} maxLength={60}
-            onChange={e => setNouvelle(n => ({ ...n, libelle: e.target.value }))} style={{ ...champ, flex: '1 1 140px', minWidth: 0 }} />
+            onChange={e => setNouvelle(n => ({ ...n, libelle: e.target.value }))} style={{ ...champ, flex: '1 1 160px', minWidth: 0 }} />
           <select value={nouvelle.famille} onChange={e => setNouvelle(n => ({ ...n, famille: e.target.value }))} style={champ}>
             {FAMILLES.map(f => <option key={f} value={f}>{LIBELLES_FAMILLE[f]}</option>)}
           </select>
+          <input placeholder="tarif / h" inputMode="decimal" value={nouvelle.tarif_vente}
+            onChange={e => setNouvelle(n => ({ ...n, tarif_vente: e.target.value }))} style={{ ...champ, width: 100, fontFamily: MONO }} />
+          <input placeholder="coût / h" inputMode="decimal" value={nouvelle.cout_revient}
+            onChange={e => setNouvelle(n => ({ ...n, cout_revient: e.target.value }))} style={{ ...champ, width: 100, fontFamily: MONO }} />
           <button type="submit" style={{ ...lien, color: AL.black }}>+ ajouter</button>
         </form>
         {erreur && <p style={{ margin: '8px 0 0', fontSize: 13, color: C.danger }}>{erreur}</p>}
       </div>
     </section>
+  )
+}
+
+// Une ligne d'activité, éditable sur place. « enregistrer » n'apparaît que
+// lorsque quelque chose a changé : une ligne intacte ne doit pas inviter à
+// cliquer. Le code, lui, n'est jamais un champ.
+function LigneActivite({ activite: a, colonnes, onEnregistrer }) {
+  const depuis = x => ({
+    libelle: x.libelle || '', famille: x.famille,
+    tarif_vente: x.tarif_vente == null ? '' : String(x.tarif_vente),
+    cout_revient: x.cout_revient == null ? '' : String(x.cout_revient),
+  })
+  const [f, setF] = useState(() => depuis(a))
+  const [envoi, setEnvoi] = useState(false)
+  const origine = depuis(a)
+  const modifie = Object.keys(f).some(k => f[k] !== origine[k])
+
+  const lire = v => { const n = Number(String(v).replace(/['’\s]/g, '').replace(',', '.')); return String(v).trim() === '' || !Number.isFinite(n) ? null : n }
+  const vente = lire(f.tarif_vente), cout = lire(f.cout_revient)
+  const marge = vente != null && cout != null ? vente - cout : null
+
+  async function enregistrer() {
+    setEnvoi(true)
+    const corps = {}
+    for (const k of Object.keys(f)) if (f[k] !== origine[k]) corps[k] = f[k]
+    await onEnregistrer(corps)
+    setEnvoi(false)
+  }
+
+  const cellule = { ...champ, padding: '5px 10px', width: '100%', boxSizing: 'border-box' }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: colonnes, gap: 10, alignItems: 'center',
+      padding: '6px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, opacity: a.actif ? 1 : 0.55 }}>
+      <span style={{ fontFamily: MONO }}>{a.code}</span>
+      <input value={f.libelle} maxLength={60} onChange={e => setF(x => ({ ...x, libelle: e.target.value }))}
+        style={{ ...cellule, textDecoration: a.actif ? 'none' : 'line-through' }} aria-label={`Libellé ${a.code}`} />
+      <select value={f.famille} onChange={e => setF(x => ({ ...x, famille: e.target.value }))} style={cellule} aria-label={`Famille ${a.code}`}>
+        {FAMILLES.map(fam => <option key={fam} value={fam}>{LIBELLES_FAMILLE[fam]}</option>)}
+      </select>
+      <input value={f.tarif_vente} inputMode="decimal" placeholder="—" onChange={e => setF(x => ({ ...x, tarif_vente: e.target.value }))}
+        style={{ ...cellule, fontFamily: MONO, textAlign: 'right' }} aria-label={`Tarif ${a.code}`} />
+      <input value={f.cout_revient} inputMode="decimal" placeholder="—" onChange={e => setF(x => ({ ...x, cout_revient: e.target.value }))}
+        style={{ ...cellule, fontFamily: MONO, textAlign: 'right' }} aria-label={`Coût ${a.code}`} />
+      <span style={{ fontFamily: MONO, textAlign: 'right', color: marge == null ? C.muted : marge < 0 ? C.danger : AL.black }}>
+        {marge == null ? '—' : Math.round(marge)}
+      </span>
+      <span style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
+        {modifie ? (
+          <>
+            <button style={{ ...lien, color: AL.black }} disabled={envoi} onClick={enregistrer}>{envoi ? '…' : 'enregistrer'}</button>
+            <button style={lien} onClick={() => setF(origine)}>annuler</button>
+          </>
+        ) : (
+          <button style={lien} onClick={() => onEnregistrer({ actif: !a.actif })}>{a.actif ? 'désactiver' : 'réactiver'}</button>
+        )}
+      </span>
+    </div>
   )
 }

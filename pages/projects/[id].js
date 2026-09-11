@@ -31,8 +31,9 @@ import { estAudio, estImage, libelleEntree, messageTranscription, nomLisible } f
 import { champsCommande, majCommande } from '../../lib/commandes'
 import { champsSousTraitance, majSousTraitance } from '../../lib/sousTraitance'
 import useSWR from 'swr'
-import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT } from '../../lib/rentabilite'
-import { totalPar, formatDuree } from '../../lib/heures'
+import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT, mainOeuvreReelle, margeReelle } from '../../lib/rentabilite'
+import { formatDuree } from '../../lib/heures'
+import { totauxDevis } from '../../lib/quoteLines'
 
 const PINK = AL.black
 
@@ -1139,8 +1140,12 @@ function RentabiliteProjet({ projectId, quote }) {
   const heures = Array.isArray(heuresBrutes) ? heuresBrutes : []
   const activites = Array.isArray(activitesBrutes) ? activitesBrutes : []
   const prevu = prevuDevis(quote)
-  const lignes = comparaison(prevu, reelProjet(couts, heures))
-  const parActivite = Object.entries(totalPar(heures, h => h.activite)).sort((a, b) => b[1] - a[1])
+  const reel = reelProjet(couts, heures)
+  const lignes = comparaison(prevu, reel)
+  // Les heures valorisées au coût de LEUR activité : une heure de CNC ne coûte
+  // pas une heure de conduite.
+  const mo = mainOeuvreReelle(heures, activites)
+  const resultat = margeReelle(totauxDevis(quote).total, reel, mo.cout)
   const libelleCat = cle => CATEGORIES_COUT.find(c => c.cle === cle)?.label || cle
 
   const fmt = (v, unite) => unite === 'h' ? `${String(v).replace('.', ',')} h` : fmtCHF(v)
@@ -1213,12 +1218,61 @@ function RentabiliteProjet({ projectId, quote }) {
         </p>
       )}
 
-      {parActivite.length > 0 && (
-        <p style={{ margin: '14px 0 0', fontSize: 13, color: AL.black }}>
-          <span style={{ color: C.muted }}>Heures par activité : </span>
-          {parActivite.map(([code, min], i) => (
-            <span key={code}>{i ? ' · ' : ''}{activites.find(a => String(a.code) === String(code))?.libelle || `activité ${code}`} {formatDuree(min)}</span>
-          ))}
+      {mo.lignes.length > 0 && (
+        <>
+          <div style={{ marginTop: 22, fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 500 }}>heures par activité</div>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden', overflowX: 'auto', marginTop: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT }}>
+              <thead>
+                <tr style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                  <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 500 }}>activité</th>
+                  <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>heures</th>
+                  <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>au coût</th>
+                  <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>au tarif</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mo.lignes.map(l => (
+                  <tr key={l.code}>
+                    <td style={cellule}><span style={{ fontFamily: MONO }}>{l.code}</span> · {l.libelle}</td>
+                    <td style={nombre}>{formatDuree(l.minutes)}</td>
+                    <td style={{ ...nombre, color: l.cout == null ? C.muted : AL.black }}>{l.cout == null ? 'coût ?' : fmtCHF(l.cout)}</td>
+                    <td style={{ ...nombre, color: l.vente == null ? C.muted : AL.black }}>{l.vente == null ? '—' : fmtCHF(l.vente)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* Marge réelle : le prix de l'offre moins TOUT ce qui a été dépensé. */}
+      <div style={{ marginTop: 22, fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 500 }}>marge réelle</div>
+      <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, marginTop: 8, padding: '6px 0' }}>
+        {[
+          ['Prix de l\'offre HT', resultat.vente, false],
+          ['Matériaux payés', -reel.materiel, true],
+          ['Sous-traitance payée', -reel.sous_traitance, true],
+          ['Autres frais', -reel.autre, true],
+          [`Main-d'œuvre au coût de revient (${formatDuree(heures.reduce((s, h) => s + (Number(h.minutes) || 0), 0))})`, -mo.cout, true],
+        ].map(([label, v, sub]) => (
+          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '6px 16px', fontSize: 13 }}>
+            <span style={{ color: sub ? C.muted : AL.black }}>{label}</span>
+            <span style={{ fontFamily: MONO }}>{sub && v !== 0 ? '− ' : ''}{fmtCHF(Math.abs(v))}</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '10px 16px 6px', marginTop: 4,
+          borderTop: `1px solid ${C.border}`, fontSize: 15, fontWeight: 500 }}>
+          <span>Marge réelle</span>
+          <span style={{ fontFamily: MONO, color: resultat.marge < 0 ? C.danger : AL.black }}>
+            {resultat.marge < 0 ? '− ' : ''}{fmtCHF(Math.abs(resultat.marge))}{resultat.pct != null ? ` · ${String(resultat.pct).replace('.', ',')} %` : ''}
+          </span>
+        </div>
+      </div>
+      {mo.minutesSansCout > 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: C.warning }}>
+          {formatDuree(mo.minutesSansCout)} imputées sur des activités sans coût de revient ne sont pas comptées : la
+          marge réelle est donc surestimée. Renseigne leur coût dans /heures.
         </p>
       )}
 
