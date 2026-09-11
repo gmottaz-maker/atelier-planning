@@ -13,6 +13,7 @@ import { fmtCHF } from '../lib/money'
 import { genRowUid, genItemUid, copierItem, deplacerLigne } from '../lib/quoteLines'
 import { DEFAUTS_OFFRE, normaliserReglagesOffre } from '../lib/quoteDefaults'
 import { AL, C, FONT, R } from '../lib/theme'
+import { ligneForfait } from '../lib/transport'
 
 // Styles partagés — le système n'a qu'une bordure (le filet outline 1.5px) et
 // deux radius.
@@ -180,7 +181,9 @@ function CompositionElement({
   )
 }
 
-export default function QuoteEditor({ value, onChange, reglages }) {
+// `transport` (facultatif) : véhicules et forfaits de ville. Absent — dans
+// l'éditeur de facture —, la colonne Véhicule et le menu Forfait n'existent pas.
+export default function QuoteEditor({ value, onChange, reglages, transport }) {
   // Repli sur les valeurs d'origine : cet éditeur sert aussi aux factures, où
   // les réglages ne sont pas forcément chargés. Une ligne ajoutée à la main
   // n'est jamais bloquée par un réglage manquant.
@@ -233,6 +236,7 @@ export default function QuoteEditor({ value, onChange, reglages }) {
   function moveManagementRow(idx, sens) { setQuote(q => ({ ...q, management: deplacerLigne(q.management, idx, sens) })); setQuoteDirty(true) }
 
   // ── Logistique ──
+  const avecVehicules = (transport?.vehicules?.length || 0) > 0
   function addLogisticsRow()    { setQuote(q => ({ ...q, logistics: [...q.logistics, emptyLogisticsRow()] })); setQuoteDirty(true) }
   function updateLogisticsRow(idx, field, v) { setQuote(q => ({ ...q, logistics: q.logistics.map((r, i) => i === idx ? { ...r, [field]: v } : r) })); setQuoteDirty(true) }
   function removeLogisticsRow(idx) { setQuote(q => ({ ...q, logistics: q.logistics.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
@@ -783,6 +787,19 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                           {!collapsedSections.logistics && (
                             <>
                               <CatalogPicker kind="all" onPick={it => appendLogisticsRow(toRateRow(it))} />
+                              {transport?.forfaits?.length > 0 && (
+                                <select value="" aria-label="Ajouter un forfait"
+                                  onChange={e => {
+                                    const f = transport.forfaits.find(x => x.id === e.target.value)
+                                    if (f) appendLogisticsRow(ligneForfait(f))
+                                  }}
+                                  className="quote-action" style={{ '--qa': TEINTES.logistics.fort, cursor: 'pointer' }}>
+                                  <option value="">+ Forfait</option>
+                                  {transport.forfaits.map(f => (
+                                    <option key={f.id} value={f.id}>{f.nom} · {f.prix ?? '?'} CHF · {f.km ?? '?'} km</option>
+                                  ))}
+                                </select>
+                              )}
                               <button onClick={addLogisticsRow}
                                 className="quote-action" style={{ '--qa': TEINTES.logistics.fort }}>+ Ligne</button>
                             </>
@@ -794,21 +811,22 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                         <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '13%' }}>Item</th>
-                              <th className={th} style={{ width: '22%' }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: '12%' }}>Prix</th>
+                              <th className={th} style={{ width: avecVehicules ? '11%' : '13%' }}>Item</th>
+                              <th className={th} style={{ width: avecVehicules ? '14%' : '22%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '10%' : '12%' }}>Prix</th>
                               <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
-                              <th className={th} style={{ width: '9%' }}>Unité</th>
+                              <th className={th} style={{ width: avecVehicules ? '8%' : '9%' }}>Unité</th>
+                              {avecVehicules && <th className={th} style={{ width: '14%' }}>Véhicule · pers.</th>}
                               <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
-                              <th className={th + ' text-right'} style={{ width: '10%' }}>Esc.&nbsp;CHF</th>
-                              <th className={th + ' text-right'} style={{ width: '8%' }}>Total</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '9%' }}>Esc.&nbsp;%</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '8%' : '10%' }}>Esc.&nbsp;CHF</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '11%' : '8%' }}>Total</th>
                               <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
                           <tbody>
                             {quote.logistics.length === 0 ? (
-                              <tr><td colSpan={10} className="text-center text-sm u-muted py-6">Aucune ligne.</td></tr>
+                              <tr><td colSpan={avecVehicules ? 11 : 10} className="text-center text-sm u-muted py-6">Aucune ligne.</td></tr>
                             ) : quote.logistics.map((r, i) => (
                               <tr key={r._uid || i} className="group quote-row">
                                 <td className={td}><input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
@@ -816,6 +834,28 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(i, 'quantity', v)} /></td>
                                 <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
+                                {avecVehicules && (
+                                  <td className={td}>
+                                    {/* Véhicule et nombre de personnes, là où l'on roule : km et
+                                        forfaits. Ni l'un ni l'autre ne s'imprime — ce sont des
+                                        données de coût, pas de vente. */}
+                                    {(String(r.unit || '').toLowerCase() === 'km' || r.forfait) && (
+                                      <span style={{ display: 'flex', gap: 4 }}>
+                                        <select className={txtCell} value={r.vehicule || ''} aria-label="Véhicule"
+                                          onChange={e => updateLogisticsRow(i, 'vehicule', e.target.value)}
+                                          style={{ flex: 1, minWidth: 0, ...(r.vehicule ? {} : { color: C.warning }) }}>
+                                          <option value="">véhicule…</option>
+                                          {transport.vehicules.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                                        </select>
+                                        <select className={txtCell} value={r.personnes || 1} aria-label="Personnes à bord"
+                                          onChange={e => updateLogisticsRow(i, 'personnes', Number(e.target.value))}
+                                          style={{ width: 52, flex: 'none' }}>
+                                          {[1, 2, 3].map(n => <option key={n} value={n}>{n} p.</option>)}
+                                        </select>
+                                      </span>
+                                    )}
+                                  </td>
+                                )}
                                 <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder="0" onChange={e => updateLogisticsRow(i, 'margin', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateLogisticsRow(i, 'discount', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateLogisticsRow(i, 'discount_amount', e.target.value)} /></td>
@@ -835,7 +875,7 @@ export default function QuoteEditor({ value, onChange, reglages }) {
                           {quote.logistics.length > 0 && (
                             <tfoot>
                               <tr>
-                                <td colSpan={8} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total logistique</td>
+                                <td colSpan={avecVehicules ? 9 : 8} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total logistique</td>
                                 <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${C.border}` }}>{fmtCHF(logisticsTotal)}</td>
                                 <td style={{ borderTop: `1px solid ${C.border}` }}></td>
                               </tr>

@@ -468,6 +468,30 @@ rentabilité du projet qui la récupère, la compensation compte comme des
 heures de consulting au coût de revient : sinon le chiffre qu'elle apporte
 n'aurait aucun coût en face.
 
+**La feuille d'heures imprimée est pensée pour le scan** (`lib/feuilleHeures.js`,
+`/api/heures/feuille`). Une page A4 par personne et par jour TRAVAILLÉ (lun,
+mar, jeu, ven), rangées jour par jour. Nom, date et code de feuille
+(`H·AAAA-MM-JJ·NOM`) sont IMPRIMÉS : on ne lit pas une écriture pour savoir à
+qui est la feuille. Horaires et numéros vont dans des CASES à un chiffre — 3
+pour le projet, 2 pour l'activité, pour qu'une colonne inversée se voie. Les
+projets en cours (hors pause) et les activités actives sont imprimés sur la
+feuille. Un membre n'imprime que la sienne. La route est dans
+`outputFileTracingIncludes` : sans elle, le binaire Chromium ne part pas avec
+la fonction et le PDF tombe en production SEULEMENT. Un jour demandé SEUL sort
+toujours (le mercredi ou le samedi exceptionnel), et `tous=1` imprime chaque
+jour d'une période.
+
+**La marge transport compare les km facturés au coût PAR VÉHICULE**
+(`lib/transport.js`). Le coût d'un km se calcule véhicule par véhicule — entre
+un Master en leasing (~1,24 CHF/km) et un Vito payé (~0,51), il varie du simple
+au double —, et le véhicule se choisit sur la ligne km ou forfait de l'offre.
+Une ligne sans véhicule est comptée au coût moyen de la flotte et SIGNALÉE. Un
+forfait copie sa distance dans la ligne à l'insertion : changer un forfait ne
+réécrit pas les offres faites. La marge transport retranche le véhicule ET le
+temps de conduite (51) au coût de revient ; la marge réelle du projet compte
+aussi les véhicules. Les coûts des véhicules sont une clé `app_settings`
+lisible par l'ADMIN seul (`CLES_ADMIN`) ; les noms et forfaits, par tous.
+
 **La rentabilité compare au prix de REVIENT** (`lib/rentabilite.js`, bloc admin
 en bas de la fiche projet). Le prévu se lit sur l'offre AVANT marge et escompte
 — prix d'achat × quantité, tarif de sous-traitance × quantité — parce que c'est
@@ -690,6 +714,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-activites-facturation.sql` | `activites.facturee_heure` (conduite et interne à false) | en fin de fichier |
 | `schema-activites-renumerotation.sql` | codes d'activité en dizaines par famille ; heures suivies | transaction : tout ou rien |
 | `schema-consulting.sql` | `heures.contact_id` : une heure peut viser un client au lieu d'un projet | en fin de fichier |
+| `schema-transport-reglages.sql` | réglages `transport` (véhicules, forfaits) et `couts_vehicules` (admin) | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

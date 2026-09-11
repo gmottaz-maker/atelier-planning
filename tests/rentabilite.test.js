@@ -172,3 +172,12 @@ describe('conduite et interne : pas facturées à l\'heure', () => {
     expect(reelProjet([], [{ activite: 99, minutes: 60 }], activites).heures).toBe(1)
   })
 })
+
+describe('margeReelle — véhicules compris', () => {
+  it('retranche le coût des véhicules', () => {
+    expect(margeReelle(5000, { materiel: 1200 }, 1000, 300)).toMatchObject({ couts: 2500, marge: 2500, pct: 50 })
+  })
+  it('reste compatible sans véhicules', () => {
+    expect(margeReelle(1000, {}, 200).couts).toBe(200)
+  })
+})

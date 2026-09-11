@@ -8,6 +8,8 @@ import { useQuoteDefaults } from '../lib/useQuoteDefaults'
 import { REGLAGES_OFFRE } from '../lib/quoteDefaults'
 import useIsAdmin from '../lib/useIsAdmin'
 import { AL, C, FONT } from '../lib/theme'
+import { CHAMPS_COUT, coutKm, coutsKmFlotte, normaliserTransport, normaliserCouts, slug, nombre } from '../lib/transport'
+import useSWR from 'swr'
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth()
@@ -68,6 +70,7 @@ export default function SettingsPage() {
 
         {/* Offre (admin only — ce sont les prix de vente de l'atelier) */}
         {isAdmin && <QuoteDefaultsSection />}
+        {isAdmin && <TransportSection />}
 
         {/* Sécurité */}
         <section>
@@ -474,6 +477,188 @@ function QuoteDefaultsSection() {
       <p className="text-xs u-muted mt-3">
         Un champ laissé vide ou négatif retombe sur sa valeur d'origine à l'enregistrement.
       </p>
+    </section>
+  )
+}
+
+// ─── Transport ────────────────────────────────────────────────────────────────
+// Ce que coûte un km, véhicule par véhicule, et les forfaits de ville. Deux
+// réglages distincts : `transport` (noms et forfaits, lisible par tous — l'offre
+// en a besoin) et `couts_vehicules` (lisible par l'admin seul). Un champ vide
+// n'est pas zéro pour les km, la consommation et le diesel : sans eux, pas de
+// coût au km plutôt qu'un coût faux.
+function TransportSection() {
+  const { data: tBrut, mutate: mT } = useSWR('/api/app-settings/transport')
+  const { data: cBrut, mutate: mC } = useSWR('/api/app-settings/couts_vehicules')
+  const [brouillon, setBrouillon] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState('')
+
+  const depuisServeur = () => ({
+    transport: normaliserTransport(tBrut?.value),
+    couts: normaliserCouts(cBrut?.value),
+  })
+  const v = brouillon ?? depuisServeur()
+  const dirty = brouillon !== null
+  const charge = tBrut !== undefined && cBrut !== undefined
+
+  const modifier = f => setBrouillon(b => f(JSON.parse(JSON.stringify(b ?? depuisServeur()))))
+  const setCout = (id, cle, val) => modifier(b => { b.couts.vehicules[id] = { ...(b.couts.vehicules[id] || {}), [cle]: val }; return b })
+  const ajouterVehicule = () => {
+    const nom = window.prompt('Nom du véhicule (ex. Renault Master)')
+    if (!nom?.trim()) return
+    const id = slug(nom)
+    if (v.transport.vehicules.some(x => x.id === id)) return
+    modifier(b => { b.transport.vehicules.push({ id, nom: nom.trim() }); b.couts.vehicules[id] = {}; return b })
+  }
+  const retirerVehicule = id => {
+    if (!window.confirm('Retirer ce véhicule ? Les offres qui le citent seront comptées au coût moyen de la flotte.')) return
+    modifier(b => { b.transport.vehicules = b.transport.vehicules.filter(x => x.id !== id); delete b.couts.vehicules[id]; return b })
+  }
+
+  async function commit() {
+    setSaving(true); setFeedback('')
+    try {
+      const transport = normaliserTransport(v.transport)
+      const couts = normaliserCouts(v.couts)
+      for (const [key, value] of [['transport', transport], ['couts_vehicules', couts]]) {
+        const r = await fetch(`/api/app-settings/${key}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }),
+        })
+        if (!r.ok) throw new Error(`${key} : ${r.status}`)
+      }
+      await Promise.all([mT(), mC()])
+      setBrouillon(null)
+      setFeedback('Enregistré')
+      setTimeout(() => setFeedback(''), 2000)
+    } catch (e) {
+      setFeedback('Erreur : ' + e.message)
+    } finally { setSaving(false) }
+  }
+
+  const couts = normaliserCouts(v.couts)
+  const flotte = coutsKmFlotte({ ...couts, vehicules: Object.fromEntries(v.transport.vehicules.map(x => [x.id, couts.vehicules[x.id] || {}])) })
+  const fmt = (x, d = 2) => (x == null ? '—' : x.toFixed(d).replace('.', ','))
+  const inputCls = "w-full px-2 py-1.5 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none text-right tabular-nums"
+
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h2 className="text-sm font-semibold u-ink">Transport</h2>
+        {dirty && (
+          <div className="flex items-center gap-3">
+            <button onClick={() => setBrouillon(null)} disabled={saving} className="text-xs u-muted hover:u-ink transition-colors">annuler</button>
+            <button onClick={commit} disabled={saving} className="text-xs font-medium px-3 py-1.5 u-pill text-white disabled:opacity-50"
+              style={{ background: AL.black }}>
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="text-xs u-muted mb-4">
+        Ce que coûte un kilomètre, véhicule par véhicule. Le véhicule se choisit sur chaque ligne km ou forfait de
+        l'offre ; la rentabilité du projet en tire la marge transport. Ces coûts ne sont visibles que par les admins.
+      </p>
+
+      <div className="u-surface u-panel border u-line p-5 overflow-x-auto">
+        <div className="flex items-center gap-3 mb-4">
+          <label htmlFor="diesel" className="text-sm u-ink" style={{ flex: 'none' }}>Prix du diesel</label>
+          <input id="diesel" inputMode="decimal" className={inputCls} style={{ width: 90 }} disabled={!charge}
+            value={v.couts.prix_diesel ?? ''} onChange={e => modifier(b => { b.couts.prix_diesel = e.target.value; return b })} />
+          <span className="text-xs u-muted">CHF / litre</span>
+          <label htmlFor="vitesse" className="text-sm u-ink" style={{ flex: 'none', marginLeft: 16 }}>Vitesse moyenne</label>
+          <input id="vitesse" inputMode="decimal" className={inputCls} style={{ width: 70 }} disabled={!charge}
+            value={v.couts.vitesse_moyenne ?? ''} onChange={e => modifier(b => { b.couts.vitesse_moyenne = e.target.value; return b })} />
+          <span className="text-xs u-muted">km/h — temps de route d'une ligne au km</span>
+        </div>
+
+        <table className="w-full" style={{ minWidth: 520, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th />
+              {v.transport.vehicules.map(x => (
+                <th key={x.id} className="text-sm font-semibold u-ink text-right" style={{ padding: '0 0 8px 12px' }}>
+                  {x.nom}
+                  <button onClick={() => retirerVehicule(x.id)} className="u-muted hover:u-ko" style={{ marginLeft: 8, fontWeight: 400 }} aria-label={`Retirer ${x.nom}`}>×</button>
+                </th>
+              ))}
+              <th style={{ padding: '0 0 8px 12px', textAlign: 'right' }}>
+                <button onClick={ajouterVehicule} className="text-xs u-muted hover:u-ink">+ véhicule</button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {CHAMPS_COUT.map(ch => (
+              <tr key={ch.cle}>
+                <td className="text-sm u-ink" style={{ padding: '4px 0' }}>
+                  {ch.label} <span className="text-xs u-muted">{ch.unite}</span>
+                </td>
+                {v.transport.vehicules.map(x => (
+                  <td key={x.id} style={{ padding: '4px 0 4px 12px', width: 130 }}>
+                    <input inputMode="decimal" className={inputCls} disabled={!charge}
+                      value={v.couts.vehicules[x.id]?.[ch.cle] ?? ''} onChange={e => setCout(x.id, ch.cle, e.target.value)}
+                      aria-label={`${ch.label} ${x.nom}`} />
+                  </td>
+                ))}
+                <td />
+              </tr>
+            ))}
+            {[['Fixe par an', 'fixeAnnuel', 0], ['Fixe par km', 'fixeKm', 2], ['Diesel par km', 'carburantKm', 2], ['Coût par km', 'totalKm', 2]].map(([label, cle, d], i) => (
+              <tr key={cle} style={{ borderTop: i === 0 ? `1px solid ${C.border}` : 'none' }}>
+                <td className={`text-sm ${cle === 'totalKm' ? 'font-semibold u-ink' : 'u-muted'}`} style={{ padding: '6px 0' }}>{label}</td>
+                {v.transport.vehicules.map(x => (
+                  <td key={x.id} className={`text-sm text-right tabular-nums ${cle === 'totalKm' ? 'font-semibold u-ink' : 'u-muted'}`} style={{ padding: '6px 0 6px 12px' }}>
+                    {fmt(coutKm(couts.vehicules[x.id] || {}, couts.prix_diesel)?.[cle], d)}
+                  </td>
+                ))}
+                <td />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-xs u-muted mt-3">
+          Moyenne de la flotte, pondérée par les km : <b className="u-ink">{fmt(flotte.moyenne)} CHF / km</b> — utilisée
+          quand une ligne de l'offre n'a pas de véhicule. Des km surestimés font baisser le coût au km : compte les km
+          réellement roulés.
+        </p>
+      </div>
+
+      <div className="u-surface u-panel border u-line p-5 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-semibold u-ink">Forfaits de ville</span>
+          <button onClick={() => modifier(b => { b.transport.forfaits.push({ id: '', nom: '', prix: '', km: '', duree: '' }); return b })}
+            className="text-xs u-muted hover:u-ink">+ forfait</button>
+        </div>
+        {v.transport.forfaits.length === 0 && <p className="text-xs u-muted">Aucun forfait.</p>}
+        {v.transport.forfaits.map((f, i) => {
+          const prix = nombre(f.prix), km = nombre(f.km)
+          return (
+            <div key={i} className="flex items-center gap-3" style={{ padding: '4px 0' }}>
+              <input className="flex-1 px-3 py-1.5 border u-line u-pill text-sm u-surface focus:outline-none" placeholder="ville"
+                value={f.nom} onChange={e => modifier(b => { b.transport.forfaits[i].nom = e.target.value; b.transport.forfaits[i].id = b.transport.forfaits[i].id || ''; return b })} />
+              <input inputMode="decimal" className={inputCls} style={{ width: 90 }} placeholder="prix"
+                value={f.prix ?? ''} onChange={e => modifier(b => { b.transport.forfaits[i].prix = e.target.value; return b })} />
+              <span className="text-xs u-muted" style={{ width: 28 }}>CHF</span>
+              <input inputMode="decimal" className={inputCls} style={{ width: 80 }} placeholder="km"
+                value={f.km ?? ''} onChange={e => modifier(b => { b.transport.forfaits[i].km = e.target.value; return b })} />
+              <span className="text-xs u-muted" style={{ width: 44 }}>km AR</span>
+              <input inputMode="decimal" className={inputCls} style={{ width: 70 }} placeholder="min"
+                value={f.duree ?? ''} onChange={e => modifier(b => { b.transport.forfaits[i].duree = e.target.value; return b })}
+                aria-label="Durée aller-retour en minutes" />
+              <span className="text-xs u-muted" style={{ width: 44 }}>min AR</span>
+              <span className="text-xs u-muted tabular-nums" style={{ width: 80, textAlign: 'right' }}>
+                {prix != null && km ? `${fmt(prix / km)} / km` : ''}
+              </span>
+              <button onClick={() => modifier(b => { b.transport.forfaits.splice(i, 1); return b })} className="u-muted hover:u-ko text-sm" aria-label="Retirer">×</button>
+            </div>
+          )
+        })}
+        <p className="text-xs u-muted mt-3">
+          Distance et durée sont copiées dans l'offre quand on y ajoute le forfait : les modifier ici ne change pas les
+          offres déjà faites. La durée dit ce que coûte le temps au volant, multiplié par le nombre de personnes à bord.
+        </p>
+      </div>
+      {feedback && <p className="text-xs u-muted mt-3">{feedback}</p>}
     </section>
   )
 }

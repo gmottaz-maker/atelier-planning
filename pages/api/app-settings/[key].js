@@ -2,6 +2,7 @@ import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireUser, requireAdmin } from '../../../lib/requireAdmin'
 import { erreurApi } from '../../../lib/apiError'
 import { DEFAUTS_OFFRE } from '../../../lib/quoteDefaults'
+import { normaliserTransport, normaliserCouts } from '../../../lib/transport'
 
 const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
@@ -10,6 +11,11 @@ const DEFAULTS = {
   // Tarifs et marge d'une offre neuve. Le défaut vient de lib/quoteDefaults.js,
   // qui fait foi — le dupliquer ici ferait diverger le formulaire du calcul.
   quote_defaults: DEFAUTS_OFFRE,
+  // Véhicules et forfaits (noms, prix de vente, distances) ; leurs COÛTS vivent
+  // à part, dans une clé réservée à l'admin. Les valeurs réelles entrent en base
+  // par schema-transport-reglages.sql, pas dans le code.
+  transport: normaliserTransport({}),
+  couts_vehicules: normaliserCouts({}),
   company_info: {
     name:    process.env.AMAZING_LAB_NAME    || 'Amazing Lab Sàrl',
     address: process.env.AMAZING_LAB_ADDRESS || "Rue de l'Ecluse 30",
@@ -35,7 +41,14 @@ const DEFAULTS = {
 // `quote_defaults` : tarifs horaires et marge d'une offre neuve. Lecture pour
 // tous — la page projet en a besoin pour remplir une offre — écriture admin :
 // ce sont les prix de vente de l'atelier.
-const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficients', 'quote_defaults'])
+// `transport` : noms des véhicules et forfaits de ville — l'éditeur d'offre en
+// a besoin, et ce ne sont que des prix de vente.
+const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficients', 'quote_defaults', 'transport'])
+
+// Clés lisibles par l'ADMIN seul. `couts_vehicules` : leasing, assurance et
+// consommation de chaque véhicule — rapprochés des km facturés, ils disent la
+// marge du transport.
+const CLES_ADMIN = new Set(['couts_vehicules'])
 
 export default async function handler(req, res) {
   const { key } = req.query
@@ -44,7 +57,7 @@ export default async function handler(req, res) {
   // Écriture réservée à l'admin : cette table porte l'IBAN de l'entreprise, le
   // nom imprimé sur les factures et les conditions de paiement. N'importe quel
   // membre pouvait les modifier, donc détourner les virements des clients.
-  if (req.method === 'PUT') {
+  if (req.method === 'PUT' || CLES_ADMIN.has(key)) {
     if (!(await requireAdmin(req, res))) return
   } else {
     if (!(await requireUser(req, res))) return

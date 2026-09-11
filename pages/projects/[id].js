@@ -34,6 +34,8 @@ import useSWR from 'swr'
 import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT, mainOeuvreReelle, margeReelle } from '../../lib/rentabilite'
 import { formatDuree } from '../../lib/heures'
 import { compensationConsommee, ligneCompensation, CODE_CONSULTING } from '../../lib/consulting'
+import { useTransport } from '../../lib/useTransport'
+import { lignesTransport, margeTransport, transportPrevu, coutsKmFlotte, normaliserCouts, CODE_CONDUITE } from '../../lib/transport'
 import { totauxDevis } from '../../lib/quoteLines'
 
 const PINK = AL.black
@@ -1178,6 +1180,8 @@ function RentabiliteProjet({ projectId, quote }) {
   const { data: coutsBruts, mutate, error: errCouts } = useSWR(`/api/projects/${projectId}/couts`)
   const { data: heuresBrutes } = useSWR(`/api/heures?project=${projectId}`)
   const { data: activitesBrutes } = useSWR('/api/activites')
+  const { data: coutsVehicules } = useSWR('/api/app-settings/couts_vehicules')
+  const reglagesTransport = useTransport()
   const [form, setForm] = useState({ categorie: 'materiel', libelle: '', fournisseur: '', montant_ht: '', date: '' })
   const [erreur, setErreur] = useState('')
   const [envoi, setEnvoi] = useState(false)
@@ -1196,7 +1200,21 @@ function RentabiliteProjet({ projectId, quote }) {
   // Les heures valorisées au coût de LEUR activité : une heure de CNC ne coûte
   // pas une heure de conduite.
   const mo = mainOeuvreReelle(heuresProjet, activites)
-  const resultat = margeReelle(totauxDevis(quote).total, reel, mo.cout)
+  // Transport. PRÉVU : ce que l'offre fixe — véhicule, personnes à bord, temps
+  // de route. RÉEL : les mêmes km, moins les heures de conduite vraiment
+  // imputées (51). Les véhicules entrent aussi dans la marge réelle du projet.
+  const coutsVeh = normaliserCouts(coutsVehicules?.value)
+  const flotte = coutsKmFlotte(coutsVeh)
+  const conduite = mo.lignes.find(l => l.code === CODE_CONDUITE)
+  const coutHoraireConduite = activites.find(a => Number(a.code) === CODE_CONDUITE)?.cout_revient
+  const lignesTr = lignesTransport(quote)
+  const prevuTr = transportPrevu({
+    lignes: lignesTr, flotte, vitesse: coutsVeh.vitesse_moyenne,
+    coutHoraire: coutHoraireConduite == null || coutHoraireConduite === '' ? null : Number(coutHoraireConduite),
+  })
+  const tr = margeTransport({ lignes: lignesTr, flotte, coutConduite: conduite?.cout || 0 })
+  const nomVehicule = id => reglagesTransport.vehicules.find(v => v.id === id)?.nom || (id ? id : 'moyenne flotte')
+  const resultat = margeReelle(totauxDevis(quote).total, reel, mo.cout, tr.coutVehicules)
   const libelleCat = cle => CATEGORIES_COUT.find(c => c.cle === cle)?.label || cle
 
   const fmt = (v, unite) => unite === 'h' ? `${String(v).replace('.', ',')} h` : fmtCHF(v)
@@ -1306,6 +1324,79 @@ function RentabiliteProjet({ projectId, quote }) {
         </>
       )}
 
+      {/* Transport : ce que chaque trajet rapporte, moins le véhicule et le temps
+          au volant de chaque personne à bord. La conduite ne se facture jamais
+          à l'heure : c'est le km ou le forfait qui doit tout payer. */}
+      {lignesTr.length > 0 && (
+        <>
+          <div style={{ marginTop: 22, fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 500 }}>transport</div>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden', overflowX: 'auto', marginTop: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, minWidth: 640 }}>
+              <thead>
+                <tr style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                  {['trajet', 'véhicule', 'km', 'route', 'facturé', 'véhicule', 'temps', 'marge'].map((h, i) => (
+                    <th key={i} style={{ textAlign: i < 2 ? 'left' : 'right', padding: '10px 14px', fontWeight: 500 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {prevuTr.lignes.map((l, i) => (
+                  <tr key={i}>
+                    <td style={cellule}>{l.libelle}</td>
+                    <td style={{ ...cellule, color: l.vehicule ? AL.black : C.warning }}>
+                      {l.vehicule ? nomVehicule(l.vehicule) : 'à choisir'} · {l.personnes} p.
+                    </td>
+                    <td style={nombre}>{Math.round(l.km)}</td>
+                    <td style={nombre}>{l.minutes == null ? '—' : formatDuree(l.minutes)}</td>
+                    <td style={nombre}>{fmtCHF(l.recette)}</td>
+                    <td style={nombre}>{l.coutVehicule == null ? '?' : `− ${fmtCHF(l.coutVehicule)}`}</td>
+                    <td style={nombre}>{l.coutTemps == null ? '?' : `− ${fmtCHF(l.coutTemps)}`}</td>
+                    <td style={{ ...nombre, fontWeight: 500, color: l.marge < 0 ? C.danger : AL.black }}>
+                      {l.marge < 0 ? '− ' : ''}{fmtCHF(Math.abs(l.marge))}
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ ...cellule, fontWeight: 500 }} colSpan={7}>
+                    Marge transport prévue{prevuTr.parKm != null ? ` · ${prevuTr.parKm < 0 ? '−' : ''}${fmtCHF(Math.abs(prevuTr.parKm))} par km` : ''}
+                  </td>
+                  <td style={{ ...nombre, fontWeight: 500, color: prevuTr.marge < 0 ? C.danger : AL.black }}>
+                    {prevuTr.marge < 0 ? '− ' : ''}{fmtCHF(Math.abs(prevuTr.marge))}
+                  </td>
+                </tr>
+                {conduite && (
+                  <tr>
+                    <td style={{ ...cellule, color: C.muted }} colSpan={7}>
+                      Réel : {formatDuree(conduite.minutes)} de conduite imputées, véhicules compris
+                    </td>
+                    <td style={{ ...nombre, color: tr.marge < 0 ? C.danger : C.muted }}>
+                      {tr.marge < 0 ? '− ' : ''}{fmtCHF(Math.abs(tr.marge))}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {prevuTr.lignes.some(l => !l.vehicule) && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: C.warning }}>
+              Un trajet sans véhicule choisi est compté au coût moyen de la flotte : choisis Master ou Vito sur la ligne de l'offre.
+            </p>
+          )}
+          {prevuTr.lignes.some(l => l.coutTemps == null) && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: C.warning }}>
+              {coutHoraireConduite == null || coutHoraireConduite === ''
+                ? 'La conduite (51) n\'a pas de coût de revient : le temps au volant n\'est pas retranché, la marge est surestimée. Renseigne-le dans /heures.'
+                : 'Un trajet n\'a pas de durée estimable : ajoute la durée au forfait ou la vitesse moyenne dans Réglages → Transport.'}
+            </p>
+          )}
+          {prevuTr.lignes.some(l => l.coutVehicule == null) && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: C.warning }}>
+              Coût des véhicules inconnu : renseigne-les dans Réglages → Transport.
+            </p>
+          )}
+        </>
+      )}
+
       {/* Marge réelle : le prix de l'offre moins TOUT ce qui a été dépensé. */}
       <div style={{ marginTop: 22, fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 500 }}>marge réelle</div>
       <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, marginTop: 8, padding: '6px 0' }}>
@@ -1315,6 +1406,7 @@ function RentabiliteProjet({ projectId, quote }) {
           ['Sous-traitance payée', -reel.sous_traitance, true],
           ['Autres frais', -reel.autre, true],
           [`Main-d'œuvre au coût de revient (${formatDuree(heuresProjet.reduce((s, h) => s + (Number(h.minutes) || 0), 0))})`, -mo.cout, true],
+          ...(tr.km ? [[`Véhicules (${Math.round(tr.km)} km)`, -tr.coutVehicules, true]] : []),
         ].map(([label, v, sub]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '6px 16px', fontSize: 13 }}>
             <span style={{ color: sub ? C.muted : AL.black }}>{label}</span>
@@ -1433,6 +1525,7 @@ export default function ProjectPage() {
   // general_margin (%) s'applique aux achats / sous-traitance sauf si une marge spécifique est définie sur la ligne (PAS la logistique)
   // Nouveau devis → pré-rempli avec un modèle par défaut (gestion + logistique)
   const { reglages, loaded: reglagesCharges } = useQuoteDefaults()
+  const transport = useTransport()
   // Vrai tant qu'aucune offre ENREGISTRÉE n'a été chargée pour ce projet.
   const offreVierge = useRef(true)
   const [quote, setQuote] = useState(() => defaultQuote())
@@ -2959,6 +3052,7 @@ export default function ProjectPage() {
                       value={quote}
                       onChange={q => { setQuote(q); setQuoteDirty(true) }}
                       reglages={reglages}
+                      transport={transport}
                     />
                   </div>
                 )}

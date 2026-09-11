@@ -48,6 +48,7 @@ const nextConfig = {
     '/api/customer-invoices/[id]/pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
     '/api/projects/[id]/devis-pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
     '/api/send-document': ['./node_modules/@sparticuz/chromium/bin/**'],
+    '/api/heures/feuille': ['./node_modules/@sparticuz/chromium/bin/**'],
   },
 }
 

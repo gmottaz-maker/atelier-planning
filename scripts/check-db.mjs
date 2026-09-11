@@ -141,6 +141,15 @@ const CONTROLES = [
     migration: 'schema-consulting.sql',
     sonde: async () => !(await sb.from('heures').select('contact_id').limit(1)).error,
   },
+  {
+    // Sans ces deux réglages, la marge transport n'a ni véhicules ni coûts.
+    nom: 'transport : véhicules, forfaits et coûts',
+    migration: 'schema-transport-reglages.sql',
+    sonde: async () => {
+      const { data, error } = await sb.from('app_settings').select('key').in('key', ['transport', 'couts_vehicules'])
+      return !error && data?.length === 2
+    },
+  },
 ]
 
 let manquants = 0

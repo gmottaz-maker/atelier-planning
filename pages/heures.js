@@ -18,6 +18,7 @@ import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { dateDuJour } from '../lib/aujourdhui'
 import { formatDuree, duree, totalPar, FAMILLES, prochainCode, complementJour } from '../lib/heures'
 import { estJourTravaille } from '../lib/joursOuvres'
+import { joursAImprimer } from '../lib/feuilleHeures'
 
 const JOURS = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
 const LIBELLES_FAMILLE = {
@@ -306,9 +307,68 @@ export default function HeuresPage() {
           </p>
         )}
 
+        <FeuillesAImprimer isAdmin={isAdmin} moi={user?.name || ''} aujourdhui={aujourdhui}
+          personnes={[...new Set([user?.name, ...personnes].filter(Boolean))]} />
+
         {isAdmin && <SectionAdmin activites={activites} personnes={personnes} aujourdhui={aujourdhui} />}
       </main>
     </div>
+  )
+}
+
+// ─── Feuilles à imprimer ─────────────────────────────────────────────────────
+// Une feuille A4 par personne et par jour travaillé (lundi, mardi, jeudi,
+// vendredi) de la période. Chacun imprime la sienne ; l'admin choisit qui.
+// Le lien ouvre le PDF dans un nouvel onglet — impression depuis le visualiseur.
+function FeuillesAImprimer({ isAdmin, moi, personnes, aujourdhui }) {
+  const [du, setDu] = useState(aujourdhui)
+  const [au, setAu] = useState(decaler(aujourdhui, 6))
+  const [choisies, setChoisies] = useState(null)
+  const [tous, setTous] = useState(false)
+  const qui = isAdmin ? (choisies ?? personnes) : [moi]
+  const jours = joursAImprimer(du, au, { tous })
+  const nb = jours.length * qui.length
+  const params = new URLSearchParams({
+    from: du, to: au, ...(tous ? { tous: '1' } : {}), ...(isAdmin ? { users: qui.join(',') } : {}),
+  }).toString()
+  const basculer = n => setChoisies(c => {
+    const base = c ?? personnes
+    return base.includes(n) ? base.filter(x => x !== n) : [...base, n]
+  })
+
+  return (
+    <section style={{ marginTop: 40 }}>
+      <div style={{ ...microLabel, marginBottom: 10 }}>feuilles à imprimer</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="date" value={du} onChange={e => setDu(e.target.value)} style={champ} aria-label="Du" />
+        <span style={{ color: C.muted }}>→</span>
+        <input type="date" value={au} onChange={e => setAu(e.target.value)} style={champ} aria-label="Au" />
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+          <input type="checkbox" checked={tous} onChange={e => setTous(e.target.checked)} style={{ accentColor: AL.black }} />
+          mercredi et week-end compris
+        </label>
+        {isAdmin && personnes.map(n => (
+          <label key={n} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+            <input type="checkbox" checked={qui.includes(n)} onChange={() => basculer(n)} style={{ accentColor: AL.black }} />
+            {n}
+          </label>
+        ))}
+        {nb > 0 ? (
+          <a href={`/api/heures/feuille?${params}`} target="_blank" rel="noopener"
+            style={{ padding: '8px 18px', borderRadius: R.pill, background: AL.black, color: AL.white,
+              font: `500 13px ${FONT}`, textDecoration: 'none' }}>
+            imprimer {nb} feuille{nb > 1 ? 's' : ''}
+          </a>
+        ) : (
+          <span style={{ fontSize: 13, color: C.muted }}>aucun jour travaillé dans la période</span>
+        )}
+      </div>
+      <p style={{ fontSize: 12.5, color: C.muted, margin: '8px 0 0', maxWidth: 760 }}>
+        Une feuille par personne et par jour travaillé — lundi, mardi, jeudi, vendredi. Un jour choisi seul sort
+        toujours, même un mercredi ou un samedi. Les projets en cours et les activités sont imprimés dessus avec leur
+        numéro, tels qu'ils sont au moment de l'impression.
+      </p>
+    </section>
   )
 }
 
