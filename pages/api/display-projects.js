@@ -21,6 +21,18 @@ export default async function handler(req, res) {
     .from('projects')
     .select(PUBLIC_FIELDS.join(', '))
     .eq('status', 'active')
+    // L'écran de l'atelier ne montre que ce qu'on fabrique vraiment : une
+    // offre ACCEPTÉE, et un projet qui n'est pas en pause. Une offre en
+    // brouillon ou envoyée n'est pas du travail — l'afficher, c'est préparer
+    // l'atelier à un projet qui n'aura peut-être jamais lieu.
+    //
+    // Filtré ICI plutôt que dans la page : sinon il faudrait publier le statut
+    // de l'offre et `suspended` sur la seule route sans authentification. Le
+    // filtre porte sur `quote_data`, mais n'en renvoie rien.
+    .eq('quote_data->>status', 'accepte')
+    // `not is true` et non `eq false` : une ligne antérieure à la colonne
+    // vaut NULL, et elle doit rester affichée.
+    .not('suspended', 'is', true)
     .order('deadline', { ascending: true })
 
   if (error) {

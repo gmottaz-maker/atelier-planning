@@ -29,6 +29,14 @@ export function faireReq({ method = 'GET', query = {}, body = {}, headers = {} }
  * sont appliqués pour de vrai, sinon un test de filtrage ne testerait rien.
  * `rpc` : { nomFonction: (args) => data }.
  */
+// `quote_data->>status` : PostgREST lit une clé dans une colonne JSON. Sans ce
+// repli, un filtre de ce genre ne retiendrait AUCUNE ligne dans les tests.
+const lire = (r, col) => {
+  if (!col.includes('->>')) return r[col]
+  const [colonne, cle] = col.split('->>')
+  return r[colonne]?.[cle]
+}
+
 export function faireSupabase({ tables = {}, rpc = {}, erreurs = {}, comptes = {} } = {}) {
   const requete = (nom) => {
     let lignes = [...(tables[nom] || [])]
@@ -37,7 +45,7 @@ export function faireSupabase({ tables = {}, rpc = {}, erreurs = {}, comptes = {
       select() { return q },
       order() { return q },
       limit(n) { lignes = lignes.slice(0, n); return q },
-      eq(col, val) { filtres.push(r => String(r[col]) === String(val)); return q },
+      eq(col, val) { filtres.push(r => String(lire(r, col)) === String(val)); return q },
       neq(col, val) { filtres.push(r => String(r[col]) !== String(val)); return q },
       in(col, vals) { filtres.push(r => vals.map(String).includes(String(r[col]))); return q },
       is(col, val) { filtres.push(r => (val === null ? r[col] == null : r[col] === val)); return q },
