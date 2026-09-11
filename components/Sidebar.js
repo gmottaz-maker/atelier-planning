@@ -18,6 +18,7 @@ const MAIN_ITEMS = [
   { href: '/tasks',     label: 'tâches',   match: (p) => p === '/tasks', count: 'tasks' },
   { href: '/planning',  label: 'planning', match: (p) => p === '/planning' },
   { href: '/schedule',  label: 'horaires', match: (p) => p === '/schedule' },
+  { href: '/heures',    label: 'heures',   match: (p) => p === '/heures' },
   { href: '/meeting',   label: 'meeting',  match: (p) => p === '/meeting' },
   { href: '/activity',  label: 'activité', match: (p) => p === '/activity' },
   { href: '/outils',    label: 'outils',   match: (p) => p.startsWith('/outils') || p === '/peintures' },

@@ -30,6 +30,9 @@ import { verifierTailleFichier, lireReponse } from '../../lib/uploadLimit'
 import { estAudio, estImage, libelleEntree, messageTranscription, nomLisible } from '../../lib/dump'
 import { champsCommande, majCommande } from '../../lib/commandes'
 import { champsSousTraitance, majSousTraitance } from '../../lib/sousTraitance'
+import useSWR from 'swr'
+import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT } from '../../lib/rentabilite'
+import { totalPar, formatDuree } from '../../lib/heures'
 
 const PINK = AL.black
 
@@ -1118,6 +1121,151 @@ function SousTraitanceItem({ task, currentUser, onUpdate, onDelete, onAddTask })
   )
 }
 
+// ─── RentabiliteProjet ────────────────────────────────────────────────────────
+// Ce que l'offre prévoyait, ce qui a été dépensé. Admin seulement : rapprochés
+// de l'offre, ces montants disent la marge réelle.
+//
+// Le PRÉVU se lit sur l'offre telle qu'elle est à l'écran, enregistrée ou non :
+// on voit l'écart bouger en corrigeant un prix d'achat.
+function RentabiliteProjet({ projectId, quote }) {
+  const { data: coutsBruts, mutate, error: errCouts } = useSWR(`/api/projects/${projectId}/couts`)
+  const { data: heuresBrutes } = useSWR(`/api/heures?project=${projectId}`)
+  const { data: activitesBrutes } = useSWR('/api/activites')
+  const [form, setForm] = useState({ categorie: 'materiel', libelle: '', fournisseur: '', montant_ht: '', date: '' })
+  const [erreur, setErreur] = useState('')
+  const [envoi, setEnvoi] = useState(false)
+
+  const couts = Array.isArray(coutsBruts) ? coutsBruts : []
+  const heures = Array.isArray(heuresBrutes) ? heuresBrutes : []
+  const activites = Array.isArray(activitesBrutes) ? activitesBrutes : []
+  const prevu = prevuDevis(quote)
+  const lignes = comparaison(prevu, reelProjet(couts, heures))
+  const parActivite = Object.entries(totalPar(heures, h => h.activite)).sort((a, b) => b[1] - a[1])
+  const libelleCat = cle => CATEGORIES_COUT.find(c => c.cle === cle)?.label || cle
+
+  const fmt = (v, unite) => unite === 'h' ? `${String(v).replace('.', ',')} h` : fmtCHF(v)
+  const couleurEcart = e => (e > 0 ? C.danger : e < 0 ? C.success : C.muted)
+
+  async function ajouter(e) {
+    e.preventDefault()
+    if (envoi) return
+    setEnvoi(true); setErreur('')
+    try {
+      const r = await fetch(`/api/projects/${projectId}/couts`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) { setErreur(data.error || `Erreur ${r.status}`); return }
+      setForm(f => ({ ...f, libelle: '', fournisseur: '', montant_ht: '' }))
+      mutate()
+    } finally { setEnvoi(false) }
+  }
+
+  async function supprimer(c) {
+    if (!confirm(`Supprimer « ${c.libelle} » (${fmtCHF(c.montant_ht)}) ?`)) return
+    const r = await fetch(`/api/projects/${projectId}/couts`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ coutId: c.id }),
+    })
+    if (r.ok) mutate()
+  }
+
+  const champ = { padding: '7px 12px', borderRadius: R.pill, border: `1px solid ${C.border}`, font: `13px ${FONT}`, background: C.surface, outline: 'none', minWidth: 0 }
+  const cellule = { padding: '10px 14px', fontSize: 13, borderTop: `1px solid ${C.border}` }
+  const nombre = { ...cellule, textAlign: 'right', fontFamily: MONO, whiteSpace: 'nowrap' }
+
+  return (
+    <div>
+      <h2 style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, margin: '0 0 4px', color: AL.black }}>Rentabilité</h2>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: C.muted }}>
+        Prévu d'après l'offre, au prix de revient (avant marge). Réel d'après les coûts saisis ci-dessous et les
+        heures imputées. Montants HT.
+      </p>
+
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT }}>
+          <thead>
+            <tr style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 500 }}></th>
+              <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>prévu</th>
+              <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>réel</th>
+              <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>écart</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map(l => (
+              <tr key={l.cle}>
+                <td style={{ ...cellule, fontWeight: 500 }}>{l.label}</td>
+                <td style={nombre}>{fmt(l.prevu, l.unite)}</td>
+                <td style={nombre}>{fmt(l.reel, l.unite)}</td>
+                <td style={{ ...nombre, color: couleurEcart(l.ecart) }}>
+                  {l.ecart > 0 ? '+' : ''}{fmt(l.ecart, l.unite)}{l.pct != null ? ` · ${l.pct > 0 ? '+' : ''}${l.pct} %` : ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {prevu.lignesNonConverties > 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: C.muted }}>
+          {prevu.lignesNonConverties} ligne{prevu.lignesNonConverties > 1 ? 's' : ''} de main-d'œuvre en jours ou sans
+          unité ne {prevu.lignesNonConverties > 1 ? 'sont' : 'est'} pas comptée{prevu.lignesNonConverties > 1 ? 's' : ''} dans
+          les heures prévues : une journée ne vaut pas le même nombre d'heures pour tout le monde.
+        </p>
+      )}
+
+      {parActivite.length > 0 && (
+        <p style={{ margin: '14px 0 0', fontSize: 13, color: AL.black }}>
+          <span style={{ color: C.muted }}>Heures par activité : </span>
+          {parActivite.map(([code, min], i) => (
+            <span key={code}>{i ? ' · ' : ''}{activites.find(a => String(a.code) === String(code))?.libelle || `activité ${code}`} {formatDuree(min)}</span>
+          ))}
+        </p>
+      )}
+
+      <div style={{ marginTop: 22, fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 500 }}>coûts réels</div>
+      {errCouts ? (
+        <p style={{ fontSize: 13, color: C.danger }}>Coûts illisibles — la migration schema-project-couts.sql est-elle jouée ?</p>
+      ) : (
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden', marginTop: 8 }}>
+          {couts.length === 0 ? (
+            <p style={{ margin: 0, padding: '12px 14px', fontSize: 13, color: C.muted }}>Aucun coût saisi pour ce projet.</p>
+          ) : couts.map(c => (
+            <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '80px 110px minmax(0, 2fr) minmax(0, 1fr) 110px auto',
+              gap: 10, alignItems: 'baseline', padding: '10px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13 }}>
+              <span style={{ fontFamily: MONO, color: C.muted }}>{c.date ? fmtDate(c.date) : '—'}</span>
+              <span style={{ color: C.muted }}>{libelleCat(c.categorie)}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.libelle}</span>
+              <span style={{ color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.fournisseur || ''}</span>
+              <span style={{ fontFamily: MONO, textAlign: 'right' }}>{fmtCHF(c.montant_ht)}</span>
+              <button onClick={() => supprimer(c)} aria-label="Supprimer"
+                style={{ border: 'none', background: 'none', cursor: 'pointer', color: C.muted, font: `13px ${FONT}` }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={ajouter} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
+        <select value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value }))} style={champ} aria-label="Catégorie">
+          {CATEGORIES_COUT.map(c => <option key={c.cle} value={c.cle}>{c.label}</option>)}
+        </select>
+        <input required placeholder="libellé" value={form.libelle} maxLength={120}
+          onChange={e => setForm(f => ({ ...f, libelle: e.target.value }))} style={{ ...champ, flex: '2 1 180px' }} />
+        <input placeholder="fournisseur" value={form.fournisseur} maxLength={80}
+          onChange={e => setForm(f => ({ ...f, fournisseur: e.target.value }))} style={{ ...champ, flex: '1 1 120px' }} />
+        <input required placeholder="montant HT" inputMode="decimal" value={form.montant_ht}
+          onChange={e => setForm(f => ({ ...f, montant_ht: e.target.value }))} style={{ ...champ, width: 120, fontFamily: MONO }} />
+        <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={champ} aria-label="Date" />
+        <button type="submit" disabled={envoi}
+          style={{ padding: '8px 18px', borderRadius: R.pill, border: 'none', background: AL.black, color: AL.white,
+            font: `500 13px ${FONT}`, cursor: envoi ? 'not-allowed' : 'pointer', opacity: envoi ? 0.5 : 1 }}>
+          {envoi ? '…' : 'ajouter'}
+        </button>
+      </form>
+      {erreur && <p style={{ margin: '8px 0 0', fontSize: 13, color: C.danger }}>{erreur}</p>}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ProjectPage() {
   const router = useRouter()
@@ -1825,6 +1973,14 @@ export default function ProjectPage() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28, flexWrap: 'wrap', marginTop: 4 }}>
+              {/* Le numéro qu'on écrit sur la feuille d'heures : il doit se
+                  lire d'un coup d'œil, d'où la chasse fixe. */}
+              {project.numero != null && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={microLabel}>n°</span>
+                  <span style={{ fontSize: 15, fontWeight: 500, fontFamily: MONO }}>{project.numero}</span>
+                </div>
+              )}
               {project.deadline && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span style={microLabel}>deadline</span>
@@ -2681,6 +2837,13 @@ export default function ProjectPage() {
             )
           })()}
         </div>
+
+        {/* ── Rentabilité (admin) ── */}
+        {isAdmin && (
+          <div className="no-print">
+            <RentabiliteProjet projectId={id} quote={quote} />
+          </div>
+        )}
 
         {/* ── Aperçu dossier kDrive ── */}
         <div className="no-print">

@@ -129,6 +129,19 @@ function isWeekend(date) {
   return d === 0 || d === 6
 }
 
+// Nom du projet précédé de son numéro — celui qu'on reporte sur la feuille
+// d'heures. Chasse fixe et même graisse que le texte principal : il doit se
+// lire à trois mètres sans voler la vedette au nom.
+function NomNumerote({ project, couleurNumero }) {
+  if (project.numero == null) return project.name
+  return (
+    <>
+      <span style={{ fontFamily: MONO, fontWeight: 600, color: couleurNumero }}>{project.numero}</span>
+      {' · '}{project.name}
+    </>
+  )
+}
+
 // ─── Logo ──────────────────────────────────────────────────────────────────
 
 
@@ -166,7 +179,9 @@ function Timeline({ projects, viewMode, dark, theme }) {
                 return (
                   <div key={p.id} className="u-panel px-5 py-3.5 border" style={{ background: colors.bg, borderColor: colors.border }}>
                     <div className="font-bold" style={{ color: theme.textPrimary, fontSize: 18 }}>{p.client}</div>
-                    <div className="mt-0.5" style={{ color: colors.text, fontSize: 15 }}>{p.name}</div>
+                    <div className="mt-0.5" style={{ color: colors.text, fontSize: 15 }}>
+                      <NomNumerote project={p} couleurNumero={theme.textPrimary} />
+                    </div>
                     <div className="mt-1" style={{ color: theme.textMuted, fontSize: 14 }}>Prévu: {formatDate(p.deadline)}</div>
                   </div>
                 )
@@ -226,7 +241,9 @@ function Timeline({ projects, viewMode, dark, theme }) {
                   {/* Infos */}
                   <div style={{ width: LABEL_W - 20, flexShrink: 0 }} className="pr-6 flex flex-col justify-center">
                     <div className="leading-tight truncate" style={{ color: theme.textPrimary, fontSize: 22, fontWeight: 700 }}>{project.client}</div>
-                    <div className="mt-1 truncate" style={{ color: theme.textSecondary, fontSize: 17 }}>{project.name}</div>
+                    <div className="mt-1 truncate" style={{ color: theme.textSecondary, fontSize: 17 }}>
+                      <NomNumerote project={project} couleurNumero={theme.textPrimary} />
+                    </div>
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className="font-bold" style={{ color: colors.badge, fontSize: 16 }}>
                         {decompte(project.deadline)}
@@ -333,7 +350,9 @@ function CardView({ projects, dark, theme }) {
                   )}
                 </div>
                 <div className="font-bold leading-tight" style={{ color: theme.textPrimary, fontSize: 26 }}>{project.client}</div>
-                <div className="mt-1.5" style={{ color: theme.textSecondary, fontSize: 18 }}>{project.name}</div>
+                <div className="mt-1.5" style={{ color: theme.textSecondary, fontSize: 18 }}>
+                  <NomNumerote project={project} couleurNumero={theme.textPrimary} />
+                </div>
                 {project.short_description && (
                   <div className="mt-2 leading-snug" style={{ color: theme.textMuted, fontSize: 15 }}>
                     {project.short_description}

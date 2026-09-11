@@ -100,6 +100,20 @@ const CONTROLES = [
     migration: 'schema-bank-classification.sql',
     sonde: async () => !(await sb.from('bank_transactions').select('classification').limit(1)).error,
   },
+  {
+    nom: 'heures imputées : numéro de projet, activités, heures',
+    migration: 'schema-heures.sql',
+    sonde: async () => {
+      if ((await sb.from('projects').select('numero').limit(1)).error) return false
+      if ((await sb.from('activites').select('code').limit(1)).error) return false
+      return !(await sb.from('heures').select('id, minutes').limit(1)).error
+    },
+  },
+  {
+    nom: 'coûts réels des projets',
+    migration: 'schema-project-couts.sql',
+    sonde: async () => !(await sb.from('project_couts').select('id, montant_ht').limit(1)).error,
+  },
 ]
 
 let manquants = 0

@@ -46,6 +46,10 @@ export function faireSupabase({ tables = {}, rpc = {}, erreurs = {}, comptes = {
       order() { return q },
       limit(n) { lignes = lignes.slice(0, n); return q },
       eq(col, val) { filtres.push(r => String(lire(r, col)) === String(val)); return q },
+      // Comparaison de chaînes : juste pour des dates YYYY-MM-DD, ce qui est
+      // le seul usage des routes.
+      gte(col, val) { filtres.push(r => String(lire(r, col)) >= String(val)); return q },
+      lte(col, val) { filtres.push(r => String(lire(r, col)) <= String(val)); return q },
       neq(col, val) { filtres.push(r => String(r[col]) !== String(val)); return q },
       in(col, vals) { filtres.push(r => vals.map(String).includes(String(r[col]))); return q },
       is(col, val) { filtres.push(r => (val === null ? r[col] == null : r[col] === val)); return q },

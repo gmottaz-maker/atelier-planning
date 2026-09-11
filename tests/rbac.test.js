@@ -46,6 +46,8 @@ const ADMIN_ATTENDU = [
   '/storage-invoices/cron.js',     // génère des factures
   '/sync-odoo-clients.js',         // réécrit le fichier clients
   '/push/send.js',                 // notifie toute l'équipe
+  '/heures/export.js',             // relevé d'activité de toute l'équipe, minute par minute
+  '/projects/[id]/couts.js',       // coûts réels : prix d'achat et, par différence, marges
 ]
 
 describe('inventaire des autorisations API', () => {

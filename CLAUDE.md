@@ -7,7 +7,7 @@ URL production : https://mazeproject.amazinglab.ch
 
 ## Stack
 
-- **Next.js 14** — Pages Router (pas App Router), JavaScript (pas TypeScript)
+- **Next.js 15** — Pages Router (pas App Router), JavaScript (pas TypeScript)
 - **Supabase JS v2** — base de données PostgreSQL + auth
 - **Tailwind CSS** — styles utilitaires
 - **Vercel** — hébergement, déploiement auto depuis GitHub
@@ -27,6 +27,8 @@ pages/
   index.js             — Projets : cartes / kanban / gantt / liste (page principale)
   home.js              — Dashboard accueil + Google Agenda
   schedule.js          — Horaires, congés et frais (page principale des non-admins)
+  heures.js            — Heures imputées : projet × activité, jour par jour ; export et
+                         activités pour l'admin (section dédiée)
   tasks.js             — Tâches, toutes catégories
   planning.js          — Planning d'atelier
   meeting.js           — Vue réunion
@@ -69,6 +71,8 @@ pages/
     push/              — Notifications push
     send-document.js   — Envoi d'une offre ou facture par e-mail (Resend)
     prospects/         — Prospection : fiche, personnes, journal, conversion
+    heures/            — Heures imputées : liste, création, correction, export (admin)
+    activites.js       — Activités d'imputation : lecture pour tous, écriture admin
     accounts.js, catalog.js, contacts.js, email-templates.js, work-*.js, …
 
 components/
@@ -111,6 +115,10 @@ lib/
   kdrive.js · receipts.js — Stockage des fichiers
   projectPhase.js · supplierStatus.js · customerStatus.js · taskCategories.js — Statuts
   prospects.js           — Prospection : étapes, canaux, sources, calcul des relances
+  heures.js              — Heures imputées : validation, recouvrements, totaux, export CSV
+  rentabilite.js         — Prévu (offre, au prix de revient) contre réel (coûts saisis, heures)
+  joursOuvres.js         — Décompte de l'écran d'atelier en jours travaillés (lun, mar, jeu, ven)
+  modelesClaude.js       — Identifiants des modèles Claude, en un seul endroit
   aujourdhui.js          — Date du jour en YYYY-MM-DD (source unique, voir plus bas)
   todoist.js · googleCalendar.js · push-server.js · adminFetch.js
 
@@ -376,6 +384,55 @@ pendant des mois (cf. `loadCandidates`).
 
 ---
 
+## Heures imputées (`/heures`)
+
+Une heure imputée dit QUI, QUEL JOUR, DE QUAND À QUAND, SUR QUEL PROJET (ou
+aucun) et POUR QUELLE ACTIVITÉ. La feuille manuscrite, son scan, la
+rentabilité par projet et l'export vers l'outil financier reposent tous sur
+cette ligne (`schema-heures.sql`, calcul dans `lib/heures.js`).
+
+**Présence et imputation sont deux tables.** `work_entries` garde la présence
+(arrivée, départ, pause) ; `heures`, ce sur quoi on a travaillé. Elles
+répondent à « étais-je là ? » et « à quoi ai-je passé ce temps ? » ; les
+confronter servira à repérer une journée à moitié imputée.
+
+**Le numéro de projet n'est pas la référence.** `projects.reference` est celle
+du CLIENT (son bon de commande, imprimé sur l'offre). `projects.numero` est le
+nôtre : attribué par une séquence Postgres à la création (jamais de max + 1),
+à partir de 100. Trois chiffres pour un projet, un ou deux pour une activité :
+deux colonnes inversées sur une feuille manuscrite ne passent pas inaperçues.
+Il n'est dans aucune liste blanche d'écriture — personne ne le choisit.
+
+**Le code d'une activité est définitif.** Il ne se modifie pas, ne se supprime
+pas et n'est jamais repris : une feuille scannée en 2026 doit vouloir dire la
+même chose en 2028. Une activité qui ne sert plus se DÉSACTIVE ; ses anciennes
+heures restent corrigibles (`tolererInactive`).
+
+**`minutes` est calculée par la base**, depuis `debut` et `fin` : elle ne peut
+pas les contredire. `fin > debut` est une contrainte ; une nuit à cheval sur
+minuit se saisit en deux lignes. Deux lignes d'une même personne ne se
+recouvrent pas (contrôlé par la route, `chevauche()`), mais peuvent se toucher.
+
+**L'identité vient du JWT.** Un membre n'écrit et ne lit que ses heures ; la
+ligne d'un collègue lui répond 404. L'admin saisit pour les autres — c'est lui
+qui reportera les feuilles scannées — et lui seul exporte : l'export est le
+relevé d'activité de toute l'équipe.
+
+**La rentabilité compare au prix de REVIENT** (`lib/rentabilite.js`, bloc admin
+en bas de la fiche projet). Le prévu se lit sur l'offre AVANT marge et escompte
+— prix d'achat × quantité, tarif de sous-traitance × quantité — parce que c'est
+ce qu'on s'attendait à payer. Le réel vient de `project_couts` (saisi à la main,
+HT, avoirs négatifs permis) et des heures imputées au projet. Les lignes masquées
+de l'offre comptent. Une ligne de main-d'œuvre en jours ou sans unité n'est PAS
+convertie en heures : elle est comptée à part et l'écran le dit. La marge en
+francs attend un coût horaire de revient, qui n'existe pas encore.
+
+**L'export neutralise les formules.** Une cellule texte commençant par
+`= + - @` est préfixée d'une apostrophe : une remarque « =HYPERLINK(...) »
+recopiée d'une feuille deviendrait sinon un lien piégé dans Excel.
+
+---
+
 ## Git / déploiement
 
 **Ne jamais mettre de jeton dans l'URL du remote.** Un PAT écrit dans
@@ -577,6 +634,8 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-integrite-financiere.sql` | `reconcile_match()`, `next_invoice_number()`, `storage_billing_key`, index d'unicité | en fin de fichier |
 | `schema-work-slots.sql` | table `work_slots` (planning par demi-journée) | `DROP TABLE work_slots;` |
 | `schema-bank-classification.sql` | `bank_transactions.classification` + comptes par défaut (salaires, virements internes) | en fin de fichier |
+| `schema-heures.sql` | `projects.numero`, tables `activites` et `heures` | en fin de fichier |
+| `schema-project-couts.sql` | table `project_couts` (coûts réels saisis par projet) | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

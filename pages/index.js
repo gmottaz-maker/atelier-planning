@@ -90,6 +90,13 @@ function daysBadge(deadline, phase, suspended) {
   return { text: `DANS ${d}J`, kind: 'normal' }
 }
 // Badge de statut : mêmes métriques partout (carte et liste).
+// Le numéro de projet — celui qu'on reporte sur la feuille d'heures. Chasse
+// fixe et gris : repérable d'un coup d'œil, sans concurrencer le nom.
+function Numero({ project }) {
+  if (project?.numero == null) return null
+  return <span style={{ fontFamily: MONO, fontWeight: 400, color: C.muted, marginRight: '.45em' }}>{project.numero}</span>
+}
+
 function BadgeStatut({ project }) {
   const s = statutProjet(project)
   return (
@@ -362,7 +369,7 @@ function GanttView({ projects }) {
               return (
                 <div key={p.id} className="flex items-center border-b u-line hover:u-fill/50 transition-colors" style={{ height: 46 }}>
                   <Link href={`/projects/${p.id}`} className="flex-shrink-0 px-4 min-w-0" style={{ width: LABEL_W }}>
-                    <div className="font-medium u-ink truncate" style={{ fontSize: 13 }}>{p.name}</div>
+                    <div className="font-medium u-ink truncate" style={{ fontSize: 13 }}><Numero project={p} />{p.name}</div>
                     <div className="u-muted truncate" style={{ fontSize: 11 }}>{p.client}</div>
                   </Link>
                   <div style={{ position: 'relative', width: trackWidth, height: '100%', flexShrink: 0 }}>
@@ -1023,7 +1030,7 @@ export default function Admin() {
         {/* En-tête : nom + client, pastille d'offre, avatar du responsable */}
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <Link href={`/projects/${project.id}`} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textDecoration: 'none' }}>
-            <span style={{ fontSize: 19, fontWeight: 500, lineHeight: 1.15, letterSpacing: '-.01em', color: AL.black }}>{project.name}</span>
+            <span style={{ fontSize: 19, fontWeight: 500, lineHeight: 1.15, letterSpacing: '-.01em', color: AL.black }}><Numero project={project} />{project.name}</span>
             <span style={{ fontSize: 13, color: incomplete ? C.accent : C.muted }}>
               {project.client}{incomplete ? ' — à compléter' : ''}
             </span>
@@ -1125,7 +1132,7 @@ export default function Admin() {
         <Link href={`/projects/${project.id}`}
           style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textDecoration: 'none' }}>
           <span style={{ fontSize: 20, fontWeight: 500, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {project.name}
+            <Numero project={project} />{project.name}
           </span>
           <span style={{ fontSize: 13, color: incomplete ? C.accent : C.muted }}>
             {project.client}{incomplete ? ' — à compléter' : ''}
@@ -1500,7 +1507,7 @@ export default function Admin() {
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
                       padding: '14px 4px', borderTop: `1px solid ${C.border}`, fontSize: 13 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, minWidth: 0 }}>
-                      <span style={{ fontWeight: 500, color: C.muted }}>{project.name}</span>
+                      <span style={{ fontWeight: 500, color: C.muted }}><Numero project={project} />{project.name}</span>
                       <span style={{ color: C.muted }}>{project.client}</span>
                       <span style={{ fontSize: 12, color: C.muted }}>{formatDate(project.deadline)}</span>
                     </div>

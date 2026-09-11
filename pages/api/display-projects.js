@@ -11,6 +11,9 @@ import { getSupabaseServer } from '../../lib/supabase-server'
 export const PUBLIC_FIELDS = [
   'id', 'name', 'client', 'deadline', 'responsible',
   'delivery_type', 'short_description', 'status', 'color_override',
+  // Le numéro qu'on reporte sur la feuille d'heures : l'atelier le lit sur
+  // l'écran. Un simple compteur, sans prix ni donnée client.
+  'numero',
 ]
 
 export default async function handler(req, res) {

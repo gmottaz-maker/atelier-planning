@@ -24,7 +24,7 @@ describe('DTO public de l\'écran mural', () => {
   it('couvre exactement ce que la page affiche', () => {
     expect([...PUBLIC_FIELDS].sort()).toEqual([
       'client', 'color_override', 'deadline', 'delivery_type',
-      'id', 'name', 'responsible', 'short_description', 'status',
+      'id', 'name', 'numero', 'responsible', 'short_description', 'status',
     ])
   })
 })
