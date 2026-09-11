@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
+import { decompte } from '../lib/joursOuvres'
 
 const REFRESH_INTERVAL = 60 * 1000
 
@@ -228,7 +229,12 @@ function Timeline({ projects, viewMode, dark, theme }) {
                     <div className="mt-1 truncate" style={{ color: theme.textSecondary, fontSize: 17 }}>{project.name}</div>
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className="font-bold" style={{ color: colors.badge, fontSize: 16 }}>
-                        {daysLeft === 0 ? "Aujourd'hui !" : `J-${daysLeft}`}
+                        {decompte(project.deadline)}
+                      </span>
+                      {/* Date de livraison à côté du décompte : « J-4 » seul ne
+                          dit pas QUEL jour il faut être prêt. */}
+                      <span style={{ color: theme.textSecondary, fontSize: 16 }}>
+                        · {formatDate(project.deadline)}
                       </span>
                       {project.responsible && (
                         <span style={{ color: theme.textMuted, fontSize: 16 }}>· {project.responsible}</span>
@@ -309,7 +315,6 @@ function CardView({ projects, dark, theme }) {
           </div>
           {group.items.map(project => {
             const colors = getProjectColors(project, dark)
-            const daysLeft = getDaysRemaining(project.deadline)
             return (
               <div
                 key={project.id}
@@ -321,10 +326,7 @@ function CardView({ projects, dark, theme }) {
                     className="font-bold px-4 py-1.5 u-pill"
                     style={{ background: colors.badge + '22', color: colors.badge, fontSize: 16 }}
                   >
-                    {daysLeft === null ? 'Sans date' :
-                     daysLeft < 0 ? `Retard ${Math.abs(daysLeft)}j` :
-                     daysLeft === 0 ? "Aujourd'hui !" :
-                     `J-${daysLeft}`}
+                    {decompte(project.deadline)}
                   </div>
                   {project.responsible && (
                     <div className="font-semibold" style={{ color: theme.textSecondary, fontSize: 16 }}>{project.responsible}</div>
