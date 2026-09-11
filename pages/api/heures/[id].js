@@ -8,7 +8,7 @@ import { erreurApi } from '../../../lib/apiError'
 import { validerEntree, chevauche } from '../../../lib/heures'
 import { CHAMPS_HEURE } from './index'
 
-const MODIFIABLES = ['date', 'debut', 'fin', 'project_id', 'activite', 'note']
+const MODIFIABLES = ['date', 'debut', 'fin', 'project_id', 'contact_id', 'activite', 'note']
 
 export default async function handler(req, res) {
   const user = await requireUser(req, res)
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   const { id } = req.query
 
   const { data: existante } = await supabase
-    .from('heures').select('id, user_name, date, debut, fin, project_id, activite, note').eq('id', id).maybeSingle()
+    .from('heures').select('id, user_name, date, debut, fin, project_id, contact_id, activite, note').eq('id', id).maybeSingle()
   if (!existante || (!admin && existante.user_name !== user.name)) {
     return res.status(404).json({ error: 'Entrée introuvable' })
   }
@@ -37,6 +37,10 @@ export default async function handler(req, res) {
     if (v.valeur.project_id && v.valeur.project_id !== existante.project_id) {
       const { data: p } = await supabase.from('projects').select('id').eq('id', v.valeur.project_id).maybeSingle()
       if (!p) return res.status(400).json({ error: 'Projet introuvable' })
+    }
+    if (v.valeur.contact_id && v.valeur.contact_id !== existante.contact_id) {
+      const { data: c } = await supabase.from('contacts').select('id').eq('id', v.valeur.contact_id).maybeSingle()
+      if (!c) return res.status(400).json({ error: 'Client introuvable' })
     }
 
     const { data: jour, error: errJour } = await supabase

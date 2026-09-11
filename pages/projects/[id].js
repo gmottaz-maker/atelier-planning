@@ -33,6 +33,7 @@ import { champsSousTraitance, majSousTraitance } from '../../lib/sousTraitance'
 import useSWR from 'swr'
 import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT, mainOeuvreReelle, margeReelle } from '../../lib/rentabilite'
 import { formatDuree } from '../../lib/heures'
+import { compensationConsommee, ligneCompensation, CODE_CONSULTING } from '../../lib/consulting'
 import { totauxDevis } from '../../lib/quoteLines'
 
 const PINK = AL.black
@@ -1122,6 +1123,51 @@ function SousTraitanceItem({ task, currentUser, onUpdate, onDelete, onAddTask })
   )
 }
 
+// ─── BandeauConsulting ────────────────────────────────────────────────────────
+// Le solde de consulting du client, au-dessus de l'offre. « compenser » glisse
+// une ligne de Gestion MASQUÉE : invisible sur le document, comprise dans le
+// prix. Sa quantité se règle ensuite dans l'éditeur — on peut compenser moins
+// que le solde, et garder le reste pour l'offre suivante.
+//
+// Le serveur compte les AUTRES offres du client ; celle-ci se lit à l'écran,
+// enregistrée ou non, pour que le reste bouge dès qu'on touche à la ligne.
+function BandeauConsulting({ projectId, contactId, quote, tarifDefaut, onCompenser }) {
+  const { data } = useSWR(`/api/consulting?contact=${contactId}&exclure=${projectId}`)
+  const { data: activitesBrutes } = useSWR('/api/activites')
+  if (!data || data.error) return null
+  const ici = compensationConsommee(quote)
+  if (!data.consulte && !data.compense && !ici) return null
+  const reste = data.solde - ici
+  const consulting = (Array.isArray(activitesBrutes) ? activitesBrutes : []).find(a => Number(a.code) === CODE_CONSULTING)
+  const tarif = consulting?.tarif_vente ?? tarifDefaut
+
+  return (
+    <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: '14px 18px',
+      display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ flex: 1, minWidth: 260 }}>
+        <span style={microLabel}>consulting de ce client</span>
+        <div style={{ fontSize: 14, marginTop: 4, color: AL.black }}>
+          {formatDuree(data.consulte)} noté · {formatDuree(data.compense)} compensé dans d'autres offres
+          {ici ? ` · ${formatDuree(ici)} dans celle-ci` : ''} ·{' '}
+          <span style={{ fontWeight: 500, color: reste < 0 ? C.danger : AL.black }}>
+            {reste < 0 ? `compensé ${formatDuree(-reste)} de trop` : `reste ${formatDuree(reste)}`}
+          </span>
+        </div>
+        <p style={{ margin: '4px 0 0', fontSize: 12, color: C.muted }}>
+          La compensation est une ligne de Gestion masquée : invisible sur l'offre, comprise dans le prix.
+          Une offre refusée rend ses heures au solde.
+        </p>
+      </div>
+      {reste > 0 && (
+        <ButtonPill onClick={() => onCompenser(ligneCompensation({ minutes: reste, tarif }))}
+          style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+          compenser {formatDuree(reste)}
+        </ButtonPill>
+      )}
+    </div>
+  )
+}
+
 // ─── RentabiliteProjet ────────────────────────────────────────────────────────
 // Ce que l'offre prévoyait, ce qui a été dépensé. Admin seulement : rapprochés
 // de l'offre, ces montants disent la marge réelle.
@@ -1139,12 +1185,17 @@ function RentabiliteProjet({ projectId, quote }) {
   const couts = Array.isArray(coutsBruts) ? coutsBruts : []
   const heures = Array.isArray(heuresBrutes) ? heuresBrutes : []
   const activites = Array.isArray(activitesBrutes) ? activitesBrutes : []
+  // Le consulting compensé dans cette offre a été passé AVANT le projet, contre
+  // le client : il entre ici comme des heures de consulting, au coût. Sinon le
+  // chiffre que la compensation apporte n'aurait aucun coût en face.
+  const compensees = compensationConsommee(quote)
+  const heuresProjet = compensees ? [...heures, { activite: CODE_CONSULTING, minutes: compensees }] : heures
   const prevu = prevuDevis(quote)
-  const reel = reelProjet(couts, heures)
+  const reel = reelProjet(couts, heuresProjet, activites)
   const lignes = comparaison(prevu, reel)
   // Les heures valorisées au coût de LEUR activité : une heure de CNC ne coûte
   // pas une heure de conduite.
-  const mo = mainOeuvreReelle(heures, activites)
+  const mo = mainOeuvreReelle(heuresProjet, activites)
   const resultat = margeReelle(totauxDevis(quote).total, reel, mo.cout)
   const libelleCat = cle => CATEGORIES_COUT.find(c => c.cle === cle)?.label || cle
 
@@ -1217,6 +1268,13 @@ function RentabiliteProjet({ projectId, quote }) {
           les heures prévues : une journée ne vaut pas le même nombre d'heures pour tout le monde.
         </p>
       )}
+      {reel.heuresNonFacturees > 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: C.muted }}>
+          {String(reel.heuresNonFacturees).replace('.', ',')} h de conduite ou d'activités non facturées à l'heure ne
+          sont pas comparées aux heures offertes — aucune offre ne les prévoit, la conduite part au km. Elles comptent
+          dans la marge réelle, au coût de revient.
+        </p>
+      )}
 
       {mo.lignes.length > 0 && (
         <>
@@ -1237,7 +1295,9 @@ function RentabiliteProjet({ projectId, quote }) {
                     <td style={cellule}><span style={{ fontFamily: MONO }}>{l.code}</span> · {l.libelle}</td>
                     <td style={nombre}>{formatDuree(l.minutes)}</td>
                     <td style={{ ...nombre, color: l.cout == null ? C.muted : AL.black }}>{l.cout == null ? 'coût ?' : fmtCHF(l.cout)}</td>
-                    <td style={{ ...nombre, color: l.vente == null ? C.muted : AL.black }}>{l.vente == null ? '—' : fmtCHF(l.vente)}</td>
+                    <td style={{ ...nombre, color: l.vente == null ? C.muted : AL.black }}>
+                      {!l.facturee ? 'pas à l\'heure' : l.vente == null ? '—' : fmtCHF(l.vente)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1254,7 +1314,7 @@ function RentabiliteProjet({ projectId, quote }) {
           ['Matériaux payés', -reel.materiel, true],
           ['Sous-traitance payée', -reel.sous_traitance, true],
           ['Autres frais', -reel.autre, true],
-          [`Main-d'œuvre au coût de revient (${formatDuree(heures.reduce((s, h) => s + (Number(h.minutes) || 0), 0))})`, -mo.cout, true],
+          [`Main-d'œuvre au coût de revient (${formatDuree(heuresProjet.reduce((s, h) => s + (Number(h.minutes) || 0), 0))})`, -mo.cout, true],
         ].map(([label, v, sub]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '6px 16px', fontSize: 13 }}>
             <span style={{ color: sub ? C.muted : AL.black }}>{label}</span>
@@ -1269,6 +1329,12 @@ function RentabiliteProjet({ projectId, quote }) {
           </span>
         </div>
       </div>
+      {compensees > 0 && (
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: C.muted }}>
+          Dont {formatDuree(compensees)} de consulting compensé dans cette offre : du temps passé avant le projet,
+          compté ici au coût de revient.
+        </p>
+      )}
       {mo.minutesSansCout > 0 && (
         <p style={{ margin: '8px 0 0', fontSize: 12, color: C.warning }}>
           {formatDuree(mo.minutesSansCout)} imputées sur des activités sans coût de revient ne sont pas comptées : la
@@ -2878,6 +2944,15 @@ export default function ProjectPage() {
                         ))}
                         <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.muted }}>Modifier via « Modifier » le projet (choix entreprise + personne).</p>
                       </div>
+                    )}
+
+                    {isAdmin && project.client_contact_id && (
+                      <BandeauConsulting projectId={id} contactId={project.client_contact_id} quote={quote}
+                        tarifDefaut={reglages?.taux_projet}
+                        onCompenser={ligne => {
+                          setQuote(q => ({ ...q, management: [...(q.management || []), { _uid: genRowUid(), ...ligne }] }))
+                          setQuoteDirty(true)
+                        }} />
                     )}
 
                     <QuoteEditor

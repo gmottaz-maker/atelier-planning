@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   normaliserHeure, versMinutes, duree, formatDuree, enHeures, validerEntree,
   chevauche, chevauchements, totalPar, lignesExport, versCSV, validerActivite, DUREE_MAX,
-  lireTarif, validerMajActivite,
+  lireTarif, validerMajActivite, prochainCode, FAMILLES,
+  complementJour, complements, JOURNEE, CODE_DIVERS, CODE_PAUSE,
 } from '../lib/heures'
 
 const ACT = [
@@ -46,7 +47,7 @@ describe('validerEntree', () => {
     const v = validerEntree(ok({ debut: '9h', note: '  ponçage plateau  ' }), { activites: ACT, aujourdhui: AUJ })
     expect(v.ok).toBe(true)
     expect(v.minutes).toBe(120)
-    expect(v.valeur).toEqual({ date: '2026-09-10', debut: '09:00', fin: '11:00', project_id: null, activite: 2, note: 'ponçage plateau' })
+    expect(v.valeur).toEqual({ date: '2026-09-10', debut: '09:00', fin: '11:00', project_id: null, contact_id: null, activite: 2, note: 'ponçage plateau' })
   })
   it('garde le projet quand il y en a un', () => {
     expect(validerEntree(ok({ project_id: 'p1' }), { activites: ACT, aujourdhui: AUJ }).valeur.project_id).toBe('p1')
@@ -79,7 +80,7 @@ describe('validerEntree', () => {
   })
   it('ne laisse passer aucun champ inattendu', () => {
     const v = validerEntree(ok({ user_name: 'Pirate', source: 'scan', id: 5 }), { activites: ACT, aujourdhui: AUJ })
-    expect(Object.keys(v.valeur).sort()).toEqual(['activite', 'date', 'debut', 'fin', 'note', 'project_id'])
+    expect(Object.keys(v.valeur).sort()).toEqual(['activite', 'contact_id', 'date', 'debut', 'fin', 'note', 'project_id'])
   })
 })
 
@@ -152,7 +153,7 @@ describe('export', () => {
 describe('validerActivite', () => {
   it('accepte une activité nouvelle', () => {
     expect(validerActivite({ code: 16, libelle: ' Gravure ', famille: 'atelier', tarif_vente: '120,50' }, ACT))
-      .toEqual({ ok: true, valeur: { code: 16, libelle: 'Gravure', famille: 'atelier', tarif_vente: 120.5, cout_revient: null } })
+      .toEqual({ ok: true, valeur: { code: 16, libelle: 'Gravure', famille: 'atelier', tarif_vente: 120.5, cout_revient: null, facturee_heure: true } })
   })
   it('ne réattribue jamais un code, même désactivé', () => {
     expect(validerActivite({ code: 9, libelle: 'Autre', famille: 'atelier' }, ACT).erreur).toMatch(/jamais réattribué/)
@@ -199,5 +200,97 @@ describe('validerMajActivite', () => {
     expect(validerMajActivite({ famille: 'cuisine' }).ok).toBe(false)
     expect(validerMajActivite({ cout_revient: '-1' }).erreur).toMatch(/Coût de revient/)
     expect(validerMajActivite({}).ok).toBe(false)
+  })
+})
+
+describe('facturée à l\'heure', () => {
+  it('par défaut oui, sauf si on dit non', () => {
+    expect(validerActivite({ code: 30, libelle: 'x', famille: 'atelier' }, []).valeur.facturee_heure).toBe(true)
+    expect(validerActivite({ code: 30, libelle: 'x', famille: 'logistique', facturee_heure: false }, []).valeur.facturee_heure).toBe(false)
+  })
+  it('se modifie, et seul un vrai booléen vaut « oui »', () => {
+    expect(validerMajActivite({ facturee_heure: false }).valeur).toEqual({ facturee_heure: false })
+    expect(validerMajActivite({ facturee_heure: 'false' }).valeur).toEqual({ facturee_heure: false })
+  })
+})
+
+describe('codes par dizaine de famille', () => {
+  const actuelles = [{ code: 10 }, { code: 11 }, { code: 12 }, { code: 20 }, { code: 21 }, { code: 60 }]
+
+  it('range les familles dans l\'ordre du travail', () => {
+    expect(FAMILLES).toEqual(['gestion', 'atelier', 'finitions', 'chantier', 'logistique', 'interne'])
+  })
+  it('propose le prochain code libre de la dizaine', () => {
+    expect(prochainCode('gestion', actuelles)).toBe(13)
+    expect(prochainCode('atelier', actuelles)).toBe(22)
+    expect(prochainCode('finitions', actuelles)).toBe(30)
+    expect(prochainCode('interne', actuelles)).toBe(61)
+  })
+  it('comble un trou plutôt que d\'aller au bout', () => {
+    expect(prochainCode('gestion', [{ code: 10 }, { code: 12 }])).toBe(11)
+  })
+  it('rend null quand la dizaine est pleine, ou pour une famille inconnue', () => {
+    const plein = Array.from({ length: 10 }, (_, i) => ({ code: 20 + i }))
+    expect(prochainCode('atelier', plein)).toBe(null)
+    expect(prochainCode('cuisine', actuelles)).toBe(null)
+  })
+})
+
+describe('journée régulière : 8,4 h payées, dont 30 min de pause offerte', () => {
+  it('8,4 h, une pause offerte de 30 min, un midi non payé d\'1 h', () => {
+    expect(JOURNEE).toEqual({ minutes: 504, pausePayee: 30, pauseMidi: 60 })
+  })
+  it('complète une journée à moitié notée : pause payée, puis Divers', () => {
+    const c = complementJour([{ activite: 31, minutes: 240 }])
+    expect(c).toEqual({ travail: 240, pauseNotee: 0, pause: 30, divers: 234, total: 504 })
+  })
+  it('ne compte pas deux fois une pause déjà notée', () => {
+    expect(complementJour([{ activite: 31, minutes: 300 }, { activite: CODE_PAUSE, minutes: 30 }]))
+      .toMatchObject({ pause: 0, divers: 174, total: 504 })
+  })
+  it('ne retranche rien d\'une journée longue : pas de Divers négatif', () => {
+    expect(complementJour([{ activite: 23, minutes: 540 }])).toMatchObject({ divers: 0, pause: 30, total: 570 })
+  })
+})
+
+describe('complements', () => {
+  const AUJ = '2026-09-11'   // vendredi
+  const lignes = [
+    { user_name: 'Arnaud', date: '2026-09-10', activite: 31, minutes: 300 },  // jeudi
+    { user_name: 'Arnaud', date: '2026-09-10', activite: 23, minutes: 60 },
+    { user_name: 'Gabin',  date: '2026-09-10', activite: 23, minutes: 474 },  // journée pleine
+    { user_name: 'Arnaud', date: '2026-09-12', activite: 23, minutes: 120 },  // samedi
+    { user_name: 'Arnaud', date: AUJ,          activite: 23, minutes: 60 },   // aujourd'hui
+  ]
+  const c = complements(lignes, { aujourdhui: AUJ })
+
+  it('complète chaque personne séparément', () => {
+    expect(c.filter(x => x.user_name === 'Arnaud').map(x => [x.activite, x.minutes]))
+      .toEqual([[CODE_PAUSE, 30], [CODE_DIVERS, 114]])
+    expect(c.filter(x => x.user_name === 'Gabin').map(x => [x.activite, x.minutes]))
+      .toEqual([[CODE_PAUSE, 30]])
+  })
+  it('ne complète ni le jour en cours ni le week-end', () => {
+    expect(c.some(x => x.date === AUJ)).toBe(false)
+    expect(c.some(x => x.date === '2026-09-12')).toBe(false)
+  })
+  it('ne complète pas un jour sans aucune ligne : oubli ou absence, on ne sait pas', () => {
+    expect(complements([], { aujourdhui: AUJ })).toEqual([])
+  })
+  it('marque ses lignes comme calculées, sans horaire ni projet', () => {
+    expect(c[0]).toMatchObject({ source: 'complément', debut: null, fin: null, project_id: null })
+  })
+})
+
+describe('une heure pour un client plutôt qu\'un projet', () => {
+  it('accepte un client seul', () => {
+    const v = validerEntree(ok({ contact_id: '3' }), { activites: ACT, aujourdhui: AUJ })
+    expect(v.valeur).toMatchObject({ contact_id: 3, project_id: null })
+  })
+  it('refuse projet et client à la fois', () => {
+    expect(validerEntree(ok({ contact_id: 3, project_id: 'p1' }), { activites: ACT, aujourdhui: AUJ }).erreur).toMatch(/OU à un client/)
+  })
+  it('refuse un identifiant de client illisible', () => {
+    expect(validerEntree(ok({ contact_id: 'andros' }), { activites: ACT, aujourdhui: AUJ }).ok).toBe(false)
   })
 })

@@ -119,6 +119,28 @@ const CONTROLES = [
     migration: 'schema-activites-tarifs.sql',
     sonde: async () => !(await sb.from('activites').select('tarif_vente, cout_revient').limit(1)).error,
   },
+  {
+    nom: 'activités : facturée à l\'heure ou non',
+    migration: 'schema-activites-facturation.sql',
+    sonde: async () => !(await sb.from('activites').select('facturee_heure').limit(1)).error,
+  },
+  {
+    // Gestion de projet porte le 10 une fois la renumérotation jouée ; avant,
+    // elle portait le 15 et aucune gestion n'avait de code en dizaine.
+    nom: 'activités renumérotées par famille (dizaines)',
+    migration: 'schema-activites-renumerotation.sql',
+    sonde: async () => {
+      const { data, error } = await sb.from('activites').select('code, famille')
+      if (error || !data?.length) return false
+      const bloc = { gestion: 1, atelier: 2, finitions: 3, chantier: 4, logistique: 5, interne: 6 }
+      return data.every(a => Math.floor(a.code / 10) === bloc[a.famille])
+    },
+  },
+  {
+    nom: 'consulting : heures rattachées à un client',
+    migration: 'schema-consulting.sql',
+    sonde: async () => !(await sb.from('heures').select('contact_id').limit(1)).error,
+  },
 ]
 
 let manquants = 0

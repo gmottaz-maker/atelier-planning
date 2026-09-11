@@ -8,8 +8,8 @@ import { requireUser, isAdminUser } from '../../../lib/requireAdmin'
 import { erreurApi } from '../../../lib/apiError'
 import { validerEntree, chevauche } from '../../../lib/heures'
 
-export const CHAMPS_HEURE = `id, user_name, date, debut, fin, minutes, project_id, activite, note,
-  source, created_by, created_at, updated_at, projects(numero, name, client)`
+export const CHAMPS_HEURE = `id, user_name, date, debut, fin, minutes, project_id, contact_id, activite, note,
+  source, created_by, created_at, updated_at, projects(numero, name, client), contacts(name)`
 
 export default async function handler(req, res) {
   const user = await requireUser(req, res)
@@ -43,6 +43,10 @@ export default async function handler(req, res) {
     if (v.valeur.project_id) {
       const { data: p } = await supabase.from('projects').select('id').eq('id', v.valeur.project_id).maybeSingle()
       if (!p) return res.status(400).json({ error: 'Projet introuvable' })
+    }
+    if (v.valeur.contact_id) {
+      const { data: c } = await supabase.from('contacts').select('id').eq('id', v.valeur.contact_id).maybeSingle()
+      if (!c) return res.status(400).json({ error: 'Client introuvable' })
     }
 
     const { data: jour, error: errJour } = await supabase

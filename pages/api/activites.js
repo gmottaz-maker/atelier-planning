@@ -12,7 +12,7 @@ import { requireUser, isAdminUser } from '../../lib/requireAdmin'
 import { erreurApi } from '../../lib/apiError'
 import { validerActivite, validerMajActivite } from '../../lib/heures'
 
-export const CHAMPS_MEMBRE = 'code, libelle, famille, actif, tarif_vente'
+export const CHAMPS_MEMBRE = 'code, libelle, famille, actif, tarif_vente, facturee_heure'
 export const CHAMPS_ADMIN = `${CHAMPS_MEMBRE}, cout_revient`
 
 export default async function handler(req, res) {

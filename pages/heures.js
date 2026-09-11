@@ -16,13 +16,13 @@ import { useResponsibles } from '../lib/useResponsibles'
 import NavBar from '../components/NavBar'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { dateDuJour } from '../lib/aujourdhui'
-import { formatDuree, duree, totalPar, FAMILLES } from '../lib/heures'
+import { formatDuree, duree, totalPar, FAMILLES, prochainCode, complementJour } from '../lib/heures'
 import { estJourTravaille } from '../lib/joursOuvres'
 
 const JOURS = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
 const LIBELLES_FAMILLE = {
   atelier: 'Atelier', finitions: 'Finitions', logistique: 'Logistique',
-  chantier: 'Chantier', gestion: 'Gestion', interne: 'Hors projet',
+  chantier: 'Chantier', gestion: 'Gestion', interne: 'Interne',
 }
 
 const versDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
@@ -41,7 +41,7 @@ const lien = {
 }
 const microLabel = { fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', color: C.muted }
 
-const formVide = { debut: '', fin: '', project_id: '', activite: '', note: '' }
+const formVide = { debut: '', fin: '', project_id: '', contact_id: '', activite: '', note: '' }
 
 export default function HeuresPage() {
   const { user } = useAuth()
@@ -66,6 +66,12 @@ export default function HeuresPage() {
   const { data: semaineBrute, mutate } = useSWR(cleSemaine)
   const { data: activitesBrutes } = useSWR('/api/activites')
   const { data: projetsBruts } = useSWR('/api/projects?light=1')
+  // Les fiches client ne se lisent que par l'admin : c'est lui qui note le
+  // consulting contre un client (lib/consulting.js).
+  const { data: contactsBruts } = useSWR(isAdmin ? '/api/contacts' : null)
+  const clients = (Array.isArray(contactsBruts) ? contactsBruts : [])
+    .filter(c => c.kind === 'company' && !c.archived)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'))
 
   const semaine = Array.isArray(semaineBrute) ? semaineBrute : []
   const activites = Array.isArray(activitesBrutes) ? activitesBrutes : []
@@ -81,13 +87,19 @@ export default function HeuresPage() {
   const actDe = code => activites.find(a => Number(a.code) === Number(code))
   const personnes = (responsibles || []).filter(r => r && r !== 'non défini' && r !== 'Sous-traitant')
 
+  // Journée passée, en semaine, avec au moins une ligne : on la complète
+  // (pause payée, temps non noté en Divers). Jamais le jour en cours.
+  const complet = jour < aujourdhui && [1, 2, 3, 4, 5].includes(versDate(jour).getDay()) && duJour.length > 0
+  const comp = complet ? complementJour(duJour) : null
+
   const dureeForm = duree(form.debut, form.fin)
   const dansLeFutur = jour > aujourdhui
 
   function editer(h) {
     setEdition(h.id)
     setErreur('')
-    setForm({ debut: hhmm(h.debut), fin: hhmm(h.fin), project_id: h.project_id || '', activite: String(h.activite), note: h.note || '' })
+    setForm({ debut: hhmm(h.debut), fin: hhmm(h.fin), project_id: h.project_id || '', contact_id: h.contact_id ? String(h.contact_id) : '',
+      activite: String(h.activite), note: h.note || '' })
   }
   function annuler() { setEdition(null); setErreur(''); setForm(formVide) }
 
@@ -98,7 +110,10 @@ export default function HeuresPage() {
     setErreur('')
     const corps = {
       date: jour, debut: form.debut, fin: form.fin,
-      project_id: form.project_id || null, activite: Number(form.activite), note: form.note,
+      project_id: form.project_id || null,
+      // Un projet OU un client : choisir un projet efface le client.
+      contact_id: form.project_id ? null : (form.contact_id ? Number(form.contact_id) : null),
+      activite: Number(form.activite), note: form.note,
       ...(isAdmin && !edition ? { user_name: personne } : {}),
     }
     try {
@@ -111,7 +126,7 @@ export default function HeuresPage() {
       if (!r.ok) { setErreur(data.error || `Erreur ${r.status}`); return }
       // Saisie à la suite : la ligne suivante commence où finit celle-ci, avec
       // le même projet et la même activité — c'est le cas le plus fréquent.
-      setForm(edition ? formVide : { ...formVide, debut: form.fin, project_id: form.project_id, activite: form.activite })
+      setForm(edition ? formVide : { ...formVide, debut: form.fin, project_id: form.project_id, contact_id: form.contact_id, activite: form.activite })
       setEdition(null)
       mutate()
     } catch {
@@ -179,7 +194,9 @@ export default function HeuresPage() {
         {/* ── Le jour ── */}
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
           <h2 style={{ font: `500 20px ${FONT}`, margin: 0 }}>{fmtJour(jour)}</h2>
-          <span style={{ fontFamily: MONO, fontSize: 13 }}>{formatDuree(totalJour)}</span>
+          <span style={{ fontFamily: MONO, fontSize: 13 }}>
+            {formatDuree(totalJour)} noté{comp ? <span style={{ color: C.muted }}> · journée {formatDuree(comp.total)}</span> : ''}
+          </span>
         </div>
 
         <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden', marginBottom: 14 }}>
@@ -195,8 +212,8 @@ export default function HeuresPage() {
               }}>
                 <span style={{ fontFamily: MONO }}>{hhmm(h.debut)} – {hhmm(h.fin)}</span>
                 <span style={{ fontFamily: MONO, color: C.muted }}>{formatDuree(h.minutes)}</span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: h.projects ? AL.black : C.muted }}>
-                  {libelleProjet(h.projects)}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: h.projects || h.contacts ? AL.black : C.muted }}>
+                  {h.projects ? libelleProjet(h.projects) : h.contacts ? `client · ${h.contacts.name}` : 'hors projet'}
                 </span>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ fontFamily: MONO }}>{h.activite}</span> · {a?.libelle || '?'}
@@ -211,6 +228,23 @@ export default function HeuresPage() {
               </div>
             )
           })}
+          {comp && [
+            comp.pause ? { code: 64, minutes: comp.pause, note: 'pause offerte, non notée' } : null,
+            comp.divers ? { code: 63, minutes: comp.divers, note: 'temps non noté' } : null,
+          ].filter(Boolean).map(l => (
+            <div key={l.code} style={{
+              display: 'grid', gridTemplateColumns: '110px 64px minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr) auto',
+              gap: 12, alignItems: 'baseline', padding: '10px 18px', borderTop: `1px dashed ${C.border}`,
+              fontSize: 13, color: C.muted,
+            }}>
+              <span style={{ fontFamily: MONO }}>—</span>
+              <span style={{ fontFamily: MONO }}>{formatDuree(l.minutes)}</span>
+              <span>interne</span>
+              <span><span style={{ fontFamily: MONO }}>{l.code}</span> · {actDe(l.code)?.libelle || (l.code === 64 ? 'Pause payée' : 'Divers')}</span>
+              <span>{l.note} · compté automatiquement</span>
+              <span />
+            </div>
+          ))}
         </div>
 
         {/* ── Saisie ── */}
@@ -224,7 +258,7 @@ export default function HeuresPage() {
             style={{ ...champ, fontFamily: MONO }} aria-label="Fin" />
           <span style={{ fontFamily: MONO, fontSize: 12, color: C.muted, minWidth: 48 }}>{dureeForm ? formatDuree(dureeForm) : ''}</span>
 
-          <select value={form.project_id} onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
+          <select value={form.project_id} onChange={e => { const v = e.target.value; setForm(f => ({ ...f, project_id: v, contact_id: v ? '' : f.contact_id })) }}
             style={{ ...champ, flex: '2 1 240px', minWidth: 0 }} aria-label="Projet">
             <option value="">hors projet</option>
             {projetsActifs.map(p => <option key={p.id} value={p.id}>{libelleProjet(p)}</option>)}
@@ -232,6 +266,14 @@ export default function HeuresPage() {
             {form.project_id && !projetsActifs.some(p => p.id === form.project_id) && projets.filter(p => p.id === form.project_id)
               .map(p => <option key={p.id} value={p.id}>{libelleProjet(p)} (archivé)</option>)}
           </select>
+
+          {isAdmin && !form.project_id && (
+            <select value={form.contact_id} onChange={e => setForm(f => ({ ...f, contact_id: e.target.value }))}
+              style={{ ...champ, flex: '1 1 170px', minWidth: 0 }} aria-label="Client">
+              <option value="">aucun client (interne)</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
 
           <select required value={form.activite} onChange={e => setForm(f => ({ ...f, activite: e.target.value }))}
             style={{ ...champ, flex: '1 1 200px', minWidth: 0 }} aria-label="Activité">
@@ -258,6 +300,11 @@ export default function HeuresPage() {
         </form>
         {erreur && <p style={{ margin: '0 0 8px', fontSize: 13, color: C.danger }}>{erreur}</p>}
         {dansLeFutur && <p style={{ margin: '0 0 8px', fontSize: 13, color: C.muted }}>On n'impute pas d'heures à l'avance.</p>}
+        {isAdmin && form.activite === '14' && !form.project_id && !form.contact_id && (
+          <p style={{ margin: '0 0 8px', fontSize: 13, color: C.muted }}>
+            Choisis le client : c'est ce qui fait entrer ce consulting dans son solde à compenser.
+          </p>
+        )}
 
         {isAdmin && <SectionAdmin activites={activites} personnes={personnes} aujourdhui={aujourdhui} />}
       </main>
@@ -271,6 +318,9 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
   const [au, setAu] = useState(aujourdhui)
   const [qui, setQui] = useState('')
   const [nouvelle, setNouvelle] = useState({ code: '', libelle: '', famille: 'atelier', tarif_vente: '', cout_revient: '' })
+  // Le code proposé suit la famille choisie : une activité d'atelier prend
+  // la prochaine place libre dans les 20. Taper un code l'emporte.
+  const codePropose = prochainCode(nouvelle.famille, activites)
   const [erreur, setErreur] = useState('')
   const { mutate } = useSWR('/api/activites')
 
@@ -288,7 +338,7 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
   }
 
   const entete = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 500 }
-  const COLONNES = '40px minmax(140px, 2fr) 130px 100px 100px 70px auto'
+  const COLONNES = '40px minmax(140px, 2fr) 120px 64px 96px 96px 64px auto'
 
   return (
     <section style={{ marginTop: 48, display: 'flex', flexDirection: 'column', gap: 40 }}>
@@ -326,10 +376,16 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
           vide veut dire « pas encore renseigné », jamais zéro. Renommer un libellé, oui ; changer le sens d'un code,
           non : une nouvelle activité prend un nouveau code.
         </p>
+        <p style={{ fontSize: 13, color: C.muted, margin: '0 0 12px', maxWidth: 760 }}>
+          Une activité décochée « à l'heure » ne se facture pas au temps passé — la conduite part au kilomètre ou au
+          forfait, l'interne ne se facture pas. Elle garde son coût, qui compte dans la marge, mais pas de tarif, et
+          ses heures ne sont pas comparées aux heures offertes.
+        </p>
         <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflowX: 'auto' }}>
           <div style={{ minWidth: 700 }}>
             <div style={{ display: 'grid', gridTemplateColumns: COLONNES, gap: 10, padding: '10px 14px', ...entete }}>
               <span>n°</span><span>libellé</span><span>famille</span>
+              <span style={{ textAlign: 'center' }}>à l'heure</span>
               <span style={{ textAlign: 'right' }}>tarif / h</span><span style={{ textAlign: 'right' }}>coût / h</span>
               <span style={{ textAlign: 'right' }}>marge</span><span />
             </div>
@@ -342,11 +398,11 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
 
         <form onSubmit={async e => {
           e.preventDefault()
-          if (await envoyer('POST', { ...nouvelle, code: Number(nouvelle.code) })) {
+          if (await envoyer('POST', { ...nouvelle, code: Number(nouvelle.code || codePropose) })) {
             setNouvelle(n => ({ code: '', libelle: '', famille: n.famille, tarif_vente: '', cout_revient: '' }))
           }
         }} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
-          <input type="number" min={1} max={99} required placeholder="n°" value={nouvelle.code}
+          <input type="number" min={1} max={99} required={codePropose == null} placeholder={codePropose == null ? 'n°' : String(codePropose)} value={nouvelle.code}
             onChange={e => setNouvelle(n => ({ ...n, code: e.target.value }))} style={{ ...champ, width: 70, fontFamily: MONO }} />
           <input required placeholder="libellé" value={nouvelle.libelle} maxLength={60}
             onChange={e => setNouvelle(n => ({ ...n, libelle: e.target.value }))} style={{ ...champ, flex: '1 1 160px', minWidth: 0 }} />
@@ -371,6 +427,7 @@ function SectionAdmin({ activites, personnes, aujourdhui }) {
 function LigneActivite({ activite: a, colonnes, onEnregistrer }) {
   const depuis = x => ({
     libelle: x.libelle || '', famille: x.famille,
+    facturee_heure: x.facturee_heure !== false,
     tarif_vente: x.tarif_vente == null ? '' : String(x.tarif_vente),
     cout_revient: x.cout_revient == null ? '' : String(x.cout_revient),
   })
@@ -380,7 +437,8 @@ function LigneActivite({ activite: a, colonnes, onEnregistrer }) {
   const modifie = Object.keys(f).some(k => f[k] !== origine[k])
 
   const lire = v => { const n = Number(String(v).replace(/['’\s]/g, '').replace(',', '.')); return String(v).trim() === '' || !Number.isFinite(n) ? null : n }
-  const vente = lire(f.tarif_vente), cout = lire(f.cout_revient)
+  const vente = f.facturee_heure ? lire(f.tarif_vente) : null
+  const cout = lire(f.cout_revient)
   const marge = vente != null && cout != null ? vente - cout : null
 
   async function enregistrer() {
@@ -401,8 +459,15 @@ function LigneActivite({ activite: a, colonnes, onEnregistrer }) {
       <select value={f.famille} onChange={e => setF(x => ({ ...x, famille: e.target.value }))} style={cellule} aria-label={`Famille ${a.code}`}>
         {FAMILLES.map(fam => <option key={fam} value={fam}>{LIBELLES_FAMILLE[fam]}</option>)}
       </select>
-      <input value={f.tarif_vente} inputMode="decimal" placeholder="—" onChange={e => setF(x => ({ ...x, tarif_vente: e.target.value }))}
-        style={{ ...cellule, fontFamily: MONO, textAlign: 'right' }} aria-label={`Tarif ${a.code}`} />
+      <span style={{ textAlign: 'center' }}>
+        <input type="checkbox" checked={f.facturee_heure} onChange={e => setF(x => ({ ...x, facturee_heure: e.target.checked }))}
+          aria-label={`${a.code} facturée à l'heure`} style={{ accentColor: AL.black, width: 15, height: 15 }} />
+      </span>
+      <input value={f.facturee_heure ? f.tarif_vente : ''} inputMode="decimal" disabled={!f.facturee_heure}
+        placeholder={f.facturee_heure ? '—' : 'pas à l\'h'}
+        onChange={e => setF(x => ({ ...x, tarif_vente: e.target.value }))}
+        style={{ ...cellule, fontFamily: MONO, textAlign: 'right', background: f.facturee_heure ? C.surface : C.neutralBg }}
+        aria-label={`Tarif ${a.code}`} />
       <input value={f.cout_revient} inputMode="decimal" placeholder="—" onChange={e => setF(x => ({ ...x, cout_revient: e.target.value }))}
         style={{ ...cellule, fontFamily: MONO, textAlign: 'right' }} aria-label={`Coût ${a.code}`} />
       <span style={{ fontFamily: MONO, textAlign: 'right', color: marge == null ? C.muted : marge < 0 ? C.danger : AL.black }}>

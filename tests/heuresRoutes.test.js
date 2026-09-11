@@ -25,6 +25,7 @@ const HEURES = () => [
 const TABLES = () => ({
   activites: ACTIVITES,
   projects: [{ id: 'p1', numero: 162, name: 'Canapé Margherita', client: 'Coca-Cola' }],
+  contacts: [{ id: 3, name: 'ANDROS' }],
   heures: HEURES(),
 })
 
@@ -102,7 +103,7 @@ describe('POST /api/heures', () => {
     const c = capturer()
     await appeler('heures/index', { method: 'POST', body: ligne({ source: 'scan', minutes: 9999, id: 77 }) })
     expect(Object.keys(c.insere()).sort()).toEqual(
-      ['activite', 'created_by', 'date', 'debut', 'fin', 'note', 'project_id', 'source', 'user_name'])
+      ['activite', 'contact_id', 'created_by', 'date', 'debut', 'fin', 'note', 'project_id', 'source', 'user_name'])
     expect(c.insere().source).toBe('saisie')
   })
 
@@ -128,6 +129,21 @@ describe('POST /api/heures', () => {
     sous(MEMBRE)
     const res = await appeler('heures/index', { method: 'POST', body: ligne({ date: '2026-09-01', debut: '11:00', fin: '12:00' }) })
     expect(res.statusCode).toBe(201)
+  })
+
+  it('impute du temps à un client, sans projet', async () => {
+    sous(ADMIN)
+    const c = capturer()
+    const res = await appeler('heures/index', { method: 'POST', body: ligne({ project_id: '', contact_id: 3, activite: 8 }) })
+    expect(res.statusCode).toBe(201)
+    expect(c.insere()).toMatchObject({ contact_id: 3, project_id: null })
+  })
+
+  it('refuse un client inconnu, ou un projet ET un client', async () => {
+    sous(ADMIN)
+    expect((await appeler('heures/index', { method: 'POST', body: ligne({ project_id: '', contact_id: 99 }) })).body.error).toBe('Client introuvable')
+    sous(ADMIN)
+    expect((await appeler('heures/index', { method: 'POST', body: ligne({ contact_id: 3 }) })).statusCode).toBe(400)
   })
 
   it('refuse une activité inconnue, un projet inconnu, une date future', async () => {
@@ -184,7 +200,7 @@ describe('GET /api/heures/export', () => {
 
   it('rend un CSV téléchargeable', async () => {
     sous(ADMIN)
-    const res = await appeler('heures/export', { method: 'GET', query: { from: '2026-09-01', to: '2026-09-30' } })
+    const res = await appeler('heures/export', { method: 'GET', query: { from: '2026-09-01', to: '2026-09-30', complements: '0' } })
     expect(res.statusCode).toBe(200)
     expect(res.headers['Content-Type']).toMatch(/text\/csv/)
     expect(res.headers['Content-Disposition']).toMatch(/attachment/)
@@ -194,9 +210,27 @@ describe('GET /api/heures/export', () => {
 
   it('rend les mêmes lignes en JSON pour un traitement automatisé', async () => {
     sous(ADMIN)
-    const res = await appeler('heures/export', { method: 'GET', query: { format: 'json' } })
+    const res = await appeler('heures/export', { method: 'GET', query: { format: 'json', complements: '0' } })
     expect(res.body).toHaveLength(2)
     expect(res.body[0]).toHaveProperty('activite_code')
+  })
+
+  // Le 1er septembre, Gabin a noté 2 h et Arnaud 3 h : le reste de leur
+  // journée régulière sort en pause payée et en Divers.
+  it('complète les journées travaillées par défaut', async () => {
+    sous(ADMIN)
+    const res = await appeler('heures/export', { method: 'GET', query: { format: 'json' } })
+    const calcul = res.body.filter(l => l.source === 'complément')
+    expect(calcul.map(l => [l.personne, l.activite_code, l.minutes])).toEqual([
+      ['Arnaud', 64, 30], ['Arnaud', 63, 294],
+      ['Gabin', 64, 30], ['Gabin', 63, 354],
+    ])
+  })
+
+  it('ne complète jamais un export filtré par projet', async () => {
+    sous(ADMIN)
+    const res = await appeler('heures/export', { method: 'GET', query: { format: 'json', project: 'p1' } })
+    expect(res.body.some(l => l.source === 'complément')).toBe(false)
   })
 
   it('refuse une date mal formée', async () => {
@@ -277,6 +311,20 @@ describe('/api/activites — tarifs', () => {
     const c = capturer()
     await appeler('activites', { method: 'PATCH', body: { code: 8, libelle: 'Peinture', code_nouveau: 30 } })
     expect(c.maj()).toEqual({ libelle: 'Peinture' })
+  })
+
+  it('dit à chacun si une activité se facture à l\'heure', async () => {
+    sous(MEMBRE)
+    const demandes = colonnesDemandees()
+    await appeler('activites', { method: 'GET' })
+    expect(demandes[0]).toContain('facturee_heure')
+  })
+
+  it('passe la conduite en « non facturée à l\'heure »', async () => {
+    sous(ADMIN)
+    const c = capturer()
+    await appeler('activites', { method: 'PATCH', body: { code: 11, facturee_heure: false } })
+    expect(c.maj()).toEqual({ facturee_heure: false })
   })
 
   it('refuse un coût négatif', async () => {

@@ -63,7 +63,7 @@ describe('reelProjet', () => {
       { categorie: 'sous_traitance', montant_ht: 310 },
       { categorie: 'inconnue', montant_ht: 999 },
     ], [{ minutes: 120 }, { minutes: 90 }])
-    expect(r).toEqual({ materiel: 350.5, sous_traitance: 310, autre: 0, heures: 3.5 })
+    expect(r).toEqual({ materiel: 350.5, sous_traitance: 310, autre: 0, heures: 3.5, heuresNonFacturees: 0 })
   })
 })
 
@@ -120,7 +120,7 @@ describe('mainOeuvreReelle', () => {
   const mo = mainOeuvreReelle(heures, activites)
 
   it('valorise chaque activité à son coût et à son tarif', () => {
-    expect(mo.lignes[0]).toEqual({ code: 8, libelle: 'Peinture', minutes: 330, cout: 385, vente: 550 })
+    expect(mo.lignes[0]).toEqual({ code: 8, libelle: 'Peinture', minutes: 330, facturee: true, cout: 385, vente: 550 })
     expect(mo.lignes.find(l => l.code === 2)).toMatchObject({ cout: 95, vente: 140 })
   })
   // Une heure sans coût n'est pas une heure gratuite.
@@ -144,5 +144,31 @@ describe('margeReelle', () => {
   })
   it('ne calcule pas de pourcentage sur une offre à zéro', () => {
     expect(margeReelle(0, {}, 0).pct).toBe(null)
+  })
+})
+
+// La conduite se facture au km, jamais au temps passé. Ses heures coûtent,
+// mais aucune offre ne les prévoit : les comparer aux heures offertes ferait
+// paraître chaque chantier hors budget de tout son temps de route.
+describe('conduite et interne : pas facturées à l\'heure', () => {
+  const activites = [
+    { code: 5, libelle: 'Assemblage', facturee_heure: true, cout_revient: 70, tarif_vente: 100 },
+    { code: 11, libelle: 'Conduite', facturee_heure: false, cout_revient: 70, tarif_vente: 100 },
+  ]
+  const heures = [{ activite: 5, minutes: 300 }, { activite: 11, minutes: 180 }, { activite: 11, minutes: 180 }]
+
+  it('sortent de la comparaison avec les heures offertes', () => {
+    expect(reelProjet([], heures, activites)).toMatchObject({ heures: 5, heuresNonFacturees: 6 })
+  })
+  it('restent un coût dans la marge', () => {
+    const mo = mainOeuvreReelle(heures, activites)
+    expect(mo.cout).toBe(350 + 420)
+  })
+  it('n\'ont pas de valeur au tarif, même si un tarif traîne en base', () => {
+    const conduite = mainOeuvreReelle(heures, activites).lignes.find(l => l.code === 11)
+    expect(conduite).toMatchObject({ facturee: false, vente: null, cout: 420 })
+  })
+  it('une activité inconnue est présumée facturée à l\'heure', () => {
+    expect(reelProjet([], [{ activite: 99, minutes: 60 }], activites).heures).toBe(1)
   })
 })

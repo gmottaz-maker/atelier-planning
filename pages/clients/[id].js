@@ -19,6 +19,7 @@ import NavBar from '../../components/NavBar'
 import { AL, C, FONT, MONO, R, initials } from '../../lib/theme'
 import { canal, source } from '../../lib/prospects'
 import { jourLocal } from '../../lib/aujourdhui'
+import { formatDuree } from '../../lib/heures'
 
 const fmtJour = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}` : '' }
 const fmtDate = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}.${y}` : '—' }
@@ -155,6 +156,8 @@ export default function FicheContact() {
                 ))}
             </Bloc>
 
+            {estSociete && <ConsultingClient contactId={c.id} />}
+
             {demarchage && (
               <div style={{ marginTop: 24 }}>
                 <Bloc titre="Comment ce client est arrivé">
@@ -243,6 +246,45 @@ export default function FicheContact() {
 }
 
 // ─── Sous-composants ────────────────────────────────────────────────────────
+
+// ─── Consulting ──────────────────────────────────────────────────────────────
+// Le temps de conseil passé avec ce client hors projet, ce qui en a déjà été
+// compensé dans ses offres, et ce qui reste (lib/consulting.js). Rien ne
+// s'affiche tant qu'il n'y a ni consulting ni compensation.
+function ConsultingClient({ contactId }) {
+  const { data } = useSWR(`/api/consulting?contact=${contactId}`)
+  if (!data || data.error || (!data.consulte && !data.compense)) return null
+  const reste = data.solde
+  const ligne = { display: 'flex', alignItems: 'baseline', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, fontSize: 13 }
+  return (
+    <div style={{ marginTop: 24 }}>
+      <Bloc titre="Consulting">
+        <div style={{ ...ligne, fontSize: 14 }}>
+          <span>{formatDuree(data.consulte)} noté · {formatDuree(data.compense)} compensé dans les offres</span>
+          <span style={{ marginLeft: 'auto', fontWeight: 500, color: reste < 0 ? C.danger : AL.black }}>
+            {reste < 0 ? `compensé ${formatDuree(-reste)} de trop` : `reste ${formatDuree(reste)}`}
+          </span>
+        </div>
+        {(data.heures || []).map(h => (
+          <div key={h.id} style={ligne}>
+            <span style={{ width: 52, flex: 'none', font: `12px ${MONO}`, color: C.muted }}>{fmtDate(h.date)}</span>
+            <span style={{ flex: 1, minWidth: 0, color: h.note ? AL.black : C.muted }}>{h.note || 'consulting'}</span>
+            <span style={{ color: C.muted }}>{h.user_name}</span>
+            <span style={{ font: `12px ${MONO}` }}>{formatDuree(h.minutes)}</span>
+          </div>
+        ))}
+        {(data.parProjet || []).map(p => (
+          <Link key={p.id} href={`/projects/${p.id}`} style={{ ...ligne, textDecoration: 'none', color: AL.black }}>
+            <span style={{ width: 52, flex: 'none', font: `12px ${MONO}`, color: C.muted }}>{p.numero ?? ''}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>compensé dans « {p.name} »</span>
+            <span style={{ color: C.muted }}>{p.statut || ''}</span>
+            <span style={{ font: `12px ${MONO}` }}>− {formatDuree(p.minutes)}</span>
+          </Link>
+        ))}
+      </Bloc>
+    </div>
+  )
+}
 
 function Bloc({ titre, children }) {
   return (

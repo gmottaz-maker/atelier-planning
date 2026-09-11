@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS activites (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Liste de départ. Les codes ont été renumérotés par dizaines de famille le
+-- 11 septembre 2026 : voir schema-activites-renumerotation.sql.
 INSERT INTO activites (code, libelle, famille) VALUES
   (1,  'Dessin / fichiers CNC',   'atelier'),
   (2,  'CNC',                     'atelier'),

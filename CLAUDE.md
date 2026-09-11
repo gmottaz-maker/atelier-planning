@@ -406,7 +406,16 @@ Il n'est dans aucune liste blanche d'écriture — personne ne le choisit.
 **Le code d'une activité est définitif.** Il ne se modifie pas, ne se supprime
 pas et n'est jamais repris : une feuille scannée en 2026 doit vouloir dire la
 même chose en 2028. Une activité qui ne sert plus se DÉSACTIVE ; ses anciennes
-heures restent corrigibles (`tolererInactive`).
+heures restent corrigibles (`tolererInactive`). La clé étrangère
+`heures → activites` est sans cascade : la base refuse elle-même de changer le
+code d'une activité utilisée.
+
+**Les codes vont par dizaines de famille** : Gestion 10–19, Atelier 20–29,
+Finitions 30–39, Chantier 40–49, Logistique 50–59, Interne 60–69. Renumérotés
+une seule fois, le 11 septembre 2026, avant la première feuille imprimée
+(`schema-activites-renumerotation.sql`). Une activité ajoutée prend le
+prochain code libre de sa famille (`prochainCode`), pour qu'elle se range avec
+les siennes. Le premier chiffre dit la famille — un contrôle de plus au scan.
 
 **`minutes` est calculée par la base**, depuis `debut` et `fin` : elle ne peut
 pas les contredire. `fin > debut` est une contrainte ; une nuit à cheval sur
@@ -425,6 +434,39 @@ n'est lu que par l'admin — `/api/activites` ne le SÉLECTIONNE pas pour un
 membre, un filtre côté page ne protégerait rien. Renommer un libellé est permis ;
 changer le SENS d'un code ne l'est pas, une nouvelle activité prend un nouveau
 code.
+
+**Toutes les activités ne se facturent pas à l'heure** (`facturee_heure`). La
+conduite part au KILOMÈTRE, parfois au forfait pour les villes régulières :
+facturer le temps de route, à deux ou trois, reviendrait trop cher au client.
+L'interne ne se facture pas du tout. Ces heures restent un COÛT dans la marge
+réelle, mais sortent de la comparaison « heures offertes / heures passées » —
+les offres n'en prévoient jamais, et chaque chantier paraîtrait sinon hors
+budget de tout son temps de route.
+
+**Une journée travaillée est complétée, jamais inventée.** Journée régulière :
+8,4 h payées, dont 30 min de pause OFFERTE ; la pause de midi (1 h) n'est pas
+payée et n'y entre pas. Pour un jour de semaine où la personne a noté au moins
+une ligne, ce qui manque devient « Divers » (63) et la pause non notée « Pause
+payée » (64) — `complements()`. Le complément est CALCULÉ, jamais écrit en
+base : il suit les lignes ajoutées après coup. Ni le jour en cours (la journée
+n'est pas finie), ni un jour sans aucune ligne (oubli ou absence ? on ne sait
+pas) ne sont complétés, et l'export filtré par PROJET n'en ajoute pas — une
+journée partielle y fabriquerait un faux « Divers ». Les codes 63 et 64 sont
+écrits en dur : c'est précisément ce que la règle « un code ne change jamais »
+autorise.
+
+**Le consulting se note contre un client et se compense dans une offre**
+(`lib/consulting.js`). Une heure va à un projet OU à un client (`contact_id`,
+contrainte en base), jamais aux deux. Seule l'activité 14 Consulting alimente
+le solde d'un client ; la 13 Relation client ne se récupère pas. On la
+compense par une ligne de Gestion MASQUÉE marquée `compensation: true` —
+invisible sur le PDF, comprise dans le prix. Elle est CONSOMMÉE dès qu'elle
+figure dans une offre, sauf offre refusée : la même heure ne sert pas deux
+fois, et une offre refusée rend ses heures au solde. Le solde passe par la
+FICHE du client (`client_contact_id`), jamais par son nom écrit. Dans la
+rentabilité du projet qui la récupère, la compensation compte comme des
+heures de consulting au coût de revient : sinon le chiffre qu'elle apporte
+n'aurait aucun coût en face.
 
 **La rentabilité compare au prix de REVIENT** (`lib/rentabilite.js`, bloc admin
 en bas de la fiche projet). Le prévu se lit sur l'offre AVANT marge et escompte
@@ -645,6 +687,9 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-heures.sql` | `projects.numero`, tables `activites` et `heures` | en fin de fichier |
 | `schema-project-couts.sql` | table `project_couts` (coûts réels saisis par projet) | en fin de fichier |
 | `schema-activites-tarifs.sql` | `activites.tarif_vente`, `activites.cout_revient` | en fin de fichier |
+| `schema-activites-facturation.sql` | `activites.facturee_heure` (conduite et interne à false) | en fin de fichier |
+| `schema-activites-renumerotation.sql` | codes d'activité en dizaines par famille ; heures suivies | transaction : tout ou rien |
+| `schema-consulting.sql` | `heures.contact_id` : une heure peut viser un client au lieu d'un projet | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

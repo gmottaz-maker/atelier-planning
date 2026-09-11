@@ -7,6 +7,7 @@ import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
 import KDriveFolderPicker from '../components/KDriveFolderPicker'
 import BillingContactSelect from '../components/BillingContactSelect'
+import { formatDuree } from '../lib/heures'
 import { PROJECT_PHASES, phaseMeta, isOngoing } from '../lib/projectPhase'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { statutProjet, joursRestants } from '../lib/projectStatus'
@@ -95,6 +96,21 @@ function daysBadge(deadline, phase, suspended) {
 function Numero({ project }) {
   if (project?.numero == null) return null
   return <span style={{ fontFamily: MONO, fontWeight: 400, color: C.muted, marginRight: '.45em' }}>{project.numero}</span>
+}
+
+// Rappel à la création d'un projet : ce client a du consulting à compenser.
+// Admin seulement — la route ne répond qu'à lui, et la compensation se glisse
+// dans l'offre de façon invisible pour le client.
+function RappelConsulting({ contactId }) {
+  const { data } = useSWR(contactId ? `/api/consulting?contact=${contactId}` : null)
+  if (!data || data.error || !(data.solde > 0)) return null
+  return (
+    <p style={{ margin: '6px 0 0', padding: '8px 12px', borderRadius: R.panel, background: C.neutralBg,
+      fontSize: 12.5, lineHeight: 1.45, color: AL.black }}>
+      Consulting à compenser pour ce client : <b style={{ fontWeight: 500 }}>{formatDuree(data.solde)}</b>.
+      Tu pourras l'ajouter dans l'offre, en ligne masquée.
+    </p>
+  )
 }
 
 function BadgeStatut({ project }) {
@@ -1213,6 +1229,9 @@ export default function Admin() {
                     key={editingProject?.id || 'new'}
                     initialContactId={editingProject?.client_contact_id}
                     onChange={vals => setForm(f => ({ ...f, ...vals }))} />
+                  {isAdmin && !editingProject && form.client_contact_id && (
+                    <RappelConsulting contactId={form.client_contact_id} />
+                  )}
                   <input type="text" required value={form.client}
                     onChange={e => handleFieldChange('client', e.target.value)}
                     placeholder="Nom / société (auto, modifiable)" className={inputClass} style={{ marginTop: 6 }} />

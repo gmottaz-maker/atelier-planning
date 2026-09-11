@@ -48,6 +48,7 @@ const ADMIN_ATTENDU = [
   '/push/send.js',                 // notifie toute l'équipe
   '/heures/export.js',             // relevé d'activité de toute l'équipe, minute par minute
   '/projects/[id]/couts.js',       // coûts réels : prix d'achat et, par différence, marges
+  '/consulting.js',                // lit les offres en entier ; la compensation y est invisible au client
 ]
 
 describe('inventaire des autorisations API', () => {

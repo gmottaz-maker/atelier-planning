@@ -8,7 +8,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { erreurApi } from '../../../lib/apiError'
-import { lignesExport, versCSV } from '../../../lib/heures'
+import { lignesExport, versCSV, complements } from '../../../lib/heures'
 import { contentDisposition } from '../../../lib/contentDisposition'
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -37,7 +37,13 @@ export default async function handler(req, res) {
   ])
   if (error || errAct) return erreurApi(req, res, 'internal', error || errAct, { route: 'heures/export' })
 
-  const lignes = lignesExport(data || [], { activites: activites || [] })
+  // Les journées travaillées sont complétées (pause payée, temps non noté en
+  // Divers), sauf à la demande (`complements=0`) — et jamais dans un export
+  // filtré par projet : les lignes d'un seul projet ne font pas une journée,
+  // le reste passerait pour du temps perdu.
+  const brutes = data || []
+  const avecComplements = !project && req.query.complements !== '0'
+  const lignes = lignesExport(avecComplements ? [...brutes, ...complements(brutes)] : brutes, { activites: activites || [] })
   res.setHeader('Cache-Control', 'private, no-store')
   if (format === 'json') return res.status(200).json(lignes)
 
