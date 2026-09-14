@@ -38,6 +38,8 @@ pages/
   settings.js          — Paramètres utilisateur
   outils/index.js      — Index des outils d'atelier
   outils/peintures.js  — Peintures RUCO : sélecteur + chiffrage (section dédiée)
+  outils/marge-km.js   — (admin) Marge au km : un trajet gagne-t-il de l'argent ?
+                         simulation sur les réglages Transport, sans les modifier
   peintures.js         — Redirection vers /outils/peintures (anciens signets)
   clients.js           — Annuaire des SOCIÉTÉS (lignes) + personnes sans société
   clients/[id].js      — Fiche société ou personne ; affiche le journal de

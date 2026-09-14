@@ -6,6 +6,7 @@
 import Head from 'next/head'
 import Link from 'next/link'
 import { C, FONT, MONO, R } from '../../lib/theme'
+import useIsAdmin from '../../lib/useIsAdmin'
 
 const OUTILS = [
   {
@@ -14,9 +15,17 @@ const OUTILS = [
     resume: 'Choisir un produit selon le support, la brillance et le mode d’application, puis chiffrer le travail : quantités, durcisseur, diluant, coût matière et temps.',
     etat: '271 produits · 20 tarifés',
   },
+  {
+    href: '/outils/marge-km',
+    nom: 'Marge au kilomètre',
+    resume: 'Un trajet gagne-t-il de l’argent ? Le kilomètre et le forfait doivent payer le véhicule et le temps de chaque personne à bord. Essaie un tarif, un salaire ou des km par an sans toucher aux réglages.',
+    etat: 'admin',
+    admin: true,
+  },
 ]
 
 export default function Outils() {
+  const isAdmin = useIsAdmin()
   return (
     <>
       <Head><title>Outils · Maze Project</title></Head>
@@ -27,7 +36,7 @@ export default function Outils() {
         </p>
 
         <div style={{ display: 'grid', gap: 12 }}>
-          {OUTILS.map(o => (
+          {OUTILS.filter(o => !o.admin || isAdmin).map(o => (
             <Link key={o.href} href={o.href} style={{ textDecoration: 'none' }}>
               <article style={{
                 border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '16px 18px',

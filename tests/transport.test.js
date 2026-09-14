@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  coutKm, coutsKmFlotte, normaliserTransport, normaliserCouts, lignesTransport, margeTransport, ligneForfait, nombre, transportPrevu,
+  coutKm, coutsKmFlotte, normaliserTransport, normaliserCouts, lignesTransport, margeTransport, ligneForfait, nombre, transportPrevu, simulerTrajet, margeParKm,
 } from '../lib/transport'
 import { lignesDevis, totauxDevis } from '../lib/quoteLines'
 
@@ -142,5 +142,45 @@ describe('transportPrevu — 1 ou 2 personnes dans la voiture', () => {
   })
   it('part d\'une personne quand rien n\'est dit', () => {
     expect(lignesTransport({ logistics: [{ unit: 'km', quantity: 10, rate: 3 }] })[0].personnes).toBe(1)
+  })
+})
+
+// L'outil de simulation : Zurich, 1000.–, 455 km, 4 h 45, à 72.–/h.
+describe('simulerTrajet', () => {
+  const zurich = { prix: 1000, km: 455, minutes: 285 }
+  const master = coutsKmFlotte(COUTS).par.master
+
+  it('retranche le véhicule puis le temps de chaque personne', () => {
+    const un = simulerTrajet({ ...zurich, coutKm: master, personnes: 1, coutHoraire: 72 })
+    const deux = simulerTrajet({ ...zurich, coutKm: master, personnes: 2, coutHoraire: 72 })
+    expect(un.coutVehicule).toBeCloseTo(562, 0)
+    expect(deux.coutTemps).toBeCloseTo(2 * un.coutTemps, 0)
+    expect(un.marge).toBeGreaterThan(0)
+    expect(deux.marge).toBeLessThan(0)
+  })
+  it('donne le prix qui couvrirait le trajet', () => {
+    const d = simulerTrajet({ ...zurich, coutKm: master, personnes: 2, coutHoraire: 72 })
+    expect(d.equilibre).toBeCloseTo(1000 - d.marge, 0)
+  })
+  it('estime la durée par la vitesse quand le trajet n\'en porte pas', () => {
+    expect(simulerTrajet({ prix: 300, km: 140, coutKm: master, coutHoraire: 72, vitesse: 70 }).minutes).toBe(120)
+  })
+  // Sur un écran de simulation, une marge à moitié calculée tromperait.
+  it('rend null tant qu\'un coût manque', () => {
+    expect(simulerTrajet({ ...zurich, coutKm: null, coutHoraire: 72 }).marge).toBe(null)
+    expect(simulerTrajet({ ...zurich, coutKm: master, coutHoraire: null }).marge).toBe(null)
+  })
+})
+
+describe('margeParKm', () => {
+  it('compte le véhicule et le temps au volant', () => {
+    const master = coutsKmFlotte(COUTS).par.master
+    expect(margeParKm({ tarif: 3, coutKm: master, personnes: 2, coutHoraire: 72, vitesse: 70 })).toBeCloseTo(-0.29, 2)
+    expect(margeParKm({ tarif: 3.5, coutKm: master, personnes: 2, coutHoraire: 72, vitesse: 70 })).toBeCloseTo(0.21, 2)
+  })
+  it('rend null sans coût de véhicule, sans coût horaire ou sans vitesse', () => {
+    expect(margeParKm({ tarif: 3, coutKm: null, coutHoraire: 72, vitesse: 70 })).toBe(null)
+    expect(margeParKm({ tarif: 3, coutKm: 1, coutHoraire: null, vitesse: 70 })).toBe(null)
+    expect(margeParKm({ tarif: 3, coutKm: 1, coutHoraire: 72, vitesse: 0 })).toBe(null)
   })
 })
