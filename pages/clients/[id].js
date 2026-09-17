@@ -275,7 +275,7 @@ function ConsultingClient({ contactId }) {
         ))}
         {(data.parProjet || []).map(p => (
           <Link key={p.id} href={`/projects/${p.id}`} style={{ ...ligne, textDecoration: 'none', color: AL.black }}>
-            <span style={{ width: 52, flex: 'none', font: `12px ${MONO}`, color: C.muted }}>{p.numero ?? ''}</span>
+            <span style={{ width: 52, flex: 'none', font: `12px ${MONO}`, color: C.accent }}>{p.numero ?? ''}</span>
             <span style={{ flex: 1, minWidth: 0 }}>compensé dans « {p.name} »</span>
             <span style={{ color: C.muted }}>{p.statut || ''}</span>
             <span style={{ font: `12px ${MONO}` }}>− {formatDuree(p.minutes)}</span>

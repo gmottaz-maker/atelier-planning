@@ -24,6 +24,7 @@ const DARK = {
   textSecondary:'rgba(255,255,255,.68)',
   textMuted:    C.muted,
   accent:       AL.white,
+  numero:       C.accent,
   gridLine:     'rgba(255,255,255,.12)',
   todayLine:    C.accent,
   todayBg:      'rgba(255,77,109,.10)',
@@ -46,6 +47,7 @@ const LIGHT = {
   textSecondary:AL.black,
   textMuted:    C.muted,
   accent:       AL.black,
+  numero:       C.accent,
   gridLine:     C.border,
   todayLine:    C.accent,
   todayBg:      'rgba(255,77,109,.07)',
@@ -180,7 +182,7 @@ function Timeline({ projects, viewMode, dark, theme }) {
                   <div key={p.id} className="u-panel px-5 py-3.5 border" style={{ background: colors.bg, borderColor: colors.border }}>
                     <div className="font-bold" style={{ color: theme.textPrimary, fontSize: 18 }}>{p.client}</div>
                     <div className="mt-0.5" style={{ color: colors.text, fontSize: 15 }}>
-                      <NomNumerote project={p} couleurNumero={theme.textPrimary} />
+                      <NomNumerote project={p} couleurNumero={theme.numero} />
                     </div>
                     <div className="mt-1" style={{ color: theme.textMuted, fontSize: 14 }}>Prévu: {formatDate(p.deadline)}</div>
                   </div>
@@ -242,7 +244,7 @@ function Timeline({ projects, viewMode, dark, theme }) {
                   <div style={{ width: LABEL_W - 20, flexShrink: 0 }} className="pr-6 flex flex-col justify-center">
                     <div className="leading-tight truncate" style={{ color: theme.textPrimary, fontSize: 22, fontWeight: 700 }}>{project.client}</div>
                     <div className="mt-1 truncate" style={{ color: theme.textSecondary, fontSize: 17 }}>
-                      <NomNumerote project={project} couleurNumero={theme.textPrimary} />
+                      <NomNumerote project={project} couleurNumero={theme.numero} />
                     </div>
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className="font-bold" style={{ color: colors.badge, fontSize: 16 }}>
@@ -351,7 +353,7 @@ function CardView({ projects, dark, theme }) {
                 </div>
                 <div className="font-bold leading-tight" style={{ color: theme.textPrimary, fontSize: 26 }}>{project.client}</div>
                 <div className="mt-1.5" style={{ color: theme.textSecondary, fontSize: 18 }}>
-                  <NomNumerote project={project} couleurNumero={theme.textPrimary} />
+                  <NomNumerote project={project} couleurNumero={theme.numero} />
                 </div>
                 {project.short_description && (
                   <div className="mt-2 leading-snug" style={{ color: theme.textMuted, fontSize: 15 }}>

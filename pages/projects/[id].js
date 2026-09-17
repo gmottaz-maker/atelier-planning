@@ -2261,7 +2261,7 @@ export default function ProjectPage() {
               {project.numero != null && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span style={microLabel}>n°</span>
-                  <span style={{ fontSize: 15, fontWeight: 500, fontFamily: MONO }}>{project.numero}</span>
+                  <span style={{ fontSize: 15, fontWeight: 500, fontFamily: MONO, color: C.accent }}>{project.numero}</span>
                 </div>
               )}
               {project.deadline && (

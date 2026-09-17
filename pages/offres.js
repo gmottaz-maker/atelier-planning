@@ -15,6 +15,7 @@ import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { offreArchivee } from '../lib/autoArchive'
 import ButtonPill from '../components/ButtonPill'
 import { grouperParClient } from '../lib/offres'
+import PillsFiltre from '../components/PillsFiltre'
 
 const fmtJour = s => { const [y, m, d] = String(s || '').slice(0, 10).split('-'); return d ? `${d}.${m}.${y}` : '' }
 
@@ -138,10 +139,6 @@ export default function Offres() {
     textTransform: 'uppercase', color: C.muted }
   const ligne = { display: 'grid', gridTemplateColumns: COLS, gap: 16, alignItems: 'center',
     padding: '14px 4px', borderTop: `1px solid ${C.border}` }
-  const pilule = (actif) => ({ fontFamily: FONT, fontSize: 13, fontWeight: actif ? 500 : 400,
-    padding: '8px 16px', borderRadius: R.pill, cursor: 'pointer',
-    border: actif ? '1.5px solid transparent' : `1.5px solid ${C.outline}`,
-    background: actif ? AL.black : C.surface, color: actif ? AL.white : C.muted })
   const selectPilule = (meta) => ({ fontFamily: FONT, fontSize: 11, fontWeight: 500, letterSpacing: '.04em',
     padding: '3px 10px', borderRadius: R.pill, border: 'none', cursor: 'pointer',
     background: meta.bg, color: meta.color, outline: 'none' })
@@ -176,24 +173,25 @@ export default function Offres() {
           ))}
         </div>
 
-        {/* Filtres */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {[
-            { key: 'all',    label: 'toutes' },
-            { key: 'sent',   label: 'envoyées',     count: sentCount },
-            { key: 'unsent', label: 'non envoyées', count: unsentCount },
-          ].map(sf => (
-            <button key={sf.key} onClick={() => setFilter(sf.key)} style={pilule(filter === sf.key)}>
-              {sf.label}{sf.count != null && ` ${sf.count}`}
-            </button>
-          ))}
-          <span style={{ width: 1, height: 20, background: C.border, margin: '0 6px' }} />
-          {[...QUOTE_STATUSES, { key: 'archived', label: 'Archivées' }].map(sf => (
-            <button key={sf.key} onClick={() => setFilter(sf.key)} style={pilule(filter === sf.key)}>
-              {sf.label.toLowerCase()} {sf.key === 'archived' ? archivedOffers.length : (byStatus[sf.key] || 0)}
-            </button>
-          ))}
-        </div>
+        {/* Filtres — même rangée de pastilles que les projets et les factures.
+            Deux rangées, parce que ce sont deux questions distinctes : l'offre
+            est-elle PARTIE, et où en est-elle. Les mêler donnait huit boutons
+            d'affilée dont on ne voyait plus la logique. */}
+        <PillsFiltre
+          valeur={filter} cleTout="all" onChange={setFilter}
+          options={[
+            { key: 'all',    label: 'toutes',       n: active.length },
+            { key: 'sent',   label: 'envoyées',     n: sentCount },
+            { key: 'unsent', label: 'non envoyées', n: unsentCount },
+          ]}
+        />
+        <PillsFiltre
+          valeur={filter} cleTout="all" onChange={setFilter}
+          options={[
+            ...QUOTE_STATUSES.map(sf => ({ key: sf.key, label: sf.label.toLowerCase(), n: byStatus[sf.key] || 0 })),
+            { key: 'archived', label: 'archivées', n: archivedOffers.length },
+          ]}
+        />
 
         {loading ? (
           <p style={{ color: C.muted, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Chargement…</p>

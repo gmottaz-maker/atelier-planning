@@ -14,6 +14,8 @@ import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { factureArchivee } from '../lib/autoArchive'
 import { effectiveStatus, correspondAuFiltre } from '../lib/customerStatus'
+import { grouperFacturesParClient } from '../lib/facturesGroupes'
+import PillsFiltre from '../components/PillsFiltre'
 import ButtonPill from '../components/ButtonPill'
 
 const PINK = AL.black
@@ -267,18 +269,24 @@ export default function FacturesEmises() {
               border: `1.5px solid ${C.outline}`, background: C.surface, color: AL.black, cursor: 'pointer' }}>
             {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          {['all', 'created', 'sent', 'pending', 'overdue', 'paid', 'cancelled', 'archived'].map(f2 => {
-            const actif = filter === f2
-            return (
-              <button key={f2} onClick={() => setFilter(f2)}
-                style={{ fontFamily: FONT, fontSize: 13, fontWeight: actif ? 500 : 400, padding: '8px 16px', borderRadius: R.pill,
-                  cursor: 'pointer', border: actif ? '1.5px solid transparent' : `1.5px solid ${C.outline}`,
-                  background: actif ? AL.black : C.surface, color: actif ? AL.white : C.muted }}>
-                {f2 === 'all' ? 'toutes' : f2 === 'archived' ? `archivées ${archivees.length}` : STATUS_LABELS[f2].toLowerCase()}
-              </button>
-            )
-          })}
         </div>
+
+        {/* Filtres de statut — même rangée de pastilles que les projets et les
+            offres, comptes compris : une catégorie vide ne se propose pas. */}
+        <PillsFiltre
+          valeur={filter}
+          cleTout="all"
+          onChange={setFilter}
+          options={[
+            { key: 'all', label: 'toutes', n: courantes.length },
+            ...['created', 'sent', 'pending', 'overdue', 'paid', 'cancelled'].map(k => ({
+              key: k,
+              label: STATUS_LABELS[k].toLowerCase(),
+              n: courantes.filter(inv => correspondAuFiltre(inv, k)).length,
+            })),
+            { key: 'archived', label: 'archivées', n: archivees.length },
+          ]}
+        />
 
         {loading ? (
           <p style={{ fontSize: 13, color: C.muted, padding: '48px 0', textAlign: 'center' }}>Chargement…</p>
@@ -290,7 +298,38 @@ export default function FacturesEmises() {
               <span>n°</span><span>client</span><span>projet</span><span>émise le</span><span>échéance</span>
               <span style={{ textAlign: 'right' }}>montant</span><span>statut</span><span style={{ textAlign: 'right' }}>actions</span>
             </div>
-            {visible.map(inv => {
+            {grouperFacturesParClient(visible).flatMap(groupe => [
+              // Un bandeau plein, pas un filet : les lignes en portent déjà un,
+              // et deux traits de même épaisseur ne disent pas lequel ouvre une
+              // section. Même bandeau que sur la page des offres.
+              <div key={`g-${groupe.client}`}
+                style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 1080,
+                  marginTop: 28, padding: '11px 16px', borderRadius: R.panel, background: C.neutralBg }}>
+                <span style={{ fontSize: 15, fontWeight: 500, color: AL.black }}>{groupe.client}</span>
+                <span style={{ font: `10.5px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
+                  {groupe.items.length} facture{groupe.items.length > 1 ? 's' : ''}
+                </span>
+                {/* Trois questions, trois sommes : ce qui a été facturé, ce qui
+                    est rentré, ce qui traîne. Le retard n'apparaît que s'il
+                    existe — mais alors il se voit. */}
+                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 14,
+                  fontVariantNumeric: 'tabular-nums', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {groupe.retard > 0 && (
+                    <span style={{ fontSize: 14, fontWeight: 500, color: C.danger }}>
+                      {fmtCHF(groupe.retard)} <span style={{ fontSize: 11, fontWeight: 400 }}>en retard</span>
+                    </span>
+                  )}
+                  {groupe.paye > 0 && (
+                    <span style={{ fontSize: 14, fontWeight: 500, color: C.success }}>
+                      {fmtCHF(groupe.paye)} <span style={{ fontSize: 11, fontWeight: 400 }}>payées</span>
+                    </span>
+                  )}
+                  <span style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>
+                    {fmtCHF(groupe.facture)} <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>facturé</span>
+                  </span>
+                </span>
+              </div>,
+              ...groupe.items.map(inv => {
               const st = effectiveStatus(inv)
               return (
                 <div key={inv.id} style={{ ...ligne, minWidth: 1080, cursor: 'pointer', background: st === 'overdue' ? RETARD_BG : 'transparent' }}
@@ -342,7 +381,8 @@ export default function FacturesEmises() {
                   </div>
                 </div>
               )
-            })}
+            }),
+            ])}
           </div>
         )}
       </main>

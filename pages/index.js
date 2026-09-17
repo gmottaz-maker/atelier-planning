@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
-import { quoteStatusMeta, quoteStripe, offreAFaire } from '../lib/quoteStatus'
+import { quoteStatusMeta, quoteStripe, offreAFaire, categorieOffre, compterOffres, CATEGORIES_OFFRE } from '../lib/quoteStatus'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
@@ -12,6 +12,7 @@ import { PROJECT_PHASES, phaseMeta, isOngoing } from '../lib/projectPhase'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { statutProjet, joursRestants } from '../lib/projectStatus'
 import ButtonPill from '../components/ButtonPill'
+import PillsFiltre from '../components/PillsFiltre'
 import useIsAdmin from '../lib/useIsAdmin'
 
 const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
@@ -92,10 +93,13 @@ function daysBadge(deadline, phase, suspended) {
 }
 // Badge de statut : mêmes métriques partout (carte et liste).
 // Le numéro de projet — celui qu'on reporte sur la feuille d'heures. Chasse
-// fixe et gris : repérable d'un coup d'œil, sans concurrencer le nom.
+// fixe et CORAIL : c'est la seule chose qu'on cherche des yeux en parcourant la
+// liste une feuille à la main, et le gris le noyait dans le reste de la ligne.
+// L'accent reste typographique, comme partout dans la marque : une couleur sur
+// des chiffres, jamais un aplat.
 function Numero({ project }) {
   if (project?.numero == null) return null
-  return <span style={{ fontFamily: MONO, fontWeight: 400, color: C.muted, marginRight: '.45em' }}>{project.numero}</span>
+  return <span style={{ fontFamily: MONO, fontWeight: 500, color: C.accent, marginRight: '.45em' }}>{project.numero}</span>
 }
 
 // Rappel à la création d'un projet : ce client a du consulting à compenser.
@@ -822,11 +826,21 @@ export default function Admin() {
   const [archiveTarget, setArchiveTarget]         = useState(null)
   const [pickerOpen, setPickerOpen]               = useState(false)
   const [viewMode, setViewMode]                   = useState('list')
+  // Filtre par état de l'offre. Garde la même valeur d'une visite à l'autre,
+  // comme le mode d'affichage : on revient en général pour la même question.
+  const [filtreOffre, setFiltreOffre]             = useState('tous')
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' && localStorage.getItem('projectsViewMode')
     if (saved === 'cards' || saved === 'kanban' || saved === 'list' || saved === 'gantt') setViewMode(saved)
+    const offre = typeof window !== 'undefined' && localStorage.getItem('projectsFiltreOffre')
+    if (offre === 'tous' || CATEGORIES_OFFRE.some(c => c.key === offre)) setFiltreOffre(offre)
   }, [])
+
+  function changeFiltreOffre(cle) {
+    setFiltreOffre(cle)
+    if (typeof window !== 'undefined') localStorage.setItem('projectsFiltreOffre', cle)
+  }
 
   function changeViewMode(mode) {
     setViewMode(mode)
@@ -992,6 +1006,14 @@ export default function Admin() {
   })()
 
   const archivedProjects = projects.filter(p => p.status !== 'active')
+
+  // Où en sont les offres des projets actifs. Le compte se fait sur la liste
+  // ENTIÈRE, pas sur celle qu'on affiche : sinon un filtre actif afficherait
+  // « 0 » à côté de toutes les autres pastilles.
+  const comptesOffre = compterOffres(activeProjects)
+  const projetsVus = filtreOffre === 'tous'
+    ? activeProjects
+    : activeProjects.filter(p => categorieOffre(p.quote_data) === filtreOffre)
   const inputClass = "w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line transition-colors u-surface"
   // Un champ multiligne ne prend JAMAIS le rayon pill. À 999px sur une boîte de
   // 140px de haut, les deux coins se rejoignent et le champ devient une ellipse.
@@ -1400,6 +1422,18 @@ export default function Admin() {
             <ButtonPill onClick={() => { resetForm(); setShowForm(true) }}>+ nouveau projet</ButtonPill>
           </div>
 
+          {/* Filtre par état de l'offre — « combien de projets attendent encore
+              que j'écrive ou que je corrige leur offre ? ». La pastille de la
+              carte répond projet par projet, ce filtre les rassemble. Même
+              rangée que sur les offres et les factures. */}
+          <PillsFiltre
+            valeur={filtreOffre} onChange={changeFiltreOffre}
+            options={[
+              { key: 'tous', label: 'tous', n: activeProjects.length },
+              ...CATEGORIES_OFFRE.map(c => ({ ...c, n: comptesOffre[c.key] })),
+            ]}
+          />
+
           {/* Bannière Todoist */}
           {activeProjects.some(needsCompletion) && (
             <div style={{ marginBottom: 24, padding: '16px 20px', borderRadius: R.panel, background: C.warningBg }}>
@@ -1411,16 +1445,18 @@ export default function Admin() {
 
           {loading ? (
             <ProjectsSkeleton />
-          ) : activeProjects.length === 0 ? (
+          ) : projetsVus.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '80px 0' }}>
-              <p style={{ color: C.muted, fontSize: 13 }}>Aucun projet actif.</p>
+              <p style={{ color: C.muted, fontSize: 13 }}>
+                {activeProjects.length === 0 ? 'Aucun projet actif.' : 'Aucun projet dans ce filtre.'}
+              </p>
             </div>
           ) : viewMode === 'cards' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24, alignContent: 'start' }}>
-              {activeProjects.map(renderProjectCard)}
+              {projetsVus.map(renderProjectCard)}
             </div>
           ) : viewMode === 'gantt' ? (
-            <GanttView projects={activeProjects} />
+            <GanttView projects={projetsVus} />
           ) : viewMode === 'kanban' ? (
             (() => {
               const kanbanCols = buildKanbanColumns()
@@ -1432,7 +1468,7 @@ export default function Admin() {
               // Une colonne vide disparaît. Le calcul est refait à chaque rendu,
               // donc elle revient d'elle-même dès qu'un projet tombe dans ce mois.
               const colonnes = kanbanCols
-                .map(col => ({ ...col, projets: activeProjects.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase, p.suspended) === col.key) }))
+                .map(col => ({ ...col, projets: projetsVus.filter(p => kanbanColumnKey(p.deadline, kanbanCols, p.phase, p.suspended) === col.key) }))
                 .filter(col => col.projets.length > 0)
               const rangeesMax = Math.max(0, ...colonnes.map(c => c.projets.length))
 
@@ -1495,7 +1531,7 @@ export default function Admin() {
               {/* Le regroupement par mois ne vient pas du handoff — il vient du
                   code existant, et il reste utile dès qu'on dépasse la douzaine
                   de projets. Seule son habillage change. */}
-              {groupByMonth(activeProjects).flatMap(g => [
+              {groupByMonth(projetsVus).flatMap(g => [
                 <div key={`m-${g.key}`}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '28px 4px 8px',
                     fontSize: 11, fontWeight: 500, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
