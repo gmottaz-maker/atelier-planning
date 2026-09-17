@@ -16,6 +16,20 @@ const OUTILS = [
     etat: '271 produits · 20 tarifés',
   },
   {
+    href: '/outils/charges-sociales',
+    nom: 'Charges sociales',
+    resume: 'Ce qu’un employé coûte vraiment : AVS, chômage, allocations familiales, accidents (LAA) et prévoyance (LPP), par personne et par organisme. Ce qui est prélevé sans qu’on ait le choix.',
+    etat: 'admin',
+    admin: true,
+  },
+  {
+    href: '/outils/assurances',
+    nom: 'Assurances',
+    resume: 'Ce qu’on a choisi d’assurer — perte de gain, RC, biens, véhicules — et surtout ce qui est couvert. Une question en une phrase, « on m’a volé de l’outillage sur un chantier », renvoie la garantie, sa limite et qui appeler.',
+    etat: 'admin',
+    admin: true,
+  },
+  {
     href: '/outils/marge-km',
     nom: 'Marge au kilomètre',
     resume: 'Un trajet gagne-t-il de l’argent ? Le kilomètre et le forfait doivent payer le véhicule et le temps de chaque personne à bord. Essaie un tarif, un salaire ou des km par an sans toucher aux réglages.',
