@@ -11,7 +11,7 @@ import { AL, C, FONT, MONO, R, personChip } from '../lib/theme'
 // ombre, statuts sémantiques — sans inventer de mise en page nouvelle.
 
 const PINK = AL.black
-const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
+const KNOWN_USERS = ['Arnaud', 'Guillaume']
 const DEFAULT_PAUSE = 1.0
 
 // Six types, quatre couleurs : le système n'a que quatre rôles sémantiques.
