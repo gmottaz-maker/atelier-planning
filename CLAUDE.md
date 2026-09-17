@@ -88,6 +88,9 @@ components/
   TaskFormDrawer.js      — Création et édition d'une tâche
   SendDocumentModal.js   — Envoi d'un document par e-mail (modèles inclus)
   KDriveFolderPicker.js  — Choix d'un dossier kDrive
+  PillsFiltre.js         — Rangée de pastilles de filtre, avec les comptes
+                           (projets, offres, factures — même geste, un seul bouton)
+  DossierUI.js · QuestionCouverture.js — Briques des deux écrans d'assurances
 
 lib/
   supabase.js · supabase-server.js — Clients Supabase (navigateur / service-role)
@@ -178,11 +181,16 @@ AMAZING_LAB_EMAIL, AMAZING_LAB_PHONE, AMAZING_LAB_WEBSITE
 ## Utilisateurs
 
 ```js
-const KNOWN_USERS = ['Arnaud', 'Gabin', 'Guillaume']
+const KNOWN_USERS = ['Arnaud', 'Guillaume']
 ```
 
 **Les droits viennent de `profiles.role`**, pas d'un nom écrit dans le code.
-Au 18 août 2026 : Guillaume et Arnaud sont `admin`, Gabin est `member`.
+Au 17 septembre 2026 : Guillaume et Arnaud, tous deux `admin`. Gabin a quitté
+l'entreprise le 31 octobre 2026 ; son compte, son profil et sa place dans la
+liste des responsables ont été supprimés le 17 septembre — il ne s'était jamais
+connecté. Ce qui porte encore son nom (9 tâches, 2 projets archivés) est de
+l'HISTOIRE et reste tel quel : réécrire qui a fait quoi serait un mensonge, et
+`personChip` rend proprement un nom qui n'est plus dans la liste.
 Pour changer, une seule requête — aucun déploiement :
 
 ```sql
@@ -346,6 +354,62 @@ cd ~/ruco-selector && python3 scrape_ruco.py --refresh \
 pour la méthode de normalisation (le texte des fiches RUCO est libre, et les
 fiches se renvoient les unes aux autres — un lexique de marques neutralise ces
 renvois, sans quoi un vernis intérieur ressort comme extérieur).
+
+### Charges sociales et Assurances (`/outils/charges-sociales`, `/outils/assurances`) — admin
+
+Deux écrans, un seul jeu de données. `charges-sociales` porte ce que l'État et
+la prévoyance obligatoire prélèvent sur les salaires (AVS/AC/AF, LAA, LPP) :
+« combien coûte un employé ». `assurances` porte ce qu'on a choisi d'assurer
+(IJM, RC, biens, véhicules, protection juridique) : « suis-je couvert ».
+`famille` sur chaque contrat de `lib/assurances.js` fait le partage.
+
+L'IJM est à cheval — assurance de personnes, mais assise sur les salaires. Elle
+est du côté ASSURANCE parce qu'elle se résilie, là où l'AVS et la LAA s'imposent.
+
+La boîte à questions (`components/QuestionCouverture.js`) est montée sur les
+deux pages et cherche dans TOUTES les garanties, jamais seulement celles de
+l'écran courant : « un gars s'est blessé à l'atelier » relève de la LAA, et
+personne ne se demande dans quel écran poser la question. Le découpage range
+les COÛTS, il ne cloisonne pas les réponses.
+
+L'écran lui-même est assemblé à partir de `components/DossierUI.js` (bandeau,
+cartes de contrat, d'obligation et de manque) : les deux pages sont jumelles,
+et cent cinquante lignes recopiées auraient divergé au premier ajustement.
+
+**Aucune base de données.** Tout vient de `lib/assurances.js`, écrit à la main
+sur le dossier kDrive `Common documents/amazing files/00. Admin/Assurances`
+(92 pièces). Une dizaine de contrats qui bougent une fois par an ne valent pas
+une table, une migration et un écran d'administration ; et un fichier versionné
+laisse voir dans `git log` quand une garantie a changé — ce qu'une ligne de base
+ne dit pas. Pour mettre à jour : modifier l'objet, pousser l'ancien contrat en
+`statut: 'caduc'` s'il est remplacé, citer le nouveau fichier dans `source`.
+
+**Trois règles reprises de `paintPrices.js`, à ne pas défaire :**
+
+1. Une valeur inconnue vaut `null`, jamais 0. Une part employeur qu'aucune pièce
+   ne fixe reste `null` et l'écran écrit « au moins ». Il serait facile de poser
+   `partEmployeur ?? 0.5` — c'est l'usage, et la loi impose au moins la moitié
+   pour l'IJM — mais l'écran servirait alors des francs inventés à côté de francs
+   relevés sur facture, sans rien pour les distinguer. Un test le garde.
+2. `couvert: 'verifier'` n'est pas un défaut de saisie, c'est une réponse. Le
+   dossier ne contient AUCUNE des Conditions Générales citées par les polices, et
+   les exclusions vivent là.
+3. Les contrats caducs restent dans la liste. Savoir qui couvrait quoi en 2023
+   est la première question quand un sinistre ancien ressort.
+
+**La boîte à questions n'appelle pas le modèle**, elle cherche par mots-clés
+dans `COUVERTURES` (`lib/assurancesCalc.js`). Une réponse d'assurance doit être
+vérifiable : chaque réponse pointe une garantie, qui pointe une police, qui
+pointe un fichier. Un modèle produirait de plus jolies phrases et, un jour, une
+exclusion inventée — sur un sujet où l'erreur se découvre au sinistre. En prime,
+ce moteur répond quand le crédit d'API est à sec.
+
+**Prime facturée et prime calculée sont deux nombres, et on garde les deux.** La
+Suva facture 2026 sur une masse provisoire de 195 000 alors que les salaires
+déclarés valent 166 800 : l'écart n'est pas une erreur de calcul, c'est une
+régularisation à venir. `ecartFactureCalcule()` l'affiche. Le plafond LAA est
+individuel — il écrête chaque salaire — mais le taux s'applique ensuite à la
+masse, comme sur la facture.
 
 ---
 
@@ -762,6 +826,51 @@ Règles à ne pas casser :
 - Le chemin d'un emplacement de visuel vient du navigateur : `emplacementImage`
   le vérifie segment par segment. Il ne désigne jamais autre chose qu'un objet
   déjà présent dans le document.
+
+---
+
+## Travail à plusieurs sessions
+
+Guillaume ouvre une session par chantier — un outil, un écran, une intégration.
+Une session **intègre** (celle-ci, ouverte sur le dépôt entier), les autres
+**fabriquent**. Ce découpage existe parce que deux sessions dans le même dossier
+de travail se marchent dessus en silence : un `git add -A` de l'une emporte les
+fichiers en cours de l'autre. C'est arrivé le 17 septembre 2026 avec
+`lib/assurances.js`, rattrapé de justesse.
+
+**Si tu es une session qui FABRIQUE :**
+
+1. Tu ne pousses jamais. Tu commites sur ta branche, et tu le dis.
+2. Tu ne touches à AUCUN fichier partagé. Ils appartiennent à l'intégration :
+   `pages/outils/index.js`, `next.config.js`, `CLAUDE.md`, `scripts/check-db.mjs`,
+   `pages/_app.js`, `components/NavBar.js`, `lib/theme.js`. Ce qu'il faut y
+   ajouter, tu l'écris dans ton message de livraison — tu ne l'écris pas toi-même.
+3. Ton chantier est autonome : une page sous `pages/`, tout le calcul dans
+   `lib/<nom>.js`, des tests dans `tests/`. Si ton calcul n'est pas testable sans
+   écran, il n'est pas au bon endroit.
+4. Tu livres en un message : ce que ça fait, les fichiers que tu as créés, ce
+   qu'il faut ajouter aux fichiers partagés, et la migration SQL s'il y en a une.
+5. `npm run lint` et `npm test` doivent être verts avant de livrer.
+
+**Si tu INTÈGRES :** tu es responsable de `main`. Tu relis ce qui est livré, tu
+appliques toi-même les changements aux fichiers partagés, tu fais tourner lint,
+tests et build, et tu pousses — seulement quand Guillaume l'a demandé. Tu écris
+aussi la sonde `check:db` et la ligne du tableau des migrations : une migration
+sans sonde est une migration qu'on oubliera.
+
+**Ne lance JAMAIS `npm run build` pendant qu'un serveur de dev tourne dans le
+même dossier.** Les deux écrivent dans `.next` : le serveur se met alors à
+répondre 500 sur toutes les pages (`Cannot find module './chunks/vendor-chunks/
+next.js'`), et rien dans le message ne désigne la cause. C'est arrivé deux fois
+le 17 septembre 2026, entre deux sessions. Le remède : arrêter le serveur,
+`rm -rf .next`, relancer. Pour vérifier qu'un build passe, préviens l'autre
+session ou arrête le serveur d'abord.
+
+**Ouvre les sessions DANS le dossier du projet** (`~/atelier-planning`), pas dans
+`~`. Une session ouverte ailleurs ne lit pas ce fichier et redécouvre tout.
+
+Les sessions vivantes se voient entre elles et s'écrivent directement ; mais un
+message est éphémère et une session se ferme. Ce qui doit survivre s'écrit ici.
 
 ---
 
