@@ -37,6 +37,7 @@ import { compensationConsommee, ligneCompensation, CODE_CONSULTING } from '../..
 import { useTransport } from '../../lib/useTransport'
 import { lignesTransport, margeTransport, transportPrevu, coutsKmFlotte, normaliserCouts, CODE_CONDUITE } from '../../lib/transport'
 import { totauxDevis } from '../../lib/quoteLines'
+import { apiFetch } from '../../lib/api'
 
 const PINK = AL.black
 
@@ -1165,6 +1166,75 @@ function BandeauConsulting({ projectId, contactId, quote, tarifDefaut, onCompens
           style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
           compenser {formatDuree(reste)}
         </ButtonPill>
+      )}
+    </div>
+  )
+}
+
+// ─── PresentationsProjet ──────────────────────────────────────────────────────
+// Le support envoyé au client avec l'offre : couverture, contexte, une paire de
+// pages par pièce, récapitulatif du budget.
+//
+// Une présentation neuve part du gabarit de la maison DÉJÀ rempli avec ce que
+// le projet sait — client, numéro d'offre, budget, date de livraison. On ne
+// resaisit que ce que la base ignore : le brief et les partis pris.
+function PresentationsProjet({ projectId }) {
+  const { data: liste, mutate } = useSWR(`/api/projects/${projectId}/presentations`)
+  const [creation, setCreation] = useState(false)
+  const router = useRouter()
+
+  async function supprimer(presentationId, titre) {
+    if (!confirm(`Supprimer « ${titre} » ? Le PDF déjà déposé sur kDrive, lui, reste dans le dossier.`)) return
+    await apiFetch(`/api/presentations/${presentationId}`, { method: 'DELETE' })
+    mutate()
+  }
+
+  async function creer() {
+    setCreation(true)
+    try {
+      const p = await apiFetch(`/api/projects/${projectId}/presentations`, { method: 'POST', json: {} })
+      mutate()
+      router.push(`/presentations/${p.id}`)
+    } finally {
+      setCreation(false)
+    }
+  }
+
+  return (
+    <div className="no-print" style={{ marginBottom: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h2 style={h2Style}>Présentation client</h2>
+        <ButtonPill onClick={creer} disabled={creation}>
+          {creation ? 'création…' : 'Nouvelle présentation'}
+        </ButtonPill>
+      </div>
+
+      {(liste || []).length === 0 ? (
+        <p style={{ fontSize: 13.5, color: C.muted, margin: 0, lineHeight: 1.6 }}>
+          Aucune présentation. On raconte le projet, on dépose les visuels, et elle se construit
+          aux codes graphiques de la maison — le budget repris de l’offre, le nombre de pages
+          suivant le nombre de pièces.
+        </p>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {liste.map(p => (
+            <div key={p.id} style={{
+              border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '12px 14px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+            }}>
+              <Link href={`/presentations/${p.id}`} style={{ textDecoration: 'none', flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 14, color: AL.black }}>{p.titre || 'Présentation'}</span>
+              </Link>
+              <span style={{ font: `11px ${MONO}`, color: C.muted }}>
+                {p.envoyee_le ? `déposée le ${jourLocal(p.envoyee_le)}` : 'brouillon'}
+              </span>
+              <button onClick={() => supprimer(p.id, p.titre || 'cette présentation')}
+                style={{ font: `12px ${FONT}`, color: C.muted, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                supprimer
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -3060,6 +3130,9 @@ export default function ProjectPage() {
             )
           })()}
         </div>
+
+        {/* ── Présentation client ── */}
+        <PresentationsProjet projectId={id} />
 
         {/* ── Rentabilité (admin) ── */}
         {isAdmin && (

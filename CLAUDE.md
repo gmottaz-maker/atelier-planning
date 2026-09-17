@@ -147,6 +147,9 @@ Par fonctionnalité — l'app démarre sans, mais la fonction concernée est hor
 
 ```
 ANTHROPIC_API_KEY          OCR des factures fournisseurs et des justificatifs
+GROQ_API_KEY               dictée et transcription des vocaux (Whisper, palier gratuit)
+                           facultative : sans elle, la dictée renvoie 503 et l'écran
+                           renvoie à la dictée du système, qui écrit dans le champ
 RESEND_API_KEY             Envoi des offres et factures par e-mail
 MAIL_FROM, MAIL_BCC        Expéditeur et copie cachée (optionnels)
 KDRIVE_TOKEN               Fichiers sur kDrive (pièces, dossiers projet)
@@ -697,6 +700,71 @@ les totaux.
 
 ---
 
+## Présentations client (`/presentations/[id]`)
+
+Le support envoyé au client avec l'offre : couverture, contexte, brief,
+pourquoi nous, aperçu des pièces, méthode des visuels, une paire de pages par
+pièce (visuels + détail), matériaux, planning, budget, conditions, clôture.
+Il se construisait avant à la main dans Claude Design, hors de Maze, et le PDF
+exporté ne revenait jamais dans le dossier du projet.
+
+**Le récit est fixe, les textes ne le sont pas.** `lib/deck.js` déroule les
+pages ; le modèle de langue ne choisit ni l'ordre ni le nombre de pages. C'est
+ce qui rend le rendu reproductible — laisser un modèle composer la mise en page
+donne une présentation superbe une fois sur trois.
+
+| Fichier | Rôle |
+|---|---|
+| `lib/deck.js` | l'ordre des pages, la numérotation des pièces, `trous()` |
+| `lib/deckHtml.js` | les 13 gabarits, la toile 1920 × 1080, les polices embarquées |
+| `lib/deckGabarit.js` | le gabarit vierge et les textes fixes de la maison |
+| `lib/presentation.js` | amorçage depuis le projet et l'offre, emplacements de visuels |
+| `lib/deckRedaction.js` | le prompt, et `validerSortie` qui borne ce que le modèle produit |
+| `pages/api/transcription.js` | dictée et vocaux → texte (Whisper via Groq ou OpenAI) |
+| `scripts/apercu-deck.mjs` | rend le gabarit en PDF, sans base ni réseau |
+
+Règles à ne pas casser :
+
+- **Le handoff du design system fait foi** (projet Claude Design `4434681b`) :
+  page de 1920 × 1080 exactement, marges 88 / 104 / 72, cinq tailles de texte,
+  zéro ombre et zéro dégradé, corail réservé au « × » du titre et au « ! » de la
+  chute, deux rayons (15 px contenu, 50 px cliquable), cadres d'image blancs
+  même sur fond noir. Tout le texte est SAISI en minuscules, jamais mis en
+  minuscules par le CSS.
+- **Une page qui déborde est un problème de contenu**, pas de mise en page : le
+  corps ne se réduit pas, le texte se coupe. Les largeurs en `ch` des gabarits
+  disent au modèle combien de signes il a le droit d'écrire.
+- **On raconte, on ne remplit pas.** L'écran est une zone de texte (dictable),
+  une zone de dépôt de visuels et un bouton. Le premier essai était un
+  formulaire de dix-sept sections : c'est exactement ce que le passage par
+  Claude Design évitait. La relecture champ par champ reste accessible, repliée,
+  pour une faute de frappe.
+- **Le nombre de pièces vient du projet**, jamais d'un réglage : le modèle le
+  déduit du récit et des fichiers déposés. Une vitrine sous trois angles fait
+  une paire de pages, douze éléments en font douze.
+- **Les visuels se rattachent par leur NOM** (`vitrine_3d.png`, `vitrine_ia.png`) :
+  le modèle cite un nom, le serveur seul le résout en identifiant kDrive. Un nom
+  inconnu laisse un cadre tireté, jamais une image au hasard.
+- **`validerSortie` borne tout ce que le modèle renvoie** : clés inconnues
+  jetées, listes tronquées à ce que la page sait afficher, budget recalculé
+  depuis l'offre et posé après coup, conditions fixes de la maison réimposées.
+  Un modèle qui « corrige » un total produit un document faux que personne ne
+  relit — il ne doit donc jamais pouvoir l'écrire.
+- **Un montant absent n'imprime rien**, jamais `0.00` : une ligne offerte
+  s'écrit `offert`, donc un zéro doit rester un argument, pas un trou.
+- **Les visuels vivent sur kDrive**, dans le dossier du projet ; le document
+  n'en garde que l'identifiant, et le PDF les embarque en base64 au rendu —
+  Chromium n'a pas de jeton kDrive, et une image qu'il ne charge pas ne lève
+  aucune erreur.
+- **`/api/presentations/[id]/pdf` doit rester dans `outputFileTracingIncludes`**
+  avec le binaire Chromium ET `public/fonts` : sans les Apercu Pro, le deck sort
+  en Helvetica, en production seulement.
+- Le chemin d'un emplacement de visuel vient du navigateur : `emplacementImage`
+  le vérifie segment par segment. Il ne désigne jamais autre chose qu'un objet
+  déjà présent dans le document.
+
+---
+
 ## Migrations SQL — ordre d'application
 
 Les fichiers `*.sql` s'exécutent à la main dans l'éditeur SQL Supabase. Ceux
@@ -717,6 +785,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-activites-renumerotation.sql` | codes d'activité en dizaines par famille ; heures suivies | transaction : tout ou rien |
 | `schema-consulting.sql` | `heures.contact_id` : une heure peut viser un client au lieu d'un projet | en fin de fichier |
 | `schema-transport-reglages.sql` | réglages `transport` (véhicules, forfaits) et `couts_vehicules` (admin) | en fin de fichier |
+| `schema-presentations.sql` | table `presentations` (support client envoyé avec l'offre) | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

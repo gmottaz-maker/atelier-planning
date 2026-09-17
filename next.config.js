@@ -49,6 +49,13 @@ const nextConfig = {
     '/api/projects/[id]/devis-pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
     '/api/send-document': ['./node_modules/@sparticuz/chromium/bin/**'],
     '/api/heures/feuille': ['./node_modules/@sparticuz/chromium/bin/**'],
+    // La présentation client embarque en plus les Apercu Pro : sans elles, le
+    // deck sort en Helvetica — la fonte EST la marque, et aucune erreur ne
+    // serait levée.
+    '/api/presentations/[id]/pdf': [
+      './node_modules/@sparticuz/chromium/bin/**',
+      './public/fonts/**',
+    ],
   },
 }
 

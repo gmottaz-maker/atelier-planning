@@ -150,6 +150,14 @@ const CONTROLES = [
       return !error && data?.length === 2
     },
   },
+  {
+    // Sans cette table, le bloc « Présentation client » de la fiche projet
+    // échoue à la création, et l'éditeur n'a rien à ouvrir.
+    nom: 'présentations client',
+    migration: 'schema-presentations.sql',
+    sonde: async () => !(await sb.from('presentations')
+      .select('id, project_id, contenu, consignes, fichiers, kdrive_id, envoyee_le').limit(1)).error,
+  },
 ]
 
 let manquants = 0
