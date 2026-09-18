@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
-import { activitesParFamille, ligneOffreActivite } from '../lib/heures'
+import { activitesParFamille, ligneOffreActivite, libelleSuitActivite } from '../lib/heures'
 import { fmtCHF } from '../lib/money'
 
 function useActivites() {
@@ -81,14 +81,26 @@ export default function ActivitePicker({ onPick, familles = null, label = '+ Act
  * Le code d'une ligne existante, en tête de sa description.
  * Vide, il s'affiche en tiret : la ligne compte alors dans « non ventilé ».
  */
-export function CodeActivite({ valeur, onChange }) {
+export function CodeActivite({ valeur, onChange, texte, onTexte }) {
   const activites = useActivites()
   const groupes = activitesParFamille(activites)
   const vide = valeur === null || valeur === undefined || valeur === ''
+  const trouver = code => activites.find(a => Number(a.code) === Number(code))
+
+  function choisir(e) {
+    const code = e.target.value === '' ? null : Number(e.target.value)
+    onChange(code)
+    // Le nom de l'activité remplit le libellé — sauf si on y a écrit autre
+    // chose (lib/heures.js, `libelleSuitActivite`). Revenir à « — » ne vide
+    // rien : on retire un code, pas un texte.
+    const nouvelle = code == null ? null : trouver(code)
+    if (onTexte && nouvelle && libelleSuitActivite(texte, trouver(valeur)?.libelle)) onTexte(nouvelle.libelle)
+  }
+
   return (
     <select
       value={vide ? '' : String(valeur)}
-      onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
+      onChange={choisir}
       title={vide ? 'Aucune activité : cette ligne ne se comparera pas aux heures passées' : 'Activité de la feuille d\'heures'}
       style={{ width: 44, flex: 'none', font: `500 12px ${MONO}`, padding: '2px 0', border: 'none',
         background: 'transparent', color: vide ? C.faint : C.accent, cursor: 'pointer', outline: 'none' }}>

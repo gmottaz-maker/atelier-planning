@@ -150,7 +150,8 @@ function CompositionElement({
               <tr key={`${kind}-${r._uid || i}`} className={'group quote-row' + (r.hidden ? ' opacity-60' : '')}>
                 <td className={td}>
                   <span style={{ display: 'flex', alignItems: 'center' }}>
-                    {!achat && <CodeActivite valeur={r.activite} onChange={v => onUpdate(kind, i, 'activite', v)} />}
+                    {!achat && <CodeActivite valeur={r.activite} onChange={v => onUpdate(kind, i, 'activite', v)}
+                      texte={r.description} onTexte={t => onUpdate(kind, i, 'description', t)} />}
                     <input className={txtCell} placeholder={achat ? 'Matériau' : 'Main d\'œuvre'}
                       value={r.description || ''} onChange={e => onUpdate(kind, i, 'description', e.target.value)} />
                   </span>
@@ -439,7 +440,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                               <tr key={r._uid || i} className="group quote-row">
                                 <td className={td}>
                                   <span style={{ display: 'flex', alignItems: 'center' }}>
-                                    <CodeActivite valeur={r.activite} onChange={v => updateManagementRow(i, 'activite', v)} />
+                                    <CodeActivite valeur={r.activite} onChange={v => updateManagementRow(i, 'activite', v)}
+                                      texte={r.item} onTexte={t => updateManagementRow(i, 'item', t)} />
                                     <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} />
                                   </span>
                                 </td>
@@ -622,7 +624,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                     <tr key={r._uid || i} className="group quote-row">
                                       <td className={td}>
                                         <span style={{ display: 'flex', alignItems: 'center' }}>
-                                          <CodeActivite valeur={r.activite} onChange={v => updateItemRow(itemIdx, 'labor', i, 'activite', v)} />
+                                          <CodeActivite valeur={r.activite} onChange={v => updateItemRow(itemIdx, 'labor', i, 'activite', v)}
+                                            texte={r.description} onTexte={t => updateItemRow(itemIdx, 'labor', i, 'description', t)} />
                                           <input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} />
                                         </span>
                                       </td>
@@ -865,7 +868,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                 <td className={td}>
                                   <span style={{ display: 'flex', alignItems: 'center' }}>
                                     {/^heure/.test(String(r.unit || '')) && (
-                                      <CodeActivite valeur={r.activite} onChange={v => updateLogisticsRow(i, 'activite', v)} />
+                                      <CodeActivite valeur={r.activite} onChange={v => updateLogisticsRow(i, 'activite', v)}
+                                        texte={r.trajet} onTexte={t => updateLogisticsRow(i, 'trajet', t)} />
                                     )}
                                     <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} />
                                   </span>

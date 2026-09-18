@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { activitesFacturables, activitesParFamille, ligneOffreActivite, libelleFamille } from '../lib/heures'
+import { activitesFacturables, activitesParFamille, ligneOffreActivite, libelleFamille, libelleSuitActivite } from '../lib/heures'
 
 const ACT = [
   { code: 31, libelle: 'Peinture / vernis / sticker', famille: 'finitions', tarif_vente: 120, facturee_heure: true, actif: true },
@@ -43,5 +43,22 @@ describe('ligneOffreActivite — la ligne qu\'une activité remplit', () => {
     const l = ligneOffreActivite(ACT[2])
     expect(l.rate).toBe('')
     expect(l.activite).toBe(20)
+  })
+})
+
+describe('libelleSuitActivite — le nom de l\'activité remplit, sans écraser', () => {
+  it('remplit une ligne vide', () => {
+    expect(libelleSuitActivite('', null)).toBe(true)
+    expect(libelleSuitActivite('   ', 'Peinture')).toBe(true)
+    expect(libelleSuitActivite(undefined, null)).toBe(true)
+  })
+
+  it('suit le changement de code tant que le texte est celui de l\'ancienne activité', () => {
+    expect(libelleSuitActivite('Peinture / vernis / sticker', 'Peinture / vernis / sticker')).toBe(true)
+  })
+
+  it('ne touche pas à ce qu\'on a écrit pour le client', () => {
+    expect(libelleSuitActivite('assemblage et collage des panneaux', 'Assemblage')).toBe(false)
+    expect(libelleSuitActivite('gestion de projet générale, correspondances', null)).toBe(false)
   })
 })
