@@ -8,6 +8,7 @@
 // Contrat : `value` est le devis, `onChange(next)` reçoit le devis modifié.
 import { useState } from 'react'
 import CatalogPicker, { toPurchaseRow, toRateRow } from './CatalogPicker'
+import ActivitePicker, { CodeActivite } from './ActivitePicker'
 import QtyInput from './QtyInput'
 import { fmtCHF } from '../lib/money'
 import { genRowUid, genItemUid, copierItem, deplacerLigne } from '../lib/quoteLines'
@@ -58,6 +59,11 @@ const subHeader     = { display: 'flex', alignItems: 'center', justifyContent: '
 const subTitle      = { fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', color: AL.black }
 
 const QUOTE_UNITS = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
+// Ce que l'ÉDITEUR affiche d'une unité. La valeur enregistrée — et donc le PDF
+// que lit le client — reste « heure(s) » : seule la liste déroulante est
+// raccourcie, parce que « heure(s) » tronqué en « heure( » dans une colonne
+// étroite ne se lisait plus, et qu'élargir la colonne rognait le reste.
+const libelleUnite = u => ({ 'heure(s)': 'h', 'jour(s)': 'j' })[u] || u
 
 function emptyPurchaseRow()      { return { _uid: genRowUid(), description: '', dimension: '', unit_price: '', quantity: '', unit: '', margin: '', discount: '', discount_amount: '' } }
 function emptyLaborRow(taux)     { return { _uid: genRowUid(), item: '', description: '', rate: taux, quantity: '', unit: '', discount: '', discount_amount: '' } }
@@ -109,7 +115,7 @@ function Reordonner({ idx, total, onDeplacer }) {
 // restent présentes : c'est là que se fait le prix.
 function CompositionElement({
   element, generalMargin, fmtCHF, purchaseNet, laborNet, th, td, tdRO, txtCell, numCell, QUOTE_UNITS,
-  onAdd, onUpdate, onRemove, onToggleHidden, onMove,
+  onAdd, onAddActivite, onUpdate, onRemove, onToggleHidden, onMove,
 }) {
   const lignes = [
     ...(element.purchases || []).map((r, i) => ({ r, i, kind: 'purchases' })),
@@ -120,17 +126,18 @@ function CompositionElement({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, padding: '8px 14px', borderTop: `1px solid ${C.border}` }}>
         <button onClick={() => onAdd('purchases')} className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Matériau</button>
         <button onClick={() => onAdd('labor')} className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Main d'œuvre</button>
+        <ActivitePicker onPick={onAddActivite} />
       </div>
       <table className="w-full" style={{ minWidth: 760, tableLayout: 'fixed' }}>
         <thead>
           <tr>
-            <th className={th} style={{ width: '30%' }}>Description</th>
-            <th className={th + ' text-right'} style={{ width: '12%' }}>Prix</th>
-            <th className={th + ' text-right'} style={{ width: '9%' }}>Qté</th>
-            <th className={th} style={{ width: '10%' }}>Unité</th>
-            <th className={th + ' text-right'} style={{ width: '9%' }}>Marge %</th>
-            <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
-            <th className={th + ' text-right'} style={{ width: '14%' }}>Total</th>
+            <th className={th} style={{ width: '38%' }}>Description</th>
+            <th className={th + ' text-right'} style={{ width: '11%' }}>Prix</th>
+            <th className={th + ' text-right'} style={{ width: '6%' }}>Qté</th>
+            <th className={th} style={{ width: '7%' }}>Unité</th>
+            <th className={th + ' text-right'} style={{ width: '8%' }}>Marge %</th>
+            <th className={th + ' text-right'} style={{ width: '8%' }}>Esc.&nbsp;%</th>
+            <th className={th + ' text-right'} style={{ width: '15%' }}>Total</th>
             <th className={th} style={{ width: '7%' }}></th>
           </tr>
         </thead>
@@ -142,8 +149,11 @@ function CompositionElement({
             return (
               <tr key={`${kind}-${r._uid || i}`} className={'group quote-row' + (r.hidden ? ' opacity-60' : '')}>
                 <td className={td}>
-                  <input className={txtCell} placeholder={achat ? 'Matériau' : 'Main d\'œuvre'}
-                    value={r.description || ''} onChange={e => onUpdate(kind, i, 'description', e.target.value)} />
+                  <span style={{ display: 'flex', alignItems: 'center' }}>
+                    {!achat && <CodeActivite valeur={r.activite} onChange={v => onUpdate(kind, i, 'activite', v)} />}
+                    <input className={txtCell} placeholder={achat ? 'Matériau' : 'Main d\'œuvre'}
+                      value={r.description || ''} onChange={e => onUpdate(kind, i, 'description', e.target.value)} />
+                  </span>
                 </td>
                 <td className={td}>
                   <input type="number" step="0.01" className={numCell}
@@ -153,7 +163,7 @@ function CompositionElement({
                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => onUpdate(kind, i, 'quantity', v)} /></td>
                 <td className={td}>
                   <select className={txtCell} value={r.unit || ''} onChange={e => onUpdate(kind, i, 'unit', e.target.value)}>
-                    <option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    <option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}
                   </select>
                 </td>
                 <td className={td}>
@@ -265,11 +275,11 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
     })
     setQuoteDirty(true)
   }
-  function addItemRow(itemIdx, kind) {
+  function addItemRow(itemIdx, kind, pre = {}) {
     // La composition sert au chiffrage : elle part masquée, on l'affiche au cas
     // par cas. Les lignes déjà en base n'ont pas ce marqueur et restent
     // visibles — les offres existantes ne changent pas d'apparence.
-    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true }
+    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true, ...pre }
     setQuote(q => ({ ...q, items: q.items.map((it, i) => i === itemIdx ? { ...it, [kind]: [...(it[kind] || []), empty] } : it) }))
     setQuoteDirty(true)
   }
@@ -292,8 +302,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
   function removeElement(itemIdx, elIdx) {
     majItem(itemIdx, it => ({ ...it, elements: (it.elements || []).filter((_, j) => j !== elIdx) }))
   }
-  function addElementRow(itemIdx, elIdx, kind) {
-    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true }
+  function addElementRow(itemIdx, elIdx, kind, pre = {}) {
+    const empty = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true, ...pre }
     majElement(itemIdx, elIdx, el => ({ ...el, [kind]: [...(el[kind] || []), empty] }))
   }
   function updateElementRow(itemIdx, elIdx, kind, rowIdx, field, v) {
@@ -396,7 +406,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                           <span style={sectionTotal}>{fmtCHF(managementTotal)} CHF</span>
                           {!collapsedSections.management && (
                             <>
-                              <CatalogPicker kind="heure" onPick={it => appendManagementRow(toRateRow(it))} />
+                              <ActivitePicker familles={['gestion']}
+                                onPick={pre => appendManagementRow({ ...pre, item: pre.description, description: '' })} />
                               <button onClick={addManagementRow}
                                 className="quote-action" style={{ '--qa': TEINTES.management.fort }}>+ Ligne</button>
                             </>
@@ -408,14 +419,16 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                         <table className="w-full" style={{ minWidth: 800, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: '15%' }}>Item</th>
-                              <th className={th} style={{ width: '22%' }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: '11%' }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
-                              <th className={th} style={{ width: '9%' }}>Unité</th>
-                              <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
-                              <th className={th + ' text-right'} style={{ width: '10%' }}>Esc.&nbsp;CHF</th>
-                              <th className={th + ' text-right'} style={{ width: '13%' }}>Total</th>
+                              {/* L'item porte le code d'activité devant son titre : il prend
+                                  la place que la quantité et l'unité (« h ») n'utilisaient pas. */}
+                              <th className={th} style={{ width: '25%' }}>Item</th>
+                              <th className={th} style={{ width: '21%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: '8%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '5%' }}>Qté</th>
+                              <th className={th} style={{ width: '6%' }}>Unité</th>
+                              <th className={th + ' text-right'} style={{ width: '7%' }}>Esc.&nbsp;%</th>
+                              <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;CHF</th>
+                              <th className={th + ' text-right'} style={{ width: '15%' }}>Total</th>
                               <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
@@ -424,11 +437,16 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                               <tr><td colSpan={9} className="text-center text-sm u-muted py-6">Aucune ligne. Clique "+ Ligne" pour ajouter.</td></tr>
                             ) : quote.management.map((r, i) => (
                               <tr key={r._uid || i} className="group quote-row">
-                                <td className={td}><input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} /></td>
+                                <td className={td}>
+                                  <span style={{ display: 'flex', alignItems: 'center' }}>
+                                    <CodeActivite valeur={r.activite} onChange={v => updateManagementRow(i, 'activite', v)} />
+                                    <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} />
+                                  </span>
+                                </td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateManagementRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateManagementRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateManagementRow(i, 'quantity', v)} /></td>
-                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateManagementRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
+                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateManagementRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}</select></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateManagementRow(i, 'discount', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateManagementRow(i, 'discount_amount', e.target.value)} /></td>
                                 <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(laborNet(r))}</td>
@@ -520,11 +538,11 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                               <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th} style={{ width: '24%' }}>Description</th>
+                                    <th className={th} style={{ width: '28%' }}>Description</th>
                                     <th className={th} style={{ width: '12%' }}>Dimension</th>
                                     <th className={th + ' text-right'} style={{ width: '11%' }}>Prix d'achat</th>
-                                    <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
-                                    <th className={th} style={{ width: '9%' }}>Unité</th>
+                                    <th className={th + ' text-right'} style={{ width: '5%' }}>Qté</th>
+                                    <th className={th} style={{ width: '7%' }}>Unité</th>
                                     <th className={th + ' text-right'} style={{ width: '6%' }}>Total</th>
                                     <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
                                     <th className={th + ' text-right'} style={{ width: '7%' }}>Esc.&nbsp;%</th>
@@ -542,7 +560,7 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                       <td className={td}><input className={txtCell} placeholder="ex: 200×120×40" value={r.dimension || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'dimension', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.unit_price || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit_price', e.target.value)} /></td>
                                       <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateItemRow(itemIdx, 'purchases', i, 'quantity', v)} /></td>
-                                      <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
+                                      <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}</select></td>
                                       <td className={tdRO + ' ' + td}>{fmtCHF(purchaseTotal(r))}</td>
                                       <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'margin', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateItemRow(itemIdx, 'purchases', i, 'discount', e.target.value)} /></td>
@@ -578,7 +596,7 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                             <div style={subHeader}>
                               <h4 style={subTitle}>Main d'œuvre (découpe, peinture…)</h4>
                               <span className="flex items-center gap-2">
-                                <CatalogPicker kind="heure" onPick={it => appendItemRow(itemIdx, 'labor', toRateRow(it))} />
+                                <ActivitePicker onPick={pre => addItemRow(itemIdx, 'labor', pre)} />
                                 <button onClick={() => addItemRow(itemIdx, 'labor')}
                                   className="quote-action" style={{ '--qa': TEINTES.fabrication.fort }}>+ Ligne</button>
                               </span>
@@ -587,13 +605,13 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                               <table className="w-full" style={{ minWidth: 800, tableLayout: 'fixed' }}>
                                 <thead>
                                   <tr>
-                                    <th className={th} style={{ width: '33%' }}>Description</th>
-                                    <th className={th + ' text-right'} style={{ width: '12%' }}>Prix</th>
-                                    <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
-                                    <th className={th} style={{ width: '9%' }}>Unité</th>
-                                    <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;%</th>
-                                    <th className={th + ' text-right'} style={{ width: '10%' }}>Esc.&nbsp;CHF</th>
-                                    <th className={th + ' text-right'} style={{ width: '16%' }}>Total</th>
+                                    <th className={th} style={{ width: '40%' }}>Description</th>
+                                    <th className={th + ' text-right'} style={{ width: '10%' }}>Prix</th>
+                                    <th className={th + ' text-right'} style={{ width: '5%' }}>Qté</th>
+                                    <th className={th} style={{ width: '6%' }}>Unité</th>
+                                    <th className={th + ' text-right'} style={{ width: '8%' }}>Esc.&nbsp;%</th>
+                                    <th className={th + ' text-right'} style={{ width: '9%' }}>Esc.&nbsp;CHF</th>
+                                    <th className={th + ' text-right'} style={{ width: '18%' }}>Total</th>
                                     <th className={th} style={{ width: '4%' }}></th>
                                   </tr>
                                 </thead>
@@ -602,10 +620,15 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                     <tr><td colSpan={8} className="text-center text-sm u-muted py-4">Aucune main d'œuvre.</td></tr>
                                   ) : it.labor.map((r, i) => (
                                     <tr key={r._uid || i} className="group quote-row">
-                                      <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} /></td>
+                                      <td className={td}>
+                                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                                          <CodeActivite valeur={r.activite} onChange={v => updateItemRow(itemIdx, 'labor', i, 'activite', v)} />
+                                          <input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} />
+                                        </span>
+                                      </td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'rate', e.target.value)} /></td>
                                       <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateItemRow(itemIdx, 'labor', i, 'quantity', v)} /></td>
-                                      <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
+                                      <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}</select></td>
                                       <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'discount', e.target.value)} /></td>
                                       <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'discount_amount', e.target.value)} /></td>
                                       <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(laborNet(r))}</td>
@@ -670,6 +693,7 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                     th={th} td={td} tdRO={tdRO} txtCell={txtCell} numCell={numCell}
                                     QUOTE_UNITS={QUOTE_UNITS}
                                     onAdd={kind => addElementRow(itemIdx, elIdx, kind)}
+                                    onAddActivite={pre => addElementRow(itemIdx, elIdx, 'labor', pre)}
                                     onUpdate={(kind, i, f, v) => updateElementRow(itemIdx, elIdx, kind, i, f, v)}
                                     onRemove={(kind, i) => removeElementRow(itemIdx, elIdx, kind, i)}
                                     onMove={(kind, i, sens) => moveElementRow(itemIdx, elIdx, kind, i, sens)}
@@ -742,7 +766,7 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateSubcontractingRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateSubcontractingRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateSubcontractingRow(i, 'quantity', v)} /></td>
-                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateSubcontractingRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
+                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateSubcontractingRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}</select></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder={quote.general_margin || ''} onChange={e => updateSubcontractingRow(i, 'margin', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateSubcontractingRow(i, 'discount', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateSubcontractingRow(i, 'discount_amount', e.target.value)} /></td>
@@ -787,6 +811,11 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                           {!collapsedSections.logistics && (
                             <>
                               <CatalogPicker kind="all" onPick={it => appendLogisticsRow(toRateRow(it))} />
+                              {/* Montage, démontage, manutention : des heures de chantier,
+                                  qui se comparent à la feuille comme celles de l'atelier.
+                                  La conduite n'y figure pas — elle part au km. */}
+                              <ActivitePicker familles={['chantier', 'logistique']}
+                                onPick={pre => appendLogisticsRow({ ...pre, trajet: pre.description, description: '' })} />
                               {transport?.forfaits?.length > 0 && (
                                 <select value="" aria-label="Ajouter un forfait"
                                   onChange={e => {
@@ -811,16 +840,20 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                         <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
                           <thead>
                             <tr>
-                              <th className={th} style={{ width: avecVehicules ? '11%' : '13%' }}>Item</th>
-                              <th className={th} style={{ width: avecVehicules ? '14%' : '22%' }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '10%' : '12%' }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: '7%' }}>Qté</th>
-                              <th className={th} style={{ width: avecVehicules ? '8%' : '9%' }}>Unité</th>
-                              {avecVehicules && <th className={th} style={{ width: '14%' }}>Véhicule · pers.</th>}
+                              {/* Les colonnes de chiffres courts — un prix au km, une
+                                  quantité, un pourcentage — cèdent de la place au véhicule
+                                  et à l'item, qui porte le code d'activité devant son
+                                  libellé. Avant, « Renault Master » s'affichait « Renau ». */}
+                              <th className={th} style={{ width: avecVehicules ? '15%' : '17%' }}>Item</th>
+                              <th className={th} style={{ width: avecVehicules ? '15%' : '24%' }}>Description</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '10%' }}>Prix</th>
+                              <th className={th + ' text-right'} style={{ width: '5%' }}>Qté</th>
+                              <th className={th} style={{ width: '6%' }}>Unité</th>
+                              {avecVehicules && <th className={th} style={{ width: '19%', whiteSpace: 'nowrap' }}>Véhicule · pers.</th>}
                               <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '9%' }}>Esc.&nbsp;%</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '8%' : '10%' }}>Esc.&nbsp;CHF</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '11%' : '8%' }}>Total</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '5%' : '8%' }}>Esc.&nbsp;%</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '9%' }}>Esc.&nbsp;CHF</th>
+                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '11%' : '10%' }}>Total</th>
                               <th className={th} style={{ width: '4%' }}></th>
                             </tr>
                           </thead>
@@ -829,11 +862,18 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                               <tr><td colSpan={avecVehicules ? 11 : 10} className="text-center text-sm u-muted py-6">Aucune ligne.</td></tr>
                             ) : quote.logistics.map((r, i) => (
                               <tr key={r._uid || i} className="group quote-row">
-                                <td className={td}><input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} /></td>
+                                <td className={td}>
+                                  <span style={{ display: 'flex', alignItems: 'center' }}>
+                                    {/^heure/.test(String(r.unit || '')) && (
+                                      <CodeActivite valeur={r.activite} onChange={v => updateLogisticsRow(i, 'activite', v)} />
+                                    )}
+                                    <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} />
+                                  </span>
+                                </td>
                                 <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateLogisticsRow(i, 'description', e.target.value)} /></td>
                                 <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
                                 <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(i, 'quantity', v)} /></td>
-                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></td>
+                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}</select></td>
                                 {avecVehicules && (
                                   <td className={td}>
                                     {/* Véhicule et nombre de personnes, là où l'on roule : km et
@@ -849,8 +889,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                         </select>
                                         <select className={txtCell} value={r.personnes || 1} aria-label="Personnes à bord"
                                           onChange={e => updateLogisticsRow(i, 'personnes', Number(e.target.value))}
-                                          style={{ width: 52, flex: 'none' }}>
-                                          {[1, 2, 3].map(n => <option key={n} value={n}>{n} p.</option>)}
+                                          style={{ width: 40, flex: 'none' }} title="Personnes à bord">
+                                          {[1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}
                                         </select>
                                       </span>
                                     )}

@@ -47,7 +47,8 @@ pages/
   prospects.js         — (admin) Prospection : liste triée par relance due
   prospects/[id].js    — (admin) Fiche prospect : journal, relances, conversion
   catalog.js           — Catalogue d'articles et d'heures
-  projects/[id].js     — Fiche projet : tâches, logistique, offre, fichiers
+  projects/[id].js     — Fiche projet : tâches, logistique, fichiers ; visite, offre,
+                         présentation et rentabilité rangées en tuiles (une ouverte à la fois)
   projects/[id]/devis.js — Aperçu imprimable de l'offre
 
   finances.js          — (admin) Vue d'ensemble des finances
@@ -88,6 +89,7 @@ components/
   TaskFormDrawer.js      — Création et édition d'une tâche
   SendDocumentModal.js   — Envoi d'un document par e-mail (modèles inclus)
   KDriveFolderPicker.js  — Choix d'un dossier kDrive
+  ActivitePicker.js      — « + Activité » dans l'offre, et le code d'une ligne existante
   PillsFiltre.js         — Rangée de pastilles de filtre, avec les comptes
                            (projets, offres, factures — même geste, un seul bouton)
   DossierUI.js · QuestionCouverture.js — Briques des deux écrans d'assurances
@@ -569,6 +571,20 @@ HT, avoirs négatifs permis) et des heures imputées au projet. Les lignes masqu
 de l'offre comptent. Une ligne de main-d'œuvre en jours ou sans unité n'est PAS
 convertie en heures : elle est comptée à part et l'écran le dit. La marge en
 francs attend un coût horaire de revient, qui n'existe pas encore.
+
+**Une ligne de main-d'œuvre de l'offre porte son activité** (`activite`, le code
+— même champ que les heures imputées et que la compensation de consulting).
+C'est ce qui permet à la rentabilité de comparer MÉTIER PAR MÉTIER
+(`heuresParActivite`) : un dépassement en peinture compensé par une avance en
+assemblage donne un total juste, et n'apprend rien. « + Activité »
+(`components/ActivitePicker.js`) remplit libellé, tarif et code ; un sélecteur
+devant le libellé pose le code d'une ligne déjà écrite sans toucher au texte ni
+au prix. Les activités ne sont PAS recopiées dans le catalogue — deux listes,
+deux tarifs, et l'une finirait par mentir. La conduite et l'interne n'y sont
+pas proposées. Un tarif absent laisse le prix VIDE plutôt que d'en mettre un
+par défaut. Une ligne sans code va dans « non ventilé », dit à l'écran. Les
+offres antérieures au 18 septembre 2026 n'ont aucun code et n'ont pas été
+réécrites.
 
 **L'export neutralise les formules.** Une cellule texte commençant par
 `= + - @` est préfixée d'une apostrophe : une remarque « =HYPERLINK(...) »

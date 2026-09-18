@@ -8,8 +8,9 @@ import { useAuth } from '../_app'
 import NavBar from '../../components/NavBar'
 import { useResponsibles } from '../../lib/useResponsibles'
 import useIsAdmin from '../../lib/useIsAdmin'
+import useIsMobile from '../../lib/useIsMobile'
 import { TASK_CATEGORIES } from '../../lib/taskCategories'
-import { QUOTE_STATUSES, quoteStatusMeta } from '../../lib/quoteStatus'
+import { QUOTE_STATUSES, quoteStatusMeta, offreAFaire } from '../../lib/quoteStatus'
 import TaskFormDrawer from '../../components/TaskFormDrawer'
 import AutocompleteInput from '../../components/AutocompleteInput'
 import { useSuggestions } from '../../lib/useSuggestions'
@@ -24,14 +25,14 @@ import {
   getDaysRemaining, getProjectColor, ensureUid, initLogistics,
   parseTimeRange, combineTime, fmtTimeDisplay, fmtTaskDate,
 } from '../../lib/projectHelpers'
-import { fmtCHF } from '../../lib/money'
+import { fmtCHF, fmtCHF0 } from '../../lib/money'
 import { jourLocal } from '../../lib/aujourdhui'
 import { verifierTailleFichier, lireReponse } from '../../lib/uploadLimit'
 import { estAudio, estImage, libelleEntree, messageTranscription, nomLisible } from '../../lib/dump'
 import { champsCommande, majCommande } from '../../lib/commandes'
 import { champsSousTraitance, majSousTraitance } from '../../lib/sousTraitance'
 import useSWR from 'swr'
-import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT, mainOeuvreReelle, margeReelle } from '../../lib/rentabilite'
+import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT, mainOeuvreReelle, margeReelle, heuresParActivite } from '../../lib/rentabilite'
 import { formatDuree } from '../../lib/heures'
 import { compensationConsommee, ligneCompensation, CODE_CONSULTING } from '../../lib/consulting'
 import { useTransport } from '../../lib/useTransport'
@@ -1171,6 +1172,91 @@ function BandeauConsulting({ projectId, contactId, quote, tarifDefaut, onCompens
   )
 }
 
+// ─── TuilesProjet ─────────────────────────────────────────────────────────────
+// Les quatre dossiers d'un projet — visite, offre, présentation, rentabilité —
+// rangés comme les apps d'un écran d'accueil : une icône, un nom, une ligne
+// d'état. Un tap ouvre le dossier sous la grille, un seul à la fois ; un second
+// tap le referme.
+//
+// Avant, les quatre s'empilaient en longueur, et l'offre dépliée d'office
+// repoussait la présentation et la rentabilité sous deux écrans de tableaux.
+// La ligne d'état dit l'essentiel sans rien ouvrir. La pastille corail, comme
+// un badge de notification, ne sort que quand l'offre attend quelque chose de
+// nous — même règle que le filtre « offre à faire » de la liste des projets.
+const ICONES = {
+  visite: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />
+    </svg>
+  ),
+  offre: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" />
+    </svg>
+  ),
+  presentation: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8M12 17v4" />
+    </svg>
+  ),
+  rentabilite: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </svg>
+  ),
+}
+
+function TuilesProjet({ tuiles, volet, onOuvrir }) {
+  // Les tuiles se partagent TOUTE la largeur : quatre colonnes égales (trois
+  // pour un membre, qui n'a pas la rentabilité), deux sur un téléphone.
+  //
+  // Elles parlent le langage des cartes de chiffres du reste de Maze (/offres,
+  // /factures-emises, l'en-tête des projets) : un libellé en capitales, LE
+  // chiffre qui compte en grand, une ligne d'explication. Un premier essai
+  // centrait de grosses icônes noires dans des cadres : ça ressemblait à un
+  // écran d'accueil, mais ça ne disait rien sans ouvrir.
+  const mobile = useIsMobile()
+  const colonnes = mobile ? 2 : tuiles.length
+  return (
+    <div className="no-print" role="tablist" aria-label="Dossiers du projet"
+      style={{ display: 'grid', gridTemplateColumns: `repeat(${colonnes}, minmax(0, 1fr))`, gap: 12, marginBottom: 8 }}>
+      {tuiles.map(t => {
+        const actif = volet === t.cle
+        // Ouverte, la carte s'INVERSE : c'est la seule profondeur que
+        // s'autorise la marque — pas d'ombre, un aplat.
+        const fond = actif ? AL.black : C.surface
+        const discret = actif ? C.navInactive : C.muted
+        return (
+          <button key={t.cle} type="button" role="tab" aria-selected={actif} onClick={() => onOuvrir(t.cle)}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3, textAlign: 'left',
+              padding: '16px 18px 15px', borderRadius: R.panel, cursor: 'pointer', fontFamily: FONT, minWidth: 0,
+              border: `1.5px solid ${C.outline}`, background: fond, transition: 'background .15s ease' }}
+            onMouseEnter={e => { if (!actif) e.currentTarget.style.background = C.hover }}
+            onMouseLeave={e => { if (!actif) e.currentTarget.style.background = fond }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: MONO, fontSize: 10.5, fontWeight: 500,
+                letterSpacing: '.08em', textTransform: 'uppercase', color: discret }}>
+                {t.nom}
+                {/* Un point corail quand le dossier attend quelque chose de
+                    nous — le seul signal de couleur de la rangée. */}
+                {t.alerte && <span aria-label="à traiter" style={{ width: 7, height: 7, borderRadius: R.pill, background: C.accent }} />}
+              </span>
+              {/* Sur téléphone, deux cartes par ligne : le libellé a besoin de
+                  toute la place, l'icône n'y ajoute rien. */}
+              {!mobile && <span style={{ display: 'flex', color: discret }}>{ICONES[t.cle]}</span>}
+            </span>
+            <span style={{ fontSize: mobile ? 20 : 24, fontWeight: 500, lineHeight: 1.1, color: actif ? AL.white : AL.black,
+              fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {t.valeur}
+            </span>
+            <span style={{ fontSize: 12, lineHeight: 1.35, color: t.alerte && !actif ? C.accent : discret }}>{t.sous}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── PresentationsProjet ──────────────────────────────────────────────────────
 // Le support envoyé au client avec l'offre : couverture, contexte, une paire de
 // pages par pièce, récapitulatif du budget.
@@ -1267,6 +1353,8 @@ function RentabiliteProjet({ projectId, quote }) {
   const prevu = prevuDevis(quote)
   const reel = reelProjet(couts, heuresProjet, activites)
   const lignes = comparaison(prevu, reel)
+  // Offert contre passé, métier par métier — ce que le total seul ne dit pas.
+  const parActivite = heuresParActivite(quote, heuresProjet, activites)
   // Les heures valorisées au coût de LEUR activité : une heure de CNC ne coûte
   // pas une heure de conduite.
   const mo = mainOeuvreReelle(heuresProjet, activites)
@@ -1362,6 +1450,52 @@ function RentabiliteProjet({ projectId, quote }) {
           sont pas comparées aux heures offertes — aucune offre ne les prévoit, la conduite part au km. Elles comptent
           dans la marge réelle, au coût de revient.
         </p>
+      )}
+
+      {(parActivite.lignes.length > 0 || parActivite.prevuSansCode > 0) && (
+        <>
+          <h3 style={{ fontFamily: FONT, fontSize: 15, fontWeight: 500, margin: '28px 0 4px', color: AL.black }}>Heures par activité</h3>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: C.muted }}>
+            Ce que l'offre prévoyait pour chaque métier, contre ce que la feuille d'heures a enregistré.
+            Un dépassement en peinture compensé par une avance en assemblage donne un total juste — et
+            n'apprend rien. Ici, il se voit.
+          </p>
+          {parActivite.lignes.length > 0 && (
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: R.panel, overflow: 'hidden', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT }}>
+                <thead>
+                  <tr style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 500 }}>activité</th>
+                    <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>offert</th>
+                    <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>passé</th>
+                    <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 500 }}>écart</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parActivite.lignes.map(l => (
+                    <tr key={l.code}>
+                      <td style={cellule}>
+                        <span style={{ fontFamily: MONO, color: C.accent, marginRight: 8 }}>{l.code}</span>{l.libelle}
+                      </td>
+                      <td style={nombre}>{l.prevu ? fmt(l.prevu, 'h') : '—'}</td>
+                      <td style={nombre}>{l.reel ? fmt(l.reel, 'h') : '—'}</td>
+                      <td style={{ ...nombre, color: couleurEcart(l.ecart) }}>
+                        {l.ecart > 0 ? '+' : ''}{fmt(l.ecart, 'h')}{l.pct != null ? ` · ${l.pct > 0 ? '+' : ''}${l.pct} %` : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {parActivite.prevuSansCode > 0 && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: C.muted }}>
+              {fmt(parActivite.prevuSansCode, 'h')} offertes ne portent pas de code d'activité : elles comptent dans le
+              total plus haut mais ne se ventilent pas. Pour les rattacher, choisis l'activité dans le petit sélecteur
+              devant le libellé de la ligne, dans l'offre.
+            </p>
+          )}
+        </>
       )}
 
       {mo.lignes.length > 0 && (
@@ -1654,6 +1788,24 @@ export default function ProjectPage() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [visitSummary, setVisitSummary] = useState('')
   const [visitExpanded, setVisitExpanded] = useState(false)
+  // Le dossier ouvert sous la grille de tuiles — un seul à la fois, comme une
+  // app. Aucun à l'arrivée : la grille EST l'accueil du projet.
+  const [volet, setVolet] = useState(null)
+  function ouvrirVolet(cle) {
+    const suivant = volet === cle ? null : cle
+    setVolet(suivant)
+    // La visite et l'offre ont leur propre pli : on les ouvre avec leur tuile,
+    // pour qu'un tap montre le contenu et pas seulement un titre.
+    setVisitExpanded(suivant === 'visite')
+    setQuoteExpanded(suivant === 'offre')
+  }
+  // Replier la section de l'intérieur (son chevron) revient à fermer l'app :
+  // sinon la tuile resterait marquée ouverte au-dessus d'un titre seul.
+  useEffect(() => { if (volet === 'visite' && !visitExpanded) setVolet(null) }, [volet, visitExpanded])
+  useEffect(() => { if (volet === 'offre' && !quoteExpanded) setVolet(null) }, [volet, quoteExpanded])
+  const { data: presentationsListe } = useSWR(id ? `/api/projects/${id}/presentations` : null)
+  const { data: heuresTuile } = useSWR(id && isAdmin ? `/api/heures?project=${id}` : null)
+  const { data: activitesTuile } = useSWR(isAdmin ? '/api/activites' : null)
 
   // ── Load data ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -2835,7 +2987,47 @@ export default function ProjectPage() {
 
         </div>
 
+        {/* ── Les dossiers du projet, en tuiles ── */}
+        {(() => {
+          const nbPres = Array.isArray(presentationsListe) ? presentationsListe.length : 0
+          const totalOffre = totauxDevis(quote).total
+          const offreVide = !totalOffre && (!quote.status || quote.status === 'brouillon')
+          // Même règle que le filtre « offre à faire » : absente, brouillon ou
+          // à corriger, la balle est chez nous.
+          const offreAlerte = offreAFaire(quote) || quote.status === 'a_corriger'
+          // Heures offertes contre heures passées — les mêmes calculs que le
+          // tableau de rentabilité, pour que la tuile ne le contredise jamais.
+          const hOffertes = prevuDevis(quote).heures
+          const hPassees = reelProjet([], Array.isArray(heuresTuile) ? heuresTuile : [], Array.isArray(activitesTuile) ? activitesTuile : []).heures
+          const heuresTexte = n => `${String(Math.round(n * 10) / 10).replace('.', ',')}`
+          const tuiles = [
+            {
+              cle: 'visite', nom: 'Visite',
+              valeur: visitSummary ? 'faite' : 'à faire',
+              sous: visitSummary ? 'résumé prêt' : 'fiche de visite sur site',
+            },
+            {
+              cle: 'offre', nom: 'Offre',
+              valeur: offreVide ? '—' : `${fmtCHF0(totalOffre)}.–`,
+              sous: offreVide ? 'à faire' : `${quoteStatusMeta(quote.status).label.toLowerCase()} · HT`,
+              alerte: offreAlerte,
+            },
+            {
+              cle: 'presentation', nom: 'Présentation',
+              valeur: nbPres ? String(nbPres) : '—',
+              sous: nbPres ? `présentation${nbPres > 1 ? 's' : ''} client` : 'aucune pour l’instant',
+            },
+            ...(isAdmin ? [{
+              cle: 'rentabilite', nom: 'Rentabilité',
+              valeur: `${heuresTexte(hPassees)} / ${heuresTexte(hOffertes)} h`,
+              sous: 'heures passées / offertes',
+            }] : []),
+          ]
+          return <TuilesProjet tuiles={tuiles} volet={volet} onOuvrir={ouvrirVolet} />
+        })()}
+
         {/* ── Visite sur site ── */}
+        {volet === 'visite' && (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
             <button onClick={() => setVisitExpanded(v => !v)}
@@ -3015,7 +3207,10 @@ export default function ProjectPage() {
           )}
         </div>
 
+        )}
+
         {/* ── Offre ── */}
+        {volet === 'offre' && (
         <div className="no-print">
           {(() => {
             const managementTotal     = quote.management.reduce((s, r) => s + laborNet(r), 0)
@@ -3131,11 +3326,13 @@ export default function ProjectPage() {
           })()}
         </div>
 
+        )}
+
         {/* ── Présentation client ── */}
-        <PresentationsProjet projectId={id} />
+        {volet === 'presentation' && <PresentationsProjet projectId={id} />}
 
         {/* ── Rentabilité (admin) ── */}
-        {isAdmin && (
+        {isAdmin && volet === 'rentabilite' && (
           <div className="no-print">
             <RentabiliteProjet projectId={id} quote={quote} />
           </div>
