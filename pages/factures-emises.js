@@ -211,11 +211,12 @@ export default function FacturesEmises() {
   const totals = invoices.reduce((acc, inv) => {
     const st = effectiveStatus(inv)
     acc.total += parseFloat(inv.amount || 0)
+    acc.totalHt += parseFloat(inv.amount_net || 0)
     if (st === 'pending' || st === 'overdue' || st === 'sent') acc.aEncaisser += parseFloat(inv.amount || 0)
     if (st === 'overdue') acc.overdue += parseFloat(inv.amount || 0)
     if (st === 'paid')    acc.paid    += parseFloat(inv.amount || 0)
     return acc
-  }, { total: 0, aEncaisser: 0, overdue: 0, paid: 0 })
+  }, { total: 0, totalHt: 0, aEncaisser: 0, overdue: 0, paid: 0 })
 
   // Grille de colonnes du handoff : n° · client · projet · émise le · échéance
   // · montant · statut · actions.
@@ -247,17 +248,18 @@ export default function FacturesEmises() {
         {/* Quatre totaux en cartes outline */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {[
-            { label: 'total année', value: totals.total,      color: AL.black },
-            { label: 'à encaisser', value: totals.aEncaisser, color: C.warning,
+            { label: 'total année ttc', value: totals.total,      color: AL.black,
+              sub: totals.totalHt ? `${fmtCHF(totals.totalHt)} HT` : null, subDiscret: true },
+            { label: 'à encaisser ttc', value: totals.aEncaisser, color: C.warning,
               sub: totals.overdue > 0 ? `dont ${fmtCHF(totals.overdue)} en retard` : null },
-            { label: 'encaissé',    value: totals.paid,       color: C.success },
+            { label: 'encaissé ttc',    value: totals.paid,       color: C.success },
           ].map(st => (
             <div key={st.label} style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 3 }}>
               <span style={{ fontSize: 10.5, fontWeight: 500, fontFamily: MONO, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>{st.label}</span>
               <span style={{ fontSize: 24, fontWeight: 500, lineHeight: 1.1, color: st.color, fontVariantNumeric: 'tabular-nums' }}>
                 {fmtCHF(st.value)} <span style={{ fontSize: 12, fontWeight: 400, color: C.muted }}>CHF</span>
               </span>
-              {st.sub && <span style={{ fontSize: 12, color: C.danger }}>{st.sub}</span>}
+              {st.sub && <span style={{ fontSize: 12, color: st.subDiscret ? C.muted : C.danger }}>{st.sub}</span>}
             </div>
           ))}
         </div>
@@ -296,7 +298,7 @@ export default function FacturesEmises() {
           <div style={{ display: 'flex', flexDirection: 'column', overflowX: 'auto' }}>
             <div style={{ ...enTete, minWidth: 1080 }}>
               <span>n°</span><span>client</span><span>projet</span><span>émise le</span><span>échéance</span>
-              <span style={{ textAlign: 'right' }}>montant</span><span>statut</span><span style={{ textAlign: 'right' }}>actions</span>
+              <span style={{ textAlign: 'right' }}>montant ttc</span><span>statut</span><span style={{ textAlign: 'right' }}>actions</span>
             </div>
             {grouperFacturesParClient(visible).flatMap(groupe => [
               // Un bandeau plein, pas un filet : les lignes en portent déjà un,
@@ -325,7 +327,7 @@ export default function FacturesEmises() {
                     </span>
                   )}
                   <span style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>
-                    {fmtCHF(groupe.facture)} <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>facturé</span>
+                    {fmtCHF(groupe.facture)} <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>facturé ttc</span>
                   </span>
                 </span>
               </div>,
@@ -342,8 +344,15 @@ export default function FacturesEmises() {
                   <span style={{ fontSize: 14, fontWeight: 500, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.projects?.name || inv.object || '—'}</span>
                   <span style={{ fontSize: 12.5, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmtDate(inv.issue_date)}</span>
                   <span style={{ fontSize: 12.5, color: st === 'overdue' ? C.danger : C.muted, fontVariantNumeric: 'tabular-nums' }}>{fmtDate(inv.due_date)}</span>
-                  <span style={{ fontSize: 14, fontWeight: 500, textAlign: 'right', color: AL.black, fontVariantNumeric: 'tabular-nums' }}>
-                    {fmtCHF(inv.amount)} <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>{inv.currency}</span>
+                  <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 500, color: AL.black }}>
+                      {fmtCHF(inv.amount)} <span style={{ fontSize: 11, fontWeight: 400, color: C.muted }}>{inv.currency}</span>
+                    </span>
+                    {/* Le HT en dessous : c'est le montant qu'on retrouve sur
+                        l'offre, et celui qui entre dans les comptes. */}
+                    {inv.amount_net != null && (
+                      <span style={{ display: 'block', fontSize: 11.5, color: C.muted }}>{fmtCHF(inv.amount_net)} HT</span>
+                    )}
                   </span>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }} onClick={e => e.stopPropagation()}>
