@@ -42,7 +42,12 @@ export default async function handler(req, res) {
   let pdf
   try {
     const contenu = await hydraterImages(presentation.contenu || {}, telechargerVisuel)
-    pdf = Buffer.from(await htmlToPdf(deckHtml(contenu, { polices: policesEmbarquees() })))
+    // Tout est dans le document — police et visuels en data-URI : il n'y a
+    // rien à attendre du réseau, mais beaucoup à dessiner (dix-sept pages de
+    // 1920 × 1080). D'où `load` plutôt que l'inactivité réseau, et trois
+    // minutes de patience au lieu de trente secondes.
+    pdf = Buffer.from(await htmlToPdf(deckHtml(contenu, { polices: policesEmbarquees() }), null,
+      { attendre: 'load', delai: 180000 }))
   } catch (e) {
     console.error('presentation pdf:', e)
     return res.status(500).json({ error: 'Génération PDF impossible : ' + e.message })

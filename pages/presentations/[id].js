@@ -18,6 +18,7 @@ import useSWR from 'swr'
 import { apiFetch } from '../../lib/api'
 import { C, FONT, MONO, R } from '../../lib/theme'
 import { pagesDeck } from '../../lib/deck'
+import { reduireImage } from '../../lib/imageReduite'
 import { gabaritDeck } from '../../lib/deckGabarit'
 
 // Postgres ne garde PAS l'ordre des clés d'un `jsonb` : il les réécrit par
@@ -274,12 +275,11 @@ export default function Presentation() {
       const f = choisis[i]
       setTravail(`dépôt ${i + 1}/${choisis.length} — ${f.name}`)
       try {
-        const base64 = await new Promise((ok, ko) => {
-          const l = new FileReader()
-          l.onload = () => ok(String(l.result).split(',')[1])
-          l.onerror = ko
-          l.readAsDataURL(f)
-        })
+        // Réduit AVANT l'envoi : l'hébergeur refuse au-delà de 4,5 Mo, et
+        // surtout ces visuels voyagent ensuite dans le PDF, encodés en base64.
+        // Le nom d'origine est conservé — c'est lui qui rattache le visuel à
+        // sa pièce.
+        const { base64 } = await reduireImage(f)
         await apiFetch(`/api/presentations/${id}/fichiers`, {
           method: 'POST', json: { base64, filename: f.name }, silencieux: true, timeoutMs: 120000,
         })
@@ -370,7 +370,8 @@ export default function Presentation() {
             <code style={{ fontFamily: MONO, fontSize: 12 }}> vitrine_3d.png</code>,
             <code style={{ fontFamily: MONO, fontSize: 12 }}> vitrine_ia.png</code>,
             <code style={{ fontFamily: MONO, fontSize: 12 }}> stand_3d.png</code>…
-            jpeg, png ou webp, 3 Mo par image.
+            jpeg, png ou webp. Les grandes images sont réduites à 2000 px dans le navigateur,
+            avant l’envoi.
           </p>
 
           <label style={{
