@@ -11,6 +11,7 @@ import { swrConfig, purgeCachePersistant } from '../lib/swr'
 import { signalerErreur, ApiError } from '../lib/api'
 import ApiErrorBanner from '../components/ApiErrorBanner'
 import { AL, C, FONT, R } from '../lib/theme'
+import { amazingLogo } from '../lib/amazingLogo'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
 
@@ -19,7 +20,6 @@ export function useAuth() { return useContext(AuthContext) }
 
 const PUBLIC_ROUTES = ['/login', '/display']
 const NO_CHROME_ROUTES = ['/login', '/display', '/projects/[id]/devis']
-const PINK = AL.black
 
 // ─── Auth des appels API ─────────────────────────────────────────────────────
 // Toutes les routes /api/* vérifient désormais le JWT Supabase côté serveur.
@@ -182,45 +182,46 @@ export default function App({ Component, pageProps }) {
     }
   }, [user, authReady, router.pathname])
 
-  // ─── Loading splash ──────────────────────────────────────────────────────
+  // ─── Écran d'attente ─────────────────────────────────────────────────────
+  //
+  // Le premier écran de l'application, et le seul qu'on voie avant de savoir
+  // qui l'on est. Il reprend la couverture des présentations client : fond
+  // noir, le vrai logo en rose clair, le nom en petites capitales. Pas de
+  // dégradé, pas de halo flou, pas de logo inventé qui tourne — trois choses
+  // que la marque n'emploie nulle part ailleurs.
+  //
+  // Un seul mouvement, un trait qui va et vient : de quoi dire que ça
+  // travaille. Il s'arrête pour qui a demandé moins d'animations à son
+  // système, et la barre reste alors visible, à moitié remplie.
   if (!authReady) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 24,
-        background: `radial-gradient(circle at 50% 38%, ${AL.white} 0%, ${C.neutralBg} 100%)`,
+        alignItems: 'center', justifyContent: 'center', gap: 28,
+        background: AL.black,
       }}>
         <style>{`
-          @keyframes maze-spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-          @keyframes maze-glow { 0%,100% { opacity: .25 } 50% { opacity: .7 } }
-          @keyframes maze-fade { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
-          @keyframes maze-bar  { 0% { transform: translateX(-120%) } 100% { transform: translateX(330%) } }
+          @keyframes maze-va-et-vient { 0% { transform: translateX(-100%) } 100% { transform: translateX(300%) } }
+          @keyframes maze-apparait { from { opacity: 0 } to { opacity: 1 } }
+          .maze-attente { animation: maze-apparait .5s ease both; }
+          .maze-trait   { animation: maze-va-et-vient 1.4s cubic-bezier(.4,0,.2,1) infinite; }
+          @media (prefers-reduced-motion: reduce) {
+            .maze-attente { animation: none; }
+            .maze-trait   { animation: none; transform: translateX(100%); }
+          }
         `}</style>
-        <div style={{ position: 'relative', width: 72, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{
-            position: 'absolute', width: 72, height: 72, borderRadius: '50%',
-            background: PINK, filter: 'blur(18px)', opacity: 0.18,
-            animation: 'maze-glow 2s ease-in-out infinite',
-          }} />
-          <svg width="64" height="64" viewBox="0 0 40 40" fill="none"
-            style={{ position: 'relative', animation: 'maze-spin 5s linear infinite' }}>
-            <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="1.5" fill="none" opacity="0.9" />
-            <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="1.5" fill="none" transform="rotate(60 20 20)" opacity="0.9" />
-            <ellipse cx="20" cy="20" rx="18" ry="7" stroke={PINK} strokeWidth="1.5" fill="none" transform="rotate(120 20 20)" opacity="0.9" />
-            <circle cx="38" cy="20" r="2.2" fill={PINK} />
-            <circle cx="20" cy="20" r="3.2" fill={PINK} />
-          </svg>
-        </div>
-        <div style={{
-          fontSize: 12, fontWeight: 700, letterSpacing: '0.3em', color: PINK,
-          textTransform: 'uppercase', fontFamily: FONT,
-          animation: 'maze-fade .7s ease both',
-        }}>Maze Project</div>
-        <div style={{
-          width: 132, height: 3, borderRadius: R.pill, background: C.border,
-          overflow: 'hidden', animation: 'maze-fade .7s ease both',
-        }}>
-          <div style={{ width: '40%', height: '100%', borderRadius: R.pill, background: PINK, animation: 'maze-bar 1.2s ease-in-out infinite' }} />
+        <div className="maze-attente" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+          <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: amazingLogo(56, AL.pink) }} />
+          <span style={{
+            fontFamily: FONT, fontSize: 11, fontWeight: 500, letterSpacing: '.28em',
+            textTransform: 'uppercase', color: C.navInactive,
+          }}>maze project</span>
+          <div role="status" aria-label="chargement" style={{
+            width: 96, height: 2, borderRadius: R.pill, overflow: 'hidden',
+            background: C.dividerOnDark,
+          }}>
+            <div className="maze-trait" style={{ width: '33%', height: '100%', borderRadius: R.pill, background: C.accent }} />
+          </div>
         </div>
       </div>
     )
