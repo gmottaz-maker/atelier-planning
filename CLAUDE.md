@@ -970,6 +970,25 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.
 
+**Depuis le 30 octobre 2026, une table nouvelle doit porter ses GRANTs.**
+Supabase n'accorde plus l'accès à l'API de données automatiquement : sans
+`GRANT`, la table est injoignable — y compris par nos routes, qui utilisent
+pourtant la clé service-role — et l'erreur est un « permission denied » qui ne
+dit pas d'où il vient. Les tables existantes gardent leurs droits ; seules les
+migrations à venir sont concernées, ainsi que tout rejeu du schéma depuis zéro.
+
+Toute migration créant une table ajoute donc, dans le MÊME fichier :
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ma_table TO service_role;
+```
+
+Et RIEN pour `anon` ni `authenticated` : l'accès passe exclusivement par les
+routes API en service-role (cf. Sécurité), et la seule exception — la lecture
+de `profiles` par le navigateur après l'ouverture de session — porte sur une
+table qui existe déjà. Accorder large « au cas où » rendrait une future
+politique RLS permissive beaucoup plus coûteuse.
+
 **Toute migration ajoutée ici doit aussi recevoir une sonde dans
 `scripts/check-db.mjs`.** `schema-work-slots.sql` est resté six semaines hors
 des deux listes : `/planning` renvoyait 500 en production et `check:db`

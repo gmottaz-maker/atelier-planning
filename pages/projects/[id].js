@@ -23,6 +23,7 @@ import { AL, C, FONT, MONO, R, initials as themeInitials, personChip } from '../
 import { statutProjet, libelleStatut } from '../../lib/projectStatus'
 import ButtonPill from '../../components/ButtonPill'
 import KDriveFolderPicker from '../../components/KDriveFolderPicker'
+import Dictee from '../../components/Dictee'
 import {
   genLogUid, TYPES_WITH_DATE, today, toDateStr, isCompletedToday, fmtDate,
   getDaysRemaining, getProjectColor, ensureUid, initLogistics,
@@ -2665,10 +2666,16 @@ export default function ProjectPage() {
               const file = e.dataTransfer.files?.[0]
               if (file) pickUpdateFile(file)
             }}>
+            {/* Dicter plutôt que taper : un appel client se raconte en
+                trente secondes et s'écrit en cinq minutes. Le texte tombe dans
+                la zone, à la suite de ce qui s'y trouve déjà, et se corrige. */}
+            <div className="no-print" style={{ marginBottom: 10 }}>
+              <Dictee onTexte={t => setNewUpdate(v => (v.trim() ? `${v.trim()}\n\n${t}` : t))} />
+            </div>
             <textarea
               value={newUpdate}
               onChange={e => setNewUpdate(e.target.value)}
-              placeholder="Téléphone client, mail recopié, lien, changement de scope… Glisse ici une photo, un PDF ou un message vocal."
+              placeholder="Téléphone client, mail recopié, lien, changement de scope… Glisse ici une photo, un PDF ou un message vocal. Ou dicte."
               rows={3}
               style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', minHeight: 64,
                 fontFamily: FONT, fontSize: 14, lineHeight: 1.45, color: AL.black, background: 'transparent' }}

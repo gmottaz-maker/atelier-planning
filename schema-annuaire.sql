@@ -66,6 +66,16 @@ ALTER TABLE annuaire            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE annuaire_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE annuaire_liens      ENABLE ROW LEVEL SECURITY;
 
+-- Depuis le 30 octobre 2026, Supabase n'ouvre plus l'API de données aux tables
+-- nouvelles sans GRANT explicite : sans ces lignes, un rejeu du schéma depuis
+-- zéro rendrait ces tables injoignables, même en service-role. Rien pour
+-- `anon` ni `authenticated` : tout passe par les routes API.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.annuaire            TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.annuaire_categories TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.annuaire_liens      TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE annuaire_id_seq            TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE annuaire_categories_id_seq TO service_role;
+
 -- ── Arborescence de départ ─────────────────────────────────────────────────
 -- Posée UNE FOIS, et seulement si la table est vide : elle donne la forme
 -- (par technique, jamais par région) sans prétendre être complète. Tout se

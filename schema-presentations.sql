@@ -36,6 +36,11 @@ CREATE INDEX IF NOT EXISTS presentations_projet_idx ON presentations(project_id)
 -- par les routes API en service-role.
 ALTER TABLE presentations ENABLE ROW LEVEL SECURITY;
 
+-- Voir CLAUDE.md, « Migrations SQL » : depuis le 30 octobre 2026, une table
+-- nouvelle n'est jointe par l'API de données que si elle porte ses GRANTs.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.presentations TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE presentations_id_seq TO service_role;
+
 -- Ce qu'on a raconté du projet, et les visuels déposés.
 --
 -- Les consignes sont gardées parce qu'on y revient : une correction demandée
