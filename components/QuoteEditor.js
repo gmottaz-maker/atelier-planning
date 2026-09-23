@@ -891,10 +891,19 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                           <option value="">véhicule…</option>
                                           {transport.vehicules.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
                                         </select>
-                                        <select className={txtCell} value={r.personnes || 1} aria-label="Personnes à bord"
+                                        {/* Largeur AUTO : le navigateur dimensionne le menu
+                                            sur son contenu, flèche comprise. En lui imposant
+                                            40 px, la marge interne et la flèche native ne
+                                            laissaient que quelques pixels au chiffre, qui
+                                            apparaissait coupé — et la bonne largeur n'est pas
+                                            la même d'un navigateur à l'autre. */}
+                                        <select value={r.personnes || 1} aria-label="Personnes à bord"
                                           onChange={e => updateLogisticsRow(i, 'personnes', Number(e.target.value))}
-                                          style={{ width: 40, flex: 'none' }} title="Personnes à bord">
-                                          {[1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}
+                                          title="Personnes à bord"
+                                          style={{ width: 'auto', flex: 'none', padding: '6px 0 6px 6px',
+                                            border: 'none', background: 'transparent', fontFamily: FONT, fontSize: 14,
+                                            color: AL.black, outline: 'none', cursor: 'pointer' }}>
+                                          {[1, 2, 3].map(n => <option key={n} value={n}>{n} p.</option>)}
                                         </select>
                                       </span>
                                     )}
