@@ -5,7 +5,7 @@
 // regroupés à part, et chacun reste autonome.
 import Head from 'next/head'
 import Link from 'next/link'
-import { C, FONT, MONO, R } from '../../lib/theme'
+import { AL, C, FONT, MONO, R } from '../../lib/theme'
 import useIsAdmin from '../../lib/useIsAdmin'
 
 const OUTILS = [
@@ -46,37 +46,73 @@ const OUTILS = [
 
 export default function Outils() {
   const isAdmin = useIsAdmin()
+  const visibles = OUTILS.filter(o => !o.admin || isAdmin)
+
   return (
     <>
       <Head><title>Outils · Maze Project</title></Head>
-      <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 48px' }}>
-        <h1 style={{ font: `700 24px ${FONT}`, color: C.ink, margin: '0 0 4px' }}>Outils</h1>
-        <p style={{ font: `14px ${FONT}`, color: C.muted, margin: '0 0 24px' }}>
-          Aides au travail d’atelier. Autonomes, sans lien avec les projets ni la facturation.
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 16px 64px' }}>
+
+        <h1 style={{ font: `500 38px ${FONT}`, lineHeight: 1.05, letterSpacing: '-.01em', color: AL.black, margin: 0 }}>
+          Outils
+        </h1>
+        <p style={{ font: `18px ${FONT}`, color: C.muted, margin: '12px 0 28px' }}>
+          {visibles.length} aides au travail d’atelier. Autonomes, sans lien avec les projets ni la facturation.
         </p>
 
-        <div style={{ display: 'grid', gap: 12 }}>
-          {OUTILS.filter(o => !o.admin || isAdmin).map(o => (
-            <Link key={o.href} href={o.href} style={{ textDecoration: 'none' }}>
-              <article style={{
-                border: `1px solid ${C.border}`, borderRadius: R.panel, padding: '16px 18px',
-                background: C.surface, display: 'flex', flexDirection: 'column', gap: 6,
+        {/* Une carte par outil, deux colonnes dès qu'il y a la place. Le nom en
+            grand, le sujet en petites capitales au-dessus, la raison d'être en
+            dessous : c'est elle qu'on lit pour savoir si c'est le bon outil.
+            Au survol, la carte s'inverse — la seule profondeur de la marque. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+          {visibles.map(o => (
+            // LE LIEN EST LA CARTE. Un premier essai posait un <article> en
+            // `height: 100%` DANS le lien : une hauteur en pourcentage n'a rien
+            // à quoi se résoudre quand le parent est libre, le contenu passait
+            // sous la grille et chevauchait la ligne suivante.
+            <Link
+              key={o.href}
+              href={o.href}
+              style={{
+                display: 'flex', flexDirection: 'column', gap: 6, textDecoration: 'none',
+                border: `1.5px solid ${C.outline}`, borderRadius: R.panel,
+                padding: '20px 22px 22px', background: C.surface, transition: 'background .15s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = AL.black
+                e.currentTarget.querySelectorAll('[data-encre]').forEach(x => { x.style.color = AL.white })
+                e.currentTarget.querySelectorAll('[data-discret]').forEach(x => { x.style.color = C.navInactive })
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = C.surface
+                e.currentTarget.querySelectorAll('[data-encre]').forEach(x => { x.style.color = AL.black })
+                e.currentTarget.querySelectorAll('[data-discret]').forEach(x => { x.style.color = C.muted })
+              }}
+            >
+              <span data-discret style={{
+                display: 'flex', alignItems: 'center', gap: 7, font: `500 10.5px ${MONO}`,
+                letterSpacing: '.09em', textTransform: 'uppercase', color: C.muted,
               }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ font: `600 16px ${FONT}`, color: C.ink }}>{o.nom}</span>
-                  <span style={{ font: `10px ${MONO}`, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>{o.etat}</span>
-                </div>
-                <p style={{ font: `13.5px ${FONT}`, color: C.inkTertiary, margin: 0, lineHeight: 1.6 }}>{o.resume}</p>
-              </article>
+                {/* Un point corail pour ce qui n'est visible que de l'admin :
+                    ces écrans portent des coûts et des marges. */}
+                {o.admin && <span style={{ width: 6, height: 6, borderRadius: R.pill, background: C.accent, flex: 'none' }} />}
+                {o.etat}
+              </span>
+
+              <span data-encre style={{ font: `500 21px ${FONT}`, lineHeight: 1.2, color: AL.black }}>{o.nom}</span>
+
+              <span data-discret style={{ font: `13.5px ${FONT}`, color: C.muted, lineHeight: 1.6, marginTop: 2 }}>
+                {o.resume}
+              </span>
             </Link>
           ))}
         </div>
 
-        <p style={{ font: `12.5px ${FONT}`, color: C.muted, marginTop: 28, lineHeight: 1.7 }}>
-          D’autres outils viendront s’ajouter ici. Pour en créer un : une page sous
-          <code style={{ fontFamily: MONO, fontSize: 12 }}> pages/outils/</code>, une entrée dans
-          la liste ci-dessus, et le calcul dans <code style={{ fontFamily: MONO, fontSize: 12 }}>lib/</code>
-          pour qu’il soit testable.
+        <p style={{ font: `12.5px ${FONT}`, color: C.muted, marginTop: 32, lineHeight: 1.7 }}>
+          Pour en ajouter un : une page sous
+          <code style={{ fontFamily: MONO, fontSize: 12 }}> pages/outils/</code>, une entrée dans la liste
+          de ce fichier, et le calcul dans <code style={{ fontFamily: MONO, fontSize: 12 }}>lib/</code> pour
+          qu’il soit testable sans écran.
         </p>
       </div>
     </>

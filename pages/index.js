@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
 import { quoteStatusMeta, quoteStripe, offreAFaire, categorieOffre, compterOffres, CATEGORIES_OFFRE } from '../lib/quoteStatus'
+import { TYPES_LIVRAISON } from '../lib/projectHelpers'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
@@ -15,7 +16,8 @@ import ButtonPill from '../components/ButtonPill'
 import PillsFiltre from '../components/PillsFiltre'
 import useIsAdmin from '../lib/useIsAdmin'
 
-const DELIVERY_TYPES = ['Livraison', 'Montage sur place', 'Client vient chercher', 'Enlèvement sur place']
+// La liste vit dans lib/projectHelpers.js : la fiche projet la lit aussi.
+const DELIVERY_TYPES = TYPES_LIVRAISON
 const COLOR_OPTIONS  = [
   { value: null,      label: 'Auto (selon urgence)', icon: '🤖' },
   { value: C.success, label: 'Vert',   icon: '🟢' },

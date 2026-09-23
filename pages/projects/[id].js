@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { useAuth } from '../_app'
 import NavBar from '../../components/NavBar'
 import { useResponsibles } from '../../lib/useResponsibles'
+import { TYPES_LIVRAISON, chargeUtileEntete } from '../../lib/projectHelpers'
+import { PROJECT_PHASES } from '../../lib/projectPhase'
 import useIsAdmin from '../../lib/useIsAdmin'
 import useIsMobile from '../../lib/useIsMobile'
 import { TASK_CATEGORIES } from '../../lib/taskCategories'
@@ -1791,6 +1793,42 @@ export default function ProjectPage() {
   // Le dossier ouvert sous la grille de tuiles — un seul à la fois, comme une
   // app. Aucun à l'arrivée : la grille EST l'accueil du projet.
   const [volet, setVolet] = useState(null)
+  // Modifier les informations du projet SANS repasser par la liste. Le
+  // formulaire vit dans la carte d'en-tête, à la place de ce qu'il modifie.
+  const [editionEntete, setEditionEntete] = useState(false)
+  const [formEntete, setFormEntete] = useState(null)
+  const [enregistrementEntete, setEnregistrementEntete] = useState(false)
+  function ouvrirEdition() {
+    setFormEntete({
+      name: project.name || '', client: project.client || '', deadline: project.deadline || '',
+      delivery_type: project.delivery_type || '', responsible: project.responsible || 'non défini',
+      reference: project.reference || '', phase: project.phase || '', status: project.status || 'active',
+      suspended: !!project.suspended, description: project.description || '',
+    })
+    setEditionEntete(true)
+  }
+
+  async function enregistrerEntete() {
+    if (!formEntete.name.trim()) return
+    setEnregistrementEntete(true)
+    try {
+      // Le projet part ENTIER : la route écrit `deadline: deadline || null`,
+      // donc un envoi partiel EFFACERAIT l'échéance au lieu de la laisser en
+      // place. Mais on retire les gros documents — offre, fiche de visite,
+      // logistique : la route ne les écrit que s'ils sont présents, et les
+      // renvoyer depuis un état chargé il y a une heure écraserait le travail
+      // fait entre-temps dans un autre onglet.
+      const r = await fetch(`/api/projects/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+        body: JSON.stringify(chargeUtileEntete(project, formEntete)),
+      })
+      const data = await r.json()
+      if (!r.ok || data.error) return
+      setProject(data)
+      setEditionEntete(false)
+    } finally { setEnregistrementEntete(false) }
+  }
+
   function ouvrirVolet(cle) {
     const suivant = volet === cle ? null : cle
     setVolet(suivant)
@@ -2403,10 +2441,66 @@ export default function ProjectPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 280, flex: 1 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={microLabel}>projet</span>
-              <h1 style={{ fontSize: 38, fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>{project.name}</h1>
-              {project.client && <span style={{ fontSize: 15, color: C.muted }}>{project.client}</span>}
+              {editionEntete ? (
+                <>
+                  <input value={formEntete.name} onChange={e => setFormEntete(f => ({ ...f, name: e.target.value }))}
+                    style={{ fontSize: 30, fontWeight: 500, letterSpacing: '-.01em', color: AL.black, fontFamily: FONT,
+                      border: 'none', borderBottom: `1.5px solid ${C.outline}`, background: 'transparent',
+                      padding: '2px 0', outline: 'none', width: '100%' }} />
+                  <input value={formEntete.client} onChange={e => setFormEntete(f => ({ ...f, client: e.target.value }))}
+                    placeholder="client" style={{ fontSize: 15, color: C.muted, fontFamily: FONT, marginTop: 6,
+                      border: `1px solid ${C.border}`, borderRadius: R.panel, background: C.surface,
+                      padding: '6px 10px', outline: 'none', width: '100%', maxWidth: 360 }} />
+                </>
+              ) : (
+                <>
+                  <h1 style={{ fontSize: 38, fontWeight: 500, lineHeight: 1.05, letterSpacing: '-.01em', margin: 0, color: AL.black }}>{project.name}</h1>
+                  {project.client && <span style={{ fontSize: 15, color: C.muted }}>{project.client}</span>}
+                </>
+              )}
             </div>
 
+            {editionEntete ? (
+              /* Les mêmes informations, modifiables sur place. Le numéro de
+                 projet n'y est pas : il est attribué par la base et ne se
+                 choisit pas. */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14, marginTop: 6, maxWidth: 760 }}>
+                <label><span style={microLabel}>deadline</span>
+                  <input type="date" className={inp} value={formEntete.deadline || ''}
+                    onChange={e => setFormEntete(f => ({ ...f, deadline: e.target.value }))} /></label>
+                <label><span style={microLabel}>mode</span>
+                  <select className={inp} value={formEntete.delivery_type}
+                    onChange={e => setFormEntete(f => ({ ...f, delivery_type: e.target.value }))}>
+                    <option value="">—</option>
+                    {TYPES_LIVRAISON.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select></label>
+                <label><span style={microLabel}>responsable</span>
+                  <select className={inp} value={formEntete.responsible}
+                    onChange={e => setFormEntete(f => ({ ...f, responsible: e.target.value }))}>
+                    {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select></label>
+                <label><span style={microLabel}>phase</span>
+                  <select className={inp} value={formEntete.phase}
+                    onChange={e => setFormEntete(f => ({ ...f, phase: e.target.value }))}>
+                    <option value="">En préparation</option>
+                    {PROJECT_PHASES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+                  </select></label>
+                <label><span style={microLabel}>référence client</span>
+                  <input className={inp} value={formEntete.reference}
+                    onChange={e => setFormEntete(f => ({ ...f, reference: e.target.value }))} /></label>
+                <label><span style={microLabel}>statut</span>
+                  <select className={inp} value={formEntete.status}
+                    onChange={e => setFormEntete(f => ({ ...f, status: e.target.value }))}>
+                    <option value="active">Actif</option>
+                    <option value="archived">Archivé</option>
+                  </select></label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end', paddingBottom: 8 }}>
+                  <input type="checkbox" checked={formEntete.suspended}
+                    onChange={e => setFormEntete(f => ({ ...f, suspended: e.target.checked }))} />
+                  <span style={{ fontSize: 13.5, color: AL.black }}>en pause</span>
+                </label>
+              </div>
+            ) : (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 28, flexWrap: 'wrap', marginTop: 4 }}>
               {/* Le numéro qu'on écrit sur la feuille d'heures : il doit se
                   lire d'un coup d'œil, d'où la chasse fixe. */}
@@ -2451,8 +2545,25 @@ export default function ProjectPage() {
                 </div>
               )}
             </div>
+            )}
 
-            {project.description && (
+            {editionEntete ? (
+              <div style={{ marginTop: 10, paddingTop: 18, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={microLabel}>résumé</span>
+                <textarea className={inp} rows={3} value={formEntete.description}
+                  onChange={e => setFormEntete(f => ({ ...f, description: e.target.value }))} />
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <ButtonPill onClick={enregistrerEntete} disabled={enregistrementEntete || !formEntete.name.trim()}
+                    style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                    {enregistrementEntete ? 'enregistrement…' : 'enregistrer'}
+                  </ButtonPill>
+                  <button onClick={() => setEditionEntete(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 13, color: C.muted }}>
+                    annuler
+                  </button>
+                </div>
+              </div>
+            ) : project.description && (
               <div style={{ marginTop: 10, paddingTop: 18, borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={microLabel}>résumé</span>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45, color: AL.black, whiteSpace: 'pre-wrap' }}>{project.description}</p>
@@ -2460,8 +2571,17 @@ export default function ProjectPage() {
             )}
           </div>
 
-          {/* Responsable + progression */}
+          {/* Responsable + progression, et le bouton qui ouvre l'édition :
+              modifier une échéance ou un statut ne doit plus obliger à
+              retourner dans la liste, cliquer « modifier », puis revenir. */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap' }}>
+            {!editionEntete && (
+              <button className="no-print" onClick={ouvrirEdition}
+                style={{ order: 3, background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: FONT, fontSize: 12.5, color: C.muted, padding: 0 }}>
+                modifier
+              </button>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
               <span style={microLabel}>responsable</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
