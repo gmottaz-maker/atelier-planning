@@ -14,7 +14,7 @@ import { contentDisposition } from '../../../../lib/contentDisposition'
 import { pdfFilename } from '../../../../lib/pdfFilename'
 import { deckHtml, policesEmbarquees } from '../../../../lib/deckHtml'
 import { hydraterImages } from '../../../../lib/presentation'
-import { downloadStream, ensureProjectFolder, upload } from '../../../../lib/kdrive'
+import { downloadStream, upload, SANS_DOSSIER } from '../../../../lib/kdrive'
 
 export const config = { maxDuration: 120 }
 
@@ -56,13 +56,10 @@ export default async function handler(req, res) {
   const nom = pdfFilename('presentation', projet.name)
 
   if (req.query.deposer) {
+    // Sans dossier choisi, le PDF se télécharge mais ne se range nulle part.
+    if (!projet.kdrive_folder_id) return res.status(409).json({ error: SANS_DOSSIER })
     try {
-      let dossier = projet.kdrive_folder_id
-      if (!dossier) {
-        dossier = await ensureProjectFolder(projet.client, projet.name)
-        await supabase.from('projects').update({ kdrive_folder_id: dossier }).eq('id', projet.id)
-      }
-      const fichier = await upload(dossier, nom, pdf, 'application/pdf')
+      const fichier = await upload(projet.kdrive_folder_id, nom, pdf, 'application/pdf')
       await supabase.from('presentations').update({
         kdrive_id: fichier.id, kdrive_nom: fichier.name, envoyee_le: new Date().toISOString(),
       }).eq('id', id)

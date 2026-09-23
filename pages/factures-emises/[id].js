@@ -44,7 +44,7 @@ export default function FactureEmisePage() {
     project_id: '', client_name: '', client_address: '', currency: 'CHF',
     vat_rate: '8.1', issue_date: today(), due_date: addDays(today(), 30),
     iban_recipient: '', notes: '', status: 'created',
-    object: '', discount_label: '', discount_rate: '', discount_amount: '',
+    object: '', reference: '', discount_label: '', discount_rate: '', discount_amount: '',
   })
   const [loading, setLoading] = useState(true)
   const [dirty, setDirty]     = useState(false)
@@ -83,6 +83,7 @@ export default function FactureEmisePage() {
           iban_recipient: inv.iban_recipient || '', notes: inv.notes || '',
           status: inv.status || 'created',
           object: inv.object || '',
+          reference: inv.reference || '',
           discount_label: inv.discount_label || '',
           discount_rate: inv.discount_rate ?? '',
           discount_amount: inv.discount_amount ?? '',
@@ -112,6 +113,9 @@ export default function FactureEmisePage() {
       ...f, project_id: pid,
       client_name: p?.client || f.client_name,
       client_address: p?.client_address || f.client_address,
+      // La référence du projet sert de point de départ ; elle reste
+      // modifiable, et une référence déjà saisie n'est pas écrasée.
+      reference: f.reference || p?.reference || '',
     }))
     if (p && isGrouped(p.quote_data)) setQuote(p.quote_data)
     setDirty(true)
@@ -215,6 +219,15 @@ export default function FactureEmisePage() {
                   placeholder="ex. Stockage T3 2026, Acompte chantier…" />
                 <p className="text-xs u-muted mt-1">
                   Permet de nommer la facture sans la lier à un projet. Sans objet ni projet, la facture n'a pas d'intitulé.
+                </p>
+              </div>
+              <div>
+                <label className={label}>Référence — imprimée sous l’objet</label>
+                <input className={input} value={form.reference} onChange={e => set('reference', e.target.value)}
+                  placeholder="bon de commande, réf. client…" />
+                <p className="text-xs u-muted mt-1">
+                  Vide, la facture reprend la référence du projet. Un chantier facturé en acompte puis en
+                  solde peut porter deux bons de commande différents.
                 </p>
               </div>
               <div>

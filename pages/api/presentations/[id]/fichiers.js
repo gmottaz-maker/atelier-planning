@@ -7,7 +7,7 @@
 import { getSupabaseServer } from '../../../../lib/supabase-server'
 import { requireUser } from '../../../../lib/requireAdmin'
 import { erreurApi } from '../../../../lib/apiError'
-import { ensureProjectFolder, upload } from '../../../../lib/kdrive'
+import { upload, SANS_DOSSIER } from '../../../../lib/kdrive'
 import { validerFichier, nomSur } from '../../../../lib/fileType'
 import { MAX_FICHIER_OCTETS } from '../../../../lib/uploadLimit'
 
@@ -41,13 +41,13 @@ export default async function handler(req, res) {
       .from('projects').select('id, client, name, kdrive_folder_id').eq('id', presentation.project_id).maybeSingle()
     if (!projet) return res.status(404).json({ error: 'Projet introuvable' })
 
+    // Le dossier du projet, tel qu'il a été CHOISI. Sans dossier, on ne dépose
+    // pas et on le dit — on n'en fabrique pas un au passage.
+    const dossier = projet.kdrive_folder_id
+    if (!dossier) return res.status(409).json({ error: SANS_DOSSIER })
+
     let depose
     try {
-      let dossier = projet.kdrive_folder_id
-      if (!dossier) {
-        dossier = await ensureProjectFolder(projet.client, projet.name)
-        await supabase.from('projects').update({ kdrive_folder_id: dossier }).eq('id', projet.id)
-      }
       depose = await upload(dossier, nomSur(`presentation_${Date.now()}_${filename}`, check.mime), buffer, check.mime)
     } catch (e) {
       console.error('presentation fichiers:', e)

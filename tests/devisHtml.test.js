@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDevisBody } from '../lib/devisHtml'
+import { buildDevisBody, buildDevisHtml } from '../lib/devisHtml'
 
 // Une offre minimale : un item de fabrication avec une ligne de main d'œuvre.
 const projet = (quote = {}) => ({
@@ -64,5 +64,18 @@ describe('offre : libellés remplacés', () => {
     const avec = buildDevisBody(projet({ items_label: 'Stockage', conditions: ['x'] }), {})
     // 2 × 100 = 200 net, TVA 8,1 % = 16,20, total 216,20
     for (const attendu of ["200,00", "16,20", "216,20"]) expect(avec).toContain(attendu)
+  })
+})
+
+describe('référence sous l\'objet de l\'offre', () => {
+  const company = { name: 'amazing lab' }
+  const projet = { id: 'p1', name: 'Vitrine', client: 'Manor SA', quote_data: { items: [], management: [] } }
+
+  it('imprime la référence du projet sous l\'objet', () => {
+    expect(buildDevisHtml({ ...projet, reference: 'BC-4471' }, company)).toContain('Référence : BC-4471')
+  })
+
+  it('n\'imprime rien quand le projet n\'en a pas', () => {
+    expect(buildDevisHtml(projet, company)).not.toContain('Référence')
   })
 })

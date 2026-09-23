@@ -713,6 +713,22 @@ partent en `inline` ; tout le reste en `attachment`, avec `nosniff`. Le HEIC est
 stocké mais jamais servi inline : `pages/schedule.js` envoie les photos iPhone
 telles quelles.
 
+**Le dossier kDrive d'un projet ne se crée JAMAIS tout seul.** Il se fabriquait
+au premier dépôt de fichier, en silence : des projets qui n'avaient besoin
+d'aucun fichier — une intervention d'une heure — se retrouvaient avec un
+dossier vide que personne ne rangeait. Les quatre routes de dépôt (fichiers,
+dump, visuels et PDF de présentation) répondent maintenant 409 avec
+`SANS_DOSSIER` (lib/kdrive.js) quand le projet n'a pas de dossier ; la fiche
+projet propose alors les deux gestes, « créer le dossier »
+(`/api/projects/[id]/kdrive-folder`) ou « choisir un dossier existant ». Un
+projet SANS dossier est un état normal, pas un oubli.
+
+**La référence imprimée est celle de la FACTURE, à défaut celle du projet.** Un
+chantier facturé en acompte puis en solde peut porter deux bons de commande ;
+`customer_invoices.reference` prime donc sur `projects.reference`. Elle
+s'affiche sous l'OBJET du document, où on la cherche, et non plus dans
+l'en-tête à côté des dates.
+
 **Un identifiant kDrive venant du navigateur n'est pas une autorisation.** Le
 serveur a un token très privilégié. Soit le fichier est référencé en base et
 `lib/kdriveAccess.js` tranche, soit il présente un jeton signé
@@ -949,6 +965,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-transport-reglages.sql` | réglages `transport` (véhicules, forfaits) et `couts_vehicules` (admin) | en fin de fichier |
 | `schema-presentations.sql` | table `presentations` (support client envoyé avec l'offre) | en fin de fichier |
 | `schema-annuaire.sql` | tables `annuaire`, `annuaire_categories`, `annuaire_liens` | en fin de fichier |
+| `schema-invoice-reference.sql` | `customer_invoices.reference` (réf. propre à la facture) | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

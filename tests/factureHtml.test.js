@@ -79,3 +79,31 @@ describe('qrDocument — page autonome du bulletin', () => {
     expect(qrDocument('<svg/>')).toContain('width:210mm')
   })
 })
+
+describe('référence sous l\'objet', () => {
+  const base = {
+    invoice_number: '2026-025', client_name: 'Manor SA', amount: 100, amount_net: 92.5,
+    vat_rate: 8.1, vat_amount: 7.5, issue_date: '2026-09-23', object: 'Vitrine',
+  }
+  const company = { name: 'amazing lab' }
+
+  it('imprime la référence de la FACTURE', () => {
+    const html = buildFactureHtml({ ...base, reference: 'BC-4471' }, company, null)
+    expect(html).toContain('Référence : BC-4471')
+  })
+
+  it('retombe sur celle du projet quand la facture n\'en a pas', () => {
+    const html = buildFactureHtml({ ...base, projects: { name: 'Vitrine', reference: 'PO-99' } }, company, null)
+    expect(html).toContain('Référence : PO-99')
+  })
+
+  it('celle de la facture l\'emporte sur celle du projet', () => {
+    const html = buildFactureHtml({ ...base, reference: 'BC-4471', projects: { name: 'V', reference: 'PO-99' } }, company, null)
+    expect(html).toContain('Référence : BC-4471')
+    expect(html).not.toContain('PO-99')
+  })
+
+  it('n\'imprime rien quand il n\'y en a aucune', () => {
+    expect(buildFactureHtml(base, company, null)).not.toContain('Référence')
+  })
+})

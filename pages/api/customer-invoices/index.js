@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     const {
       project_id, client_name, client_address, amount, amount_net, vat_rate, vat_amount,
       currency, issue_date, due_date, iban_recipient, quote_snapshot, notes,
-      detail_level, status, object,
+      detail_level, status, object, reference,
       discount_label, discount_rate, discount_amount,
     } = req.body
 
@@ -63,6 +63,7 @@ export default async function handler(req, res) {
         status: status || 'created',
         notes,
         object: object || null,
+        reference: reference || null,
         discount_label:  discount_label || null,
         discount_rate:   discount_rate   != null && discount_rate   !== '' ? parseFloat(discount_rate)   : null,
         discount_amount: discount_amount != null && discount_amount !== '' ? parseFloat(discount_amount) : null,

@@ -22,6 +22,7 @@ import QuoteEditor from '../../components/QuoteEditor'
 import { AL, C, FONT, MONO, R, initials as themeInitials, personChip } from '../../lib/theme'
 import { statutProjet, libelleStatut } from '../../lib/projectStatus'
 import ButtonPill from '../../components/ButtonPill'
+import KDriveFolderPicker from '../../components/KDriveFolderPicker'
 import {
   genLogUid, TYPES_WITH_DATE, today, toDateStr, isCompletedToday, fmtDate,
   getDaysRemaining, getProjectColor, ensureUid, initLogistics,
@@ -1798,6 +1799,28 @@ export default function ProjectPage() {
   const [editionEntete, setEditionEntete] = useState(false)
   const [formEntete, setFormEntete] = useState(null)
   const [enregistrementEntete, setEnregistrementEntete] = useState(false)
+  const [choixDossier, setChoixDossier] = useState(false)
+  const [dossierEnCours, setDossierEnCours] = useState(false)
+
+  async function creerDossierKdrive() {
+    setDossierEnCours(true)
+    try {
+      const r = await fetch(`/api/projects/${id}/kdrive-folder`, { method: 'POST', headers: { 'x-actor': currentUser } })
+      const data = await r.json()
+      if (r.ok && data.kdrive_folder_id) setProject(p => ({ ...p, kdrive_folder_id: data.kdrive_folder_id }))
+    } finally { setDossierEnCours(false) }
+  }
+
+  async function lierDossierKdrive(folderId) {
+    setChoixDossier(false)
+    const r = await fetch(`/api/projects/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
+      body: JSON.stringify(chargeUtileEntete(project, { deadline: project.deadline, kdrive_folder_id: folderId })),
+    })
+    const data = await r.json()
+    if (r.ok && !data.error) setProject(data)
+  }
+
   function ouvrirEdition() {
     setFormEntete({
       name: project.name || '', client: project.client || '', deadline: project.deadline || '',
@@ -3475,9 +3498,31 @@ export default function ProjectPage() {
           </div>
 
           {!project.kdrive_folder_id ? (
+            /* Sans dossier, on ne prétend pas en avoir un : c'est un état
+               normal — une intervention d'une heure n'a pas de fichier. Rien
+               ne se crée tant qu'on ne le demande pas. */
             <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: 24, textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 13, color: C.muted }}>Aucun dossier kDrive lié à ce projet.</p>
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: C.muted }}>Modifie le projet pour le lier à un dossier existant sur kDrive.</p>
+              <p style={{ margin: 0, fontSize: 13, color: AL.black }}>Ce projet n’a pas de dossier kDrive.</p>
+              <p style={{ margin: '4px 0 14px', fontSize: 12.5, color: C.muted }}>
+                C’est permis : tant qu’il n’y en a pas, on ne peut simplement rien y déposer.
+              </p>
+              <div className="no-print" style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <ButtonPill onClick={creerDossierKdrive} disabled={dossierEnCours} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                  {dossierEnCours ? 'création…' : 'créer le dossier'}
+                </ButtonPill>
+                <button onClick={() => setChoixDossier(true)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 13, color: C.muted }}>
+                  choisir un dossier existant
+                </button>
+              </div>
+              {choixDossier && (
+                <div style={{ marginTop: 16, textAlign: 'left' }}>
+                  <KDriveFolderPicker
+                    onClose={() => setChoixDossier(false)}
+                    onSelect={({ id: folderId }) => lierDossierKdrive(folderId)}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ background: C.surface, border: `1.5px solid ${C.outline}`, borderRadius: R.panel, overflow: 'hidden' }}>

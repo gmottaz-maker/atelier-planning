@@ -1,7 +1,7 @@
 import { getSupabaseServer } from '../../../../lib/supabase-server'
 
 const supabase = getSupabaseServer()
-import { ensureProjectFolder, upload, del } from '../../../../lib/kdrive'
+import { upload, del, SANS_DOSSIER } from '../../../../lib/kdrive'
 import { validerFichier, nomSur } from '../../../../lib/fileType'
 import { requireUser } from '../../../../lib/requireAdmin'
 import { erreurApi } from '../../../../lib/apiError'
@@ -43,20 +43,14 @@ export default async function handler(req, res) {
     if (!check.ok) return res.status(check.status).json({ error: check.error })
     const nom = nomSur(filename, check.mime)
 
-    // Récupérer (ou créer) le dossier kDrive du projet
+    // Le dossier kDrive du projet — celui qu'on a CHOISI. Il ne se crée plus
+    // au passage : voir lib/kdrive.js, SANS_DOSSIER.
     const { data: project, error: projErr } = await supabase
       .from('projects').select('id, name, client, kdrive_folder_id').eq('id', id).single()
     if (projErr || !project) return res.status(404).json({ error: 'Projet introuvable' })
 
-    let folderId = project.kdrive_folder_id
-    if (!folderId) {
-      try {
-        folderId = await ensureProjectFolder(project.client, project.name)
-      } catch (e) {
-        return res.status(500).json({ error: 'kDrive folder error: ' + e.message })
-      }
-      await supabase.from('projects').update({ kdrive_folder_id: folderId }).eq('id', id)
-    }
+    const folderId = project.kdrive_folder_id
+    if (!folderId) return res.status(409).json({ error: SANS_DOSSIER })
 
     // Upload sur kDrive
     let kdriveFile

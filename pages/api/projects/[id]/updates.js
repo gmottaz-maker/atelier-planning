@@ -1,7 +1,7 @@
 import { getSupabaseServer } from '../../../../lib/supabase-server'
 
 const supabase = getSupabaseServer()
-import { ensureProjectFolder, upload, del } from '../../../../lib/kdrive'
+import { upload, del, SANS_DOSSIER } from '../../../../lib/kdrive'
 import { validerFichier, nomSur, TYPES_DUMP, TYPES_AUDIO } from '../../../../lib/fileType'
 import { requireUser } from '../../../../lib/requireAdmin'
 import { erreurApi } from '../../../../lib/apiError'
@@ -164,13 +164,7 @@ async function dossierProjet(id) {
   if (error || !project) return { status: 404, error: 'Projet introuvable' }
 
   if (project.kdrive_folder_id) return { folderId: project.kdrive_folder_id }
-
-  let folderId
-  try {
-    folderId = await ensureProjectFolder(project.client, project.name)
-  } catch (e) {
-    return { status: 500, error: 'kDrive folder error: ' + e.message }
-  }
-  await supabase.from('projects').update({ kdrive_folder_id: folderId }).eq('id', id)
-  return { folderId }
+  // Plus de création à la volée : déposer un fichier ne fabrique pas un
+  // dossier dans le dos de celui qui dépose (lib/kdrive.js, SANS_DOSSIER).
+  return { status: 409, error: SANS_DOSSIER }
 }
