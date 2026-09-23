@@ -151,6 +151,17 @@ const CONTROLES = [
     },
   },
   {
+    // Les trois tables vont ensemble : sans les liaisons, l'annuaire perd son
+    // rangement par technique et ne garde qu'une liste à plat.
+    nom: 'annuaire : entrées, catégories et rattachements',
+    migration: 'schema-annuaire.sql',
+    sonde: async () => {
+      if ((await sb.from('annuaire').select('id, nom, quoi, site, ville').limit(1)).error) return false
+      if ((await sb.from('annuaire_categories').select('id, nom, parent_id').limit(1)).error) return false
+      return !(await sb.from('annuaire_liens').select('entree_id, categorie_id').limit(1)).error
+    },
+  },
+  {
     // Sans cette table, le bloc « Présentation client » de la fiche projet
     // échoue à la création, et l'éditeur n'a rien à ouvrir.
     nom: 'présentations client',

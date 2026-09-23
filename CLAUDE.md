@@ -38,6 +38,9 @@ pages/
   settings.js          — Paramètres utilisateur
   outils/index.js      — Index des outils d'atelier
   outils/peintures.js  — Peintures RUCO : sélecteur + chiffrage (section dédiée)
+  outils/annuaire.js   — Annuaire : qui fait quoi, où l'on commande (section dédiée)
+  outils/charges-sociales.js — (admin) Ce qu'un employé coûte : AVS/AC/AF, LAA, LPP
+  outils/assurances.js — (admin) Ce qu'on a choisi d'assurer, et ce qui est couvert
   outils/marge-km.js   — (admin) Marge au km : un trajet gagne-t-il de l'argent ?
                          simulation sur les réglages Transport, sans les modifier
   peintures.js         — Redirection vers /outils/peintures (anciens signets)
@@ -105,6 +108,8 @@ lib/
   projectHelpers.js      — Calculs et formatage de la fiche projet
   paintPrices.js         — Tarif RUCO d'atelier (20 produits, prix facturés)
   paintCalc.js           — Chiffrage peinture : quantités, coût matière, temps
+  annuaire.js            — Annuaire : validation, arbre par technique, recherche
+  assurances.js · assurancesCalc.js — Contrats, couvertures, coût par personne
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
@@ -356,6 +361,38 @@ cd ~/ruco-selector && python3 scrape_ruco.py --refresh \
 pour la méthode de normalisation (le texte des fiches RUCO est libre, et les
 fiches se renvoient les unes aux autres — un lexique de marques neutralise ces
 renvois, sans quoi un vernis intérieur ressort comme extérieur).
+
+### Annuaire (`/outils/annuaire`)
+
+« Le thermolaquage, on le fait faire chez qui, déjà ? » La réponse vivait dans
+d'anciennes factures et dans la tête d'Arnaud.
+
+**Base séparée de `contacts`, et non un drapeau dessus** — même arbitrage que
+pour les prospects. Les 113 contacts marqués « fournisseur » sont des
+contreparties COMPTABLES (AVS, fiduciaire, ECA, transporteur, agence
+d'intérim) : un annuaire de savoir-faire noyé là-dedans ne se consulterait pas.
+Inversement, une entrée d'annuaire n'a ni numéro de TVA, ni adresse de
+facturation, ni facture.
+
+**On range par TECHNIQUE, jamais par région.** Deux niveaux à l'écran, aucune
+profondeur imposée en base. Une entrée peut tenir dans plusieurs catégories —
+un tôlier qui fait aussi le thermolaquage se retrouve depuis les deux — d'où la
+table de liaison. Choisir une catégorie inclut ses SOUS-catégories : demander
+« CNC » sort aussi les fournisseurs de fraises rangés dessous, sinon une mère
+afficherait zéro alors que tout est classé dessous.
+
+**Une entrée peut n'être qu'un nom.** Tout le reste est facultatif, et
+« ruco.ch » suffit comme site — le préfixe est posé par `normaliserSite`. Un
+lien noté à la volée vaut mieux qu'une fiche complète jamais saisie.
+
+**La recherche porte aussi sur le nom des catégories** : taper
+« thermolaquage » sort l'atelier rangé dessous même si le mot n'apparaît pas
+dans sa fiche. Accents et casse ignorés, et TOUS les mots exigés.
+
+**Lecture et écriture pour tout membre** : celui qui trouve un bon tôlier doit
+pouvoir l'inscrire sans demander à l'admin. Supprimer une catégorie emporte ses
+sous-catégories et les rattachements, jamais les entrées — elles se retrouvent
+sans catégorie, pas à la corbeille.
 
 ### Charges sociales et Assurances (`/outils/charges-sociales`, `/outils/assurances`) — admin
 
@@ -911,6 +948,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-consulting.sql` | `heures.contact_id` : une heure peut viser un client au lieu d'un projet | en fin de fichier |
 | `schema-transport-reglages.sql` | réglages `transport` (véhicules, forfaits) et `couts_vehicules` (admin) | en fin de fichier |
 | `schema-presentations.sql` | table `presentations` (support client envoyé avec l'offre) | en fin de fichier |
+| `schema-annuaire.sql` | tables `annuaire`, `annuaire_categories`, `annuaire_liens` | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

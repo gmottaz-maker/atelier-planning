@@ -30,6 +30,12 @@ const OUTILS = [
     admin: true,
   },
   {
+    href: '/outils/annuaire',
+    nom: 'Annuaire',
+    resume: 'Qui fait quoi, et où l’on commande : tôlerie, thermolaquage, fraises de CNC, filtres du mur aspirant. Rangé par technique, jamais par région — et une entrée peut n’être qu’un nom et un site.',
+    etat: 'atelier',
+  },
+  {
     href: '/outils/marge-km',
     nom: 'Marge au kilomètre',
     resume: 'Un trajet gagne-t-il de l’argent ? Le kilomètre et le forfait doivent payer le véhicule et le temps de chaque personne à bord. Essaie un tarif, un salaire ou des km par an sans toucher aux réglages.',
