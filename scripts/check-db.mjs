@@ -169,6 +169,24 @@ const CONTROLES = [
     sonde: async () => !(await sb.from('presentations')
       .select('id, project_id, contenu, consignes, fichiers, kdrive_id, envoyee_le').limit(1)).error,
   },
+  {
+    // Les quatre tables vont ensemble : sans le journal des commandes, basculer
+    // un article en 🔵 répondrait 500 au moment précis où l'on commande.
+    // `jeton` et `etat` sont sondés nommément : ce sont eux que la vue rapide
+    // scannée au téléphone exige, et un ALTER oublié ne se verrait qu'à
+    // l'atelier, un téléphone à la main.
+    nom: 'économat : articles, catégories, fournisseurs et commandes',
+    migration: 'schema-economat.sql',
+    sonde: async () => {
+      if ((await sb.from('economat_categories').select('id, nom, parent_id, couleur').limit(1)).error) return false
+      if ((await sb.from('economat_fournisseurs').select('id, nom, annuaire_id, archived').limit(1)).error) return false
+      if ((await sb.from('economat_articles')
+        .select('id, code, jeton, designation, categorie_id, fournisseur_id, etat, etat_le, delai_jours')
+        .limit(1)).error) return false
+      return !(await sb.from('economat_commandes')
+        .select('id, article_id, commande_le, recu_le, par, quantite').limit(1)).error
+    },
+  },
 ]
 
 let manquants = 0

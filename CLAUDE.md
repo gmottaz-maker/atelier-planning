@@ -33,12 +33,15 @@ pages/
   planning.js          — Planning d'atelier
   meeting.js           — Vue réunion
   activity.js          — Journal d'activité
+  e/[jeton].js         — Vue rapide d'un article d'économat, après scan du QR de sa
+                         carte (sans chrome, connexion exigée — section dédiée)
   display.js           — Affichage mural (route publique, sans chrome ; lit
                          /api/display-projects, DTO réduit — voir Sécurité)
   settings.js          — Paramètres utilisateur
   outils/index.js      — Index des outils d'atelier
   outils/peintures.js  — Peintures RUCO : sélecteur + chiffrage (section dédiée)
   outils/annuaire.js   — Annuaire : qui fait quoi, où l'on commande (section dédiée)
+  outils/economat.js   — Économat : les consommables de l'atelier (section dédiée)
   outils/charges-sociales.js — (admin) Ce qu'un employé coûte : AVS/AC/AF, LAA, LPP
   outils/assurances.js — (admin) Ce qu'on a choisi d'assurer, et ce qui est couvert
   outils/marge-km.js   — (admin) Marge au km : un trajet gagne-t-il de l'argent ?
@@ -78,6 +81,7 @@ pages/
     send-document.js   — Envoi d'une offre ou facture par e-mail (Resend)
     prospects/         — Prospection : fiche, personnes, journal, conversion
     heures/            — Heures imputées : liste, création, correction, export (admin)
+    economat/          — Économat : catalogue, états, fiche scannée, cartes PDF
     activites.js       — Activités d'imputation : lecture pour tous, écriture admin
     accounts.js, catalog.js, contacts.js, email-templates.js, work-*.js, …
 
@@ -109,6 +113,8 @@ lib/
   paintPrices.js         — Tarif RUCO d'atelier (20 produits, prix facturés)
   paintCalc.js           — Chiffrage peinture : quantités, coût matière, temps
   annuaire.js            — Annuaire : validation, arbre par technique, recherche
+  economat.js            — Économat : états, lien fournisseur, arbre, filtres, planches
+  economatCarte.js       — La carte A6 et la planche A4 PAYSAGE (quatre par feuille)
   assurances.js · assurancesCalc.js — Contrats, couvertures, coût par personne
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
@@ -132,6 +138,8 @@ lib/
   joursOuvres.js         — Décompte de l'écran d'atelier en jours travaillés (lun, mar, jeu, ven)
   modelesClaude.js       — Identifiants des modèles Claude, en un seul endroit
   aujourdhui.js          — Date du jour en YYYY-MM-DD (source unique, voir plus bas)
+  suiteConnexion.js      — Où renvoyer après connexion (`?suite=`) ; refuse tout ce
+                           qui sortirait de Maze — redirection ouverte
   todoist.js · googleCalendar.js · push-server.js · adminFetch.js
 
 tests/                   — Vitest (npm test) : calculs, parsing, nommage, autorisations
@@ -393,6 +401,143 @@ dans sa fiche. Accents et casse ignorés, et TOUS les mots exigés.
 pouvoir l'inscrire sans demander à l'admin. Supprimer une catégorie emporte ses
 sous-catégories et les rattachements, jamais les entrées — elles se retrouvent
 sans catégorie, pas à la corbeille.
+
+### Économat (`/outils/economat`, `/e/<jeton>`)
+
+Les consommables de l'atelier : vis, abrasifs, adhésifs, EPI, filtres. Ce
+n'est **pas une gestion de stock**. Aucune quantité n'est décrémentée, aucun
+seuil n'est comparé à rien, et Maze ne décide jamais d'un état — c'est un
+humain devant une boîte qui bascule 🟢 → 🟠 → 🔴 → 🔵 → 🟢. Le **Kanban
+physique reste l'outil** ; Maze centralise les références, dit ce qu'il y a à
+commander, garde l'historique et imprime les cartes.
+
+**Toutes les transitions sont libres.** Le `CHECK` porte sur la VALEUR de
+`etat`, jamais sur le chemin : 🟠 → 🔵 est une commande anticipée, un retour
+en arrière est une correction. Il n'y a pas d'état « Reçu » — à réception,
+l'article repasse en 🟢 et la ligne de commande se ferme toute seule
+(`recu_le`). Les états sont des clés courtes (`ok`, `bas`, `commander`,
+`commande`) : **jamais d'emoji en base**, ça ne se cherche pas, ne se trie pas
+et casse le premier export.
+
+**Tous les seuils sont du TEXTE.** « Si inférieur à 100pce », « ½ rouleau »,
+« ~20 % restant », « dernier paquet ». Un seuil numérique inviterait à
+comparer, donc à automatiser — et l'automatisation ment dès la première boîte
+à moitié vide. Seul `delai_jours`, facultatif, est un nombre : il ne sert
+qu'à signaler un 🔵 qui traîne, et sans lui on ne signale RIEN plutôt que
+d'inventer un délai par défaut.
+
+**Un seul geste écrit l'état** (`/api/economat/etat`), parce qu'il ouvre et
+ferme aussi le journal des commandes. Laisser le PUT du catalogue écrire
+`etat` en passant produirait des états sans historique, découverts le jour où
+l'on cherche « on l'a commandé quand, déjà ? ». Le journal **recopie**
+fournisseur, référence et quantité : même raison que le forfait transport qui
+fige sa distance — changer de fournisseur ne doit pas réécrire le passé.
+
+**Une seule clé vers la catégorie**, qui pointe la sous-catégorie ou la
+racine, et `ON DELETE SET NULL` — à l'inverse du catalogue, qui casse en
+cascade. Ranger la taxonomie ne doit jamais effacer un article : c'est un
+objet physique dans une boîte, il se retrouve « sans catégorie », pas à la
+corbeille. La **couleur ne vit qu'au premier niveau**, la sous-catégorie
+hérite : cinquante teintes seraient cinquante teintes indiscernables sur le
+bandeau d'une carte, et ce bandeau ne répond qu'à « ça se range où ». Les
+douze catégories et leurs quarante-trois filles sont **semées par la
+migration**, jamais codées en dur.
+
+**Le fournisseur est une liste contrôlée** (`economat_fournisseurs`), pas du
+texte libre sur l'article. C'est un FILTRE métier — « montre-moi ce qui est 🟠
+et 🔴 chez OPO pendant leur promo » — et une colonne libre produit « OPO »,
+« opo » et « OPO Oeschger » côte à côte au bout de six mois ; c'est exactement
+la divergence de vocabulaire qui avait rendu les factures clientes
+irrapprochables. Un fournisseur s'ajoute depuis la fiche article, sans détour
+par un écran d'administration. Il s'ARCHIVE, ne se supprime pas, et le filtre
+continue de proposer un archivé encore utilisé — sinon les articles qu'on lui
+achète disparaîtraient avec lui. `annuaire_id` est nullable et sans usage en
+V1 : l'annuaire ne porte aucun de ces quatre fournisseurs, et exiger une fiche
+d'annuaire avant de commander des vis serait absurde. **Le journal des
+commandes recopie le NOM**, pas la clé : une ligne d'historique doit rester
+lisible si le fournisseur est renommé — c'est une photographie, pas une
+jointure.
+
+**L'emplacement reste du texte libre en V1**, parce que la nomenclature
+physique de l'atelier n'existe pas encore : imposer une liste avant d'avoir
+posé les étiquettes sur les rayonnages garantirait des « divers » partout. Le
+passage en liste contrôlée se fera comme pour les fournisseurs — une table,
+une colonne `emplacement_id`, un script qui reprend les valeurs distinctes —
+sans toucher au reste du module.
+
+**Le bouton « Commander » se fabrique depuis la référence chez OPO.**
+Vérifié en direct : `https://www.opo.ch/fr/s?searchfield=<référence>`
+redirige sur la fiche produit. Les 64 articles OPO n'ont donc aucune URL à
+saisir, et une référence fausse tombe sur « 0 résultats » — ce qui en fait
+aussi le vérificateur des références. OPO n'offre ni API, ni punchout OCI,
+ni flux catalogue publics : mettre au panier depuis Maze serait du scraping
+authentifié, et c'est hors périmètre — l'import CSV d'une liste de commande
+est à leur demander, mais ne bloque pas la V1. **L'URL saisie à la main gagne
+toujours** sur le lien déduit : une décision humaine passe avant une
+déduction, et c'est la soupape le jour où la structure d'opo.ch bouge ou
+qu'une fiche ne sort pas de leur recherche.
+
+**Le QR mène à `/e/<jeton>`, et l'adresse est courte exprès.** Elle est
+encodée dans un QR imprimé à 20 mm : `/outils/economat/article/<jeton>` ferait
+soixante-dix signes et obligerait à grossir le QR sur une carte déjà chargée.
+C'est un **jeton**, pas l'id — un QR sur `/e/42` s'énumère depuis le parking.
+La page **exige une session** comme toutes les autres : Maze n'a qu'une route
+publique (`display-projects`), et `tests/rbac.test.js` est construit pour
+rendre l'ajout d'une seconde délibéré. Si l'authentification se révèle trop
+pénible à l'usage, le repli décidé est lecture publique / écriture connectée —
+pas d'écriture publique. `_app.js` garde donc la destination
+(`/login?suite=…`, chemin interne seulement) : sans ça, un scan atterrissait
+sur l'accueil et il fallait rescanner, le téléphone déjà à la main. Ouvrir
+« Commander » ne change pas l'état — on consulte souvent une fiche sans rien
+commander.
+
+**La planche de cartes est un A4 PAYSAGE.** A6 paysage = 148 × 105 mm ;
+2 × 148,5 = 297 et 2 × 105 = 210. Quatre cartes tombent pile sur un A4 couché,
+et sur aucun A4 debout. Repères de coupe en traits courts aux bords, pas un
+cadre : une coupe de travers laisse alors du blanc, pas un demi-cadre. L'état
+courant et le stock cible ne sont **pas imprimés** — ils changent, la carte
+non. `depart` laisse des cases vides en tête de planche pour réimprimer une
+carte perdue sans gâcher une feuille. `/api/economat/cartes` doit rester dans
+`outputFileTracingIncludes` avec Chromium ET `public/fonts`, et se rend en
+`attendre: 'load'` : les photos sont des URL distantes, et une carte sans sa
+photo s'imprimerait sans erreur — le défaut ne se verrait qu'au massicot.
+
+**Les photos vont dans un bucket PUBLIC** (`economat-photos`), pas sur kDrive.
+La même image doit s'afficher dans une page ouverte au téléphone après un scan
+ET dans un PDF rendu par Chromium, qui n'a aucun jeton kDrive — c'est ce qui a
+obligé la présentation client à tout passer en base64. Contrepartie assumée :
+qui possède l'URL voit la photo d'une boîte de vis ; le chemin est aléatoire,
+jamais devinable depuis le code article. Le navigateur réduit à 1200 px avant
+l'envoi (le corps d'une requête est plafonné à 4,5 Mo sur Vercel, tous plans
+confondus). La photo s'ajoute depuis la FICHE ARTICLE, jamais depuis la vue
+scannée : celle-ci est réservée aux gestes rapides, et prendre une photo y
+ajouterait une seconde action là où le budget est « scan + une ».
+
+**Le code ECO-0001 est définitif**, attribué par une séquence Postgres comme
+`projects.numero`, jamais réattribué — même règle que le code d'une activité :
+une carte imprimée aujourd'hui doit vouloir dire la même chose dans deux ans.
+Un article se RANGE (`archived`), il ne se jette pas ; la suppression
+définitive est réservée à l'admin et emporte le journal des commandes.
+
+**L'import des 84 articles est un script, pas un écran**
+(`scripts/import-economat.mjs <csv> [--ecrire]`). Une seule fois, sur
+quatre-vingts lignes, avec un arbitrage humain sur une vingtaine : un import
+générique coûterait plus cher que la donnée. Sans `--ecrire` il ne produit
+qu'un **rapport**, parce que le brief prévient que « des désignations ou
+photos proches ne signifient pas nécessairement qu'il s'agit de doublons ».
+Les colonnes d'audit du classeur (`A_completer`, `Controle_reference`,
+`Doublon_reference`, `Source_Numbers`…) ne deviennent pas des colonnes : elles
+alimentent ce rapport et s'arrêtent là. Quatre vrais doublons sont fusionnés ; trois
+lignes de colliers partagent une référence pour des dimensions différentes et
+**ne sont PAS importées** — deux produits différents ne peuvent pas porter la
+même référence puisque la référence fait foi, et les importer en se promettant
+de corriger plus tard, c'est imprimer deux cartes qui mènent au même produit
+et découvrir l'erreur une boîte à la main. Elles restent dans le fichier de
+préparation et reviennent au prochain passage. Un fournisseur absent de la
+liste contrôlée est créé, mais ANNONCÉ : c'est plus souvent une coquille
+qu'une nouvelle maison. Rejouer le
+script met à jour sans dupliquer et **ne touche ni `etat`, ni `jeton`, ni
+l'historique** — un rejeu ne doit pas remettre tout le stock au vert.
 
 ### Charges sociales et Assurances (`/outils/charges-sociales`, `/outils/assurances`) — admin
 
@@ -736,6 +881,14 @@ serveur a un token très privilégié. Soit le fichier est référencé en base 
 navigation ne part que de la racine du projet. Les pièces comptables sont
 réservées à l'admin, les frais à leur auteur.
 
+**La destination gardée pendant la connexion ne peut pas sortir de Maze.**
+`_app.js` renvoie sur `/login?suite=<chemin>` pour qu'un QR d'économat scanné
+à l'atelier ne perde pas sa page — mais `lib/suiteConnexion.js` n'y laisse
+passer qu'un chemin interne. `//evil.ch` est une URL ABSOLUE pour le
+navigateur, pas un chemin : c'est exactement ce qu'un `startsWith('/')`
+laisserait passer, et une redirection ouverte après une VRAIE connexion depuis
+un VRAI lien Maze est la forme classique du hameçonnage.
+
 **L'admin se reconnaît à son RÔLE** (`profiles.role`), jamais à son nom ni à
 son e-mail. `isAdminUser` côté serveur, `useIsAdmin` côté client. Renommer un
 profil ne doit pas changer ses droits.
@@ -966,6 +1119,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-presentations.sql` | table `presentations` (support client envoyé avec l'offre) | en fin de fichier |
 | `schema-annuaire.sql` | tables `annuaire`, `annuaire_categories`, `annuaire_liens` | en fin de fichier |
 | `schema-invoice-reference.sql` | `customer_invoices.reference` (réf. propre à la facture) | en fin de fichier |
+| `schema-economat.sql` | tables `economat_categories`, `economat_fournisseurs`, `economat_articles`, `economat_commandes` + arbre, couleurs et fournisseurs de départ | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

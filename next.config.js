@@ -56,6 +56,12 @@ const nextConfig = {
       './node_modules/@sparticuz/chromium/bin/**',
       './public/fonts/**',
     ],
+    // Les cartes Kanban de l'économat, pour la même raison : une carte en
+    // Helvetica n'est pas une carte de la maison, et rien ne le signalerait.
+    '/api/economat/cartes': [
+      './node_modules/@sparticuz/chromium/bin/**',
+      './public/fonts/**',
+    ],
   },
 }
 

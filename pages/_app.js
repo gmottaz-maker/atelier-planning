@@ -11,6 +11,7 @@ import { swrConfig, purgeCachePersistant } from '../lib/swr'
 import { signalerErreur, ApiError } from '../lib/api'
 import ApiErrorBanner from '../components/ApiErrorBanner'
 import { AL, C, FONT, R } from '../lib/theme'
+import { suiteAMemoriser, cheminApresConnexion } from '../lib/suiteConnexion'
 import { amazingLogo } from '../lib/amazingLogo'
 
 // ─── Auth context ───────────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ export const AuthContext = createContext(null)
 export function useAuth() { return useContext(AuthContext) }
 
 const PUBLIC_ROUTES = ['/login', '/display']
-const NO_CHROME_ROUTES = ['/login', '/display', '/projects/[id]/devis']
+const NO_CHROME_ROUTES = ['/login', '/display', '/projects/[id]/devis', '/e/[jeton]']
 
 // ─── Auth des appels API ─────────────────────────────────────────────────────
 // Toutes les routes /api/* vérifient désormais le JWT Supabase côté serveur.
@@ -176,11 +177,16 @@ export default function App({ Component, pageProps }) {
     if (!authReady) return
     const isPublic = PUBLIC_ROUTES.includes(router.pathname)
     if (!user && !isPublic) {
-      router.replace('/login')
+      // On garde la destination. Un QR d'économat scanné à l'atelier envoie
+      // sur /e/<jeton> : sans ça, la connexion atterrissait sur l'accueil et
+      // il fallait rescanner la carte, le téléphone déjà à la main.
+      // `lib/suiteConnexion.js` filtre ce qui sortirait de Maze.
+      const suite = suiteAMemoriser(router.asPath)
+      router.replace(suite ? `/login?suite=${encodeURIComponent(suite)}` : '/login')
     } else if (user && router.pathname === '/login') {
-      router.replace('/')
+      router.replace(cheminApresConnexion(router.query.suite))
     }
-  }, [user, authReady, router.pathname])
+  }, [user, authReady, router.pathname, router.asPath, router.query.suite])
 
   // ─── Écran d'attente ─────────────────────────────────────────────────────
   //

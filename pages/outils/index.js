@@ -36,6 +36,12 @@ const OUTILS = [
     etat: 'atelier',
   },
   {
+    href: '/outils/economat',
+    nom: 'Économat',
+    resume: 'Les consommables de l’atelier : ce qu’il y a à commander, chez qui, et avec quelle référence. Le Kanban physique reste l’outil — Maze centralise le catalogue, garde l’historique et imprime les cartes.',
+    etat: 'atelier',
+  },
+  {
     href: '/outils/marge-km',
     nom: 'Marge au kilomètre',
     resume: 'Un trajet gagne-t-il de l’argent ? Le kilomètre et le forfait doivent payer le véhicule et le temps de chaque personne à bord. Essaie un tarif, un salaire ou des km par an sans toucher aux réglages.',
