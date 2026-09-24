@@ -1,18 +1,18 @@
 {
+  "id": "/",
   "name": "Maze Project",
-  "short_name": "Maze Project",
-  "description": "Gestionnaire de projets et tâches — Amazing Lab",
-  "start_url": "/tasks",
+  "short_name": "Maze",
+  "description": "Projets, heures et frais — Amazing Lab",
+  "lang": "fr-CH",
+  "scope": "/",
+  "start_url": "/home",
   "display": "standalone",
-  "background_color": "#fafafa",
-  "theme_color": "#111827",
   "orientation": "portrait",
+  "background_color": "#0C0C0C",
+  "theme_color": "#0C0C0C",
   "icons": [
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

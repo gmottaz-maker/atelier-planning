@@ -146,6 +146,7 @@ tests/                   — Vitest (npm test) : calculs, parsing, nommage, auto
 scripts/                 — Scripts ponctuels et contrôles :
                            check-secrets.mjs (CI), check-db.mjs (état des migrations)
 *.sql                    — Migrations, à exécuter dans l'éditeur SQL Supabase
+public/icons/            — Icônes de l'app installée, produites par scripts/icones-pwa.mjs
 public/ruco/             — Données du sélecteur de peintures (voir section dédiée)
 ```
 
@@ -596,6 +597,50 @@ individuel — il écrête chaque salaire — mais le taux s'applique ensuite à
 masse, comme sur la facture.
 
 ---
+
+## Sur iPhone — l'application installée
+
+Maze s'installe sur l'écran d'accueil (PWA). Pas de Capacitor : `ios/` reste
+échafaudé mais `capacitor.config.json` pointe `server.url` sur la production,
+donc l'app native chargerait EXACTEMENT le même site dans un WebView. On
+paierait les certificats et une resoumission TestFlight tous les 90 jours pour
+afficher ce qu'un raccourci d'écran d'accueil affiche déjà. À deux, ça ne vaut
+pas le prix — et sur iOS 16.4+, les notifications push marchent depuis une PWA
+installée. L'échafaudage reste en place pour le jour où l'équipe grandit.
+
+**L'icône vient du LOGO, pas d'un fichier déposé à la main.**
+`node scripts/icones-pwa.mjs` la produit depuis `lib/amazingLogo.js`, celui de
+l'écran de chargement. Il y avait trois dessins pour la même marque — le vrai
+logo, plus un « atome » inventé au rose de juillet dans `icon.svg` ET dans
+`favicon.svg`. Trois façons de diverger.
+
+Trois contraintes d'iOS qu'aucun outil ne rappelle, et qui expliquent le
+script :
+
+1. **`apple-touch-icon` doit être un PNG.** iOS ne lit pas le SVG et fabrique à
+   la place une capture de la page — c'est ce qui se passait, et l'icône sur
+   l'écran d'accueil n'était donc pas la bonne.
+2. **La transparence devient noire.** Le fond est peint, et il l'est avec le
+   noir de la marque.
+3. **iOS arrondit les angles lui-même.** Un rayon dessiné dans l'image
+   donnerait un double arrondi.
+
+**Le noir du manifeste est celui de l'écran de chargement** (`#0C0C0C`).
+L'écran de lancement d'iOS et le nôtre s'enchaînent alors sans clignotement
+blanc entre les deux. `background_color` et `theme_color` étaient restés à la
+palette de juillet (`#fafafa` / `#111827`).
+
+**`apple-mobile-web-app-status-bar-style` reste à `default`.** `black-translucent`
+ferait passer le contenu SOUS l'heure et la batterie : il faudrait alors une
+marge haute en `env(safe-area-inset-top)` sur chaque page, et seule la marge
+BASSE est gérée aujourd'hui (`_app.js`, pour la barre de navigation).
+
+**Le service worker ne fait QUE les notifications.** Il n'y a aucun cache : une
+constante `CACHE_NAME` y traînait sans usage, et le commentaire promettait un
+« cache PWA » qui n'a jamais existé. Le hors-ligne demande de décider quoi
+servir périmé — et une offre périmée est pire que pas d'offre. Son icône de
+notification pointait sur `/icon-192.png`, à la racine : ce fichier n'a jamais
+existé, les push s'affichaient sans icône depuis toujours.
 
 ## Prospection (`/prospects`)
 

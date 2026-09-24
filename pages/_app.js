@@ -260,7 +260,14 @@ export default function App({ Component, pageProps }) {
         <meta name="apple-mobile-web-app-title" content="Maze Project" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" href="/favicon.svg" sizes="any" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
+        {/* PNG, et non SVG : iOS ne sait pas lire un SVG pour l'icône d'écran
+            d'accueil — il fabriquait à la place une capture de la page. Les
+            fichiers sont produits par `node scripts/icones-pwa.mjs` depuis le
+            logo de la maison, celui de l'écran de chargement. */}
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+        {/* Le noir de la marque, celui de l'écran de chargement et du manifeste :
+            l'écran de lancement d'iOS et le nôtre s'enchaînent alors sans
+            clignotement blanc entre les deux. */}
         <meta name="theme-color" content={AL.black} />
       </Head>
       {showChrome ? (
