@@ -24,17 +24,22 @@ export default function PillsFiltre({ options = [], valeur, onChange, cleTout = 
         return (
           <button
             key={o.key}
+            className="u-pastille"
             onClick={() => onChange(actif && o.key !== cleTout ? cleTout : o.key)}
             style={{
               fontFamily: FONT, fontSize: 12.5, fontWeight: actif ? 500 : 400,
               padding: '6px 14px', borderRadius: R.pill, cursor: 'pointer',
+              // `gap` et non l'espace du texte : en inline-flex, le nœud
+              // d'espacement entre le libellé et le compte est écrasé, et on
+              // lisait « tous29 ».
+              display: 'inline-flex', alignItems: 'center', gap: 5,
               border: `1px solid ${actif ? C.outline : C.border}`,
               background: actif ? AL.black : C.surface,
               color: actif ? AL.white : C.muted,
             }}
           >
             {o.label}
-            {o.n != null && <span style={{ fontFamily: MONO, fontSize: 11 }}> {o.n}</span>}
+            {o.n != null && <span style={{ fontFamily: MONO, fontSize: 11 }}>{o.n}</span>}
           </button>
         )
       })}

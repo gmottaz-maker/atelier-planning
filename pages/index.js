@@ -11,6 +11,7 @@ import BillingContactSelect from '../components/BillingContactSelect'
 import { formatDuree } from '../lib/heures'
 import { PROJECT_PHASES, phaseMeta, isOngoing } from '../lib/projectPhase'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
+import useIsMobile from '../lib/useIsMobile'
 import { statutProjet, joursRestants } from '../lib/projectStatus'
 import ButtonPill from '../components/ButtonPill'
 import PillsFiltre from '../components/PillsFiltre'
@@ -273,7 +274,9 @@ function ProjectActionsMenu({ items = [] }) {
   const [open, setOpen] = useState(false)
   return (
     <div style={{ position: 'relative', flex: 'none' }}>
-      <button onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }} aria-label="Actions"
+      {/* 28 px dessinés, 44 px tactiles au doigt : cf. `u-tactile`. Le menu vit
+          dans le coin d'une carte, là où le pouce vise le moins bien. */}
+      <button onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }} aria-label="Actions" className="u-tactile"
         style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
           borderRadius: R.pill, border: 'none', background: open ? C.hover : 'transparent',
           color: open ? AL.black : C.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1,
@@ -308,6 +311,7 @@ function ProjectActionsMenu({ items = [] }) {
 // ─── Vue Gantt (frise temporelle par échéance) ──────────────────────────────
 
 function GanttView({ projects }) {
+  const mobile = useIsMobile()
   const DAY = 86400000
   const today = new Date(); today.setHours(0, 0, 0, 0)
 
@@ -350,7 +354,10 @@ function GanttView({ projects }) {
   }
 
   const PX_PER_DAY = 5
-  const LABEL_W    = 200
+  // 200 px de libellés sur un écran de 375, c'est 58 % de la largeur laissée
+  // aux noms et 141 px à la frise. Au doigt, on rogne sur le nom — il est
+  // tronqué de toute façon — pour garder de quoi lire les barres.
+  const LABEL_W    = mobile ? 132 : 200
   const trackWidth = offset * PX_PER_DAY
   const x = (ms) => Math.max(0, Math.min(trackWidth, ((ms - rangeStart.getTime()) / DAY) * PX_PER_DAY))
   const todayX = x(today.getTime())
@@ -367,9 +374,10 @@ function GanttView({ projects }) {
           {/* Ligne "aujourd'hui" */}
           <div style={{ position: 'absolute', top: 0, bottom: 0, left: LABEL_W + todayX, width: 1.5, background: C.danger, zIndex: 5 }} />
 
-          {/* En-tête des mois */}
+          {/* En-tête des mois. Le cale-libellé est COLLANT lui aussi, sinon les
+              mois glisseraient sous la colonne des noms en défilant. */}
           <div className="flex border-b u-line" style={{ position: 'relative', zIndex: 1 }}>
-            <div className="flex-shrink-0" style={{ width: LABEL_W }} />
+            <div className="flex-shrink-0" style={{ width: LABEL_W, position: 'sticky', left: 0, zIndex: 6, background: C.surface }} />
             {months.map(m => (
               <div key={m.key} className="u-muted uppercase tracking-wide"
                 style={{ width: m.days * PX_PER_DAY, fontSize: 10.5, fontWeight: 600, padding: '8px 6px', flexShrink: 0 }}>
@@ -390,7 +398,12 @@ function GanttView({ projects }) {
               const d = getDaysRemaining(p.deadline)
               return (
                 <div key={p.id} className="flex items-center border-b u-line hover:u-fill/50 transition-colors" style={{ height: 46 }}>
-                  <Link href={`/projects/${p.id}`} className="flex-shrink-0 px-4 min-w-0" style={{ width: LABEL_W }}>
+                  {/* COLLANTE : la frise fait 1425 px, elle défile donc sur un
+                      téléphone comme sur un portable. Sans ça, on voyait des
+                      barres et des dates sans savoir à quel projet elles
+                      appartenaient — le nom partait à -567 px. */}
+                  <Link href={`/projects/${p.id}`} className="flex-shrink-0 px-4 min-w-0"
+                    style={{ width: LABEL_W, position: 'sticky', left: 0, zIndex: 6, background: C.surface }}>
                     <div className="font-medium u-ink truncate" style={{ fontSize: 13 }}><Numero project={p} />{p.name}</div>
                     <div className="u-muted truncate" style={{ fontSize: 11 }}>{p.client}</div>
                   </Link>
@@ -1165,12 +1178,18 @@ export default function Admin() {
     const progress   = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
 
     return (
+      // `flexWrap` plutôt qu'une seconde mise en page pour le téléphone : sur
+      // un écran large tout tient sur une ligne, exactement comme avant ; sur
+      // 375 px, le nom prend la première ligne et le statut, l'avancement et le
+      // menu passent à la seconde. Sans ça, le badge, les 120 px d'avancement
+      // et le menu laissaient DIX-NEUF pixels au nom du projet, qui
+      // disparaissait tandis que le client se cassait mot par mot.
       <div key={project.id}
         style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 4px',
-          borderTop: `1px solid ${C.border}`, fontFamily: FONT }}>
+          flexWrap: 'wrap', borderTop: `1px solid ${C.border}`, fontFamily: FONT }}>
 
         <Link href={`/projects/${project.id}`}
-          style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textDecoration: 'none' }}>
+          style={{ flex: '1 1 220px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textDecoration: 'none' }}>
           <span style={{ fontSize: 20, fontWeight: 500, color: AL.black, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             <Numero project={project} />{project.name}
           </span>
@@ -1181,7 +1200,7 @@ export default function Admin() {
 
         <div style={{ flex: 'none' }}><BadgeStatut project={project} /></div>
 
-        <div style={{ width: 120, flex: 'none', display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
+        <div style={{ width: 120, flex: 'none', marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: totalCount === 0 ? C.muted : AL.black }}>
             {totalCount === 0 ? '—' : `${progress}%`}
           </span>
@@ -1207,7 +1226,22 @@ export default function Admin() {
           input:focus, select:focus, textarea:focus { border-color: ${C.faintBorder} !important; box-shadow: 0 0 0 3px rgba(224,80,110,0.08) !important; }
           * { -webkit-tap-highlight-color: transparent; }
           button, a { touch-action: manipulation; }
-          @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
+          @media (max-width: 768px) {
+            input, select, textarea { font-size: 16px !important; }
+            /* 40 px de marge de chaque côté sur un écran de 375, c'est 21 % de
+               la largeur donnée au vide. */
+            .proj-main  { padding: 24px 16px 104px !important; }
+            /* Trois panneaux de 98 px : « 50 % » en corps 40 débordait. On
+               garde les trois de front — le rythme fait partie de l'écran —
+               mais à la taille de l'endroit. */
+            .proj-stats { gap: 8px !important; margin-bottom: 36px !important; }
+            .proj-stats > div   { padding: 14px 12px !important; }
+            .proj-stats .chiffre { font-size: 26px !important; }
+            .proj-stats .legende { font-size: 11px !important; line-height: 1.25 !important; }
+            /* Les lignes passent à deux niveaux au doigt : trois en-têtes de
+               colonne qui ne surmontent plus rien désignent de travers. */
+            .proj-entetes { display: none !important; }
+          }
           .pac-container { z-index: 99999 !important; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
         `}</style>
       </Head>
@@ -1220,7 +1254,7 @@ export default function Admin() {
         </div>
       )}
 
-      <main className="w-full" style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <main className="w-full proj-main" style={{ padding: '32px 40px 104px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
         {/* Formulaire Add/Edit — en SURCOUCHE, pas en tête de page.
             Inséré dans le flux, il repoussait la liste des projets vers le bas :
@@ -1385,15 +1419,15 @@ export default function Admin() {
               l'inversion de fond, pas d'une ombre : il n'y en a aucune.
               Les trois chiffres sont DÉRIVÉS de la liste déjà chargée, pas
               d'un nouvel endpoint. */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 64 }}>
+          <div className="proj-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 64 }}>
             {[
               { valeur: activeProjects.length, label: 'projets actifs' },
               { valeur: stats.echeanceProche,  label: 'échéance sous 7 jours' },
               { valeur: `${stats.avancementMoyen}%`, label: 'avancement moyen' },
             ].map(s => (
               <div key={s.label} style={{ background: AL.black, borderRadius: R.panel, padding: 24, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 40, fontWeight: 500, lineHeight: 1, color: AL.white }}>{s.valeur}</span>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>{s.label}</span>
+                <span className="chiffre" style={{ fontSize: 40, fontWeight: 500, lineHeight: 1, color: AL.white }}>{s.valeur}</span>
+                <span className="legende" style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>{s.label}</span>
               </div>
             ))}
           </div>
@@ -1523,7 +1557,7 @@ export default function Admin() {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {/* En-tête de colonnes. Capitales assumées : le handoff excepte
                   explicitement les en-têtes de la règle des minuscules. */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0 4px 12px',
+              <div className="proj-entetes" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0 4px 12px',
                 fontSize: 11, fontWeight: 500, letterSpacing: '.08em', textTransform: 'uppercase', color: C.muted }}>
                 <span style={{ flex: 1 }}>projet</span>
                 <span style={{ flex: 'none' }}>statut</span>

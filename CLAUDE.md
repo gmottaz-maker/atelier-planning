@@ -23,6 +23,8 @@ Les pages marquées **(admin)** sont réservées à Guillaume : elles font
 ```
 pages/
   _app.js              — Auth Supabase, contexte global (useAuth), injection du JWT dans fetch
+  _document.js         — Squelette HTML : `lang="fr"` et les balises PWA, rendues par le
+                         SERVEUR quel que soit l'état de la session (voir « Sur iPhone »)
   login.js             — Connexion
   index.js             — Projets : cartes / kanban / gantt / liste (page principale)
   home.js              — Dashboard accueil + Google Agenda
@@ -634,6 +636,69 @@ palette de juillet (`#fafafa` / `#111827`).
 ferait passer le contenu SOUS l'heure et la batterie : il faudrait alors une
 marge haute en `env(safe-area-inset-top)` sur chaque page, et seule la marge
 BASSE est gérée aujourd'hui (`_app.js`, pour la barre de navigation).
+
+**Les balises PWA sont rendues par le SERVEUR** (`pages/_document.js`). Elles
+vivaient dans le `<Head>` de `_app.js`, placé APRÈS deux sorties anticipées —
+l'écran de chargement tant que l'authentification n'a pas répondu, et le
+`return null` d'une page protégée sans session. Au rendu serveur, `authReady`
+vaut toujours false : le HTML servi ne contenait donc ni manifeste, ni
+apple-touch-icon, ni `viewport-fit=cover`, seulement le viewport par défaut de
+Next. Tout n'apparaissait qu'après hydratation. Le VIEWPORT, lui, reste dans
+`_app.js` via `next/head` et est rendu dans les TROIS branches : Next en
+injecte un par défaut dès qu'il n'en trouve pas là, et on se retrouvait sinon
+avec deux balises viewport.
+
+`lang="fr"` ne peut être posé QUE depuis `_document` — React ne touche pas aux
+attributs de `<html>`. Il manquait : un lecteur d'écran lisait une interface
+française avec une voix anglaise.
+
+**La barre du bas est le SEUL accès sur mobile**, la sidebar ne s'affiche
+qu'au-delà de 768 px. Elle portait sept entrées et rien d'autre : tout ce qui
+n'y figurait pas était injoignable depuis un téléphone — heures, activité,
+outils (donc l'économat et l'annuaire), contacts, catalogue, stockage, offres,
+factures, banque, compta. Dix-huit pages. Elle porte maintenant QUATRE entrées
+(accueil, projets, tâches, horaires) et un « plus » qui ouvre la MÊME liste que
+la sidebar, **importée d'elle** (`MAIN_ITEMS`, `FIN_TOP`, `FIN_GROUPS`) et non
+recopiée : deux listes de navigation divergent au premier ajout, et c'est
+exactement comme ça que l'économat est né sans entrée mobile.
+
+**`u-tactile` agrandit la ZONE sans agrandir le DESSIN** (`globals.css`). Un
+pseudo-élément centré de 44 px capte le doigt ; l'élément garde sa taille et la
+mise en page ne bouge pas. C'est la seule façon d'élargir une pastille de 17 px
+sans refaire la ligne autour. Réservé au pointeur GROSSIER : à la souris, deux
+zones de 44 px côte à côte se chevaucheraient et le clic partirait au mauvais
+bouton. `u-pastille` grandit pour de vrai, là où la place existe.
+
+**Une ligne qui ne tient pas PASSE À LA LIGNE, elle ne s'écrase pas.** La
+liste des projets était une rangée fixe : badge, 120 px d'avancement, menu et
+trois gouttières de 16 px faisaient 276 px de contenu fixe, et `main` gardait
+40 px de marge de chaque côté. Sur 375 px, il restait DIX-NEUF pixels au nom du
+projet — il disparaissait, le numéro se coupait en « 1. » et le client se
+cassait mot par mot. Corrigé par un `flexWrap` et une base de 220 px sur le
+nom : sur un écran large tout tient sur une ligne, exactement comme avant ;
+au doigt, le nom prend la première ligne et le reste la seconde. Pas de seconde
+mise en page à maintenir — c'est la règle à suivre pour les autres écrans.
+
+**La colonne des libellés du gantt est COLLANTE** (`position: sticky`). La
+frise fait 1425 px : elle défile sur un téléphone comme sur un portable de
+13 pouces, et sans ça le nom du projet partait à −567 px — on lisait des barres
+et des dates sans savoir à qui elles appartenaient. Le cale-libellé de
+l'en-tête des mois l'est aussi, sinon les mois glissent dessous. La colonne
+passe de 200 à 132 px au doigt : 200 px sur 375, c'est 58 % de la largeur pour
+des noms déjà tronqués. Les vues CARTES et KANBAN n'ont rien demandé — la
+première retombe sur une colonne par `minmax(300px, 1fr)`, la seconde défile
+horizontalement, ce qui est le geste attendu d'un kanban.
+
+**Les en-têtes de sécurité vivent dans `next.config.js`.** La production n'en
+servait qu'un, le HSTS posé par Vercel. La CSP est écrite sur ce que
+l'application charge RÉELLEMENT dans le navigateur — Maps, Google Identity,
+gapi, Nominatim, Supabase — et vérifiée origine par origine en chargeant chaque
+script sous la règle. Tout le reste (Anthropic, Groq, Resend, Todoist, kDrive,
+Odoo) part des routes API, côté serveur : la CSP ne s'y applique pas, et les y
+inscrire n'aurait fait qu'élargir la règle pour rien. `'unsafe-inline'` sur
+`style-src` n'est pas un relâchement : toute l'interface est en styles inline,
+c'est la seule façon d'écrire la règle. Caméra et micro restent autorisés dans
+`Permissions-Policy` — la photo d'un justificatif et la dictée en dépendent.
 
 **Le service worker ne fait QUE les notifications.** Il n'y a aucun cache : une
 constante `CACHE_NAME` y traînait sans usage, et le commentaire promettait un

@@ -1,6 +1,6 @@
 import '../styles/globals.css'
-import Head from 'next/head'
 import { useState, useEffect, createContext, useContext } from 'react'
+import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { SWRConfig } from 'swr'
@@ -199,8 +199,25 @@ export default function App({ Component, pageProps }) {
   // Un seul mouvement, un trait qui va et vient : de quoi dire que ça
   // travaille. Il s'arrête pour qui a demandé moins d'animations à son
   // système, et la barre reste alors visible, à moitié remplie.
+  //
+  // Le viewport passe par `next/head` et non par `_document`, parce que Next
+  // en injecte un par défaut (`width=device-width` seul) dès qu'il n'en trouve
+  // pas ici : on se retrouvait avec DEUX balises viewport, dont la première
+  // sans `initial-scale` ni `viewport-fit`. En le déclarant, on remplace la
+  // sienne au lieu de s'y ajouter.
+  //
+  // Il est rendu dans les trois branches — y compris l'écran d'attente, qui
+  // est TOUT ce que le serveur rend : c'est précisément l'oubli que l'audit a
+  // trouvé. Le reste des balises PWA vit dans `_document.js`, où le serveur
+  // les écrit quel que soit l'état de la session.
+  const viewport = (
+    <Head><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /></Head>
+  )
+
   if (!authReady) {
     return (
+      <>
+      {viewport}
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: 28,
@@ -230,46 +247,20 @@ export default function App({ Component, pageProps }) {
           </div>
         </div>
       </div>
+      </>
     )
   }
 
   // Don't render protected pages while redirecting
-  if (!user && !PUBLIC_ROUTES.includes(router.pathname)) return null
+  if (!user && !PUBLIC_ROUTES.includes(router.pathname)) return viewport
 
   const showChrome = user && !NO_CHROME_ROUTES.includes(router.pathname)
 
   return (
     <AuthContext.Provider value={{ user, signOut: () => { purgeCachePersistant(); return supabase.auth.signOut() } }}>
       <SWRConfig value={swrConfig}>
+      {viewport}
       <ApiErrorBanner />
-      <Head>
-        {/* Apercu Pro est servie en local (@font-face dans styles/globals.css).
-            On précharge les deux graisses présentes dès le premier écran — la
-            sidebar et les titres — pour éviter le saut de police au chargement. */}
-        <link rel="preload" href="/fonts/apercu-pro-400.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-        <link rel="preload" href="/fonts/apercu-pro-500.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-        {/* Plus aucune police distante : Apercu Pro est servie depuis
-            /public/fonts. Les gabarits PDF gardent leur propre lien — ils sont
-            rendus hors de l'application, par Chrome headless, et restent en
-            IBM Plex tant que la chaîne documentaire n'est pas reprise. */}
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Maze Project" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <link rel="icon" href="/favicon.svg" sizes="any" />
-        {/* PNG, et non SVG : iOS ne sait pas lire un SVG pour l'icône d'écran
-            d'accueil — il fabriquait à la place une capture de la page. Les
-            fichiers sont produits par `node scripts/icones-pwa.mjs` depuis le
-            logo de la maison, celui de l'écran de chargement. */}
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
-        {/* Le noir de la marque, celui de l'écran de chargement et du manifeste :
-            l'écran de lancement d'iOS et le nôtre s'enchaînent alors sans
-            clignotement blanc entre les deux. */}
-        <meta name="theme-color" content={AL.black} />
-      </Head>
       {showChrome ? (
         <>
           {!isMobile && <Sidebar />}

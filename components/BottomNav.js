@@ -1,9 +1,30 @@
+// La navigation du téléphone.
+//
+// Elle portait SEPT entrées : 53 px chacune sur un iPhone, sous la cible
+// tactile de 44 px une fois les marges comptées, et l'icône « accueil »
+// mordait sur son libellé. Elle en porte quatre, plus un « plus ».
+//
+// Mais le vrai défaut était ailleurs, trouvé en la mesurant : cette barre est
+// le SEUL accès sur mobile — la sidebar ne s'affiche qu'au-delà de 768 px.
+// Tout ce qui n'y figurait pas était donc INJOIGNABLE depuis un téléphone :
+// les heures, l'activité, les outils (donc l'économat et l'annuaire), les
+// contacts, le catalogue, le stockage, les offres, les factures, la banque,
+// la compta. Dix-huit pages.
+//
+// Le « plus » ouvre donc la MÊME liste que la sidebar — importée d'elle, pas
+// recopiée : deux listes de navigation auraient divergé au premier ajout, et
+// c'est exactement comme ça que l'économat est né sans entrée mobile.
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { AL, C, FONT } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
+import useIsAdmin from '../lib/useIsAdmin'
+import { MAIN_ITEMS, FIN_TOP, FIN_GROUPS } from './Sidebar'
 
 export const BOTTOM_NAV_HEIGHT = 64
 
+// Les quatre qu'on ouvre debout, une main occupée. Le planning et le meeting
+// sont des vues de semaine : on les consulte assis, ils passent dans la liste.
 const ITEMS = [
   {
     href: '/home',
@@ -37,17 +58,6 @@ const ITEMS = [
     ),
   },
   {
-    href: '/planning',
-    label: 'planning',
-    match: (p) => p === '/planning',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M3 9h18M8 2v4M16 2v4" />
-      </svg>
-    ),
-  },
-  {
     href: '/schedule',
     label: 'horaires',
     match: (p) => p === '/schedule',
@@ -58,32 +68,94 @@ const ITEMS = [
       </svg>
     ),
   },
-  {
-    href: '/meeting',
-    label: 'meeting',
-    match: (p) => p === '/meeting',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/settings',
-    label: 'réglages',
-    match: (p) => p === '/settings' || p === '/activity',
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    ),
-  },
 ]
+
+/** Tout ce qui n'est pas dans la barre — la liste de la sidebar, moins ce
+ *  qu'elle affiche déjà en bas. */
+function reste(isAdmin) {
+  const dansLaBarre = new Set(ITEMS.map(i => i.href))
+  const groupes = [
+    { label: '', items: MAIN_ITEMS.filter(i => !dansLaBarre.has(i.href)) },
+    { label: 'COMPTE', items: [{ href: '/settings', label: 'réglages' }] },
+  ]
+  if (isAdmin) {
+    groupes.push({ label: 'GESTION', items: FIN_TOP })
+    for (const g of FIN_GROUPS) groupes.push(g)
+  }
+  return groupes.filter(g => g.items.length)
+}
 
 export default function BottomNav() {
   const router = useRouter()
+  const isAdmin = useIsAdmin()
+  const [ouvert, setOuvert] = useState(false)
+
+  // Changer de page referme la feuille : sans ça, on revient dessus en
+  // arrière et elle est encore là, par-dessus la page qu'on vient d'ouvrir.
+  useEffect(() => { setOuvert(false) }, [router.asPath])
+
+  // Le doigt qui feuillette ne doit pas emporter la page DERRIÈRE la feuille.
+  useEffect(() => {
+    if (!ouvert) return
+    const avant = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = avant }
+  }, [ouvert])
+
+  const groupes = reste(isAdmin)
+
   return (
+    <>
+    {ouvert && (
+      <div
+        onClick={() => setOuvert(false)}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 41, background: 'rgba(12,12,12,.45)',
+          display: 'flex', alignItems: 'flex-end',
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            width: '100%', maxHeight: '78vh', overflowY: 'auto',
+            background: AL.black, color: AL.white, fontFamily: FONT,
+            borderTopLeftRadius: R.panel, borderTopRightRadius: R.panel,
+            padding: `18px 16px calc(${BOTTOM_NAV_HEIGHT}px + 18px + env(safe-area-inset-bottom))`,
+          }}
+        >
+          {/* La poignée : elle dit « ça se tire vers le bas » sans une ligne
+              de texte, et c'est la convention de toutes les feuilles d'iOS. */}
+          <div style={{ width: 36, height: 4, borderRadius: R.pill, background: C.dividerOnDark, margin: '0 auto 18px' }} />
+
+          {groupes.map((g, gi) => (
+            <div key={g.label || gi} style={{ marginBottom: 18 }}>
+              {g.label && (
+                <span style={{
+                  display: 'block', font: `500 10.5px ${MONO}`, letterSpacing: '.1em',
+                  color: C.navInactive, margin: '0 8px 8px',
+                }}>{g.label}</span>
+              )}
+              {g.items.map(it => {
+                const actif = it.match ? it.match(router.pathname) : router.pathname === it.href
+                return (
+                  <Link key={it.href} href={it.href}
+                    style={{
+                      display: 'flex', alignItems: 'center', minHeight: 48, padding: '0 16px',
+                      borderRadius: R.pill, textDecoration: 'none', fontSize: 15.5,
+                      fontWeight: actif ? 500 : 400,
+                      background: actif ? AL.white : 'transparent',
+                      color: actif ? AL.black : AL.white,
+                    }}>
+                    {it.label}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
     <nav
       style={{
         position: 'fixed',
@@ -125,6 +197,26 @@ export default function BottomNav() {
           </Link>
         )
       })}
+
+      {/* Cinquième case : tout le reste de l'application. */}
+      <button
+        onClick={() => setOuvert(o => !o)}
+        aria-label="Plus"
+        aria-expanded={ouvert}
+        style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', gap: 3, padding: '8px 4px', height: BOTTOM_NAV_HEIGHT,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: ouvert ? AL.white : C.navInactive,
+          fontFamily: FONT, fontSize: 11, fontWeight: ouvert ? 500 : 400,
+        }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+        <span>plus</span>
+      </button>
     </nav>
+    </>
   )
 }

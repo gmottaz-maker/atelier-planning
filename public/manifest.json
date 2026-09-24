@@ -5,7 +5,7 @@
   "description": "Projets, heures et frais — Amazing Lab",
   "lang": "fr-CH",
   "scope": "/",
-  "start_url": "/home",
+  "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0C0C0C",

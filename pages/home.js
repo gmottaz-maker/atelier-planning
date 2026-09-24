@@ -62,7 +62,8 @@ function TaskRow({ task, onToggle, last }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 2px', borderBottom: last ? 'none' : `1px solid ${C.divider}` }}>
-      <button onClick={() => onToggle && onToggle(task)} aria-label="Basculer la tâche"
+      {/* 17 px dessinés, 44 px tactiles : cf. `u-tactile` dans globals.css. */}
+      <button onClick={() => onToggle && onToggle(task)} aria-label="Basculer la tâche" className="u-tactile"
         style={{
           width: 17, height: 17, borderRadius: '50%', flex: 'none', cursor: 'pointer', padding: 0,
           border: completed ? 'none' : `2px solid ${C.faintBorder}`,

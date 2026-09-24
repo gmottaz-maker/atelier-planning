@@ -93,3 +93,40 @@ body {
    planning — toutes justifiées à leur point d'usage. */
 .u-panel { border-radius: 15px; }
 .u-pill  { border-radius: 999px; }
+
+
+/* ── Cibles tactiles ─────────────────────────────────────────────────────── */
+/*
+   Un doigt fait une dizaine de millimètres ; Apple et le WCAG demandent 44 px.
+   Mesuré le 24 septembre 2026 à 375 px : 64 des 75 éléments cliquables de la
+   liste des projets passaient sous 40 px, et les pastilles de tâche de
+   l'accueil faisaient 17 × 17.
+
+   `touch-action: manipulation` supprime le délai de 300 ms que Safari garde
+   pour guetter un double-tap. Aucun coût, aucun risque de mise en page.
+*/
+button, a, select, input, [role="button"] { touch-action: manipulation; }
+* { -webkit-tap-highlight-color: transparent; }
+
+@media (pointer: coarse) {
+  /*
+     `u-tactile` AGRANDIT LA ZONE SANS AGRANDIR LE DESSIN : un pseudo-élément
+     centré de 44 px capte le doigt, l'élément garde sa taille visuelle, et la
+     mise en page ne bouge pas d'un pixel. C'est la seule façon d'élargir une
+     pastille de 17 px sans refaire la ligne autour.
+
+     Réservé au pointeur GROSSIER. À la souris, une cible de 17 px se vise très
+     bien, et deux zones de 44 px côte à côte se chevaucheraient — le clic
+     partirait au mauvais bouton.
+  */
+  .u-tactile { position: relative; }
+  .u-tactile::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 44px; height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  /* Là où la place existe, on grandit pour de vrai plutôt que de tricher. */
+  .u-pastille { min-height: 44px; }
+}

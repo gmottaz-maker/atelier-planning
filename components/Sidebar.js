@@ -12,7 +12,7 @@ export const SIDEBAR_WIDTH = 224
 // Items principaux (haut de la sidebar). Libellés en minuscules : règle
 // éditoriale du design system, tapée telle quelle et non obtenue par
 // text-transform — la casse fait partie du texte, pas de la présentation.
-const MAIN_ITEMS = [
+export const MAIN_ITEMS = [
   { href: '/home',      label: 'accueil',  match: (p) => p === '/home' },
   { href: '/',          label: 'projets',  match: (p) => p === '/' || p.startsWith('/projects'), count: 'projects' },
   { href: '/tasks',     label: 'tâches',   match: (p) => p === '/tasks', count: 'tasks' },
@@ -25,7 +25,7 @@ const MAIN_ITEMS = [
 ]
 
 // Zone finances (admin uniquement) : 4 items transverses + 2 groupes labellisés
-const FIN_TOP = [
+export const FIN_TOP = [
   { href: '/finances', label: 'tableau de bord' },
   { href: '/clients',  label: 'contacts' },
   // La prospection est une base SÉPARÉE des contacts : ce qu'on veut savoir
@@ -35,7 +35,7 @@ const FIN_TOP = [
   { href: '/catalog',  label: 'catalogue' },
   { href: '/stockage', label: 'stockage' },
 ]
-const FIN_GROUPS = [
+export const FIN_GROUPS = [
   { label: 'FINANCES CLIENTS', items: [
     { href: '/offres',          label: 'offres' },
     { href: '/factures-emises', label: 'factures sortantes' },
