@@ -7,7 +7,7 @@ import { buildFactureHtml } from '../../../../lib/factureHtml'
 import { qrDocument } from '../../../../lib/docLayout'
 import { htmlToPdf } from '../../../../lib/htmlToPdf'
 import { contentDisposition } from '../../../../lib/contentDisposition'
-import { pdfFilename } from '../../../../lib/pdfFilename'
+import { nomPdfDocument } from '../../../../lib/pdfFilename'
 
 // 60 s : les rendus sont sérialisés par conteneur (lib/htmlToPdf), une requête
 // peut donc attendre la fin d'un rendu précédent avant de démarrer le sien.
@@ -62,12 +62,12 @@ export default async function handler(req, res) {
     const html = buildFactureHtml(inv, company, qrSvg)
     const pdf = await htmlToPdf(html, qrSvg ? qrDocument(qrSvg) : null)
     res.setHeader('Content-Type', 'application/pdf')
-    const docType = 'facture'
+
     // `?download=1` force le téléchargement plutôt que l'ouverture dans le
     // visualiseur : c'est ce que demande le lien « pdf » de la liste, qui doit
     // se comporter comme un téléchargement demandé par l'utilisateur.
     const disposition = req.query.download ? 'attachment' : 'inline'
-    const nom = pdfFilename(docType, inv.projects?.name || inv.client_name)
+    const nom = nomPdfDocument(inv.client_name, inv.invoice_number, { repli: inv.projects?.name })
     // Le nom porte celui du projet ou du client : « végétale », « Café… ».
     // Un en-tête HTTP est en ASCII — sans encodage RFC 6266, les accents
     // arrivaient en « ? ».

@@ -8,7 +8,7 @@ import adminFetch from '../lib/adminFetch'
 import ContactPicker from '../components/ContactPicker'
 import CatalogPicker, { toPurchaseRow, toRateRow } from '../components/CatalogPicker'
 import SendDocumentModal from '../components/SendDocumentModal'
-import { pdfFilename } from '../lib/pdfFilename'
+import { nomPdfDocument } from '../lib/pdfFilename'
 import { invoiceCopyBody } from '../lib/duplicateDoc'
 import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
@@ -146,7 +146,7 @@ export default function FacturesEmises() {
   // Une navigation vers l'URL, elle, est un téléchargement demandé par
   // l'utilisateur : pas de permission, pas de blocage, et rien à révoquer.
   const pdfHref = (inv) =>
-    `/api/customer-invoices/${inv.id}/pdf?download=1&n=${encodeURIComponent(pdfFilename('facture', inv.projects?.name || inv.object || inv.client_name))}`
+    `/api/customer-invoices/${inv.id}/pdf?download=1&n=${encodeURIComponent(nomPdfDocument(inv.client_name, inv.invoice_number, { repli: inv.projects?.name }))}`
 
   // Duplique une facture : nouveau numéro, dates du jour, statut « créée ».
   async function duplicate(inv) {
