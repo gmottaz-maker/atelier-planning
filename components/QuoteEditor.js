@@ -11,7 +11,7 @@ import CatalogPicker, { toPurchaseRow, toRateRow } from './CatalogPicker'
 import ActivitePicker, { CodeActivite } from './ActivitePicker'
 import QtyInput from './QtyInput'
 import { fmtCHF } from '../lib/money'
-import { genRowUid, genItemUid, copierItem, deplacerLigne } from '../lib/quoteLines'
+import { genRowUid, genItemUid, copierItem, copierEvenement, deplacerLigne, evenementsLogistiques } from '../lib/quoteLines'
 import { DEFAUTS_OFFRE, normaliserReglagesOffre } from '../lib/quoteDefaults'
 import { AL, C, FONT, R } from '../lib/theme'
 import { ligneForfait } from '../lib/transport'
@@ -247,11 +247,37 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
   function moveManagementRow(idx, sens) { setQuote(q => ({ ...q, management: deplacerLigne(q.management, idx, sens) })); setQuoteDirty(true) }
 
   // ── Logistique ──
+  //
+  // Un chantier se déplace plusieurs fois : la pose, puis la reprise. Chaque
+  // passage est un ÉVÉNEMENT qui porte son trajet, son montage et son
+  // démontage — sans quoi, en vrac dans une seule liste, on ne sait plus
+  // lequel va avec lequel.
+  //
+  // `evenementsLogistiques` relit indifféremment l'ancien tableau plat et le
+  // nouveau : toute écriture repart en événements, mais une offre jamais
+  // rouverte reste lisible telle quelle.
   const avecVehicules = (transport?.vehicules?.length || 0) > 0
-  function addLogisticsRow()    { setQuote(q => ({ ...q, logistics: [...q.logistics, emptyLogisticsRow()] })); setQuoteDirty(true) }
-  function updateLogisticsRow(idx, field, v) { setQuote(q => ({ ...q, logistics: q.logistics.map((r, i) => i === idx ? { ...r, [field]: v } : r) })); setQuoteDirty(true) }
-  function removeLogisticsRow(idx) { setQuote(q => ({ ...q, logistics: q.logistics.filter((_, i) => i !== idx) })); setQuoteDirty(true) }
-  function moveLogisticsRow(idx, sens) { setQuote(q => ({ ...q, logistics: deplacerLigne(q.logistics, idx, sens) })); setQuoteDirty(true) }
+  const evenements = evenementsLogistiques(quote.logistics)
+  const majEvenements = fn => {
+    setQuote(q => ({ ...q, logistics: fn(evenementsLogistiques(q.logistics)) }))
+    setQuoteDirty(true)
+  }
+  const majLignes = (ei, fn) =>
+    majEvenements(evs => evs.map((ev, i) => i === ei ? { ...ev, lignes: fn(ev.lignes) } : ev))
+
+  function addEvenement()                { majEvenements(evs => [...evs, { _uid: genItemUid(), nom: '', lignes: [] }]) }
+  function updateEvenementNom(ei, nom)   { majEvenements(evs => evs.map((ev, i) => i === ei ? { ...ev, nom } : ev)) }
+  function removeEvenement(ei)           { majEvenements(evs => evs.filter((_, i) => i !== ei)) }
+  function moveEvenement(ei, sens)       { majEvenements(evs => deplacerLigne(evs, ei, sens)) }
+  // La copie se pose JUSTE APRÈS l'originale, comme pour un item : c'est
+  // précisément le geste d'un second passage sur le même chantier.
+  function dupliquerEvenement(ei)        { majEvenements(evs => [...evs.slice(0, ei + 1), copierEvenement(evs[ei]), ...evs.slice(ei + 1)]) }
+
+  function addLogisticsRow(ei)                 { majLignes(ei, l => [...l, emptyLogisticsRow()]) }
+  function updateLogisticsRow(ei, ri, field, v){ majLignes(ei, l => l.map((r, i) => i === ri ? { ...r, [field]: v } : r)) }
+  function removeLogisticsRow(ei, ri)          { majLignes(ei, l => l.filter((_, i) => i !== ri)) }
+  function moveLogisticsRow(ei, ri, sens)      { majLignes(ei, l => deplacerLigne(l, ri, sens)) }
+  function toggleLogisticsRowHidden(ei, ri)    { majLignes(ei, l => l.map((r, i) => i === ri ? { ...r, hidden: !r.hidden } : r)) }
 
   // ── Sous-traitance ──
   function addSubcontractingRow() { setQuote(q => ({ ...q, subcontracting: [...(q.subcontracting || []), emptySubcontractingRow()] })); setQuoteDirty(true) }
@@ -346,7 +372,7 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
 
   // ── Lignes pré-remplies depuis le catalogue ──
   function appendManagementRow(pre)     { setQuote(q => ({ ...q, management: [...q.management, { ...emptyLaborRow(tarifs.taux_main_oeuvre), ...pre }] })); setQuoteDirty(true) }
-  function appendLogisticsRow(pre)      { setQuote(q => ({ ...q, logistics: [...q.logistics, { ...emptyLogisticsRow(), ...pre }] })); setQuoteDirty(true) }
+  function appendLogisticsRow(ei, pre)  { majLignes(ei, l => [...l, { ...emptyLogisticsRow(), ...pre }]) }
   function appendSubcontractingRow(pre) { setQuote(q => ({ ...q, subcontracting: [...(q.subcontracting || []), { ...emptySubcontractingRow(), ...pre }] })); setQuoteDirty(true) }
   function appendItemRow(itemIdx, kind, pre) {
     const base = { ...(kind === 'purchases' ? emptyPurchaseRow() : emptyLaborRow(tarifs.taux_main_oeuvre)), hidden: true }
@@ -357,7 +383,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
   const managementTotal     = (quote.management || []).reduce((s, r) => s + laborNet(r), 0)
   const itemsTotal          = (quote.items || []).reduce((s, it) => s + itemTotal(it), 0)
   const subcontractingTotal = (quote.subcontracting || []).reduce((s, r) => s + serviceNet(r), 0)
-  const logisticsTotal      = (quote.logistics || []).reduce((s, r) => s + logisticsNet(r), 0)
+  const totalEvenement      = ev => (ev.lignes || []).reduce((s, r) => s + logisticsNet(r), 0)
+  const logisticsTotal      = evenements.reduce((s, ev) => s + totalEvenement(ev), 0)
   const grandTotal          = managementTotal + itemsTotal + subcontractingTotal + logisticsTotal
 
   const numCell = "px-2 py-1.5 text-sm bg-transparent text-right tabular-nums w-full quote-cell focus:outline-none"
@@ -812,129 +839,179 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                         <div className="flex items-center gap-4">
                           <span style={sectionTotal}>{fmtCHF(logisticsTotal)} CHF</span>
                           {!collapsedSections.logistics && (
-                            <>
-                              <CatalogPicker kind="all" onPick={it => appendLogisticsRow(toRateRow(it))} />
-                              {/* Montage, démontage, manutention : des heures de chantier,
-                                  qui se comparent à la feuille comme celles de l'atelier.
-                                  La conduite n'y figure pas — elle part au km. */}
-                              <ActivitePicker familles={['chantier', 'logistique']}
-                                onPick={pre => appendLogisticsRow({ ...pre, trajet: pre.description, description: '' })} />
-                              {transport?.forfaits?.length > 0 && (
-                                <select value="" aria-label="Ajouter un forfait"
-                                  onChange={e => {
-                                    const f = transport.forfaits.find(x => x.id === e.target.value)
-                                    if (f) appendLogisticsRow(ligneForfait(f))
-                                  }}
-                                  className="quote-action" style={{ '--qa': TEINTES.logistics.fort, cursor: 'pointer' }}>
-                                  <option value="">+ Forfait</option>
-                                  {transport.forfaits.map(f => (
-                                    <option key={f.id} value={f.id}>{f.nom} · {f.prix ?? '?'} CHF · {f.km ?? '?'} km</option>
-                                  ))}
-                                </select>
-                              )}
-                              <button onClick={addLogisticsRow}
-                                className="quote-action" style={{ '--qa': TEINTES.logistics.fort }}>+ Ligne</button>
-                            </>
+                            <button onClick={addEvenement}
+                              className="quote-action" style={{ '--qa': TEINTES.logistics.fort, whiteSpace: 'nowrap' }}
+                              title="Un déplacement et ce qu'on y fait : trajet, montage, démontage">+ Événement</button>
                           )}
                         </div>
                       </div>
+
                       {!collapsedSections.logistics && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
-                          <thead>
-                            <tr>
-                              {/* Les colonnes de chiffres courts — un prix au km, une
-                                  quantité, un pourcentage — cèdent de la place au véhicule
-                                  et à l'item, qui porte le code d'activité devant son
-                                  libellé. Avant, « Renault Master » s'affichait « Renau ». */}
-                              <th className={th} style={{ width: avecVehicules ? '15%' : '17%' }}>Item</th>
-                              <th className={th} style={{ width: avecVehicules ? '15%' : '24%' }}>Description</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '10%' }}>Prix</th>
-                              <th className={th + ' text-right'} style={{ width: '5%' }}>Qté</th>
-                              <th className={th} style={{ width: '6%' }}>Unité</th>
-                              {avecVehicules && <th className={th} style={{ width: '19%', whiteSpace: 'nowrap' }}>Véhicule · pers.</th>}
-                              <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '5%' : '8%' }}>Esc.&nbsp;%</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '9%' }}>Esc.&nbsp;CHF</th>
-                              <th className={th + ' text-right'} style={{ width: avecVehicules ? '11%' : '10%' }}>Total</th>
-                              <th className={th} style={{ width: '4%' }}></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {quote.logistics.length === 0 ? (
-                              <tr><td colSpan={avecVehicules ? 11 : 10} className="text-center text-sm u-muted py-6">Aucune ligne.</td></tr>
-                            ) : quote.logistics.map((r, i) => (
-                              <tr key={r._uid || i} className="group quote-row">
-                                <td className={td}>
-                                  <span style={{ display: 'flex', alignItems: 'center' }}>
-                                    {/^heure/.test(String(r.unit || '')) && (
-                                      <CodeActivite valeur={r.activite} onChange={v => updateLogisticsRow(i, 'activite', v)}
-                                        texte={r.trajet} onTexte={t => updateLogisticsRow(i, 'trajet', t)} />
-                                    )}
-                                    <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(i, 'trajet', e.target.value)} />
-                                  </span>
-                                </td>
-                                <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateLogisticsRow(i, 'description', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(i, 'rate', e.target.value)} /></td>
-                                <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(i, 'quantity', v)} /></td>
-                                <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}</select></td>
-                                {avecVehicules && (
-                                  <td className={td}>
-                                    {/* Véhicule et nombre de personnes, là où l'on roule : km et
-                                        forfaits. Ni l'un ni l'autre ne s'imprime — ce sont des
-                                        données de coût, pas de vente. */}
-                                    {(String(r.unit || '').toLowerCase() === 'km' || r.forfait) && (
-                                      <span style={{ display: 'flex', gap: 4 }}>
-                                        <select className={txtCell} value={r.vehicule || ''} aria-label="Véhicule"
-                                          onChange={e => updateLogisticsRow(i, 'vehicule', e.target.value)}
-                                          style={{ flex: 1, minWidth: 0, ...(r.vehicule ? {} : { color: C.warning }) }}>
-                                          <option value="">véhicule…</option>
-                                          {transport.vehicules.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
-                                        </select>
-                                        {/* Largeur AUTO : le navigateur dimensionne le menu
-                                            sur son contenu, flèche comprise. En lui imposant
-                                            40 px, la marge interne et la flèche native ne
-                                            laissaient que quelques pixels au chiffre, qui
-                                            apparaissait coupé — et la bonne largeur n'est pas
-                                            la même d'un navigateur à l'autre. */}
-                                        <select value={r.personnes || 1} aria-label="Personnes à bord"
-                                          onChange={e => updateLogisticsRow(i, 'personnes', Number(e.target.value))}
-                                          title="Personnes à bord"
-                                          style={{ width: 'auto', flex: 'none', padding: '6px 0 6px 6px',
-                                            border: 'none', background: 'transparent', fontFamily: FONT, fontSize: 14,
-                                            color: AL.black, outline: 'none', cursor: 'pointer' }}>
-                                          {[1, 2, 3].map(n => <option key={n} value={n}>{n} p.</option>)}
-                                        </select>
-                                      </span>
-                                    )}
-                                  </td>
+                      <div className="p-4 space-y-4">
+                        {evenements.length === 0 && (
+                          <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: C.muted }}>
+                            Aucun événement. Un événement = un déplacement et ce qu’on y fait : trajet, montage, démontage.
+                          </div>
+                        )}
+                        {evenements.map((ev, ei) => {
+                          const cle = ev._uid || `ev${ei}`
+                          const plie = collapsedItems[cle]
+                          return (
+                          <div key={cle} style={itemBox}>
+                            <div style={{ ...itemHeader, borderBottom: plie ? 'none' : `1px solid ${C.border}` }}>
+                              <button type="button" onClick={() => toggleCollapsedItem(cle)}
+                                className="hover:opacity-70" title={plie ? 'Déplier' : 'Replier'}>
+                                <span style={chevron(!plie)}>▾</span>
+                              </button>
+                              {/* Le nom est FACULTATIF : sans lui, l'événement ne pose aucun
+                                  en-tête sur le PDF et ses lignes s'impriment comme avant.
+                                  C'est ce qui laisse une offre simple — un aller, un montage —
+                                  exactement telle qu'elle était. */}
+                              <input
+                                style={{ flex: 1, minWidth: 0, padding: '4px 8px', border: 'none', background: 'transparent', outline: 'none', fontFamily: FONT, fontSize: 15, fontWeight: 500, color: AL.black }}
+                                placeholder="Nom de l’événement (ex : Montage Genève) — facultatif"
+                                value={ev.nom || ''}
+                                onChange={e => updateEvenementNom(ei, e.target.value)}
+                              />
+                              <span style={{ ...sectionTotal, whiteSpace: 'nowrap' }}>{fmtCHF(totalEvenement(ev))} CHF</span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <Reordonner idx={ei} total={evenements.length} onDeplacer={sens => moveEvenement(ei, sens)} />
+                              </span>
+                              <button onClick={() => dupliquerEvenement(ei)}
+                                className="quote-action" style={{ '--qa': TEINTES.logistics.fort, whiteSpace: 'nowrap' }}
+                                title="Dupliquer : le second passage sur le même chantier">dupliquer</button>
+                              <button onClick={() => { if (confirm(`Supprimer l’événement "${ev.nom || 'sans nom'}" et ses ${ev.lignes.length} ligne(s) ?`)) removeEvenement(ei) }}
+                                className="quote-action" style={{ fontSize: 13 }} title="Supprimer cet événement">✕</button>
+                            </div>
+
+                            {!plie && (
+                            <>
+                            <div style={subHeader}>
+                              <span style={subTitle}>Lignes</span>
+                              <span className="flex items-center gap-2">
+                                <CatalogPicker kind="all" onPick={it => appendLogisticsRow(ei, toRateRow(it))} />
+                                {/* Montage, démontage, manutention : des heures de chantier,
+                                    qui se comparent à la feuille comme celles de l'atelier.
+                                    La conduite n'y figure pas — elle part au km. */}
+                                <ActivitePicker familles={['chantier', 'logistique']}
+                                  onPick={pre => appendLogisticsRow(ei, { ...pre, trajet: pre.description, description: '' })} />
+                                {transport?.forfaits?.length > 0 && (
+                                  <select value="" aria-label="Ajouter un forfait"
+                                    onChange={e => {
+                                      const f = transport.forfaits.find(x => x.id === e.target.value)
+                                      if (f) appendLogisticsRow(ei, ligneForfait(f))
+                                    }}
+                                    className="quote-action" style={{ '--qa': TEINTES.logistics.fort, cursor: 'pointer' }}>
+                                    <option value="">+ Forfait</option>
+                                    {transport.forfaits.map(f => (
+                                      <option key={f.id} value={f.id}>{f.nom} · {f.prix ?? '?'} CHF · {f.km ?? '?'} km</option>
+                                    ))}
+                                  </select>
                                 )}
-                                <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder="0" onChange={e => updateLogisticsRow(i, 'margin', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateLogisticsRow(i, 'discount', e.target.value)} /></td>
-                                <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateLogisticsRow(i, 'discount_amount', e.target.value)} /></td>
-                                <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(logisticsNet(r))}</td>
-                                <td className={td + ' text-center'}>
-                                  <span className="inline-flex items-center gap-2">
-                                    <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleRowHidden('logistics', i)} />
-                                    <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Reordonner idx={i} total={quote.logistics.length} onDeplacer={sens => moveLogisticsRow(i, sens)} />
-                                      <button onClick={() => removeLogisticsRow(i)} className="u-muted hover:u-ko text-sm">×</button>
-                                    </span>
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          {quote.logistics.length > 0 && (
-                            <tfoot>
-                              <tr>
-                                <td colSpan={avecVehicules ? 9 : 8} style={{ padding: '10px 12px', textAlign: 'right', fontSize: 12, color: C.muted, borderTop: `1px solid ${C.border}` }}>Sous-total logistique</td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums', borderTop: `1px solid ${C.border}` }}>{fmtCHF(logisticsTotal)}</td>
-                                <td style={{ borderTop: `1px solid ${C.border}` }}></td>
-                              </tr>
-                            </tfoot>
-                          )}
-                        </table>
+                                <button onClick={() => addLogisticsRow(ei)}
+                                  className="quote-action" style={{ '--qa': TEINTES.logistics.fort }}>+ Ligne</button>
+                              </span>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full" style={{ minWidth: 900, tableLayout: 'fixed' }}>
+                                <thead>
+                                  <tr>
+                                    {/* Les colonnes de chiffres courts — un prix au km, une
+                                        quantité, un pourcentage — cèdent de la place au véhicule
+                                        et à l'item, qui porte le code d'activité devant son
+                                        libellé. Avant, « Renault Master » s'affichait « Renau ». */}
+                                    <th className={th} style={{ width: avecVehicules ? '15%' : '17%' }}>Item</th>
+                                    <th className={th} style={{ width: avecVehicules ? '15%' : '24%' }}>Description</th>
+                                    <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '10%' }}>Prix</th>
+                                    <th className={th + ' text-right'} style={{ width: '5%' }}>Qté</th>
+                                    <th className={th} style={{ width: '6%' }}>Unité</th>
+                                    {avecVehicules && <th className={th} style={{ width: '19%', whiteSpace: 'nowrap' }}>Véhicule · pers.</th>}
+                                    <th className={th + ' text-right'} style={{ width: '6%' }}>Marge %</th>
+                                    <th className={th + ' text-right'} style={{ width: avecVehicules ? '5%' : '8%' }}>Esc.&nbsp;%</th>
+                                    <th className={th + ' text-right'} style={{ width: avecVehicules ? '7%' : '9%' }}>Esc.&nbsp;CHF</th>
+                                    <th className={th + ' text-right'} style={{ width: avecVehicules ? '11%' : '10%' }}>Total</th>
+                                    <th className={th} style={{ width: '4%' }}></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {ev.lignes.length === 0 ? (
+                                    <tr><td colSpan={avecVehicules ? 11 : 10} className="text-center text-sm u-muted py-6">Aucune ligne.</td></tr>
+                                  ) : ev.lignes.map((r, i) => (
+                                    <tr key={r._uid || i} className="group quote-row">
+                                      <td className={td}>
+                                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                                          {/^heure/.test(String(r.unit || '')) && (
+                                            <CodeActivite valeur={r.activite} onChange={v => updateLogisticsRow(ei, i, 'activite', v)}
+                                              texte={r.trajet} onTexte={t => updateLogisticsRow(ei, i, 'trajet', t)} />
+                                          )}
+                                          <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(ei, i, 'trajet', e.target.value)} />
+                                        </span>
+                                      </td>
+                                      <td className={td}><input className={txtCell} value={r.description || ''} onChange={e => updateLogisticsRow(ei, i, 'description', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} value={r.rate || ''} onChange={e => updateLogisticsRow(ei, i, 'rate', e.target.value)} /></td>
+                                      <td className={td}><QtyInput className={numCell} value={r.quantity} onChange={v => updateLogisticsRow(ei, i, 'quantity', v)} /></td>
+                                      <td className={td}><select className={txtCell} value={r.unit || ''} onChange={e => updateLogisticsRow(ei, i, 'unit', e.target.value)}><option value="">—</option>{QUOTE_UNITS.map(u => <option key={u} value={u}>{libelleUnite(u)}</option>)}</select></td>
+                                      {avecVehicules && (
+                                        <td className={td}>
+                                          {/* Véhicule et nombre de personnes, là où l'on roule : km et
+                                              forfaits. Ni l'un ni l'autre ne s'imprime — ce sont des
+                                              données de coût, pas de vente. */}
+                                          {(String(r.unit || '').toLowerCase() === 'km' || r.forfait) && (
+                                            <span style={{ display: 'flex', gap: 4 }}>
+                                              <select className={txtCell} value={r.vehicule || ''} aria-label="Véhicule"
+                                                onChange={e => updateLogisticsRow(ei, i, 'vehicule', e.target.value)}
+                                                style={{ flex: 1, minWidth: 0, ...(r.vehicule ? {} : { color: C.warning }) }}>
+                                                <option value="">véhicule…</option>
+                                                {transport.vehicules.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                                              </select>
+                                              {/* Largeur AUTO : le navigateur dimensionne le menu
+                                                  sur son contenu, flèche comprise. En lui imposant
+                                                  40 px, la marge interne et la flèche native ne
+                                                  laissaient que quelques pixels au chiffre, qui
+                                                  apparaissait coupé — et la bonne largeur n'est pas
+                                                  la même d'un navigateur à l'autre. */}
+                                              <select value={r.personnes || 1} aria-label="Personnes à bord"
+                                                onChange={e => updateLogisticsRow(ei, i, 'personnes', Number(e.target.value))}
+                                                title="Personnes à bord"
+                                                style={{ width: 'auto', flex: 'none', padding: '6px 0 6px 6px',
+                                                  border: 'none', background: 'transparent', fontFamily: FONT, fontSize: 14,
+                                                  color: AL.black, outline: 'none', cursor: 'pointer' }}>
+                                                {[1, 2, 3].map(n => <option key={n} value={n}>{n} p.</option>)}
+                                              </select>
+                                            </span>
+                                          )}
+                                        </td>
+                                      )}
+                                      <td className={td}><input type="number" step="0.1" className={numCell} value={r.margin || ''} placeholder="0" onChange={e => updateLogisticsRow(ei, i, 'margin', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.1" className={numCell} placeholder="0" value={r.discount || ''} onChange={e => updateLogisticsRow(ei, i, 'discount', e.target.value)} /></td>
+                                      <td className={td}><input type="number" step="0.01" className={numCell} placeholder="0" value={r.discount_amount || ''} onChange={e => updateLogisticsRow(ei, i, 'discount_amount', e.target.value)} /></td>
+                                      <td className={tdRO + ' ' + td + ' font-semibold u-ink'}>{fmtCHF(logisticsNet(r))}</td>
+                                      <td className={td + ' text-center'}>
+                                        <span className="inline-flex items-center gap-2">
+                                          <OeilVisibilite masquee={!!r.hidden} onToggle={() => toggleLogisticsRowHidden(ei, i)} />
+                                          <span className="inline-flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Reordonner idx={i} total={ev.lignes.length} onDeplacer={sens => moveLogisticsRow(ei, i, sens)} />
+                                            <button onClick={() => removeLogisticsRow(ei, i)} className="u-muted hover:u-ko text-sm">×</button>
+                                          </span>
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            </>
+                            )}
+                          </div>
+                          )
+                        })}
+
+                        {evenements.length > 1 && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: '4px 4px 0', fontSize: 12, color: C.muted }}>
+                            <span>Sous-total logistique</span>
+                            <span style={{ fontSize: 14, fontWeight: 500, color: AL.black, fontVariantNumeric: 'tabular-nums' }}>{fmtCHF(logisticsTotal)}</span>
+                          </div>
+                        )}
                       </div>
                       )}
                     </div>

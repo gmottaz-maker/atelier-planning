@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem, deplacerLigne, libelleEscompte } from '../lib/quoteLines'
+import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem, deplacerLigne, libelleEscompte,
+  evenementsLogistiques,
+  totalEvenement,
+  copierEvenement,
+} from '../lib/quoteLines'
 import { computeQuoteTotal } from '../lib/quoteTotals'
 import { buildDevisHtml } from '../lib/devisHtml'
 
@@ -436,5 +440,97 @@ describe('deplacerLigne — l\'ordre de saisie est l\'ordre du document', () => 
     expect(deplacerLigne(undefined, 0, 1)).toBeUndefined()
     expect(deplacerLigne([], 0, 1)).toEqual([])
     expect(ids(deplacerLigne([{ id: 'a' }], 0, 1))).toEqual(['a'])
+  })
+})
+
+// ── Événements logistiques ───────────────────────────────────────────────────
+describe('événements logistiques', () => {
+  const ligne = (trajet, rate, quantity, unit) => ({ trajet, rate, quantity, unit })
+  const TRAJET = ligne('Trajet', 3, 100, 'km')
+  const MONTAGE = ligne('Montage', 100, 4, 'heure(s)')
+
+  it('lit l\'ancien tableau plat comme un événement SANS NOM', () => {
+    // Toutes les offres d'avant le 24 septembre 2026 sont dans cette forme.
+    const evs = evenementsLogistiques([TRAJET, MONTAGE])
+    expect(evs).toHaveLength(1)
+    expect(evs[0].nom).toBe('')
+    expect(evs[0].lignes).toEqual([TRAJET, MONTAGE])
+  })
+
+  it('lit le nouveau format tel quel', () => {
+    const evs = evenementsLogistiques([{ nom: 'Pose', lignes: [TRAJET] }, { nom: 'Reprise', lignes: [MONTAGE] }])
+    expect(evs.map(e => e.nom)).toEqual(['Pose', 'Reprise'])
+  })
+
+  it('récupère des lignes en vrac mêlées à des événements, sans les perdre', () => {
+    // Une écriture interrompue à mi-chemin produirait ce mélange : mieux vaut
+    // le lire que le jeter.
+    const evs = evenementsLogistiques([TRAJET, { nom: 'Reprise', lignes: [MONTAGE] }])
+    expect(evs).toHaveLength(2)
+    expect(evs[0].nom).toBe('')
+    expect(evs[0].lignes).toEqual([TRAJET])
+    expect(evs[1].nom).toBe('Reprise')
+  })
+
+  it('expose une liste PLATE pour les totaux, la marge transport et la rentabilité', () => {
+    const q = normaliserDevis({ logistics: [
+      { nom: 'Pose', lignes: [TRAJET] },
+      { nom: 'Reprise', lignes: [MONTAGE] },
+    ] })
+    expect(q.logistics).toEqual([TRAJET, MONTAGE])
+    expect(q.logistics_evenements).toHaveLength(2)
+  })
+
+  it('compte le même total, que les lignes soient groupées ou non', () => {
+    // Le regroupement est une mise en page, jamais un changement de prix.
+    const plat = totauxDevis({ logistics: [TRAJET, MONTAGE] })
+    const groupe = totauxDevis({ logistics: [{ nom: 'Pose', lignes: [TRAJET] }, { nom: 'Reprise', lignes: [MONTAGE] }] })
+    expect(groupe.logistique).toBe(plat.logistique)
+    expect(groupe.logistique).toBe(300 + 400)
+  })
+
+  it('totalEvenement somme ses lignes, masquées comprises', () => {
+    expect(totalEvenement({ lignes: [TRAJET, { ...MONTAGE, hidden: true }] })).toBe(700)
+  })
+
+  it('rend un événement NOMMÉ comme un item : en-tête puis lignes au niveau 2', () => {
+    const l = lignesDevis({ logistics: [{ nom: 'Montage Genève', lignes: [TRAJET, MONTAGE] }] })
+    const log = l.slice(l.findIndex(x => x.kind === 'section' && x.label === 'Logistique') + 1)
+    expect(log[0]).toMatchObject({ level: 1, role: 'item', title: 'Montage Genève', total: 700 })
+    expect(log[1]).toMatchObject({ level: 2, role: 'composition', title: 'Trajet' })
+    expect(log[2]).toMatchObject({ level: 2, role: 'composition', title: 'Montage' })
+  })
+
+  it('rend un événement SANS NOM exactement comme avant : pas d\'en-tête', () => {
+    // C'est ce qui garantit qu'une offre ancienne réimprimée donne le même PDF.
+    const avant = lignesDevis({ logistics: [TRAJET, MONTAGE] })
+    const apres = lignesDevis({ logistics: [{ nom: '', lignes: [TRAJET, MONTAGE] }] })
+    expect(apres).toEqual(avant)
+    const log = avant.slice(avant.findIndex(x => x.kind === 'section' && x.label === 'Logistique') + 1)
+    expect(log.map(x => [x.level, x.role, x.title])).toEqual([
+      [1, 'prestation', 'Trajet'],
+      [1, 'prestation', 'Montage'],
+    ])
+  })
+
+  it('un événement masqué disparaît du document, jamais des totaux', () => {
+    const devis = { logistics: [{ nom: 'Pose', lignes: [TRAJET], hidden: true }, { nom: 'Reprise', lignes: [MONTAGE] }] }
+    expect(totauxDevis(devis).logistique).toBe(700)
+    const l = lignesDevis(devis)
+    expect(l.some(x => x.title === 'Pose')).toBe(false)
+    expect(l.some(x => x.title === 'Reprise')).toBe(true)
+    // La section, elle, annonce toujours le total entier.
+    expect(l.find(x => x.kind === 'section' && x.label === 'Logistique').total).toBe(700)
+  })
+
+  it('duplique un événement en regénérant tous les identifiants', () => {
+    const ev = { _uid: 'e1', nom: 'Pose', lignes: [{ ...TRAJET, _uid: 'r1' }] }
+    const copie = copierEvenement(ev)
+    expect(copie.nom).toBe('Pose (copie)')
+    expect(copie._uid).not.toBe('e1')
+    expect(copie.lignes[0]._uid).not.toBe('r1')
+    expect(copie.lignes[0].rate).toBe(3)
+    // L'originale n'a pas bougé.
+    expect(ev.lignes[0]._uid).toBe('r1')
   })
 })

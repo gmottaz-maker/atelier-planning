@@ -868,6 +868,22 @@ projet propose alors les deux gestes, « créer le dossier »
 (`/api/projects/[id]/kdrive-folder`) ou « choisir un dossier existant ». Un
 projet SANS dossier est un état normal, pas un oubli.
 
+**Dupliquer un projet ne recopie ni son dossier, ni son passé.** Le même
+chantier se refait six mois plus tard : `projectCopy` (lib/duplicateDoc.js)
+reprend client, contact, résumé, notes, logistique, démontage, visite sur
+place et toute l'offre. Trois choses ne suivent JAMAIS, et pour des raisons,
+pas par goût. Le `kdrive_folder_id` : deux projets sur un même dossier
+mélangent leurs pièces, et la règle de la maison veut que ce dossier soit un
+geste. La `synthese` : c'est un condensé des mises à jour, qui elles ne
+suivent pas — la garder attribuerait à la copie une histoire qui n'a pas eu
+lieu. Le numéro d'offre et la `reference` client : ils désignent des documents
+déjà émis. L'offre repart en brouillon (`offerCopy`), la phase à zéro, la
+pause levée. Tâches, fichiers, heures et coûts ne suivent pas non plus : c'est
+le TRAVAIL fait sur le chantier d'origine, pas sa définition. La copie se fait
+côté serveur (`/api/projects/[id]/dupliquer`) — `quote_data` porte les prix
+d'achat et n'a aucune raison de faire l'aller-retour par le navigateur pour
+être réécrit tel quel.
+
 **La référence imprimée est celle de la FACTURE, à défaut celle du projet.** Un
 chantier facturé en acompte puis en solde peut porter deux bons de commande ;
 `customer_invoices.reference` prime donc sur `projects.reference`. Elle
@@ -930,6 +946,22 @@ C'est ce qui permet de chiffrer au détail sans imposer au client une offre
 longue comme le bras. `lib/quoteLines.js` est la seule source du barème et de
 la mise à plat — l'éditeur, le PDF et la validation serveur des factures
 doivent compter pareil, sinon une facture juste finit refusée.
+
+**Deux niveaux dans Logistique** : événement → ligne. Un chantier se déplace
+plusieurs fois — la pose, puis la reprise trois semaines plus tard — et chaque
+passage a son trajet, son montage et son démontage. En vrac dans une seule
+liste, on ne sait plus lequel va avec lequel, ni au chiffrage ni sur le PDF.
+L'événement n'a pas de prix propre : son total est la somme de ses lignes,
+comme un item. Son nom est FACULTATIF, et c'est ce qui rend la bascule
+invisible : un événement sans nom ne pose aucun en-tête et ses lignes
+s'impriment au premier niveau, exactement comme avant. `quote_data.logistics`
+était un tableau PLAT de lignes jusqu'au 24 septembre 2026 ;
+`evenementsLogistiques()` relit les deux formes, ligne par ligne, et une offre
+ancienne réimprimée donne le même PDF — un test compare les deux sorties.
+`normaliserDevis` continue d'exposer `logistics` À PLAT en plus des
+événements : les totaux, la marge transport et la rentabilité raisonnent ligne
+par ligne, leur imposer de traverser les groupes n'apprendrait rien et
+multiplierait les endroits où l'oublier.
 
 **Trois niveaux dans Fabrication** : item → élément (facultatif) → composition.
 Seule la composition porte des quantités et des prix ; un item et un élément

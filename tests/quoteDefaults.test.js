@@ -3,6 +3,11 @@ import {
   REGLAGES_OFFRE, DEFAUTS_OFFRE, normaliserReglagesOffre, defaultQuote,
   doitSemerOffreVierge,
 } from '../lib/quoteDefaults'
+import { normaliserDevis } from '../lib/quoteLines'
+
+// La logistique d'un devis vierge est un ÉVÉNEMENT qui porte ses lignes : on
+// la relit par la normalisation, ce qui vérifie l'aller-retour au passage.
+const lignesLog = q => normaliserDevis(q).logistics
 
 describe('normaliserReglagesOffre', () => {
   it('accepte des valeurs valides', () => {
@@ -64,7 +69,7 @@ describe('defaultQuote', () => {
       ['Visuels & développement', '160'],
       ['Visite sur place', '90'],
     ])
-    expect(q.logistics.map(l => [l.trajet, l.rate])).toEqual([
+    expect(lignesLog(q).map(l => [l.trajet, l.rate])).toEqual([
       ['Trajet', '4'],
       ['Montage', '95'],
       ['Démontage', '85'],
@@ -77,7 +82,11 @@ describe('defaultQuote', () => {
   it('sans réglage, produit l\'offre historique', () => {
     const q = defaultQuote()
     expect(q.management.map(l => l.rate)).toEqual(['120', '140', '100'])
-    expect(q.logistics.map(l => l.rate)).toEqual(['3', '100', '100'])
+    expect(lignesLog(q).map(l => l.rate)).toEqual(['3', '100', '100'])
+    // Un SEUL événement, et sans nom : un nom poserait un en-tête de groupe
+    // sur le PDF de toutes les offres, y compris celles qui n'ont qu'un aller.
+    expect(q.logistics).toHaveLength(1)
+    expect(q.logistics[0].nom).toBe('')
     expect(q.general_margin).toBe('20')
     expect(q.status).toBe('brouillon')
     expect(q.items).toEqual([])
@@ -85,7 +94,7 @@ describe('defaultQuote', () => {
   })
 
   it('donne un identifiant distinct à chaque ligne, et à chaque appel', () => {
-    const uids = q => [...q.management, ...q.logistics].map(l => l._uid)
+    const uids = q => [...q.management, ...lignesLog(q)].map(l => l._uid)
     const a = defaultQuote(), b = defaultQuote()
     const tous = [...uids(a), ...uids(b)]
     expect(new Set(tous).size).toBe(tous.length)
@@ -93,7 +102,7 @@ describe('defaultQuote', () => {
 
   it('laisse les quantités vides — c\'est le chiffrage qui les pose', () => {
     const q = defaultQuote()
-    for (const l of [...q.management, ...q.logistics]) expect(l.quantity).toBe('')
+    for (const l of [...q.management, ...lignesLog(q)]) expect(l.quantity).toBe('')
   })
 })
 

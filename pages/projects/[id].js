@@ -1832,6 +1832,37 @@ export default function ProjectPage() {
     setEditionEntete(true)
   }
 
+  // Dupliquer le projet entier. La copie se fait côté serveur : `quote_data`
+  // porte les prix d'achat et les marges, il n'a aucune raison de faire
+  // l'aller-retour par le navigateur pour être réécrit tel quel.
+  //
+  // Le nom est le seul champ demandé — le numéro est attribué par la base, et
+  // ce qui ne suit pas est annoncé ici plutôt que découvert après coup.
+  const [duplicationEnCours, setDuplicationEnCours] = useState(false)
+  async function dupliquerProjet() {
+    const nom = prompt('Nom du nouveau projet ?', `${project.name} (copie)`)
+    if (!nom || !nom.trim()) return
+    if (!confirm(
+      `Créer « ${nom.trim()} » à partir de ce projet ?\n\n`
+      + 'Sont repris : client, contact, résumé, notes, logistique, démontage, '
+      + 'visite sur place et toute l\'offre (en brouillon, sans numéro).\n\n'
+      + 'Ne suivent pas : le dossier kDrive, la référence client, la synthèse, '
+      + 'la phase — ni les tâches, fichiers, heures et coûts, qui sont le '
+      + 'travail fait sur CE chantier.'
+    )) return
+
+    setDuplicationEnCours(true)
+    try {
+      const copie = await apiFetch(`/api/projects/${project.id}/dupliquer`, {
+        method: 'POST', json: { name: nom.trim() }, silencieux: true,
+      })
+      router.push(`/projects/${copie.id}`)
+    } catch (e) {
+      alert(`Duplication impossible : ${e.message}`)
+      setDuplicationEnCours(false)
+    }
+  }
+
   async function enregistrerEntete() {
     if (!formEntete.name.trim()) return
     setEnregistrementEntete(true)
@@ -2600,11 +2631,19 @@ export default function ProjectPage() {
               retourner dans la liste, cliquer « modifier », puis revenir. */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap' }}>
             {!editionEntete && (
-              <button className="no-print" onClick={ouvrirEdition}
-                style={{ order: 3, background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: FONT, fontSize: 12.5, color: C.muted, padding: 0 }}>
-                modifier
-              </button>
+              <span className="no-print" style={{ order: 3, display: 'flex', alignItems: 'center', gap: 14 }}>
+                <button onClick={ouvrirEdition}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: FONT, fontSize: 12.5, color: C.muted, padding: 0 }}>
+                  modifier
+                </button>
+                <button onClick={dupliquerProjet} disabled={duplicationEnCours}
+                  title="Le même chantier, six mois plus tard : tout est repris sauf le numéro et le nom"
+                  style={{ background: 'none', border: 'none', cursor: duplicationEnCours ? 'progress' : 'pointer',
+                    fontFamily: FONT, fontSize: 12.5, color: C.muted, padding: 0 }}>
+                  {duplicationEnCours ? 'duplication…' : 'dupliquer'}
+                </button>
+              </span>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
               <span style={microLabel}>responsable</span>
