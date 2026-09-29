@@ -48,3 +48,22 @@ describe('matchesQuery', () => {
     expect(matchesQuery([null, undefined, ''], 'obi')).toBe(false)
   })
 })
+
+describe('découpage de la requête', () => {
+  const projet = ['152', 'BCV — Stand 2026', 'BC-4471']
+
+  it('trouve une référence tapée avec sa ponctuation', () => {
+    // Les CHAMPS étaient coupés sur la ponctuation, pas la requête : « BC-4471 »
+    // donnait un terme unique qu'aucun mot ne pouvait commencer.
+    expect(matchesQuery(projet, 'BC-4471')).toBe(true)
+    expect(matchesQuery(projet, 'bc 4471')).toBe(true)
+  })
+
+  it('ne ramène pas un document qui n\'a qu\'un des deux morceaux', () => {
+    expect(matchesQuery(['BC-9999'], 'BC-4471')).toBe(false)
+  })
+
+  it('une requête sans aucun caractère utile vaut une requête vide', () => {
+    expect(matchesQuery(projet, '---')).toBe(true)
+  })
+})

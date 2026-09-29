@@ -111,7 +111,11 @@ lib/
   fetchTimeout.js        — fetch avec délai maximal, pour tous les appels sortants
   apiError.js            — Réponses d'erreur normalisées + journalisation nettoyée
   api.js                 — Client API : res.ok, erreurs typées, annulation
-  projectHelpers.js      — Calculs et formatage de la fiche projet
+  projectHelpers.js      — Calculs et formatage de la fiche projet ; recherche libre
+                           dans la liste (`chercherProjets`)
+  textSearch.js          — Correspondance par DÉBUT DE MOT, tous les mots exigés.
+                           Requête et champs se découpent PAREIL — sur la
+                           ponctuation — sinon « BC-4471 » ne trouve pas « BC-4471 »
   paintPrices.js         — Tarif RUCO d'atelier (20 produits, prix facturés)
   paintCalc.js           — Chiffrage peinture : quantités, coût matière, temps
   annuaire.js            — Annuaire : validation, arbre par technique, recherche

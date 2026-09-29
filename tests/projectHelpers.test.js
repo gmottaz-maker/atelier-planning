@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   toDateStr, isCompletedToday, fmtDate, getDaysRemaining, getProjectColor,
-  ensureUid, initLogistics, parseTimeRange, combineTime, fmtTimeDisplay, fmtTaskDate,
-} from '../lib/projectHelpers'
+  ensureUid, initLogistics, parseTimeRange, combineTime, fmtTimeDisplay, fmtTaskDate, chercherProjets} from '../lib/projectHelpers'
 
 // Date figée : ces fonctions dépendent d'« aujourd'hui », un test qui s'appuie
 // sur l'horloge réelle finit par échouer un jour donné.
@@ -130,5 +129,57 @@ describe('libellé relatif d\'une date de tâche', () => {
 
   it('ne renvoie rien sans date', () => {
     expect(fmtTaskDate(null)).toBeNull()
+  })
+})
+
+// ── Recherche dans la liste des projets ──────────────────────────────────────
+describe('chercherProjets', () => {
+  const PROJETS = [
+    { id: 1, numero: 129, name: 'Trolley Nespresso', client: 'Fusion Pub SA', responsible: 'Arnaud' },
+    { id: 2, numero: 130, name: 'Chariot monobar', client: 'Rémy Cointreau Europe & MEA', responsible: 'Guillaume' },
+    { id: 3, numero: 152, name: 'BCV — Stand 2026', client: 'Banque Cantonale Vaudoise', reference: 'BC-4471',
+      logistics_address: 'Quai Perdonnet 12, 1820 Montreux' },
+  ]
+  const ids = q => chercherProjets(PROJETS, q).map(p => p.id)
+
+  it('rend la liste entière quand la requête est vide', () => {
+    expect(chercherProjets(PROJETS, '')).toHaveLength(3)
+    expect(chercherProjets(PROJETS, '   ')).toHaveLength(3)
+  })
+
+  it('trouve par numéro, par nom et par client', () => {
+    expect(ids('129')).toEqual([1])
+    expect(ids('trolley')).toEqual([1])
+    expect(ids('cointreau')).toEqual([2])
+  })
+
+  it('ignore accents et casse', () => {
+    expect(ids('REMY')).toEqual([2])
+    expect(ids('vaudoise')).toEqual([3])
+  })
+
+  it('exige TOUS les mots, dans n\'importe quel ordre', () => {
+    expect(ids('nespresso 129')).toEqual([1])
+    expect(ids('129 nespresso')).toEqual([1])
+    expect(ids('nespresso chariot')).toEqual([])
+  })
+
+  it('trouve par référence, responsable et adresse de chantier', () => {
+    // « le chantier à Montreux » est une façon normale de nommer un projet.
+    expect(ids('BC-4471')).toEqual([3])
+    expect(ids('montreux')).toEqual([3])
+    expect(ids('arnaud')).toEqual([1])
+  })
+
+  it('correspond par DÉBUT de mot, pas par sous-chaîne', () => {
+    // Compromis assumé de lib/textSearch : sans lui, trois lettres ramènent la
+    // moitié de la liste.
+    expect(ids('nes')).toEqual([1])
+    expect(ids('presso')).toEqual([])
+  })
+
+  it('ne casse pas sur une liste absente ou des champs manquants', () => {
+    expect(chercherProjets(null, 'x')).toEqual([])
+    expect(chercherProjets([{ id: 9 }], 'x')).toEqual([])
   })
 })

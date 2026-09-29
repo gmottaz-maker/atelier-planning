@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
 import { quoteStatusMeta, quoteStripe, offreAFaire, categorieOffre, compterOffres, CATEGORIES_OFFRE } from '../lib/quoteStatus'
-import { TYPES_LIVRAISON } from '../lib/projectHelpers'
+import { TYPES_LIVRAISON, chercherProjets } from '../lib/projectHelpers'
 import Link from 'next/link'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
@@ -844,6 +844,7 @@ export default function Admin() {
   // Filtre par état de l'offre. Garde la même valeur d'une visite à l'autre,
   // comme le mode d'affichage : on revient en général pour la même question.
   const [filtreOffre, setFiltreOffre]             = useState('tous')
+  const [recherche, setRecherche]                 = useState('')
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' && localStorage.getItem('projectsViewMode')
@@ -1026,9 +1027,20 @@ export default function Admin() {
   // ENTIÈRE, pas sur celle qu'on affiche : sinon un filtre actif afficherait
   // « 0 » à côté de toutes les autres pastilles.
   const comptesOffre = compterOffres(activeProjects)
-  const projetsVus = filtreOffre === 'tous'
-    ? activeProjects
-    : activeProjects.filter(p => categorieOffre(p.quote_data) === filtreOffre)
+  // La recherche s'applique APRÈS le filtre d'offre : les deux se cumulent,
+  // et les comptes des pastilles restent ceux de la liste entière — sinon
+  // taper trois lettres afficherait « 0 » partout.
+  const projetsVus = chercherProjets(
+    filtreOffre === 'tous'
+      ? activeProjects
+      : activeProjects.filter(p => categorieOffre(p.quote_data) === filtreOffre),
+    recherche,
+  )
+  // Un projet qu'on cherche est souvent un projet ARCHIVÉ — c'est même la
+  // raison la plus fréquente de chercher. La section des archivés se filtre
+  // donc aussi, et s'ouvre d'elle-même dès qu'une recherche la fait répondre.
+  const archivesVues = chercherProjets(archivedProjects, recherche)
+  const enRecherche  = recherche.trim().length > 0
   const inputClass = "w-full px-3 py-2 border u-line u-pill text-sm focus:outline-none focus:u-line transition-colors u-surface"
   // Un champ multiligne ne prend JAMAIS le rayon pill. À 999px sur une boîte de
   // 140px de haut, les deux coins se rejoignent et le champ devient une ellipse.
@@ -1458,6 +1470,36 @@ export default function Admin() {
             <ButtonPill onClick={() => { resetForm(); setShowForm(true) }}>+ nouveau projet</ButtonPill>
           </div>
 
+          {/* Recherche libre. Elle porte sur le numéro, le nom, le client, la
+              référence, le responsable et les adresses — tout ce par quoi on
+              désigne un projet à voix haute. Le calcul est dans
+              `lib/projectHelpers.js`, testé. */}
+          <div style={{ position: 'relative', marginBottom: 16, maxWidth: 420 }}>
+            <input
+              value={recherche}
+              onChange={e => setRecherche(e.target.value)}
+              placeholder="Chercher un projet — numéro, nom, client, référence…"
+              aria-label="Chercher un projet"
+              style={{
+                width: '100%', padding: '11px 38px 11px 14px', borderRadius: R.pill,
+                border: `1px solid ${C.border}`, background: C.surface,
+                font: `14px ${FONT}`, color: C.ink, outline: 'none',
+              }}
+            />
+            {enRecherche && (
+              <button
+                onClick={() => setRecherche('')}
+                aria-label="Effacer la recherche"
+                className="u-tactile"
+                style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  font: `16px ${FONT}`, color: C.muted, lineHeight: 1, padding: 0,
+                }}
+              >×</button>
+            )}
+          </div>
+
           {/* Filtre par état de l'offre — « combien de projets attendent encore
               que j'écrive ou que je corrige leur offre ? ». La pastille de la
               carte répond projet par projet, ce filtre les rassemble. Même
@@ -1484,8 +1526,17 @@ export default function Admin() {
           ) : projetsVus.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '80px 0' }}>
               <p style={{ color: C.muted, fontSize: 13 }}>
-                {activeProjects.length === 0 ? 'Aucun projet actif.' : 'Aucun projet dans ce filtre.'}
+                {activeProjects.length === 0 ? 'Aucun projet actif.'
+                  : enRecherche ? `Aucun projet actif pour « ${recherche.trim()} ».`
+                  : 'Aucun projet dans ce filtre.'}
               </p>
+              {/* Le projet cherché est peut-être archivé : on le dit plutôt que
+                  de laisser croire qu'il n'existe pas. */}
+              {enRecherche && archivesVues.length > 0 && (
+                <p style={{ color: C.muted, fontSize: 13, marginTop: 8 }}>
+                  {archivesVues.length} dans les projets archivés, plus bas.
+                </p>
+              )}
             </div>
           ) : viewMode === 'cards' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24, alignContent: 'start' }}>
@@ -1581,19 +1632,19 @@ export default function Admin() {
         </div>
 
         {/* Projets archivés */}
-        {archivedProjects.length > 0 && (
+        {archivesVues.length > 0 && (
           <div>
             <button onClick={() => setShowArchived(v => !v)}
               style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: 0,
                 border: 'none', background: 'none', cursor: 'pointer', font: `13px ${FONT}`, color: C.muted }}
               onMouseEnter={e => { e.currentTarget.style.color = AL.black }}
               onMouseLeave={e => { e.currentTarget.style.color = C.muted }}>
-              <span style={{ fontSize: 11 }}>{showArchived ? '▾' : '▸'}</span>
-              projets archivés ({archivedProjects.length})
+              <span style={{ fontSize: 11 }}>{showArchived || enRecherche ? '▾' : '▸'}</span>
+              projets archivés ({archivesVues.length}{enRecherche ? ` sur ${archivedProjects.length}` : ''})
             </button>
-            {showArchived && (
+            {(showArchived || enRecherche) && (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {archivedProjects.map(project => (
+                {archivesVues.map(project => (
                   <div key={project.id}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
                       padding: '14px 4px', borderTop: `1px solid ${C.border}`, fontSize: 13 }}>
