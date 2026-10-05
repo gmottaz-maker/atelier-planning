@@ -16,7 +16,7 @@ import { ETAT_CLES } from '../../../lib/economat'
 
 const supabase = getSupabaseServer()
 
-const CHAMPS = `id, code, jeton, designation, fournisseur_id, reference, quantite_commande, etat, etat_le`
+const CHAMPS = `id, code, jeton, designation, fournisseur_id, reference, quantite_commande, etat, etat_le, suivi`
 
 export default async function handler(req, res) {
   const utilisateur = await requireUser(req, res)
@@ -36,6 +36,11 @@ export default async function handler(req, res) {
   const { data: article, error: lecture } = await (id !== null ? requete.eq('id', id) : requete.eq('jeton', jeton)).maybeSingle()
   if (lecture) return erreurApi(req, res, 'internal', lecture, { route: 'economat/etat' })
   if (!article) return res.status(404).json({ error: 'Article introuvable' })
+  // V2 : un article dont le stock est configuré n'a plus d'état CHOISI — il
+  // est calculé depuis le stock (brief §6) et bouge par les gestes
+  // (`/api/economat/geste`). Seuls les articles pas encore configurés
+  // gardent ce geste V1 pendant la reprise.
+  if (article.suivi) return res.status(409).json({ error: 'Cet article suit son stock : utilise les gestes de stock.' })
 
   const maintenant = new Date().toISOString()
   const avant = article.etat

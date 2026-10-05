@@ -1,50 +1,38 @@
 // La vue rapide : ce qu'on voit après avoir scanné le QR d'une carte Kanban.
 //
-// Objectif UX du brief, et la seule chose à ne pas perdre de vue ici :
-// SCAN + UNE ACTION. Pas de menu, pas de barre latérale, pas d'onglet — quatre
-// gros boutons au pouce, et c'est fini. Tout ce qui ne sert pas à ça descend
-// sous la ligne de flottaison.
+// Brief V2, §11 : « scanner → voir le niveau actuel → faire une action →
+// terminé ». Pas de menu, pas de barre latérale, pas de fiche catalogue
+// complète : on est devant la boîte, la carte à la main. Tout ce qui ne sert
+// pas au geste descend sous la ligne de flottaison.
+//
+// Trois cas :
+//  - article configuré : le niveau, le geste, le réapprovisionnement ;
+//  - article pas encore configuré (repris de V1) : une invite à compléter la
+//    fiche, et rien d'autre — décision du 5 octobre 2026 ;
+//  - référence uniquement : pas de stock (§3.2), seulement l'identification.
 //
 // L'adresse est courte (`/e/<jeton>`) parce qu'elle est encodée dans un QR
 // imprimé à 20 mm : `/outils/economat/article/<jeton>` ferait soixante-dix
 // signes et obligerait à grossir le QR sur une carte déjà chargée.
-//
-// Ouvrir « Commander » NE CHANGE PAS l'état : on consulte souvent une fiche
-// produit sans rien commander.
-import { useState } from 'react'
 import Head from 'next/head'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import useSWR from 'swr'
-import { apiFetch } from '../../lib/api'
 import { AL, C, FONT, MONO, R } from '../../lib/theme'
-import { ETATS, etatInfo, couleurDe, categorieDe, lienCommande, enRetard, nomFournisseur } from '../../lib/economat'
-
-const jour = s => {
-  if (!s) return ''
-  const d = new Date(s)
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
+import {
+  couleurDe, categorieDe, nomFournisseur, nomEntree, estConfigure, libelleMouvement, quand, lienCommande,
+} from '../../lib/economat'
+import EconomatGestes from '../../components/EconomatGestes'
 
 export default function VueRapide() {
   const router = useRouter()
   const { jeton } = router.query
   const { data, error, mutate } = useSWR(jeton ? `/api/economat/fiche?jeton=${encodeURIComponent(jeton)}` : null)
-  const [enCours, setEnCours] = useState('')
-  const [souci, setSouci] = useState('')
 
   const article = data?.article
   const categories = data?.categories || []
   const fournisseurs = data?.fournisseurs || []
-
-  async function basculer(etat) {
-    setEnCours(etat); setSouci('')
-    try {
-      const maj = await apiFetch('/api/economat/etat', { method: 'POST', json: { jeton, etat }, silencieux: true })
-      // On réécrit localement plutôt que de recharger : le téléphone est
-      // souvent au fond de l'atelier, et l'écran doit répondre tout de suite.
-      mutate({ ...data, article: { ...article, ...maj } }, { revalidate: true })
-    } catch (e) { setSouci(e.message) } finally { setEnCours('') }
-  }
+  const unites = data?.unites || []
 
   if (error) {
     return (
@@ -60,9 +48,14 @@ export default function VueRapide() {
   const couleur = couleurDe(article, categories)
   const { feuille, racine } = categorieDe(article, categories)
   const nomCat = [racine?.nom, feuille && feuille.id !== racine?.id ? feuille.nom : null].filter(Boolean).join(' · ')
-  const commander = lienCommande(article, fournisseurs)
-  const retard = enRetard(article)
+  const reference = article.type === 'reference'
+  const configure = estConfigure(article)
   const chezQui = nomFournisseur(article.fournisseur_id, fournisseurs)
+
+  // Après un geste, la route renvoie l'article à jour : on le réécrit
+  // localement plutôt que de tout relire — le téléphone est souvent au fond
+  // de l'atelier. L'historique se relit ensuite, sans bloquer l'écran.
+  const maj = partiel => mutate({ ...data, article: { ...article, ...partiel } }, { revalidate: true })
 
   return (
     <>
@@ -72,9 +65,8 @@ export default function VueRapide() {
       </Head>
 
       <div style={{ minHeight: '100vh', background: C.surface, fontFamily: FONT }}>
-        {/* Le bandeau reprend la couleur du bandeau de la carte en papier :
-            on doit reconnaître au premier coup d'œil qu'on est sur le bon
-            article, sans lire. */}
+        {/* Le bandeau reprend la couleur de la carte en papier : on reconnaît
+            qu'on est sur le bon article sans lire. */}
         <div style={{ background: couleur, padding: '14px 18px 12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
             <span style={{ font: `500 11px ${MONO}`, letterSpacing: '.09em', textTransform: 'uppercase', color: AL.black }}>
@@ -88,85 +80,69 @@ export default function VueRapide() {
           <h1 style={{ font: `500 28px ${FONT}`, lineHeight: 1.15, letterSpacing: '-.01em', color: AL.black, margin: 0 }}>
             {article.designation}
           </h1>
-
-          {retard && (
-            <p style={{
-              font: `13px ${FONT}`, color: C.danger, background: C.dangerBg, borderRadius: R.panel,
-              padding: '8px 12px', margin: '12px 0 0',
-            }}>
-              Commandé le {jour(article.etat_le)} — au-delà du délai habituel ({article.delai_jours} j).
-            </p>
+          {article.sous_titre && (
+            <p style={{ font: `17px ${FONT}`, color: C.muted, margin: '4px 0 0' }}>{article.sous_titre}</p>
           )}
 
-          {/* L'ACTION PRINCIPALE, tout de suite et sans rien avant. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
-            {ETATS.map(e => {
-              const actif = article.etat === e.cle
-              return (
-                <button
-                  key={e.cle}
-                  onClick={() => basculer(e.cle)}
-                  disabled={!!enCours}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                    padding: '18px 8px', borderRadius: R.panel, cursor: 'pointer',
-                    border: `1.5px solid ${actif ? C.outline : C.border}`,
-                    background: actif ? AL.black : C.surface,
-                    color: actif ? AL.white : AL.black,
-                    font: `${actif ? 500 : 400} 14px ${FONT}`,
-                    opacity: enCours && enCours !== e.cle ? .5 : 1,
-                  }}
-                >
-                  <span style={{ fontSize: 26, lineHeight: 1 }}>{e.emoji}</span>
-                  {e.libelle}
-                </button>
-              )
-            })}
+          <div style={{ marginTop: 22 }}>
+            {reference && (
+              <p style={{ font: `15px ${FONT}`, color: C.muted, margin: 0 }}>
+                Référence uniquement : cet article n’est pas suivi en stock.
+              </p>
+            )}
+
+            {!reference && !configure && (
+              <div style={{ border: `1.5px dashed ${C.border}`, borderRadius: R.panel, padding: 18 }}>
+                <p style={{ font: `500 17px ${FONT}`, color: AL.black, margin: '0 0 6px' }}>Stock pas encore configuré</p>
+                <p style={{ font: `14px ${FONT}`, color: C.muted, margin: '0 0 14px' }}>
+                  Choisis le mode de suivi, l’unité, le stock cible et les seuils dans la fiche de l’article.
+                  Le QR servira ensuite à suivre le stock.
+                </p>
+                <Link href={`/outils/economat?article=${article.id}`} style={{
+                  display: 'block', textAlign: 'center', padding: '15px 18px', borderRadius: R.pill,
+                  background: AL.black, color: AL.white, font: `500 15px ${FONT}`, textDecoration: 'none',
+                }}>
+                  Configurer l’article
+                </Link>
+              </div>
+            )}
+
+            {!reference && configure && (
+              <EconomatGestes article={article} unites={unites} fournisseurs={fournisseurs} onMaj={maj} grand />
+            )}
           </div>
-          {souci && <p style={{ font: `13px ${FONT}`, color: C.danger, marginTop: 10 }}>{souci}</p>}
 
-          {commander && (
-            <a href={commander} target="_blank" rel="noopener noreferrer"
-              style={{
-                display: 'block', textAlign: 'center', marginTop: 12, padding: '15px 18px',
-                borderRadius: R.pill, border: `1.5px solid ${C.outline}`, background: C.surface,
-                font: `500 15px ${FONT}`, color: AL.black, textDecoration: 'none',
-              }}>
-              Commander chez {chezQui || 'le fournisseur'} ↗
-            </a>
-          )}
-
-          {/* Tout le reste, en dessous : utile, mais jamais devant l'action. */}
-          <dl style={{ margin: '28px 0 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Tout le reste, en dessous : utile, mais jamais devant le geste. */}
+          <dl style={{ margin: '30px 0 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Info cle="Emplacement" valeur={nomEntree(article.emplacement_id, data.emplacements)} />
             <Info cle="Fournisseur" valeur={chezQui} />
             <Info cle="Référence" valeur={article.reference} mono />
-            <Info cle="Emplacement" valeur={article.emplacement} />
-            <Info cle="Seuil stock bas" valeur={article.seuil_bas} />
-            <Info cle="Seuil à commander" valeur={article.seuil_commander} />
-            <Info cle="Quantité à commander" valeur={article.quantite_commande} />
-            <Info cle="Délai habituel" valeur={article.delai} />
+            <Info cle="Délai habituel" valeur={nomEntree(article.delai_id, data.delais)} />
             <Info cle="Fournisseur alternatif" valeur={nomFournisseur(article.fournisseur_alt_id, fournisseurs)} />
             <Info cle="Notes" valeur={article.notes} />
           </dl>
+          {reference && lienCommande(article, fournisseurs) && (
+            <a href={lienCommande(article, fournisseurs)} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-block', marginTop: 14, font: `14px ${FONT}`, color: AL.black }}>
+              Fiche chez {chezQui || 'le fournisseur'} ↗
+            </a>
+          )}
 
-          {(data.commandes || []).length > 0 && (
+          {(data.mouvements || []).length > 0 && (
             <div style={{ marginTop: 28, borderTop: `1px solid ${C.divider}`, paddingTop: 16 }}>
               <p style={{ font: `500 10.5px ${MONO}`, letterSpacing: '.09em', textTransform: 'uppercase', color: C.muted, margin: '0 0 8px' }}>
-                Dernières commandes
+                Derniers gestes
               </p>
-              {data.commandes.map(c => (
-                <p key={c.id} style={{ font: `13px ${FONT}`, color: C.muted, margin: '0 0 4px' }}>
-                  {jour(c.commande_le)}{c.quantite ? ` · ${c.quantite}` : ''}{c.par ? ` · ${c.par}` : ''}
-                  {c.recu_le ? ` · reçu le ${jour(c.recu_le)}` : ' · en attente'}
+              {data.mouvements.map(m => (
+                <p key={m.id} style={{
+                  font: `13px ${FONT}`, color: C.muted, margin: '0 0 4px',
+                  textDecoration: m.annule_le ? 'line-through' : 'none',
+                }}>
+                  {quand(m.le)} · {libelleMouvement(m, article, unites)}{m.par ? ` · ${m.par}` : ''}
                 </p>
               ))}
             </div>
           )}
-
-          <p style={{ font: `12px ${FONT}`, color: C.muted, marginTop: 28 }}>
-            État actuel : {etatInfo(article.etat).emoji} {etatInfo(article.etat).libelle}
-            {article.etat_le ? ` depuis le ${jour(article.etat_le)}` : ''}
-          </p>
         </div>
       </div>
     </>
@@ -174,9 +150,7 @@ export default function VueRapide() {
 }
 
 function Info({ cle, valeur, mono }) {
-  // Un champ vide ne laisse pas un label orphelin : la moitié des colonnes du
-  // fichier repris de Numbers sont vides, et afficher « Emplacement : — »
-  // huit fois d'affilée noierait ce qui est renseigné.
+  // Un champ vide ne laisse pas un label orphelin.
   if (!String(valeur || '').trim()) return null
   return (
     <div>

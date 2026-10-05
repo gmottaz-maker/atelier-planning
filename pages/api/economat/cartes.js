@@ -44,7 +44,8 @@ export default async function handler(req, res) {
 
   // Trois façons de désigner ce qu'on imprime : une sélection, une catégorie
   // (ses sous-catégories comprises), ou tout le catalogue actif.
-  let choisis = (articles.data || []).filter(a => !a.archived)
+  // Une « référence uniquement » n'a pas de carte Kanban (brief V2, §3.2).
+  let choisis = (articles.data || []).filter(a => !a.archived && a.type !== 'reference')
   const ids = String(req.query.ids || '').split(',').map(Number).filter(Number.isInteger)
   if (ids.length) {
     const voulus = new Set(ids)
