@@ -28,11 +28,14 @@ pages/
   login.js             — Connexion
   index.js             — Projets : cartes / kanban / gantt / liste (page principale)
   home.js              — Dashboard accueil + Google Agenda
-  schedule.js          — Horaires, congés et frais (page principale des non-admins)
+  schedule.js          — Horaires et congés : présence, solde, jours fériés
+                         (page principale des non-admins)
+  frais.js             — Mes notes de frais : photo du ticket, scan, dépôt (section dédiée)
   heures.js            — Heures imputées : projet × activité, jour par jour ; export et
                          activités pour l'admin (section dédiée)
   tasks.js             — Tâches, toutes catégories
-  planning.js          — Planning d'atelier
+  agenda.js            — Agenda par demi-journée, toute l'équipe (section dédiée)
+  planning.js          — Charge de l'atelier : la jauge (section dédiée)
   meeting.js           — Vue réunion
   activity.js          — Journal d'activité
   e/[jeton].js         — Vue rapide d'un article d'économat, après scan du QR de sa
@@ -878,13 +881,317 @@ devant le libellé pose le code d'une ligne déjà écrite sans toucher au texte
 au prix. Les activités ne sont PAS recopiées dans le catalogue — deux listes,
 deux tarifs, et l'une finirait par mentir. La conduite et l'interne n'y sont
 pas proposées. Un tarif absent laisse le prix VIDE plutôt que d'en mettre un
-par défaut. Une ligne sans code va dans « non ventilé », dit à l'écran. Les
-offres antérieures au 18 septembre 2026 n'ont aucun code et n'ont pas été
-réécrites.
+par défaut.
+
+**Une ligne EN HEURES doit porter une activité.** Le sélecteur affiche
+l'intitulé, pas seulement le code — il n'affichait que « 31 » sur 44 px, et un
+code oublié ne se voyait pas. Quand la ligne est en heures et le code absent,
+il passe en rouge (`requis`, depuis `estEnHeures`) ; l'éditeur compte les
+lignes manquantes en tête de l'offre, avec l'endroit d'où elles viennent ; et
+**une offre ne peut pas passer en « acceptée » tant qu'il en reste**. Les
+autres statuts restent libres : une offre se rédige par étapes, et bloquer un
+brouillon n'aiderait personne. Une ligne au kilomètre ou au forfait n'a pas
+d'activité à porter et n'est jamais signalée.
+
+**`lignesSansActivite` et `heuresParActivite` parcourent la MÊME liste**
+(`lignesMainOeuvre`). C'est ce qui garantit que les lignes signalées à l'écran
+sont exactement celles qui tombent dans `prevuSansCode` ; deux parcours
+séparés finiraient par diverger, et l'offre dirait « tout est ventilé »
+pendant que la jauge compterait des heures orphelines. Un test l'exige.
+
+Les offres antérieures au 18 septembre 2026 n'ont aucun code. Elles sont
+reprises À LA MAIN avant le 1er novembre 2026, date de mise en service de la
+rentabilité et du premier dépôt de feuilles d'heures ; la colonne « à coder »
+de `/planning` dit par quels projets commencer.
 
 **L'export neutralise les formules.** Une cellule texte commençant par
 `= + - @` est préfixée d'une apostrophe : une remarque « =HYPERLINK(...) »
 recopiée d'une feuille deviendrait sinon un lien piégé dans Excel.
+
+---
+
+## kDrive — où Maze dépose les pièces
+
+**Un seul identifiant en dur, et c'est une RACINE** : `ADMIN_ID = 53682`
+(`amazing files / 00. Admin`). Tout le reste se résout PAR NOM
+(`findOrCreateChild`).
+
+Cette règle vient d'une panne silencieuse. Les deux dossiers de dépôt étaient
+visés par leur propre id — `37796` et `37797`, « Claude Finance / Factures
+fournisseurs » et « … / Justificatifs ». Ces ids appartenaient à l'ancien
+`00. Admin`, **renommé `20. Admin Backup`** le jour où sa copie réorganisée a
+pris sa place. Le code a donc continué d'écrire dans le backup pendant des
+mois, sans qu'aucune erreur ne le signale : les dossiers existaient toujours.
+Au 5 octobre 2026, 234 pièces s'y étaient rangées, et 234 copies homonymes
+dormaient dans l'arbre vivant sans qu'aucune ligne de base ne les référence.
+**Un id en dur ne survit pas à un renommage, et ne le dit pas.**
+
+**Le classement, depuis le 5 octobre 2026 :**
+
+```
+00. Admin / Finances / Comptabilité / Comptabilité <année> / Factures fournisseurs / T<trimestre>
+00. Admin / Finances / Comptabilité / Comptabilité <année> / Justificatifs        / T<trimestre>
+```
+
+**Deux régimes dans ce chemin, et la frontière est voulue.** `Finances` et
+`Comptabilité` sont la STRUCTURE : `dossierExistant` les exige, et un dépôt
+échoue en disant lequel manque. L'année, la rubrique et le trimestre se créent
+à la demande — en janvier, « Comptabilité 2027 » n'existe pas encore, et c'est
+normal. Appliquer `findOrCreateChild` à un dossier de structure est exactement
+ce qui a produit la panne : l'original renommé, un homonyme vide recréé à côté,
+et les pièces qui s'empilent dans un arbre fantôme. **Un dépôt qui échoue en
+annonçant pourquoi se répare en deux minutes ; deux cents documents mal classés
+en silence coûtent une journée.**
+
+Les scans ne vivent plus à côté de la comptabilité mais DEDANS, dans l'année
+concernée : la fiduciaire n'a plus deux endroits à regarder pour un même
+exercice. Le découpage par trimestre est celui de la TVA.
+
+**Tout l'exercice est dans son dossier d'année** (5 octobre 2026). Un contrôle
+fiscal n'ouvre qu'un dossier :
+
+```
+00. Admin / Finances / Comptabilité / Comptabilité <année> /
+    Factures fournisseurs / T<n>      ← déposées par Maze
+    Justificatifs         / T<n>      ← tickets déposés par Maze
+    Justificatifs comptables / T<n>   ← les 929 pièces historiques, versées depuis
+                                        « Justificatifs comptables »
+```
+
+`Justificatifs` et `Justificatifs comptables` restent SÉPARÉS, et ce n'est pas
+une hésitation : les premiers viennent de Maze, les seconds de l'archive, et
+certaines pièces d'un même trimestre sont peut-être le même ticket scanné deux
+fois. Les fusionner rendrait la question indécidable.
+
+**Deux choses ne sont PAS versées dans les années, et ne doivent pas l'être :**
+
+- l'export bexio — son arborescence suit la date de SAISIE : « Saisie 2024 »
+  contient des pièces de 2023, parce que la saisie se faisait par rattrapages.
+  Le verser par année de document mélangerait les exercices. 3185 pièces,
+  saisies de 2018 à 2026.
+- `_Sans date` — trois pièces dont la date est illisible ou absente ; sans
+  année, pas de destination.
+
+Les 929 pièces parties dans les années, ce qui restait ne s'appelait plus
+« Justificatifs comptables » : le dossier est devenu
+**`Finances / Export bexio 2018-2026`**, nommé par ce qu'il contient.
+
+**L'année et le trimestre viennent de la date du DOCUMENT**, pas de celle du
+scan (`quarterOf(date)` pour un frais, `quarterOf(issue_date)` pour une
+facture). Une facture de décembre numérisée en janvier appartient à l'exercice
+de décembre — c'est le seul classement qu'un comptable accepte. C'est ce qui a
+rangé tout seul les deux pièces de 2025 dans `Comptabilité 2025`.
+
+**Un déplacement kDrive CONSERVE l'identifiant du fichier** (vérifié sur un
+fichier jetable avant de toucher à quoi que ce soit). C'est pour ça que la
+reprise s'est faite par déplacement et non par copie : les 234 références de
+`expenses.kdrive_file_id` et `supplier_invoices.kdrive_file_id` ont survécu
+sans une seule écriture en base.
+
+**Deux scripts de reprise**, `scripts/ranger-finance.mjs` (les 234 scans de
+Maze) et `scripts/ranger-justificatifs.mjs` (les 929 pièces historiques), qui ne font rien sans
+`--ecrire`, écrivent dans le MÊME journal TSV, et `scripts/annuler-ranger-finance.mjs`
+le rejoue à l'envers. Il refuse d'écarter un « doublon » dont la TAILLE diffère de
+l'original : même nom ne veut pas dire même fichier, et la version la plus
+récente peut être celle qu'on s'apprêtait à jeter. Les doublons ne sont jamais
+supprimés, seulement déplacés dans `00. Admin / _A supprimer` — vider reste un
+geste humain.
+
+**L'annulation ne vaut que tant que les dossiers d'origine existent.** Elle
+rejoue des déplacements, donc elle a besoin de la destination d'origine. Les
+coquilles vidées du 5 octobre 2026 — `Claude Finance` dans les deux arbres,
+puis les dix dossiers d'année de `Justificatifs comptables` — ont été
+supprimées à la demande, après contrôle récursif du vide : le reclassement de
+cette journée n'est donc plus rejouable à l'envers par script. Reste la
+corbeille kDrive. Les suppressions sont tracées dans le journal, en lignes de
+commentaire que l'annulation ignore.
+
+---
+
+## Navigation — où va quoi
+
+La sidebar a quatre zones, et leur ordre dit la fréquence :
+
+```
+accueil · projets · tâches · agenda · meeting · outils     ce qu'on ouvre en travaillant
+MON TEMPS            horaires · heures · frais             ce que chacun saisit pour soi
+FINANCES CLIENTS     …                                     (admin)
+FINANCES INTERNES    …                                     (admin)
+REPORTING            charge de l'atelier · journal         ce qu'on regarde (admin)
+```
+
+**Agenda, horaires et heures étaient côte à côte dans la liste plate** : trois
+mots qui disent « temps » sans dire lequel, et qu'il fallait ouvrir pour s'en
+souvenir. Seul l'agenda y reste — c'est le seul qu'on touche plusieurs fois par
+jour. Les autres sont groupés sous une étiquette qui fait la moitié du travail :
+*horaires* = étais-je là, *heures* = à quoi je l'ai passé, *frais* = ce que j'ai
+avancé.
+
+**REPORTING n'est pas une zone de travail.** La charge de l'atelier y est parce
+qu'on l'ouvre pour décider si l'on peut dire oui à un client, pas pour
+produire ; en tête de liste, à côté des projets, elle se faisait passer pour un
+écran quotidien.
+
+**Les frais ne sont PAS dans les horaires.** Un reçu de parking n'est pas une
+demi-journée de vacances, et la page des horaires était deux écrans cousus.
+`/frais` (tout le monde) est l'écran de celui qui DÉPENSE : photo du ticket,
+scan, dépôt. `/justificatifs` (admin) est celui de celui qui CLASSE :
+rapprochement, comptes, export. **Supprimer le dépôt plutôt que le déplacer
+aurait retiré à un membre sa seule façon de rendre un ticket** — `/api/expenses`
+ramène un non-admin à son propre nom, mais encore faut-il un écran.
+
+**Tout écran retiré de `MAIN_ITEMS` doit figurer dans un groupe repris par
+`BottomNav`**, sinon il devient inatteignable au doigt : la barre du bas est la
+seule navigation sous 768 px, et dix-huit pages avaient déjà disparu ainsi.
+
+**La pointeuse n'existe plus** (`clock_sessions`, `/api/clock-session`,
+pointage arrivée/départ). Rien ne fermait jamais une session : au 5 octobre
+2026, deux étaient ouvertes depuis le 27 août, et pointer le départ aurait
+écrit une journée de travail datée de ce jour-là. La saisie des horaires se
+fait à la main dans la fenêtre du jour — c'était déjà la seule voie qui
+marchait (`schema-pointeuse-retrait.sql`).
+
+---
+
+## Agenda (`/agenda`)
+
+**Une table, `agenda`, pour tout ce qui occupe quelqu'un** : production,
+montage, démontage, trajet, meeting, admin, entretien. Google Agenda tenait ça
+dans cinq calendriers séparés qui ne savaient ni à quel projet ni à quelle
+activité vendue ils appartenaient — c'est ce lien qui manquait, pas un
+calendrier de plus. Un bloc porte `project_id` et `activite`, donc il décharge
+quelque chose.
+
+**Pas d'heure de début.** Une demi-journée (`demi` = `am` | `pm`), et c'est
+tout : un atelier ne commence pas une soudure à 9 h 15 parce qu'un calendrier
+l'a écrit, et un horaire faux à la minute est un horaire qu'on cesse de lire.
+**Une journée entière est DEUX lignes**, pas une troisième valeur `jour` —
+sinon chaque somme de demi-journées traîne un cas particulier, et chaque oubli
+de ce cas donne un total faux.
+
+**La durée se compte par demi-heures** (`minutes`, multiple de 30, max 300),
+et vide = toute la demi-journée. C'est ce qui permet de poser « 30 min de
+ponçage léger » sans bloquer quatre heures : trois heures de peinture ne sont
+pas un bloc de trois heures mais une demi-heure, un séchage, un ponçage et une
+reprise. Une demi-journée vaut la MOITIÉ DU CONTRAT (4,2 h à 33,6 h/semaine),
+jamais quatre heures en dur.
+
+**Ce qui n'est pas dans `agenda`** : les absences restent dans `work_entries`
+(elles disent « indisponible », pas « occupé à ceci », et chacun saisit les
+siennes dans `/schedule`) ; les fériés ne sont dans aucune table, ils se
+calculent ; les heures faites restent dans `heures`. **L'agenda dit le PRÉVU,
+`heures` dit le constaté.**
+
+**L'écran refuse de laisser poser du travail sur une absence** : congés et
+fériés sont dessinés par-dessus la grille, et la demi-journée n'a alors pas de
+bouton. C'est la faute que l'ancien planning laissait commettre en silence,
+parce qu'il ignorait les congés.
+
+**Un membre ne voit et n'écrit que son agenda** ; le nom vient du JWT. L'admin
+voit l'équipe et place pour chacun — il est le seul garant du planning.
+`/api/work-entries?userName=*` a été ouvert à l'admin pour la même raison :
+poser un montage sur la semaine de vacances d'un collègue doit être impossible
+à l'écran.
+
+**`source` est posée par le serveur** (`main` | `offre` | `planificateur`), et
+`fige` protège un bloc du futur planificateur : un montage annoncé au client
+est une promesse, pas une préférence.
+
+**La semaine type n'écrit AUCUN bloc.** Rangée dans
+`app_settings.semaine_type` (admin), forme
+`{ "Guillaume": { "1": ["admin", "production"] } }` où la clé est le jour au
+sens de `getDay()`. Elle colore le fond des demi-journées vides et propose le
+type au moment de poser. La matérialiser en centaines de blocs identiques
+obligerait à les supprimer un par un le jour où l'habitude change. **Elle ne se
+retire pas de la capacité de la jauge** : une partie de l'administratif est de
+la gestion de projet, qui est vendue et porte son code — la retirer de la
+capacité ET la compter dans la demande la compterait deux fois.
+
+**Un bloc posé hors semaine d'atelier ne compte dans aucune capacité.** La
+table accepte n'importe quelle date — un montage exceptionnel un samedi se
+consigne — mais `JOURS_TRAVAILLES` ne connaît que lundi, mardi, jeudi,
+vendredi, et la jauge non plus. L'écran le dit au lieu de le cacher.
+
+---
+
+## Charge de l'atelier (`/planning`) — admin
+
+**Une seule question : « est-ce qu'on peut prendre ce projet ? »** L'écran ne
+pose aucun bloc, ne choisit aucun ordre, ne connaît ni le séchage de la
+peinture ni les délais de livraison. Il compare ce qu'on doit encore au temps
+qui reste. Tout le calcul vit dans `lib/capacite.js`, testé sans base ni
+réseau ; `/api/capacite` ne fait que rassembler les ingrédients, et la page
+n'affiche. **Si l'écran se met à calculer, c'est qu'il faut le remonter dans
+la lib.**
+
+**Aucune table nouvelle.** Les heures viennent de l'offre (chaque ligne de
+main-d'œuvre porte son code d'activité), le réel des heures imputées, les
+congés de `work_entries`, le contrat de `work_settings`. L'écran remplace
+l'ancien planning par demi-journées, qui demandait de ressaisir à la main ce
+que l'offre savait déjà. `work_slots` et `lib/googleCalendar.js` ne sont donc
+plus lus par `/planning` — l'agenda de l'étape suivante les reprendra ou les
+enterrera.
+
+**« Ça ne rentre pas » a toujours raison ; « ça rentre » dit seulement qu'il
+n'y a pas de mur.** La jauge suppose le travail infiniment divisible et ignore
+l'ordre des étapes : vingt heures de peinture « rentrent » dans vingt heures
+libres, même si le séchage les étale sur trois semaines.
+
+**Deux choses qu'un total global cache, et que l'écran montre :**
+
+- **le goulot** — une activité qu'une seule personne sait faire peut déborder
+  alors que la somme des deux capacités tient largement. Avec deux personnes
+  l'attribution se résout EXACTEMENT : ce qu'un seul sait faire lui est
+  imposé, le reste va dans un pot commun, et ça tient si chacun absorbe son
+  imposé ET si le total rentre dans le total ;
+- **le mur** — la première échéance qui casse. Chaque palier porte tout ce qui
+  est dû avant lui : décembre peut tenir quand la semaine du 20 octobre est
+  déjà perdue, parce que trois chantiers tombent le même jour.
+
+**La fenêtre part de DEMAIN.** La journée en cours est entamée ; la compter
+entière promet des heures qu'on n'a plus. Elle finit à la dernière échéance
+engagée, **mais jamais à moins de huit semaines** : sans ce plancher, un
+atelier dont tout est livré dans quinze jours n'aurait que quinze jours à
+opposer au prochain client et refuserait un projet qu'il a tout le temps de
+faire. `?au=YYYY-MM-DD` pose la question sur une autre date.
+
+**Une échéance déjà passée ne fait pas un palier.** Il n'y a plus une heure
+disponible avant elle : elle ne tiendrait jamais, et le mur désignerait
+toujours la plus vieille date en retard au lieu de la prochaine qui va céder.
+Ces heures sortent dans `enRetard` — et continuent de peser sur tous les
+paliers suivants, parce qu'un retard ne s'efface pas, il se reporte.
+
+**Les heures sans code d'activité ne comptent dans aucune jauge.** Elles sont
+dues, mais on ne sait pas qui sait les faire. Les offres antérieures au
+18 septembre 2026 n'ont aucun code : au 3 octobre 2026, c'est 218 h sans code
+contre 75 h comptées sur les offres acceptées. L'écran l'affiche en tête, et
+tant que ce chiffre est le plus gros des deux **la jauge est optimiste par
+construction**.
+
+**Les compétences vivent dans `app_settings.competences`**, pas dans une
+table : deux personnes et une vingtaine d'activités, quarante cases qui
+bougent une fois par an (même arbitrage que les coefficients de peinture).
+Forme `{ "Arnaud": [20, 21, …] }` — la liste des codes que la personne SAIT
+faire. **Une personne absente de l'objet sait tout faire** : c'est l'état de
+départ, et il vaut mieux une jauge optimiste qu'une jauge qui refuse un projet
+parce qu'un écran n'a pas été rempli. Clé ADMIN en lecture comme en écriture :
+c'est elle qui décide qu'un chantier « ne rentre pas », et une erreur ici fait
+refuser un projet qu'on aurait pu prendre.
+
+**Une personne sans `work_settings` n'a aucune capacité.** Inventer une
+semaine de 42 h pour quelqu'un dont on ne sait rien ferait tenir des projets
+qui ne tiennent pas. L'écran dit alors qu'il n'a rien à mesurer et renvoie
+vers `/schedule`.
+
+**`weekly_hours` se divise par les jours TRAVAILLÉS, pas par cinq.** L'atelier
+travaille lundi, mardi, jeudi, vendredi (`JOURS_TRAVAILLES`) : 33,6 h donnent
+8,4 h par jour, pas 6,72 h — le temps d'un jour qui n'existe pas.
+
+**Les jours fériés vaudois sont dans `lib/joursFeries.js`**, extraits de
+`schedule.js` où ils vivaient au milieu d'un composant. Il y MANQUAIT le Lundi
+du Jeûne fédéral (le lundi suivant le troisième dimanche de septembre) : une
+journée de travail comptée en trop chaque année. Le 1er mai n'y est pas, et
+c'est volontaire — il est férié à Genève, pas dans le canton de Vaud.
 
 ---
 
@@ -1254,6 +1561,8 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-profiles-role.sql` | colonne `profiles.role` | `ALTER TABLE profiles DROP COLUMN role;` |
 | `schema-integrite-financiere.sql` | `reconcile_match()`, `next_invoice_number()`, `storage_billing_key`, index d'unicité | en fin de fichier |
 | `schema-work-slots.sql` | table `work_slots` (planning par demi-journée) | `DROP TABLE work_slots;` |
+| `schema-agenda.sql` | table `agenda` (demi-journées typées, remplace `work_slots`) | `DROP TABLE agenda;` |
+| `schema-pointeuse-retrait.sql` | supprime `clock_sessions` (pointeuse retirée) | aucun — le code lecteur est supprimé |
 | `schema-bank-classification.sql` | `bank_transactions.classification` + comptes par défaut (salaires, virements internes) | en fin de fichier |
 | `schema-heures.sql` | `projects.numero`, tables `activites` et `heures` | en fin de fichier |
 | `schema-project-couts.sql` | table `project_couts` (coûts réels saisis par projet) | en fin de fichier |
