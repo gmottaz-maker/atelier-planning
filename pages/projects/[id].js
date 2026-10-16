@@ -36,7 +36,7 @@ import { estAudio, estImage, libelleEntree, messageTranscription, nomLisible } f
 import { champsCommande, majCommande } from '../../lib/commandes'
 import { champsSousTraitance, majSousTraitance } from '../../lib/sousTraitance'
 import useSWR from 'swr'
-import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT, mainOeuvreReelle, margeReelle, heuresParActivite } from '../../lib/rentabilite'
+import { prevuDevis, reelProjet, comparaison, CATEGORIES_COUT, mainOeuvreReelle, margeReelle, heuresParActivite, lignesSansActivite } from '../../lib/rentabilite'
 import { formatDuree } from '../../lib/heures'
 import { compensationConsommee, ligneCompensation, CODE_CONSULTING } from '../../lib/consulting'
 import { useTransport } from '../../lib/useTransport'
@@ -2223,15 +2223,22 @@ export default function ProjectPage() {
     return p + l
   }
 
-  async function saveQuote() {
+  // `devis` explicite : `setQuote` n'a pas encore eu lieu quand on enregistre
+  // dans la foulée d'un changement, et l'état lu ici serait celui d'AVANT.
+  // C'est ce décalage qui ferait repartir l'ancien statut vers la base.
+  async function saveQuote(devis) {
+    const aEcrire = devis || quote
     setQuoteSaving(true)
     try {
       const r = await fetch(`/api/projects/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-actor': currentUser },
-        body: JSON.stringify({ ...project, quote_data: quote }),
+        body: JSON.stringify({ ...project, quote_data: aEcrire }),
       })
       if (r.ok) setQuoteDirty(false)
+      return r.ok
+    } catch {
+      return false
     } finally {
       setQuoteSaving(false)
     }
@@ -3435,7 +3442,37 @@ export default function ProjectPage() {
                             pill outline : c'est un contrôle, donc radius 999. */}
                         <select
                           value={quote.status || 'brouillon'}
-                          onChange={e => { setQuote(q => ({ ...q, status: e.target.value })); setQuoteDirty(true) }}
+                          onChange={e => {
+                            // Accepter une offre, c'est s'engager à la produire : à partir
+                            // de là ses heures entrent dans la charge de l'atelier et
+                            // serviront de référence à la feuille d'heures. Des heures sans
+                            // activité y seraient invisibles — on les fait coder d'abord.
+                            // Les autres statuts restent libres : une offre se rédige par
+                            // étapes, et bloquer un brouillon n'aiderait personne.
+                            const manquantes = lignesSansActivite(quote)
+                            if (e.target.value === 'accepte' && manquantes.length > 0) {
+                              alert(
+                                `${manquantes.length} ligne(s) en heures n'ont pas d'activité (` +
+                                `${Math.round(manquantes.reduce((t, l) => t + l.heures, 0) * 10) / 10} h).\n\n` +
+                                'Une offre acceptée alimente la charge de l\'atelier et sert de ' +
+                                'référence aux heures imputées : ces heures-là y seraient invisibles.\n\n' +
+                                'Choisis une activité sur chaque ligne signalée en rouge, puis réessaie.'
+                              )
+                              return
+                            }
+                            // Le statut s'enregistre SEUL, comme dans la liste des offres
+                            // (`changeOfferStatus`). Il y était écrit au clic et ici il
+                            // attendait le bouton « Enregistrer » : on passait une offre
+                            // en « envoyé », on quittait la page, et la liste continuait
+                            // d'afficher un brouillon — le changement n'avait jamais
+                            // atteint la base. Un statut est un état, pas une rédaction.
+                            const suivant = { ...quote, status: e.target.value }
+                            setQuote(suivant)
+                            setQuoteDirty(true)
+                            saveQuote(suivant).then(ok => {
+                              if (!ok) alert('Le statut n\'a pas pu être enregistré — vérifie la connexion, puis clique sur Enregistrer.')
+                            })
+                          }}
                           style={{ fontFamily: FONT, fontSize: 13, padding: '0.45rem 1rem', borderRadius: R.pill,
                             border: `1.5px solid ${C.outline}`, background: C.surface, color: AL.black, cursor: 'pointer' }}>
                           {QUOTE_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}

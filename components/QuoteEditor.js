@@ -9,11 +9,12 @@
 import { useState } from 'react'
 import CatalogPicker, { toPurchaseRow, toRateRow } from './CatalogPicker'
 import ActivitePicker, { CodeActivite } from './ActivitePicker'
+import { estEnHeures, lignesSansActivite } from '../lib/rentabilite'
 import QtyInput from './QtyInput'
 import { fmtCHF } from '../lib/money'
 import { genRowUid, genItemUid, copierItem, copierEvenement, deplacerLigne, evenementsLogistiques } from '../lib/quoteLines'
 import { DEFAUTS_OFFRE, normaliserReglagesOffre } from '../lib/quoteDefaults'
-import { AL, C, FONT, R } from '../lib/theme'
+import { AL, C, FONT, MONO, R } from '../lib/theme'
 import { ligneForfait } from '../lib/transport'
 
 // Styles partagés — le système n'a qu'une bordure (le filet outline 1.5px) et
@@ -149,8 +150,8 @@ function CompositionElement({
             return (
               <tr key={`${kind}-${r._uid || i}`} className={'group quote-row' + (r.hidden ? ' opacity-60' : '')}>
                 <td className={td}>
-                  <span style={{ display: 'flex', alignItems: 'center' }}>
-                    {!achat && <CodeActivite valeur={r.activite} onChange={v => onUpdate(kind, i, 'activite', v)}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {!achat && <CodeActivite requis={estEnHeures(r.unit)} valeur={r.activite} onChange={v => onUpdate(kind, i, 'activite', v)}
                       texte={r.description} onTexte={t => onUpdate(kind, i, 'description', t)} />}
                     <input className={txtCell} placeholder={achat ? 'Matériau' : 'Main d\'œuvre'}
                       value={r.description || ''} onChange={e => onUpdate(kind, i, 'description', e.target.value)} />
@@ -403,9 +404,40 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
   `
   const tdRO = "px-3 py-1.5 text-sm text-right u-ink tabular-nums"
 
+  // Les lignes en heures qui n'ont pas d'activité. Tant qu'il en reste, ces
+  // heures sont dues mais inattribuables : la jauge de charge ne sait pas qui
+  // peut les faire, et la feuille d'heures n'aura rien à quoi se comparer.
+  const sansActivite = lignesSansActivite(quote)
+
   return (
     <>
       <style>{styleLocal}</style>
+                    {sansActivite.length > 0 && (
+                      <div style={{ border: `1.5px solid ${C.warning}`, background: C.warningBg, borderRadius: R.panel, padding: '14px 18px' }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>
+                          {sansActivite.length} ligne{sansActivite.length > 1 ? 's' : ''} en heures sans activité
+                          {' · '}{Math.round(sansActivite.reduce((t, l) => t + l.heures, 0) * 10) / 10} h
+                        </div>
+                        <p style={{ margin: '6px 0 10px', fontSize: 13, color: AL.black }}>
+                          Ces heures sont vendues, mais rien ne dit de quel métier elles relèvent :
+                          la charge de l&apos;atelier ne sait pas qui peut les faire, et la feuille
+                          d&apos;heures n&apos;aura rien à quoi les comparer. Choisis une activité dans le
+                          menu en tête de chaque ligne signalée.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {sansActivite.slice(0, 8).map((l, i) => (
+                            <span key={i} style={{ fontSize: 12.5, color: AL.black }}>
+                              <span style={{ font: `11px ${MONO}`, color: C.muted, marginRight: 8 }}>{l.ou}</span>
+                              {l.description} — {l.heures} h
+                            </span>
+                          ))}
+                          {sansActivite.length > 8 && (
+                            <span style={{ fontSize: 12.5, color: C.muted }}>… et {sansActivite.length - 8} autre{sansActivite.length - 8 > 1 ? 's' : ''}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* ── Marge générale ── */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', border: `1.5px solid ${C.outline}`, borderRadius: R.panel, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14, fontWeight: 500, color: AL.black }}>Marge générale</span>
@@ -466,8 +498,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                             ) : quote.management.map((r, i) => (
                               <tr key={r._uid || i} className="group quote-row">
                                 <td className={td}>
-                                  <span style={{ display: 'flex', alignItems: 'center' }}>
-                                    <CodeActivite valeur={r.activite} onChange={v => updateManagementRow(i, 'activite', v)}
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <CodeActivite requis={estEnHeures(r.unit)} valeur={r.activite} onChange={v => updateManagementRow(i, 'activite', v)}
                                       texte={r.item} onTexte={t => updateManagementRow(i, 'item', t)} />
                                     <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.item || ''} onChange={e => updateManagementRow(i, 'item', e.target.value)} />
                                   </span>
@@ -650,8 +682,8 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                   ) : it.labor.map((r, i) => (
                                     <tr key={r._uid || i} className="group quote-row">
                                       <td className={td}>
-                                        <span style={{ display: 'flex', alignItems: 'center' }}>
-                                          <CodeActivite valeur={r.activite} onChange={v => updateItemRow(itemIdx, 'labor', i, 'activite', v)}
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                          <CodeActivite requis={estEnHeures(r.unit)} valeur={r.activite} onChange={v => updateItemRow(itemIdx, 'labor', i, 'activite', v)}
                                             texte={r.description} onTexte={t => updateItemRow(itemIdx, 'labor', i, 'description', t)} />
                                           <input className={txtCell} value={r.description || ''} onChange={e => updateItemRow(itemIdx, 'labor', i, 'description', e.target.value)} />
                                         </span>
@@ -939,9 +971,9 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                   ) : ev.lignes.map((r, i) => (
                                     <tr key={r._uid || i} className="group quote-row">
                                       <td className={td}>
-                                        <span style={{ display: 'flex', alignItems: 'center' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                           {/^heure/.test(String(r.unit || '')) && (
-                                            <CodeActivite valeur={r.activite} onChange={v => updateLogisticsRow(ei, i, 'activite', v)}
+                                            <CodeActivite requis={estEnHeures(r.unit)} valeur={r.activite} onChange={v => updateLogisticsRow(ei, i, 'activite', v)}
                                               texte={r.trajet} onTexte={t => updateLogisticsRow(ei, i, 'trajet', t)} />
                                           )}
                                           <input className={txtCell} style={{ background: C.neutralBg, fontWeight: 500 }} value={r.trajet || ''} onChange={e => updateLogisticsRow(ei, i, 'trajet', e.target.value)} />

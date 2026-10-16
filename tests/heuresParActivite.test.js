@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { heuresParActivite } from '../lib/rentabilite'
+import { heuresParActivite, lignesSansActivite, lignesMainOeuvre } from '../lib/rentabilite'
 
 const ACTIVITES = [
   { code: 10, libelle: 'Gestion de projet', famille: 'gestion', facturee_heure: true },
@@ -87,5 +87,60 @@ describe('heuresParActivite — offert contre passé, métier par métier', () =
   it('range par code, donc par famille', () => {
     const { lignes } = heuresParActivite(devis, [], ACTIVITES)
     expect(lignes.map(l => l.code)).toEqual([10, 23, 31, 40])
+  })
+})
+
+describe('lignesSansActivite — la liste de ce qu\'il reste à coder', () => {
+  const devis = {
+    management: [{ item: 'Suivi', rate: 140, quantity: 4, unit: 'heure(s)' }],          // sans code
+    items: [{
+      name: 'Bar',
+      labor: [
+        { description: 'Peinture', rate: 120, quantity: 12, unit: 'heure(s)', activite: 31 },
+        { description: 'Ponçage', rate: 120, quantity: 3, unit: 'heure(s)' },           // sans code
+      ],
+      elements: [{ name: 'Socle', labor: [{ description: 'Soudure', rate: 120, quantity: 2, unit: 'h' }] }],  // sans code
+    }],
+    logistics: [
+      { trajet: 'Aller', rate: 3, quantity: 58, unit: 'km' },                           // pas des heures
+      { trajet: 'Montage', rate: 120, quantity: 6, unit: 'heure(s)', activite: 40 },
+    ],
+  }
+
+  it('ne retient QUE les lignes en heures sans code', () => {
+    const manquantes = lignesSansActivite(devis)
+    expect(manquantes.map(m => m.description)).toEqual(['Suivi', 'Ponçage', 'Soudure'])
+    // Le kilométrage n'a pas d'activité et n'en a pas besoin : il ne se
+    // compare à aucune ligne de feuille d'heures.
+    expect(manquantes.some(m => m.description === 'Aller')).toBe(false)
+  })
+
+  it('dit d\'où vient chaque ligne, pour la retrouver dans un devis long', () => {
+    expect(lignesSansActivite(devis).map(m => m.ou)).toEqual(['Gestion projet', 'Bar', 'Bar › Socle'])
+  })
+
+  it('signale EXACTEMENT les heures que la jauge ne sait pas ventiler', () => {
+    // La propriété qui compte : l'éditeur et le calcul parcourent la même
+    // liste. S'ils divergeaient, l'offre dirait « tout est ventilé » pendant
+    // que la jauge compterait des heures orphelines.
+    const { prevuSansCode } = heuresParActivite(devis, [], ACTIVITES)
+    const total = lignesSansActivite(devis).reduce((s, m) => s + m.heures, 0)
+    expect(total).toBe(prevuSansCode)
+    expect(total).toBe(9)
+  })
+
+  it('ne signale rien quand tout est codé', () => {
+    const propre = { management: [{ item: 'Suivi', quantity: 4, unit: 'heure(s)', activite: 10 }] }
+    expect(lignesSansActivite(propre)).toEqual([])
+    expect(heuresParActivite(propre, [], ACTIVITES).prevuSansCode).toBe(0)
+  })
+
+  it('parcourt la gestion, la logistique, les items et leurs éléments', () => {
+    expect(lignesMainOeuvre(devis)).toHaveLength(6)
+  })
+
+  it('supporte un devis vide ou absent', () => {
+    expect(lignesSansActivite(null)).toEqual([])
+    expect(lignesSansActivite({})).toEqual([])
   })
 })

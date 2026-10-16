@@ -78,14 +78,24 @@ export default function ActivitePicker({ onPick, familles = null, label = '+ Act
 }
 
 /**
- * Le code d'une ligne existante, en tête de sa description.
- * Vide, il s'affiche en tiret : la ligne compte alors dans « non ventilé ».
+ * L'activité d'une ligne existante, AVEC son intitulé.
+ *
+ * Elle n'affichait que le code, sur 44 px : il fallait ouvrir la liste pour
+ * savoir si « 31 » était la peinture ou le montage, et un code oublié ne se
+ * voyait pas. Or une ligne en heures SANS activité ne se compare à rien quand
+ * la feuille d'heures remonte, et ses heures disparaissent de la jauge dans un
+ * fourre-tout appelé « non ventilé ».
+ *
+ * D'où `requis` : sur une ligne en heures, le vide n'est plus un tiret discret
+ * mais un manque qui se voit. Les lignes au kilomètre ou au forfait gardent le
+ * tiret — elles n'ont pas d'activité à porter.
  */
-export function CodeActivite({ valeur, onChange, texte, onTexte }) {
+export function CodeActivite({ valeur, onChange, texte, onTexte, requis = false }) {
   const activites = useActivites()
   const groupes = activitesParFamille(activites)
   const vide = valeur === null || valeur === undefined || valeur === ''
   const trouver = code => activites.find(a => Number(a.code) === Number(code))
+  const manque = vide && requis
 
   function choisir(e) {
     const code = e.target.value === '' ? null : Number(e.target.value)
@@ -97,14 +107,23 @@ export function CodeActivite({ valeur, onChange, texte, onTexte }) {
     if (onTexte && nouvelle && libelleSuitActivite(texte, trouver(valeur)?.libelle)) onTexte(nouvelle.libelle)
   }
 
+  const choisie = vide ? null : trouver(valeur)
   return (
     <select
       value={vide ? '' : String(valeur)}
       onChange={choisir}
-      title={vide ? 'Aucune activité : cette ligne ne se comparera pas aux heures passées' : 'Activité de la feuille d\'heures'}
-      style={{ width: 44, flex: 'none', font: `500 12px ${MONO}`, padding: '2px 0', border: 'none',
-        background: 'transparent', color: vide ? C.faint : C.accent, cursor: 'pointer', outline: 'none' }}>
-      <option value="">—</option>
+      title={manque
+        ? 'Cette ligne est en heures et n\'a pas d\'activité : elle ne se comparera à aucune heure passée'
+        : choisie ? `${choisie.code} · ${choisie.libelle}` : 'Activité de la feuille d\'heures'}
+      style={{
+        flex: requis ? '1 1 130px' : '0 0 auto', minWidth: 0, maxWidth: 190,
+        font: `500 11.5px ${FONT}`, padding: requis ? '2px 6px' : '2px 0',
+        borderRadius: R.pill, cursor: 'pointer', outline: 'none',
+        border: manque ? `1px solid ${C.danger}` : 'none',
+        background: manque ? C.dangerBg : 'transparent',
+        color: manque ? C.danger : vide ? C.faint : C.accent,
+      }}>
+      <option value="">{manque ? '⚠ activité à choisir' : '—'}</option>
       {groupes.map(g => (
         <optgroup key={g.famille} label={g.libelle}>
           {g.activites.map(a => <option key={a.code} value={a.code}>{a.code} · {a.libelle}</option>)}
