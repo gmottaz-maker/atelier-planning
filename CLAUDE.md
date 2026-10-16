@@ -926,12 +926,44 @@ Au 5 octobre 2026, 234 pièces s'y étaient rangées, et 234 copies homonymes
 dormaient dans l'arbre vivant sans qu'aucune ligne de base ne les référence.
 **Un id en dur ne survit pas à un renommage, et ne le dit pas.**
 
-**Le classement, depuis le 5 octobre 2026 :**
+**`_Gestion/CONSIGNES-MAZE-PROJECT.md`, sur le drive, fait foi.** Il est écrit
+POUR cette application par celui qui range le dossier, et il remplace toute
+convention antérieure — y compris ce qui est écrit ici. À relire avant de
+toucher au classement.
+
+**Le classement, depuis le 16 octobre 2026 — UNE SEULE branche :**
 
 ```
-00. Admin / Finances / Comptabilité / Comptabilité <année> / Factures fournisseurs / T<trimestre>
-00. Admin / Finances / Comptabilité / Comptabilité <année> / Justificatifs        / T<trimestre>
+00. Admin / Finances / Comptabilité / Comptabilité <année> / Justificatifs comptables / T<trimestre>
 ```
+
+Justificatifs ET factures fournisseurs, ensemble. Elles ont d'abord eu deux
+branches séparées (`Factures fournisseurs/` et `Justificatifs/`), fusionnées
+par le reclassement : un contrôle fiscal porte sur un EXERCICE, pas sur la
+façon dont une pièce est arrivée, et chercher un achat dans deux dossiers
+selon qu'il portait un numéro de facture était une distinction pour nous, pas
+pour le contrôleur. **Si `Factures fournisseurs/` ou `Justificatifs/`
+réapparaissent, c'est que ce code écrit au mauvais endroit** — c'est la
+sentinelle que donnent les consignes, et elle a servi : le code déployé le
+16 octobre au matin les recréait.
+
+**Ce qui n'est PAS une pièce d'achat ne se classe pas** : un décompte AVS, une
+police, un bail, un bulletin de salaire, un relevé bancaire, un courrier
+fiscal vont dans `00. Admin / Classement auto/`. Mieux vaut une pièce dans la
+boîte d'entrée qu'une pièce au mauvais endroit.
+
+**Nom de fichier** — `AAAA-MM-JJ_FOURNISSEUR-description_montant.pdf` :
+
+```
+2026-05-12_BOIS-SA-2026-0451_1240.50.pdf     facture (le n° occupe la description)
+2026-10-01_HORNBACH_944.15.pdf               justificatif (pas de description)
+```
+
+Le montant est le TOTAL, jamais un sous-total, un acompte ou un supplément —
+quatre factures DHL portaient le supplément carburant à sa place et ne se
+retrouvaient dans aucun relevé. Un montant illisible n'écrit RIEN :
+`amountTag` rend `null`, et un nom sans montant vaut mieux qu'un montant faux.
+Ni accent ni apostrophe, ils cassent les recherches et les liens.
 
 **Deux régimes dans ce chemin, et la frontière est voulue.** `Finances` et
 `Comptabilité` sont la STRUCTURE : `dossierExistant` les exige, et un dépôt
@@ -947,21 +979,13 @@ Les scans ne vivent plus à côté de la comptabilité mais DEDANS, dans l'anné
 concernée : la fiduciaire n'a plus deux endroits à regarder pour un même
 exercice. Le découpage par trimestre est celui de la TVA.
 
-**Tout l'exercice est dans son dossier d'année** (5 octobre 2026). Un contrôle
-fiscal n'ouvre qu'un dossier :
-
-```
-00. Admin / Finances / Comptabilité / Comptabilité <année> /
-    Factures fournisseurs / T<n>      ← déposées par Maze
-    Justificatifs         / T<n>      ← tickets déposés par Maze
-    Justificatifs comptables / T<n>   ← les 929 pièces historiques, versées depuis
-                                        « Justificatifs comptables »
-```
-
-`Justificatifs` et `Justificatifs comptables` restent SÉPARÉS, et ce n'est pas
-une hésitation : les premiers viennent de Maze, les seconds de l'archive, et
-certaines pièces d'un même trimestre sont peut-être le même ticket scanné deux
-fois. Les fusionner rendrait la question indécidable.
+**Tout l'exercice est dans son dossier d'année.** Un contrôle fiscal n'ouvre
+qu'un dossier, et les pièces d'achat de l'année y sont toutes dans
+`Justificatifs comptables / T<n>` — celles déposées par Maze comme les 929
+pièces de l'archive. Elles ont été séparées un temps, le 5 octobre, en pariant
+qu'un même ticket pouvait être scanné deux fois des deux côtés ; le
+reclassement a tranché autrement et dédoublonné à la main (2025 : 450 pièces,
+450 contenus distincts).
 
 **Deux choses ne sont PAS versées dans les années, et ne doivent pas l'être :**
 

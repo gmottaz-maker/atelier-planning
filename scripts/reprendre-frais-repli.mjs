@@ -70,15 +70,18 @@ async function creer(parent, nom) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nom }),
   })
 }
-// Même chemin que `lib/kdrive.js` : structure exigée, classement créé.
+// Même chemin que `lib/kdrive.js` : structure exigée, classement créé, et UNE
+// seule branche pour toutes les pièces d'achat. Recréer `Justificatifs/` ici
+// reviendrait à défaire le fusionnement d'octobre 2026 — les consignes
+// préviennent que la réapparition de ce dossier signale une erreur d'écriture.
 async function dossier(annee, trimestre) {
   const finances = await exige(ADMIN_ID, 'Finances', '00. Admin / Finances')
   const compta   = await exige(finances.id, 'Comptabilité', '00. Admin / Finances / Comptabilité')
   const an  = await creer(compta.id, `Comptabilité ${annee}`)
   if (an._virtuel) return an
-  const rub = await creer(an.id, 'Justificatifs')
-  if (rub._virtuel) return rub
-  return creer(rub.id, `T${trimestre}`)
+  const br = await creer(an.id, 'Justificatifs comptables')
+  if (br._virtuel) return br
+  return creer(br.id, `T${trimestre}`)
 }
 
 async function main() {
