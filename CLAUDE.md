@@ -1000,6 +1000,17 @@ Les 929 pièces parties dans les années, ce qui restait ne s'appelait plus
 « Justificatifs comptables » : le dossier est devenu
 **`Finances / Export bexio 2018-2026`**, nommé par ce qu'il contient.
 
+**Le dédoublonnage du drive déréférence la base, en silence.** Quand le
+reclassement garde un exemplaire et parque l'autre dans `_Gestion/Doublons/`,
+c'est souvent le PARQUÉ que `kdrive_file_id` désigne : la pièce reste
+ouvrable, jusqu'au jour où la corbeille se vide. Dix-sept l'étaient au
+16 octobre 2026. `scripts/repointer-doublons.mjs` les remet sur l'exemplaire
+conservé — en appariant sur des PREUVES (date du document, puis montant ou
+numéro de facture retrouvé dans le nom conservé), jamais sur une ressemblance
+de nom : l'exemplaire gardé a été renommé avec une description, il ne ressemble
+plus au parqué. Un rapprochement sans montant ni numéro n'est pas appliqué, il
+est listé. **À relancer après chaque séance de dédoublonnage.**
+
 **L'année et le trimestre viennent de la date du DOCUMENT**, pas de celle du
 scan (`quarterOf(date)` pour un frais, `quarterOf(issue_date)` pour une
 facture). Une facture de décembre numérisée en janvier appartient à l'exercice
