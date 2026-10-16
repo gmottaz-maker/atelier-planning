@@ -16,6 +16,13 @@ const DEFAULTS = {
   // par schema-transport-reglages.sql, pas dans le code.
   transport: normaliserTransport({}),
   couts_vehicules: normaliserCouts({}),
+  // Vide = tout le monde sait tout faire. Les exceptions se saisissent ;
+  // refuser un projet parce qu'un écran n'a pas été rempli serait pire.
+  competences: {},
+  // La semaine type : les demi-journées qui reviennent chaque semaine (admin
+  // le lundi matin, atelier le reste). Elle ne crée AUCUN bloc d'agenda — elle
+  // colore le fond des demi-journées vides. Vide = aucune habitude déclarée.
+  semaine_type: {},
   company_info: {
     name:    process.env.AMAZING_LAB_NAME    || 'Amazing Lab Sàrl',
     address: process.env.AMAZING_LAB_ADDRESS || "Rue de l'Ecluse 30",
@@ -48,7 +55,15 @@ const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficien
 // Clés lisibles par l'ADMIN seul. `couts_vehicules` : leasing, assurance et
 // consommation de chaque véhicule — rapprochés des km facturés, ils disent la
 // marge du transport.
-const CLES_ADMIN = new Set(['couts_vehicules'])
+// `competences` : qui sait faire quelle activité, pour la jauge de charge.
+// Deux personnes et une vingtaine d'activités — quarante cases qui bougent une
+// fois par an ne valent pas une table, une migration et un écran. Admin, parce
+// que c'est ce qui décide qu'un chantier « ne rentre pas » : une erreur ici
+// fait refuser un projet qu'on aurait pu prendre.
+// `semaine_type` : les habitudes de semaine qui colorent l'agenda. Admin, pour
+// la même raison que les compétences — c'est de l'organisation d'atelier, et
+// c'est l'admin qui tient le planning.
+const CLES_ADMIN = new Set(['couts_vehicules', 'competences', 'semaine_type'])
 
 export default async function handler(req, res) {
   const { key } = req.query

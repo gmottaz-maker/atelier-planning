@@ -19,8 +19,13 @@ export default async function handler(req, res) {
     let query = supabase
       .from('work_entries')
       .select('*')
-      .eq('user_name', userName)
       .order('date')
+
+    // `userName=*` : toute l'équipe, pour l'ADMIN seul. L'agenda en a besoin —
+    // poser un montage sur la semaine de vacances d'un collègue est l'erreur
+    // que l'écran doit rendre impossible à commettre. `ownName` a déjà ramené
+    // un membre à son propre nom, donc l'étoile ne lui sert à rien.
+    if (userName !== '*') query = query.eq('user_name', userName)
 
     if (from) query = query.gte('date', from)
     if (to)   query = query.lte('date', to)

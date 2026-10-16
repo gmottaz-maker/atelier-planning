@@ -91,9 +91,20 @@ const CONTROLES = [
     // Absente de ce script pendant six semaines : le planning renvoyait 500 en
     // production sans que `check:db` n'y voie rien à redire. Une migration qui
     // n'est pas sondée ici est une migration qu'on oubliera.
+    //
+    // `work_slots` est REMPLACÉE par `agenda` (sonde ci-dessous) et destinée au
+    // DROP ; la sonde reste tant que la table est là, pour que sa disparition
+    // soit un choix et non une surprise.
     nom: 'work_slots',
     migration: 'schema-work-slots.sql',
     sonde: async () => !(await sb.from('work_slots').select('id').limit(1)).error,
+  },
+  {
+    nom: 'agenda',
+    migration: 'schema-agenda.sql',
+    sonde: async () => !(await sb.from('agenda')
+      .select('id, user_name, date, demi, type, project_id, activite, minutes, source, fige')
+      .limit(1)).error,
   },
   {
     nom: 'bank_transactions.classification',
