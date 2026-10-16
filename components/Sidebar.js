@@ -12,17 +12,50 @@ export const SIDEBAR_WIDTH = 224
 // Items principaux (haut de la sidebar). Libellés en minuscules : règle
 // éditoriale du design system, tapée telle quelle et non obtenue par
 // text-transform — la casse fait partie du texte, pas de la présentation.
+// Ce qu'on ouvre en travaillant. Agenda, horaires et heures étaient côte à
+// côte dans cette liste plate : trois mots qui disent « temps » sans dire
+// lequel, et qu'il fallait ouvrir pour s'en souvenir. Seul l'agenda reste ici
+// — c'est le seul qu'on touche plusieurs fois par jour ; les deux autres sont
+// groupés sous MON TEMPS, où leur nom de groupe fait la moitié du travail.
 export const MAIN_ITEMS = [
   { href: '/home',      label: 'accueil',  match: (p) => p === '/home' },
   { href: '/',          label: 'projets',  match: (p) => p === '/' || p.startsWith('/projects'), count: 'projects' },
   { href: '/tasks',     label: 'tâches',   match: (p) => p === '/tasks', count: 'tasks' },
-  { href: '/planning',  label: 'planning', match: (p) => p === '/planning' },
-  { href: '/schedule',  label: 'horaires', match: (p) => p === '/schedule' },
-  { href: '/heures',    label: 'heures',   match: (p) => p === '/heures' },
+  { href: '/agenda',    label: 'agenda',   match: (p) => p === '/agenda' },
   { href: '/meeting',   label: 'meeting',  match: (p) => p === '/meeting' },
-  { href: '/activity',  label: 'activité', match: (p) => p === '/activity' },
   { href: '/outils',    label: 'outils',   match: (p) => p.startsWith('/outils') || p === '/peintures' },
 ]
+
+// Mon temps : ce que chacun saisit pour soi. Visible de tous — c'est la
+// seule zone où un membre écrit autre chose qu'une tâche.
+//   — horaires : étais-je là ? (présence, congés, solde)
+//   — heures   : à quoi l'ai-je passé ? (projet × activité)
+// Deux questions distinctes, deux tables (`work_entries` et `heures`) ; les
+// confronter dira les journées à moitié imputées.
+export const TEMPS_GROUP = {
+  label: 'MON TEMPS',
+  items: [
+    { href: '/schedule', label: 'horaires' },
+    { href: '/heures',   label: 'heures' },
+    // Les frais vivaient sous les congés, dans /schedule : un reçu de parking
+    // n'est pas une demi-journée de vacances. Ils ont leur page, et elle est
+    // ouverte à tous — `/justificatifs` est l'écran de celui qui CLASSE, et il
+    // est réservé à l'admin.
+    { href: '/frais',    label: 'frais' },
+  ],
+}
+
+// Reporting : ce qu'on regarde, pas ce qu'on fait. Rien ici ne se consulte
+// tous les jours, et c'est exactement pourquoi ça ne doit pas occuper le haut
+// de la liste — la charge y côtoyait les projets alors qu'on l'ouvre quand on
+// se demande si l'on peut dire oui, pas pour travailler.
+export const REPORTING_GROUP = {
+  label: 'REPORTING',
+  items: [
+    { href: '/planning', label: 'charge de l\'atelier' },
+    { href: '/activity', label: 'journal d\'activité' },
+  ],
+}
 
 // Zone finances (admin uniquement) : 4 items transverses + 2 groupes labellisés
 export const FIN_TOP = [
@@ -109,6 +142,12 @@ export default function Sidebar() {
     <div key={key} style={{ height: 1, background: C.dividerOnDark, margin: '14px 16px' }} />
   )
 
+  // L'étiquette d'un groupe. Elle portait la moitié du sens des finances ;
+  // elle porte maintenant celui de MON TEMPS et de REPORTING.
+  const etiquette = (label) => (
+    <div key={label} style={{ font: `700 9.5px ${MONO}`, letterSpacing: '.16em', color: C.muted, textTransform: 'uppercase', padding: '22px 16px 8px' }}>{label}</div>
+  )
+
   return (
     <aside
       style={{
@@ -146,14 +185,18 @@ export default function Sidebar() {
 
       {divider('sep-main')}
 
-      {/* Finances (admin) */}
+      {/* Mon temps — pour tout le monde */}
+      {etiquette(TEMPS_GROUP.label)}
+      {TEMPS_GROUP.items.map(finLink)}
+
+      {/* Finances et reporting (admin) */}
       {isAdmin && (
         <>
+          {divider('sep-temps')}
           {FIN_TOP.map(finLink)}
-          {FIN_GROUPS.flatMap(g => [
-            <div key={g.label} style={{ font: `700 9.5px ${MONO}`, letterSpacing: '.16em', color: C.muted, textTransform: 'uppercase', padding: '22px 16px 8px' }}>{g.label}</div>,
-            ...g.items.map(finLink),
-          ])}
+          {FIN_GROUPS.flatMap(g => [etiquette(g.label), ...g.items.map(finLink)])}
+          {etiquette(REPORTING_GROUP.label)}
+          {REPORTING_GROUP.items.map(finLink)}
         </>
       )}
 

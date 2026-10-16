@@ -19,7 +19,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
 import useIsAdmin from '../lib/useIsAdmin'
-import { MAIN_ITEMS, FIN_TOP, FIN_GROUPS } from './Sidebar'
+import { MAIN_ITEMS, TEMPS_GROUP, REPORTING_GROUP, FIN_TOP, FIN_GROUPS } from './Sidebar'
 
 export const BOTTOM_NAV_HEIGHT = 64
 
@@ -74,13 +74,19 @@ const ITEMS = [
  *  qu'elle affiche déjà en bas. */
 function reste(isAdmin) {
   const dansLaBarre = new Set(ITEMS.map(i => i.href))
+  const sansDoublon = items => items.filter(i => !dansLaBarre.has(i.href))
   const groupes = [
-    { label: '', items: MAIN_ITEMS.filter(i => !dansLaBarre.has(i.href)) },
+    { label: '', items: sansDoublon(MAIN_ITEMS) },
+    // Les groupes de la sidebar sont repris tels quels : un écran retiré de la
+    // liste principale et oublié ici deviendrait inatteignable au doigt, et
+    // c'est déjà arrivé à dix-huit pages.
+    { label: TEMPS_GROUP.label, items: sansDoublon(TEMPS_GROUP.items) },
     { label: 'COMPTE', items: [{ href: '/settings', label: 'réglages' }] },
   ]
   if (isAdmin) {
     groupes.push({ label: 'GESTION', items: FIN_TOP })
     for (const g of FIN_GROUPS) groupes.push(g)
+    groupes.push({ label: REPORTING_GROUP.label, items: REPORTING_GROUP.items })
   }
   return groupes.filter(g => g.items.length)
 }

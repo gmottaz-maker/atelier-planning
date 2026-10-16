@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import Head from 'next/head'
+import Link from 'next/link'
 import { useAuth } from './_app'
 import NavBar from '../components/NavBar'
 import useIsAdmin from '../lib/useIsAdmin'
 import { AL, C, FONT, MONO, R, personChip } from '../lib/theme'
+import StatCard from '../components/StatCard'
 
 // Cet écran n'a PAS de maquette : le handoff v2 ne cartographie pas /schedule.
 // Ce qui suit applique le système par extension — jetons, deux radius, aucune
@@ -29,16 +31,6 @@ const TYPES = {
 const HALF_DAY_TYPES = ['VACATION_AM', 'VACATION_PM']
 // Types comptant comme journée entière
 const FULL_DAY_VACATION_TYPES = ['VACATION']
-
-const EXPENSE_CATEGORIES = [
-  { key: 'Repas',       icon: '🍽',  color: C.warning },
-  { key: 'Transport',   icon: '🚗',  color: C.info },
-  { key: 'Hébergement', icon: '🏨',  color: C.violet },
-  { key: 'Fournitures', icon: '🛒',  color: C.success },
-  { key: 'Matériel',    icon: '🔧',  color: C.muted },
-  { key: 'Autre',       icon: '📋',  color: C.muted },
-]
-const CURRENCIES = ['CHF', 'EUR', 'USD']
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 const DAYS_FR   = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
@@ -117,15 +109,6 @@ function getVaudHolidays(year) {
 }
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
-
-// Source d'affichage d'un reçu : URL signée Supabase (anciens frais) ou
-// fichier kDrive (nouveaux frais, classés par trimestre).
-function receiptSrc(exp) {
-  if (!exp) return null
-  if (exp.receipt_url) return exp.receipt_url
-  if (exp.kdrive_file_id) return `/api/kdrive/download?fileId=${exp.kdrive_file_id}`
-  return null
-}
 
 async function apiFetch(path, options = {}) {
   const r = await fetch(path, options)
@@ -227,29 +210,6 @@ export default function SchedulePage() {
   const [saving, setSaving]           = useState(false)
   const [saveError, setSaveError]     = useState('')
 
-  // ── Expenses state (via SWR) ─────────────────────────────────────────────
-  const expensesKey = effectiveUser
-    ? `/api/expenses?userName=${encodeURIComponent(effectiveUser)}&year=${year}`
-    : null
-  const { data: expenses = [], mutate: mutateExpenses } = useSWR(expensesKey)
-  const [expenseModal, setExpenseModal]   = useState(false)
-  const [expEditId, setExpEditId]         = useState(null)
-  const EMPTY_EXP = { date: dateStr(new Date()), amount: '', currency: 'CHF', category: 'Autre', merchant: '', description: '', payment_method: 'company' }
-  const [expForm, setExpForm]             = useState(EMPTY_EXP)
-  const [expReceiptB64, setExpReceiptB64] = useState(null)
-  const [expReceiptMime, setExpReceiptMime] = useState(null)
-  const [expReceiptPreview, setExpReceiptPreview] = useState(null)
-  const [expScanLoading, setExpScanLoading] = useState(false)
-  const [expScanError, setExpScanError]   = useState('')
-  const [expSaving, setExpSaving]         = useState(false)
-  const [expSaveError, setExpSaveError]   = useState('')
-
-  // Clock-in / clock-out
-  const [clockInTime, setClockInTime]   = useState(null) // 'HH:MM'
-  const [clockInDate, setClockInDate]   = useState(null) // 'YYYY-MM-DD'
-  const [clockElapsed, setClockElapsed] = useState('') // display string
-  const [clockOutModal, setClockOutModal] = useState(false)
-
   // Modal – settings
   const [settingsOpen, setSettingsOpen]   = useState(false)
   const [setVacation, setSetVacation]     = useState(20)
@@ -289,207 +249,9 @@ export default function SchedulePage() {
   useEffect(() => { loadSettings() }, [loadSettings])
   useEffect(() => { loadAllSettings() }, [loadAllSettings])
 
-  // ── Clock-in — synced via DB (cross-device) ───────────────────────────────
-  const loadClockSession = useCallback(async () => {
-    if (!effectiveUser) return
-    try {
-      const data = await apiFetch(`/api/clock-session?userName=${encodeURIComponent(effectiveUser)}`)
-      if (data && data.clock_in_at) {
-        // clock_in_at is stored as "HH:MM" (local time string)
-        setClockInTime(data.clock_in_at)
-        setClockInDate(data.date)
-      } else {
-        setClockInTime(null)
-        setClockInDate(null)
-      }
-    } catch (e) { /* ignore — table may not exist yet */ }
-  }, [effectiveUser])
-
-  useEffect(() => { loadClockSession() }, [loadClockSession])
-
-  // Poll every 30s to stay in sync with other devices
-  useEffect(() => {
-    const id = setInterval(loadClockSession, 30000)
-    return () => clearInterval(id)
-  }, [loadClockSession])
-
-  // Update elapsed display every minute
-  useEffect(() => {
-    if (!clockInTime) { setClockElapsed(''); return }
-    const update = () => {
-      const now = new Date()
-      const [h, m] = clockInTime.split(':').map(Number)
-      const diff = (now.getHours() * 60 + now.getMinutes()) - (h * 60 + m)
-      if (diff < 0) { setClockElapsed(''); return }
-      const dh = Math.floor(diff / 60), dm = diff % 60
-      setClockElapsed(`${dh}h${dm.toString().padStart(2, '0')}`)
-    }
-    update()
-    const id = setInterval(update, 60000)
-    return () => clearInterval(id)
-  }, [clockInTime])
-
-  async function handleClockIn() {
-    const now  = new Date()
-    const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-    const date = dateStr(now)
-    // Optimistic update
-    setClockInTime(time)
-    setClockInDate(date)
-    try {
-      await apiFetch('/api/clock-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName: effectiveUser, clock_in_at: time, date }),
-      })
-    } catch (e) {
-      console.error('clock-in save error', e)
-    }
-  }
-
-  function handleClockOut() {
-    setClockOutModal(true)
-  }
-
-  async function confirmClockOut() {
-    const now = new Date()
-    const departure = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-    const totalH = timeDiffHours(clockInTime, departure)
-    const pause  = totalH >= 8 ? 1.0 : totalH >= 5.5 ? 0.5 : 0
-    setSaving(true)
-    try {
-      await apiFetch('/api/work-entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userName: effectiveUser,
-          date: clockInDate,
-          type: 'WORK',
-          hours: totalH,
-          pause_hours: pause,
-          arrival_time: clockInTime,
-          departure_time: departure,
-          note: null,
-        }),
-      })
-      // Clear clock session from DB
-      await apiFetch(`/api/clock-session?userName=${encodeURIComponent(effectiveUser)}`, { method: 'DELETE' })
-      await loadEntries()
-    } catch (e) { console.error(e) }
-    setSaving(false)
-    setClockInTime(null)
-    setClockInDate(null)
-    setClockOutModal(false)
-  }
-
-  // ── Expenses ─────────────────────────────────────────────────────────────
-  const loadExpenses = useCallback(() => { mutateExpenses() }, [mutateExpenses])
-
-  function openAddExpense() {
-    setExpEditId(null)
-    setExpForm({ ...EMPTY_EXP, date: dateStr(new Date()) })
-    setExpReceiptB64(null); setExpReceiptMime(null); setExpReceiptPreview(null)
-    setExpScanError(''); setExpSaveError('')
-    setExpenseModal(true)
-  }
-
-  function openEditExpense(exp) {
-    setExpEditId(exp.id)
-    setExpForm({ date: exp.date, amount: exp.amount ?? '', currency: exp.currency || 'CHF', category: exp.category || 'Autre', merchant: exp.merchant || '', description: exp.description || '', payment_method: exp.payment_method || 'personal' })
-    setExpReceiptB64(null); setExpReceiptMime(null)
-    setExpReceiptPreview(receiptSrc(exp))
-    setExpScanError(''); setExpSaveError('')
-    setExpenseModal(true)
-  }
-
-  function handleReceiptFile(file) {
-    if (!file) return
-    const mime = file.type || 'image/jpeg'
-    setExpReceiptMime(mime)
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target.result
-      setExpReceiptPreview(dataUrl)
-      // Extract base64 part
-      setExpReceiptB64(dataUrl.split(',')[1])
-    }
-    reader.readAsDataURL(file)
-  }
-
-  async function scanReceipt() {
-    if (!expReceiptB64) return
-    setExpScanLoading(true); setExpScanError('')
-    try {
-      const result = await apiFetch('/api/expenses/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: expReceiptB64, mimeType: expReceiptMime }),
-      })
-      if (result.error) { setExpScanError(result.error); return }
-      // L'API renvoie une liste (un document peut contenir plusieurs reçus) ;
-      // ici on saisit un frais à la fois, donc on prend le premier.
-      const rec = Array.isArray(result.receipts) ? result.receipts[0] : result
-      if (!rec) { setExpScanError('Aucun reçu détecté sur cette image.'); return }
-      setExpForm(f => ({
-        ...f,
-        date:     rec.date     || f.date,
-        amount:   rec.amount   != null ? String(rec.amount) : f.amount,
-        currency: rec.currency || f.currency,
-        merchant: rec.merchant || f.merchant,
-        category: rec.category || f.category,
-      }))
-    } catch (e) { setExpScanError(e.message) }
-    finally { setExpScanLoading(false) }
-  }
-
-  async function saveExpense() {
-    if (!expForm.date) return
-    setExpSaving(true); setExpSaveError('')
-    try {
-      if (expEditId) {
-        // Update: delete + re-create (simple approach)
-        await apiFetch(`/api/expenses?id=${expEditId}&userName=${encodeURIComponent(effectiveUser)}`, { method: 'DELETE' })
-      }
-      await apiFetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userName:        effectiveUser,
-          date:            expForm.date,
-          amount:          expForm.amount !== '' ? parseFloat(expForm.amount) : null,
-          currency:        expForm.currency,
-          category:        expForm.category,
-          merchant:        expForm.merchant || null,
-          description:     expForm.description || null,
-          receiptBase64:   expReceiptB64 || null,
-          receiptMimeType: expReceiptMime || null,
-          payment_method:  expForm.payment_method || 'personal',
-        }),
-      })
-      await loadExpenses()
-      setExpenseModal(false)
-    } catch (e) { setExpSaveError(e.message) }
-    finally { setExpSaving(false) }
-  }
-
-  async function deleteExpense(id) {
-    if (!confirm('Supprimer ce frais ?')) return
-    try {
-      await apiFetch(`/api/expenses?id=${id}&userName=${encodeURIComponent(effectiveUser)}`, { method: 'DELETE' })
-      await loadExpenses()
-      setExpenseModal(false)
-    } catch (e) { console.error(e) }
-  }
-
-  // ── Display month/year (needed early for expense stats) ──────────────────
+  // ── Mois et année affichés ───────────────────────────────────────────────
   const displayMonth = currentDate.getMonth()
   const displayYear  = currentDate.getFullYear()
-
-  // ── Expense stats ─────────────────────────────────────────────────────────
-  const expTotal      = expenses.reduce((s, e) => s + (e.amount || 0), 0)
-  const expThisMonth  = expenses.filter(e => {
-    const d = new Date(e.date); return d.getMonth() === displayMonth && d.getFullYear() === displayYear
-  }).reduce((s, e) => s + (e.amount || 0), 0)
 
   // ── Vaud holidays for current year ───────────────────────────────────────
   const vaudHolidays  = getVaudHolidays(year)
@@ -542,7 +304,6 @@ export default function SchedulePage() {
   }, 0)
 
   // ── Month stats (for current displayed month) ─────────────────────────────
-  // displayMonth / displayYear are declared above (near expense stats)
   const monthEntries = entries.filter(e => {
     const d = parseDate(e.date)
     return d.getFullYear() === displayYear && d.getMonth() === displayMonth
@@ -782,7 +543,12 @@ export default function SchedulePage() {
               Horaires {isAdmin && selectedUser ? `· ${selectedUser}` : ''}
             </h1>
             <p style={{ fontSize: 18, color: C.muted, margin: '12px 0 0' }}>
-              {effectiveUser} · {year}
+              Présence et congés · {effectiveUser} · {year}
+            </p>
+            {/* Les frais étaient sous les congés, sur cette page. On le dit une
+                fois, sinon on les cherche ici pendant un mois. */}
+            <p style={{ fontSize: 13.5, color: C.muted, margin: '8px 0 0' }}>
+              Les notes de frais ont leur page : <Link href="/frais" style={{ color: AL.black }}>frais</Link>.
             </p>
           </div>
         </header>
@@ -814,37 +580,6 @@ export default function SchedulePage() {
             color={sickDays > 0 ? C.warning : C.muted}
           />
         </div>
-
-        {/* ── Pointeuse (clock-in/out) ── */}
-        {clockInTime ? (
-          <div className="px-6 py-4 u-panel border flex items-center gap-4 flex-wrap" style={{ background: C.successBg, borderColor: C.successBg }}>
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-2.5 h-2.5 u-pill flex-shrink-0" style={{ background: C.success, boxShadow: `0 0 0 4px ${C.successBg}`, animation: 'pulse 2s infinite' }} />
-              <div>
-                <p className="font-semibold" style={{ color: C.success, fontSize: 15 }}>En service depuis {clockInTime}</p>
-                {clockElapsed && <p className="text-xs mt-0.5" style={{ color: C.success }}>Durée : <span className="font-semibold tabular-nums">{clockElapsed}</span></p>}
-              </div>
-            </div>
-            <button
-              onClick={handleClockOut}
-              className="px-4 py-2 u-pill text-sm font-medium text-white flex-shrink-0"
-              style={{ background: AL.black }}
-            >
-              Pointer le départ
-            </button>
-          </div>
-        ) : (
-          <div>
-            <button
-              onClick={handleClockIn}
-              className="px-4 py-2.5 u-pill text-sm font-medium border transition-colors"
-              style={{ background: 'white', color: C.success, borderColor: C.successBg }}
-            >
-              <span className="inline-block w-2 h-2 u-pill mr-2 align-middle" style={{ background: C.success }} />
-              Pointer l'arrivée
-            </button>
-          </div>
-        )}
 
         {/* ── Controls bar ── */}
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1255,86 +990,6 @@ export default function SchedulePage() {
           </div>
         )}
 
-        {/* ── Expenses section ── */}
-        <div>
-          {/* Section header */}
-          <div className="flex justify-between items-baseline mb-5">
-            <div>
-              <h2 className="font-semibold sch-ink tracking-tight" style={{ fontSize: 22 }}>Frais</h2>
-              <p className="text-sm sch-muted mt-0.5">{year} · {expenses.length} note{expenses.length > 1 ? 's' : ''}</p>
-            </div>
-            <button
-              onClick={openAddExpense}
-              className="px-4 py-2 u-pill text-sm font-medium text-white"
-              style={{ background: AL.black }}
-            >
-              + Ajouter un frais
-            </button>
-          </div>
-
-          {/* Stats row */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-            <StatCard label={`Total ${year}`} value={`${expTotal.toFixed(2)} CHF`} sub={`${expenses.length} frais`} />
-            <StatCard label={MONTHS_FR[displayMonth]} value={`${expThisMonth.toFixed(2)} CHF`} sub={`${expenses.filter(e=>{ const d=new Date(e.date); return d.getMonth()===displayMonth&&d.getFullYear()===displayYear }).length} frais`} />
-            {EXPENSE_CATEGORIES.map(cat => {
-              const total = expenses.filter(e=>e.category===cat.key).reduce((s,e)=>s+(e.amount||0),0)
-              if (total === 0) return null
-              return <StatCard key={cat.key} label={cat.key} value={`${total.toFixed(2)} CHF`} sub={`${expenses.filter(e=>e.category===cat.key).length} frais`} color={cat.color} />
-            })}
-          </div>
-
-          {/* Expense list */}
-          {expenses.length === 0 ? (
-            <div className="bg-white u-panel border sch-line p-12 text-center">
-              <p className="sch-muted text-sm">Aucun frais enregistré pour {year}</p>
-              <button onClick={openAddExpense} className="mt-4 px-4 py-2 u-pill text-sm font-medium text-white" style={{ background: AL.black }}>
-                Ajouter mon premier frais
-              </button>
-            </div>
-          ) : (
-            <div className="bg-white u-panel border sch-line overflow-hidden">
-              {expenses.map((exp, i) => {
-                const cat = EXPENSE_CATEGORIES.find(c => c.key === exp.category) || EXPENSE_CATEGORIES[5]
-                return (
-                  <div
-                    key={exp.id}
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:sch-fill transition-colors"
-                    style={{ borderBottom: i < expenses.length - 1 ? `1px solid ${C.border}` : 'none' }}
-                    onClick={() => openEditExpense(exp)}
-                  >
-                    {/* Receipt thumbnail or category icon */}
-                    {(() => {
-                      const src = receiptSrc(exp)
-                      return (
-                        <div className="w-10 h-10 u-panel flex-shrink-0 overflow-hidden flex items-center justify-center"
-                          style={{ background: src ? C.neutralBg : `${cat.color}18`, fontSize: src ? 10 : 20 }}>
-                          {src
-                            ? <img src={src} alt="reçu" className="w-full h-full object-cover" onError={e => { e.target.style.display='none' }} />
-                            : cat.icon
-                          }
-                        </div>
-                      )
-                    })()}
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold sch-ink truncate">{exp.merchant || exp.category}</p>
-                      <p className="text-xs sch-muted">{new Date(exp.date+'T12:00:00').toLocaleDateString('fr-CH', { day:'numeric', month:'short' })} · <span style={{ color: cat.color }}>{cat.icon} {exp.category}</span></p>
-                    </div>
-                    {/* Amount */}
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold sch-ink">{exp.amount != null ? `${parseFloat(exp.amount).toFixed(2)}` : '—'}</p>
-                      <p className="text-xs sch-muted">{exp.currency}</p>
-                    </div>
-                    <svg className="w-4 h-4 sch-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
         {/* ── Admin overview ── */}
         {isAdmin && allSettings.length > 0 && (
           <div className="mt-8">
@@ -1567,71 +1222,6 @@ export default function SchedulePage() {
         </Modal>
       )}
 
-      {/* ── Expense drawer ── */}
-      {expenseModal && (
-        <ExpenseDrawer
-          editId={expEditId}
-          form={expForm}
-          setForm={setExpForm}
-          receiptPreview={expReceiptPreview}
-          receiptB64={expReceiptB64}
-          onReceiptFile={handleReceiptFile}
-          onScan={scanReceipt}
-          scanLoading={expScanLoading}
-          scanError={expScanError}
-          saving={expSaving}
-          saveError={expSaveError}
-          onSave={saveExpense}
-          onDelete={deleteExpense}
-          onClose={() => !expSaving && setExpenseModal(false)}
-        />
-      )}
-
-      {/* ── Clock-out confirmation modal ── */}
-      {clockOutModal && (() => {
-        const now = new Date()
-        const dep = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-        const totalH = timeDiffHours(clockInTime, dep)
-        const pause  = totalH >= 8 ? 1.0 : totalH >= 5.5 ? 0.5 : 0
-        const effectif = Math.max(0, totalH - pause)
-        return (
-          <Modal onClose={() => setClockOutModal(false)}>
-            <h3 className="font-bold sch-ink mb-1">Confirmer le départ</h3>
-            <p className="text-xs sch-muted mb-4">{effectiveUser} · {clockInDate}</p>
-            <div className="u-panel p-4 mb-4 space-y-2" style={{ background: 'rgba(12,12,12,.05)', border: '1px solid rgba(12,12,12,.06)' }}>
-              <div className="flex justify-between text-sm">
-                <span className="sch-muted">Arrivée</span>
-                <span className="font-semibold sch-ink">{clockInTime}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="sch-muted">Départ</span>
-                <span className="font-semibold sch-ink">{dep}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="sch-muted">Présence</span>
-                <span className="font-semibold sch-ink">{totalH.toFixed(2)}h</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="sch-muted">Pause auto</span>
-                <span className="font-semibold sch-ink">− {pause}h</span>
-              </div>
-              <div className="flex justify-between border-t pt-2 mt-1" style={{ borderColor: C.neutralBg }}>
-                <span className="text-sm font-bold sch-ok">Temps effectif</span>
-                <span className="text-base font-bold sch-ok">{effectif.toFixed(2)}h</span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setClockOutModal(false)} className="flex-1 px-4 py-2 u-panel border text-sm font-medium sch-ink" style={{ borderColor: C.border }}>
-                Annuler
-              </button>
-              <button onClick={confirmClockOut} disabled={saving} className="flex-1 px-4 py-2 u-panel text-sm font-semibold text-white" style={{ background: PINK, opacity: saving ? 0.7 : 1 }}>
-                {saving ? '…' : 'Enregistrer'}
-              </button>
-            </div>
-          </Modal>
-        )
-      })()}
-
       {/* ── Settings modal ── */}
       {settingsOpen && (
         <Modal onClose={() => !settingsSaving && setSettingsOpen(false)}>
@@ -1747,235 +1337,6 @@ export default function SchedulePage() {
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
-
-function ExpenseDrawer({ editId, form, setForm, receiptPreview, receiptB64, onReceiptFile, onScan, scanLoading, scanError, saving, saveError, onSave, onDelete, onClose }) {
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape' && !saving) onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, saving])
-
-  const inputCls = "w-full px-3 py-2 border sch-line u-pill text-sm bg-white focus:sch-line focus:outline-none transition-colors"
-  // Rayon panneau (15px) pour les champs multilignes : à 999px les deux coins
-  // se rejoignent et le champ devient une ellipse. Dérivé, pour ne pas diverger.
-  const textareaCls = inputCls.replace('u-pill', 'u-panel')
-
-  return (
-    <>
-      <style>{`
-        @keyframes drawerSlide { from { transform: translateX(100%); } to { transform: translateX(0); } }
-        @keyframes drawerFade  { from { opacity: 0; } to { opacity: 1; } }
-      `}</style>
-      <div className="fixed inset-0 z-50"
-        style={{ background: 'rgba(15, 23, 42, 0.35)', animation: 'drawerFade 0.15s ease-out both' }}
-        onClick={e => e.target === e.currentTarget && onClose()}>
-        <div
-          className="fixed top-0 right-0 bottom-0 bg-white flex flex-col shadow-2xl"
-          style={{
-            width: '100%',
-            maxWidth: 520,
-            animation: 'drawerSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) both',
-            fontFamily: FONT,
-          }}>
-          {/* Header */}
-          <div className="flex items-center justify-between px-8 py-5 border-b sch-line">
-            <div>
-              <p className="text-xs uppercase tracking-wider sch-muted mb-0.5">{editId ? 'Modifier' : 'Nouveau frais'}</p>
-              <h2 className="font-semibold sch-ink tracking-tight" style={{ fontSize: 20 }}>
-                {editId ? (form.merchant || 'Frais') : 'Ajouter un frais'}
-              </h2>
-            </div>
-            <button onClick={onClose}
-              className="w-9 h-9 flex items-center justify-center u-pill sch-muted hover:sch-fill hover:sch-ink transition-colors"
-              style={{ fontSize: 22 }}>
-              ×
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
-            {/* Receipt */}
-            <div>
-              <label className="block text-xs font-medium sch-muted mb-1.5">Photo du reçu</label>
-              <label
-                className="block w-full u-pill border border-dashed cursor-pointer overflow-hidden transition-colors"
-                style={{ borderColor: receiptPreview ? C.successBg : C.border, background: receiptPreview ? C.successBg : C.surface, minHeight: 84 }}
-                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = AL.black }}
-                onDragLeave={e => { e.currentTarget.style.borderColor = receiptPreview ? C.successBg : C.border }}
-                onDrop={e => {
-                  e.preventDefault()
-                  e.currentTarget.style.borderColor = receiptPreview ? C.successBg : C.border
-                  const file = e.dataTransfer.files?.[0]
-                  if (file && file.type.startsWith('image/')) onReceiptFile(file)
-                }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={e => onReceiptFile(e.target.files?.[0])}
-                />
-                {receiptPreview ? (
-                  <div className="flex items-center gap-3 p-3">
-                    <img src={receiptPreview} alt="reçu" className="w-16 h-16 object-cover u-pill flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold" style={{ color: C.success }}>Reçu attaché</p>
-                      <p className="text-xs sch-muted mt-0.5">Cliquer pour changer</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 gap-1">
-                    <p className="text-sm sch-ink font-medium">Glisser une image ou <span className="sch-ink underline">parcourir</span></p>
-                    <p className="text-xs sch-muted">JPG / PNG / HEIC</p>
-                  </div>
-                )}
-              </label>
-
-              {receiptPreview && receiptB64 && (
-                <button
-                  onClick={onScan}
-                  disabled={scanLoading}
-                  className="mt-3 w-full py-2 u-pill text-sm font-medium border transition-colors"
-                  style={{
-                    background: scanLoading ? C.neutralBg : 'white',
-                    color: scanLoading ? C.muted : AL.black,
-                    borderColor: 'rgba(12,12,12,.08)',
-                  }}>
-                  {scanLoading ? 'Analyse en cours…' : 'Scanner avec l\'IA'}
-                </button>
-              )}
-              {scanError && (
-                <p className="mt-2 text-xs sch-warn">{scanError}</p>
-              )}
-            </div>
-
-            {/* Date + Montant */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium sch-muted mb-1.5">Date</label>
-                <input type="date" value={form.date} onChange={e => setForm(f=>({...f,date:e.target.value}))}
-                  className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium sch-muted mb-1.5">Montant</label>
-                <div className="flex gap-2">
-                  <input type="number" step="0.01" min="0" placeholder="0.00" value={form.amount}
-                    onChange={e => setForm(f=>({...f,amount:e.target.value}))}
-                    className={`${inputCls} flex-1`} />
-                  <select value={form.currency} onChange={e => setForm(f=>({...f,currency:e.target.value}))}
-                    className={inputCls} style={{ width: 80 }}>
-                    {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Commerçant */}
-            <div>
-              <label className="block text-xs font-medium sch-muted mb-1.5">Commerçant</label>
-              <input type="text" placeholder="Ex : Migros, SBB, Hôtel Ibis…" value={form.merchant}
-                onChange={e => setForm(f=>({...f,merchant:e.target.value}))}
-                className={inputCls} />
-            </div>
-
-            {/* Catégorie */}
-            <div>
-              <label className="block text-xs font-medium sch-muted mb-2">Catégorie</label>
-              <div className="grid grid-cols-3 gap-2">
-                {EXPENSE_CATEGORIES.map(cat => {
-                  const active = form.category === cat.key
-                  return (
-                    <button
-                      key={cat.key}
-                      type="button"
-                      onClick={() => setForm(f=>({...f,category:cat.key}))}
-                      className="py-2.5 u-pill text-sm font-medium transition-colors border"
-                      style={active
-                        ? { borderColor: cat.color, background: cat.color + '14', color: cat.color }
-                        : { borderColor: C.border, background: 'white', color: C.muted }
-                      }>
-                      {cat.key}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Mode de paiement */}
-            <div>
-              <label className="block text-xs font-medium sch-muted mb-2">Mode de paiement</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button"
-                  onClick={() => setForm(f => ({ ...f, payment_method: 'company' }))}
-                  className="py-2.5 u-pill text-sm font-medium transition-colors border"
-                  style={form.payment_method === 'personal'
-                    ? { borderColor: C.warning, background: C.warningBg, color: C.warning }
-                    : { borderColor: C.border, background: 'white', color: C.muted }}>
-                  💳 Compte perso
-                  <span className="block text-[10px] opacity-75 font-normal">à rembourser</span>
-                </button>
-                <button type="button"
-                  onClick={() => setForm(f => ({ ...f, payment_method: 'company' }))}
-                  className="py-2.5 u-pill text-sm font-medium transition-colors border"
-                  style={form.payment_method === 'company'
-                    ? { borderColor: C.outline, background: C.neutralBg, color: AL.black }
-                    : { borderColor: C.border, background: 'white', color: C.muted }}>
-                  🏢 Carte société
-                  <span className="block text-[10px] opacity-75 font-normal">déjà payé</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Note */}
-            <div>
-              <label className="block text-xs font-medium sch-muted mb-1.5">Note</label>
-              <textarea rows={2} placeholder="Détails supplémentaires…" value={form.description}
-                onChange={e => setForm(f=>({...f,description:e.target.value}))}
-                className={textareaCls} style={{ resize: 'vertical' }} />
-            </div>
-
-            {saveError && (
-              <div className="px-4 py-3 u-pill text-sm" style={{ background: 'rgba(196,0,43,.10)', border: '1px solid rgba(196,0,43,.10)', color: C.danger }}>
-                {saveError}
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-8 py-4 border-t sch-line flex items-center justify-between gap-3">
-            {editId ? (
-              <button onClick={() => onDelete(editId)} disabled={saving}
-                className="text-sm font-medium sch-ko hover:sch-ko">
-                Supprimer
-              </button>
-            ) : <span />}
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={onClose} disabled={saving}
-                className="px-4 py-2 u-pill text-sm font-medium sch-ink hover:sch-fill transition-colors">
-                Annuler
-              </button>
-              <button onClick={onSave} disabled={saving || !form.date}
-                className="px-5 py-2 u-pill text-white font-medium text-sm transition-opacity disabled:opacity-50"
-                style={{ background: AL.black }}>
-                {saving ? 'Enregistrement…' : editId ? 'Mettre à jour' : 'Enregistrer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function StatCard({ label, value, sub, color }) {
-  return (
-    <div style={{ border: `1.5px solid ${C.outline}`, borderRadius: R.panel, padding: 22, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: '.1em', textTransform: 'uppercase', color: C.muted }}>{label}</span>
-      <span style={{ color: color || AL.black, fontSize: 26, fontWeight: 500, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
-      <span style={{ fontSize: 12.5, color: C.muted }}>{sub}</span>
-    </div>
-  )
-}
 
 function EntryChip({ type, hours, arrival, departure, note, overtime }) {
   const cfg = TYPES[type]
