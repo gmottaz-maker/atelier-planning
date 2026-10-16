@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.0.0",
-    "@capacitor/ios": "^6.0.0",
+    "@capacitor/ios": "^6.2.2",
     "@sparticuz/chromium": "^149.0.0",
     "@supabase/supabase-js": "^2.39.0",
     "fast-xml-parser": "^5.8.0",
