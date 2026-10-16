@@ -926,10 +926,10 @@ Au 5 octobre 2026, 234 pièces s'y étaient rangées, et 234 copies homonymes
 dormaient dans l'arbre vivant sans qu'aucune ligne de base ne les référence.
 **Un id en dur ne survit pas à un renommage, et ne le dit pas.**
 
-**`_Gestion/CONSIGNES-MAZE-PROJECT.md`, sur le drive, fait foi.** Il est écrit
-POUR cette application par celui qui range le dossier, et il remplace toute
-convention antérieure — y compris ce qui est écrit ici. À relire avant de
-toucher au classement.
+**`_Gestion/CONSIGNES-MAZE-PROJECT.md`, sur le drive, dit où classer.** À
+relire avant de toucher au classement — mais ne pas en déduire plus que ce
+qui est demandé : ce qu'il décrit du nommage et du dédoublonnage concerne le
+rangement À LA MAIN, pas le code.
 
 **Le classement, depuis le 16 octobre 2026 — UNE SEULE branche :**
 
@@ -952,18 +952,11 @@ police, un bail, un bulletin de salaire, un relevé bancaire, un courrier
 fiscal vont dans `00. Admin / Classement auto/`. Mieux vaut une pièce dans la
 boîte d'entrée qu'une pièce au mauvais endroit.
 
-**Nom de fichier** — `AAAA-MM-JJ_FOURNISSEUR-description_montant.pdf` :
-
-```
-2026-05-12_BOIS-SA-2026-0451_1240.50.pdf     facture (le n° occupe la description)
-2026-10-01_HORNBACH_944.15.pdf               justificatif (pas de description)
-```
-
-Le montant est le TOTAL, jamais un sous-total, un acompte ou un supplément —
-quatre factures DHL portaient le supplément carburant à sa place et ne se
-retrouvaient dans aucun relevé. Un montant illisible n'écrit RIEN :
-`amountTag` rend `null`, et un nom sans montant vaut mieux qu'un montant faux.
-Ni accent ni apostrophe, ils cassent les recherches et les liens.
+**Les noms de fichiers n'ont PAS changé** : `<date>_<FOURNISSEUR>_<n°>.pdf`
+pour une facture, `<date>_<MARCHAND>_<montant>.pdf` pour un justificatif. Les
+consignes décrivent une convention de nommage pour le classement À LA MAIN ;
+l'appliquer au code n'était pas demandé, a été fait puis défait le 16 octobre
+2026. **La consigne portait sur la DESTINATION, rien d'autre.**
 
 **Deux régimes dans ce chemin, et la frontière est voulue.** `Finances` et
 `Comptabilité` sont la STRUCTURE : `dossierExistant` les exige, et un dépôt
