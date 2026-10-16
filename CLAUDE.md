@@ -1219,7 +1219,16 @@ git push  # → déclenche déploiement Vercel automatiquement
 
 ---
 
-## Capacitor (iOS — en cours)
+## Capacitor (iOS — échafaudage, en devDependencies)
+
+**Les trois paquets `@capacitor/*` sont en `devDependencies`, et doivent y
+rester.** Aucun fichier de `pages/`, `lib/`, `components/` ou `scripts/` ne les
+importe : ils ne servent qu'à fabriquer un binaire natif, ce qui ne se fait pas
+aujourd'hui (cf. « Sur iPhone » — c'est la PWA qui est installée). Un paquet
+d'outillage en dépendance de PRODUCTION, c'est un avis de sécurité qui bloque
+le déploiement d'une fonctionnalité que personne n'utilise : arrivé le
+16 octobre 2026 avec GHSA-rvm3-566m-v7fv sur `@capacitor/ios`, corrigé en
+6.2.2 puis reclassé.
 
 Structure créée dans `ios/` mais setup CocoaPods non terminé.
 ```bash
@@ -1675,6 +1684,14 @@ production. Deux pièges à connaître si tu ajoutes des cas :
 La CI (`.github/workflows/ci.yml`) exécute lint, tests, build, audit des
 dépendances et détection de secrets. Le lint passe en premier : c'est le
 contrôle le plus rapide.
+
+**Deux avis restent ouverts, et ils exigent Next 16** (au 16 octobre 2026) :
+`postcss` (high) et `next` (moderate), tous deux corrigés par un saut de
+majeure, donc une migration de framework et non un correctif. Ni l'un ni
+l'autre n'expose cette application : l'avis `postcss` porte sur la lecture de
+source maps AU BUILD, celui de Next sur l'empoisonnement de cache EN
+AUTO-HÉBERGEMENT — on déploie sur Vercel. À traiter comme un chantier, avec
+son propre build de vérification.
 
 **L'audit distingue « faille critique » de « npm injoignable »**
 (`scripts/check-audit.mjs`). Le 4 septembre 2026, l'endpoint d'audit de npm a
