@@ -122,14 +122,24 @@ export function Entete({ projet, responsables, onEnregistrer, onDupliquer, dupli
 
 // ── Frise ───────────────────────────────────────────────────────────────────
 
-export function Frise({ etapes }) {
+// Un clic sur un statut manuel le pose ; sur « préparation » ou
+// « pré-production », il rend la main à l'offre, qui les déduit. « Facturé »
+// ne se clique pas : il vient d'une facture.
+export function Frise({ etapes, onChoisir, enCours }) {
   return (
-    <ol className="fx-frise" aria-label="Avancement du projet">
-      {etapes.map(e => (
-        <li key={e.cle} className={e.etat === 'avenir' ? '' : e.etat} aria-current={e.etat === 'ici' ? 'step' : undefined}>
-          {e.nom}{e.detail && <small className="n">{e.detail}</small>}
-        </li>
-      ))}
+    <ol className="fx-frise" aria-label="Statut du projet">
+      {etapes.map(e => {
+        const contenu = <>{e.nom}{e.detail && <small className="n">{e.detail}</small>}</>
+        const cliquable = onChoisir && e.cle !== 'facture' && e.etat !== 'ici'
+        return (
+          <li key={e.cle} className={e.etat === 'avenir' ? '' : e.etat} aria-current={e.etat === 'ici' ? 'step' : undefined}>
+            {cliquable
+              ? <button className="fx-etape" disabled={enCours} onClick={() => onChoisir(e.cle)}
+                  title={e.auto ? `Revenir en « ${e.nom} » : le statut suit de nouveau l’offre` : `Passer en « ${e.nom} »`}>{contenu}</button>
+              : contenu}
+          </li>
+        )
+      })}
     </ol>
   )
 }

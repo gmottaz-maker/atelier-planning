@@ -22,7 +22,7 @@ import { apiFetch } from '../../../lib/api'
 import { lireReponse } from '../../../lib/uploadLimit'
 import { dateDuJour } from '../../../lib/aujourdhui'
 import { fmtCHF } from '../../../lib/money'
-import { aVenir, enRetard, etapeCourante, parcours } from '../../../lib/fiche'
+import { aVenir, enRetard, parcours, statutCourant } from '../../../lib/fiche'
 import { STYLE_FICHE } from '../../../components/fiche/styles'
 import { AVenir, Entete, Frise, Synthese } from '../../../components/fiche/Haut'
 import Taches from '../../../components/fiche/Taches'
@@ -44,9 +44,9 @@ const NOMS_TYPES = Object.fromEntries(TYPES_LOGISTIQUE.map(t => [t.key, t.label]
 
 // Le dossier ouvert à l'arrivée suit l'étape : on prépare l'offre, puis on
 // travaille sur les tâches, puis on regarde ce que le chantier a coûté.
-function dossierParDefaut(etape, isAdmin) {
-  if (etape === 'preparation' || etape === 'offre') return 'offre'
-  if (etape === 'termine') return isAdmin ? 'rentabilite' : 'offre'
+function dossierParDefaut(statut, isAdmin) {
+  if (statut === 'preparation') return 'offre'
+  if (statut === 'termine' || statut === 'facture') return isAdmin ? 'rentabilite' : 'offre'
   return 'taches'
 }
 
@@ -79,6 +79,11 @@ export default function FicheEssai() {
   const transport = useTransport()
   const { data: activitesBrutes } = useSWR('/api/activites')
   const activites = Array.isArray(activitesBrutes) ? activitesBrutes : []
+  // « Facturé » se déduit d'une facture existante. Les factures ne se lisent
+  // que par l'admin : pour un membre, un projet terminé reste « terminé ».
+  const { data: factures } = useSWR(isAdmin ? '/api/customer-invoices' : null)
+  const facture = (Array.isArray(factures) ? factures : []).some(f => String(f.project_id) === String(id))
+  const [statutEnCours, setStatutEnCours] = useState(false)
 
   const [projet, setProjet] = useState(null)
   const [taches, setTaches] = useState([])
@@ -143,7 +148,7 @@ export default function FicheEssai() {
   useEffect(() => {
     if (!projet || dossier) return
     const demande = router.query.dossier
-    setDossier(typeof demande === 'string' ? demande : dossierParDefaut(etapeCourante({ phase: projet.phase, statutOffre: quote.status }), isAdmin))
+    setDossier(typeof demande === 'string' ? demande : dossierParDefaut(statutCourant({ statut: projet.statut, phase: projet.phase, statutOffre: quote.status }), isAdmin))
   }, [projet, dossier, router.query.dossier, quote.status, isAdmin])
   function ouvrirDossier(cle) {
     setDossier(cle)
@@ -315,6 +320,19 @@ export default function FicheEssai() {
     await synchroniserTaches(points)
   }
 
+  // Le statut s'enregistre seul, par sa route : c'est un état, pas une rédaction.
+  async function changerStatutProjet(cle) {
+    const manuel = !['preparation', 'preproduction'].includes(cle)
+    const avant = projet.statut ?? null
+    setStatutEnCours(true)
+    setProjet(p => ({ ...p, statut: manuel ? cle : null }))
+    try {
+      const r = await fetch(`/api/projects/${id}/statut`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-actor': moi }, body: JSON.stringify({ statut: manuel ? cle : null }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setProjet(p => ({ ...p, statut: avant })); alert(d.error || 'Le statut n’a pas pu être enregistré.') }
+    } finally { setStatutEnCours(false) }
+  }
+
   async function creerDossierKdrive() {
     setCreationDossier(true)
     try {
@@ -328,7 +346,7 @@ export default function FicheEssai() {
   if (chargement) return <div className="fx" style={{ padding: 40 }}><style>{STYLE_FICHE}</style><p style={{ color: '#5f6672' }}>Chargement…</p></div>
   if (!projet || projet.error) return <div className="fx"><style>{STYLE_FICHE}</style><p>Projet introuvable.</p></div>
 
-  const etapes = parcours({ phase: projet.phase, statutOffre: quote.status, logistique, disassemblyDate: projet.disassembly_date })
+  const etapes = parcours({ statut: projet.statut, phase: projet.phase, statutOffre: quote.status, facture, logistique, disassemblyDate: projet.disassembly_date })
   const prochaines = aVenir({ taches, logistique, aujourdhui, limite: 4, nomsTypes: NOMS_TYPES })
   const ouvertes = taches.filter(t => t.status !== 'completed' && !t.category_data?.source_logistics_uid)
   const retards = ouvertes.filter(t => enRetard(t, aujourdhui)).length
@@ -353,7 +371,7 @@ export default function FicheEssai() {
           onDupliquer={dupliquer} duplication={duplication} versAncienne={versAncienne} />
 
         <div className="fx-etat">
-          <Frise etapes={etapes} />
+          <Frise etapes={etapes} onChoisir={changerStatutProjet} enCours={statutEnCours} />
           <Synthese projet={projet} entrees={entrees} peutSupprimer={isAdmin} enCours={synthEnCours} erreur={synthErreur}
             onRefaire={refaireSynthese} onDeposer={deposer} onSupprimer={supprimerEntree} largeurChamp={largeurChamp} />
           <AVenir items={prochaines} />

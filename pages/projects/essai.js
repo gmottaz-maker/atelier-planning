@@ -3,14 +3,16 @@
 // d'essai (/projects/[id]/essai).
 //
 // Une seule question par écran : où en est chaque projet. Les projets se
-// rangent par ÉTAPE — la même que la frise de leur fiche — ou par date de
-// livraison. Le calcul vit dans lib/fiche.js.
+// rangent par STATUT — le même que la frise de leur fiche — en liste ou en
+// kanban, ou par date de livraison. Le calcul vit dans lib/fiche.js.
 import { useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import useSWR from 'swr'
 import { STYLE_FICHE } from '../../components/fiche/styles'
-import { ETAPES, aVenir, dateCourte, delai, etapeProjet, groupesParEtape, groupesParLivraison, livraisonEnRetard } from '../../lib/fiche'
+import { STATUTS, aVenir, dateCourte, delai, statutProjet, groupesParStatut, groupesParLivraison, livraisonEnRetard } from '../../lib/fiche'
+import useIsAdmin from '../../lib/useIsAdmin'
+import { useAuth } from '../_app'
 import { CATEGORIES_OFFRE, categorieOffre, compterOffres } from '../../lib/quoteStatus'
 import { chercherProjets, initLogistics } from '../../lib/projectHelpers'
 import { dateDuJour } from '../../lib/aujourdhui'
@@ -30,20 +32,28 @@ function memoire(cle, defaut) {
 }
 function retenir(cle, v) { try { localStorage.setItem(cle, v) } catch { /* navigation privée */ } }
 
-function MiniFrise({ etape }) {
-  const rang = ETAPES.findIndex(e => e.cle === etape)
+function MiniFrise({ statut }) {
+  const rang = STATUTS.findIndex(e => e.cle === statut)
   return (
     <span className="fx-mini" aria-hidden="true">
-      {ETAPES.map((e, i) => <i key={e.cle} className={i < rang ? 'fait' : i === rang ? 'ici' : ''} />)}
+      {STATUTS.map((e, i) => <i key={e.cle} className={i < rang ? 'fait' : i === rang ? 'ici' : ''} />)}
     </span>
   )
 }
 
-function Ligne({ p, prochaine, aujourdhui, archive }) {
-  const etape = etapeProjet(p)
-  const offre = OFFRE[categorieOffre(p.quote_data)]
+function Livraison({ p, aujourdhui }) {
   const retard = livraisonEnRetard(p, aujourdhui)
   const d = p.deadline ? p.deadline.slice(0, 10) : null
+  return (
+    <span className={`livraison${retard ? ' rouge' : ''}`}>
+      {d ? <><b className="n">{dateCourte(d)}</b><small>{retard ? `en retard, ${delai(d, aujourdhui).replace('il y a ', '')}` : delai(d, aujourdhui)}</small></> : <small>Pas de date</small>}
+    </span>
+  )
+}
+
+function Ligne({ p, prochaine, aujourdhui, archive, facture }) {
+  const etape = statutProjet(p, facture)
+  const offre = OFFRE[categorieOffre(p.quote_data)]
   return (
     <Link href={`/projects/${p.id}/essai`} className={`fx-projet${archive ? ' archive' : ''}`}>
       <span className="no n">{p.numero}</span>
@@ -51,11 +61,9 @@ function Ligne({ p, prochaine, aujourdhui, archive }) {
         <b>{p.name}</b>
         <small>{p.client || 'Client à définir'}</small>
       </span>
-      <span className={`livraison${retard ? ' rouge' : ''}`}>
-        {d ? <><b className="n">{dateCourte(d)}</b><small>{retard ? `en retard, ${delai(d, aujourdhui).replace('il y a ', '')}` : delai(d, aujourdhui)}</small></> : <small>Pas de date</small>}
-      </span>
+      <Livraison p={p} aujourdhui={aujourdhui} />
       <span className="etape">
-        {p.suspended ? <span className="mot gris">En pause</span> : <><MiniFrise etape={etape} /><span className="mot">{ETAPES.find(e => e.cle === etape)?.nom}</span></>}
+        {p.suspended ? <span className="mot gris">En pause</span> : <><MiniFrise statut={etape} /><span className="mot">{STATUTS.find(e => e.cle === etape)?.nom}</span></>}
       </span>
       <span className="offre"><i style={{ background: offre.couleur }} />{offre.mot}</span>
       <span className="prochaine">
@@ -66,16 +74,43 @@ function Ligne({ p, prochaine, aujourdhui, archive }) {
   )
 }
 
+// Une carte du kanban : ce qu'il faut pour décider sans ouvrir — qui, quand
+// livrer, où en est l'offre. Elle se glisse vers une autre colonne pour
+// changer de statut.
+function Carte({ p, aujourdhui, onGlisser }) {
+  const offre = OFFRE[categorieOffre(p.quote_data)]
+  return (
+    <Link href={`/projects/${p.id}/essai`} className="fx-carte" draggable={!p.suspended}
+      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(p.id)); onGlisser(p) }}
+      onDragEnd={() => onGlisser(null)}>
+      <span className="haut"><span className="no n">{p.numero}</span><span className="qui" title={p.responsible || 'non défini'}>{initiales(p.responsible)}</span></span>
+      <b>{p.name}</b>
+      <small>{p.client || 'Client à définir'}</small>
+      <span className="bas"><Livraison p={p} aujourdhui={aujourdhui} /><span className="offre"><i style={{ background: offre.couleur }} />{offre.mot}</span></span>
+    </Link>
+  )
+}
+
 export default function ProjetsEssai() {
   const { data: brut, isLoading } = useSWR('/api/projects?light=1')
   const { data: taches } = useSWR('/api/tasks')
-  const projets = Array.isArray(brut) ? brut : []
+  const { user } = useAuth()
+  const isAdmin = useIsAdmin()
+  // « Facturé » se déduit d'une facture ; les factures ne se lisent que par l'admin.
+  const { data: factures } = useSWR(isAdmin ? '/api/customer-invoices' : null)
+  const facturesIds = useMemo(() => new Set((Array.isArray(factures) ? factures : []).map(f => String(f.project_id))), [factures])
+  const [statutsLocaux, setStatutsLocaux] = useState({})   // id → statut posé ici, avant revalidation
+  const projets = (Array.isArray(brut) ? brut : []).map(p => (p.id in statutsLocaux ? { ...p, statut: statutsLocaux[p.id] } : p))
+  const [vue, setVue] = useState('liste')
+  const [tenu, setTenu] = useState(null)
+  const [survol, setSurvol] = useState(null)
   const aujourdhui = dateDuJour()
   const [recherche, setRecherche] = useState('')
   const [offre, setOffre] = useState('tous')
-  const [rangement, setRangement] = useState('etape')
+  const [rangement, setRangement] = useState('statut')
   const [archives, setArchives] = useState(false)
-  useEffect(() => { setRangement(memoire('projetsEssaiRangement', 'etape')); setOffre(memoire('projetsEssaiOffre', 'tous')) }, [])
+  useEffect(() => { setRangement(memoire('projetsEssaiRangement', 'statut') === 'livraison' ? 'livraison' : 'statut'); setOffre(memoire('projetsEssaiOffre', 'tous')); setVue(memoire('projetsEssaiVue', 'liste')) }, [])
+  const changerVue = v => { setVue(v); retenir('projetsEssaiVue', v) }
   const changerRangement = v => { setRangement(v); retenir('projetsEssaiRangement', v) }
   const changerOffre = v => { setOffre(v); retenir('projetsEssaiOffre', v) }
 
@@ -84,7 +119,23 @@ export default function ProjetsEssai() {
   const comptes = compterOffres(actifs)
   const vus = chercherProjets(offre === 'tous' ? actifs : actifs.filter(p => categorieOffre(p.quote_data) === offre), recherche)
   const archivesVues = chercherProjets(archives_, recherche).sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0))
-  const groupes = rangement === 'livraison' ? groupesParLivraison(vus, aujourdhui) : groupesParEtape(vus)
+  const groupes = rangement === 'livraison' ? groupesParLivraison(vus, aujourdhui) : groupesParStatut(vus, { factures: facturesIds })
+  const colonnes = groupesParStatut(vus, { factures: facturesIds, vides: true })
+
+  // Lâcher une carte dans une colonne pose ce statut. Préparation et
+  // pré-production rendent la main à l'offre ; facturé et pause ne se posent
+  // pas en glissant.
+  async function poser(p, cle) {
+    if (!p || p.suspended || ['facture', 'pause'].includes(cle) || statutProjet(p, facturesIds.has(String(p.id))) === cle) return
+    const statut = ['preparation', 'preproduction'].includes(cle) ? null : cle
+    setStatutsLocaux(m => ({ ...m, [p.id]: statut }))
+    const r = await fetch(`/api/projects/${p.id}/statut`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-actor': user?.name || '' }, body: JSON.stringify({ statut }) })
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}))
+      setStatutsLocaux(m => { const n = { ...m }; delete n[p.id]; return n })
+      alert(d.error || 'Le statut n’a pas pu être enregistré.')
+    }
+  }
 
   // La prochaine date de chaque projet : logistique et tâches mêlées, comme
   // le bloc « À venir » de sa fiche.
@@ -137,23 +188,44 @@ export default function ProjetsEssai() {
               </button>
             ))}
           </span>
-          <span className="fx-seg" role="group" aria-label="Ranger par">
-            <button aria-pressed={rangement === 'etape'} onClick={() => changerRangement('etape')}>Par étape</button>
-            <button aria-pressed={rangement === 'livraison'} onClick={() => changerRangement('livraison')}>Par livraison</button>
+          <span className="fx-seg" role="group" aria-label="Affichage">
+            <button aria-pressed={vue === 'liste' && rangement === 'statut'} onClick={() => { changerVue('liste'); changerRangement('statut') }}>Par statut</button>
+            <button aria-pressed={vue === 'kanban'} onClick={() => changerVue('kanban')}>Kanban</button>
+            <button aria-pressed={vue === 'liste' && rangement === 'livraison'} onClick={() => { changerVue('liste'); changerRangement('livraison') }}>Par livraison</button>
           </span>
         </div>
 
         {isLoading && !projets.length && <p className="fx-note">Chargement…</p>}
         {!isLoading && !vus.length && <p className="fx-vide" style={{ marginTop: 48 }}>Aucun projet en cours ne répond à « {recherche || CATEGORIES_OFFRE.find(c => c.key === offre)?.label} ».</p>}
 
-        <div className="fx-liste">
+        {vue === 'kanban' && (
+          <div className="fx-kanban">
+            {colonnes.map(c => {
+              const posable = !['facture', 'pause'].includes(c.cle)
+              return (
+                <section key={c.cle} className={`fx-colonne${survol === c.cle && tenu ? ' survol' : ''}${tenu && !posable ? ' ferme' : ''}`}
+                  onDragOver={e => { if (tenu && posable) { e.preventDefault(); if (survol !== c.cle) setSurvol(c.cle) } }}
+                  onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setSurvol(null) }}
+                  onDrop={e => { e.preventDefault(); setSurvol(null); poser(tenu, c.cle); setTenu(null) }}>
+                  <h2>{c.nom} <span className="n">{c.projets.length}</span></h2>
+                  {c.auto && c.cle !== 'pause' && <p className="auto">{c.cle === 'facture' ? 'Dès qu’une facture existe' : 'Suit l’état de l’offre'}</p>}
+                  <div className="cartes">
+                    {c.projets.map(p => <Carte key={p.id} p={p} aujourdhui={aujourdhui} onGlisser={setTenu} />)}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+        )}
+
+        {vue === 'liste' && <div className="fx-liste">
           <div className="fx-projet tete" aria-hidden="true">
             <span /><span>Projet</span><span>Livraison</span><span>Étape</span><span>Offre</span><span>Prochaine date</span><span />
           </div>
           {groupes.map(g => (
             <section key={g.cle} className="fx-groupe-liste">
               <h2>{g.nom} <span className="n">{g.projets.length}</span></h2>
-              {g.projets.map(p => <Ligne key={p.id} p={p} prochaine={prochaines[p.id]} aujourdhui={aujourdhui} />)}
+              {g.projets.map(p => <Ligne key={p.id} p={p} prochaine={prochaines[p.id]} aujourdhui={aujourdhui} facture={facturesIds.has(String(p.id))} />)}
             </section>
           ))}
 
@@ -168,7 +240,7 @@ export default function ProjetsEssai() {
                 : <div className="fx-ajouts"><button className="fx-lien" onClick={() => setArchives(true)}>Voir les {archivesVues.length} projets archivés</button></div>}
             </section>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )

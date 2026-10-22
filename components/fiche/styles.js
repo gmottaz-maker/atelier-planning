@@ -66,6 +66,9 @@ export const STYLE_FICHE = `
 .fx-frise li:last-child{flex:0 0 auto;padding-right:0;text-align:right}
 .fx-frise li:last-child::after{left:auto;right:0}
 .fx-frise li:last-child::before{left:0;right:7px}
+.fx-etape{text-align:inherit;font:inherit;color:inherit;border-radius:6px}
+.fx-etape:hover{color:${N.cobalt}}
+.fx-etape:hover small{color:${N.cobalt}}
 .fx-frise small{display:block;font-size:${t.petit}px;font-weight:400;color:${N.gris};margin-top:2px}
 .fx-frise li.ici small{color:${N.cobalt}}
 
@@ -261,6 +264,28 @@ a.fx-projet:hover{background:#fafbfc}
 .fx-projet .qui{width:34px;height:34px;border-radius:50%;background:${N.doux};display:grid;place-items:center;font-size:12px;font-weight:600}
 .fx-projet.archive{color:${N.gris}}
 .fx-projet.archive .no{color:${N.gris}}
+
+.fx-kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(240px,1fr);gap:16px;margin-top:40px;overflow-x:auto;padding-bottom:16px;align-items:start}
+.fx-colonne{background:${N.doux};border-radius:${N.rayon + 2}px;padding:16px 12px 12px;min-height:240px;transition:background .15s,box-shadow .15s}
+.fx-colonne h2{font-size:${t.corps}px;padding:0 6px}
+.fx-colonne h2 .n{color:${N.gris};font-weight:500;margin-left:4px}
+.fx-colonne .auto{font-size:${t.petit}px;color:${N.gris};padding:2px 6px 0}
+.fx-colonne .cartes{display:grid;gap:8px;margin-top:12px}
+.fx-colonne.survol{background:${N.cobaltDoux};box-shadow:inset 0 0 0 2px ${N.cobalt}}
+.fx-colonne.ferme{opacity:.55}
+.fx-carte{display:grid;gap:4px;background:#fff;border-radius:${N.rayon}px;padding:14px;color:inherit;text-decoration:none;cursor:grab}
+.fx-carte:hover{box-shadow:0 2px 10px rgba(17,19,24,.08)}
+.fx-carte .haut{display:flex;justify-content:space-between;align-items:center}
+.fx-carte .no{color:${N.cobalt};font-weight:600}
+.fx-carte .qui{width:28px;height:28px;border-radius:50%;background:${N.doux};display:grid;place-items:center;font-size:11px;font-weight:600}
+.fx-carte b{font-weight:600;line-height:1.3}
+.fx-carte small{color:${N.gris};font-size:${t.petit}px}
+.fx-carte .bas{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;margin-top:8px}
+.fx-carte .livraison b{font-weight:600}
+.fx-carte .livraison small{display:block}
+.fx-carte .livraison.rouge b,.fx-carte .livraison.rouge small{color:${N.rouge}}
+.fx-carte .offre{display:flex;align-items:center;gap:6px;font-size:${t.petit}px;font-weight:500;white-space:nowrap}
+.fx-carte .offre i{width:7px;height:7px;border-radius:50%}
 
 /* ── Rentabilité ── */
 .fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}

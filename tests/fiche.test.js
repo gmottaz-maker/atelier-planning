@@ -1,18 +1,33 @@
 import { describe, it, expect } from 'vitest'
-import { aVenir, dateCourte, dateLongue, decouperSynthese, delai, enRetard, etapeCourante, groupesParEtape, groupesParLivraison, joursEntre, listeNoms, livraisonEnRetard, parcours, premiereDate } from '../lib/fiche'
+import { aVenir, dateCourte, dateLongue, decouperSynthese, delai, enRetard, groupesParLivraison, groupesParStatut, joursEntre, listeNoms, livraisonEnRetard, parcours, premiereDate, statutCourant, statutStockable } from '../lib/fiche'
 
-describe('étape du projet', () => {
-  it('la phase posée à la main passe avant l’offre', () => {
-    expect(etapeCourante({ phase: 'termine', statutOffre: 'brouillon' })).toBe('termine')
-    expect(etapeCourante({ phase: 'demontage', statutOffre: 'accepte' })).toBe('demontage')
-    expect(etapeCourante({ phase: 'en_cours', statutOffre: 'accepte' })).toBe('montage')
+describe('statut du projet', () => {
+  it('se déduit de l’offre tant que rien n’est posé', () => {
+    expect(statutCourant({})).toBe('preparation')
+    expect(statutCourant({ statutOffre: 'envoye' })).toBe('preparation')
+    expect(statutCourant({ statutOffre: 'accepte' })).toBe('preproduction')
   })
-  it('sans phase, l’offre décide', () => {
-    expect(etapeCourante({ statutOffre: 'accepte' })).toBe('production')
-    expect(etapeCourante({ statutOffre: 'envoye' })).toBe('offre')
-    expect(etapeCourante({ statutOffre: 'a_corriger' })).toBe('offre')
-    expect(etapeCourante({ statutOffre: 'brouillon' })).toBe('preparation')
-    expect(etapeCourante({})).toBe('preparation')
+  it('le statut posé à la main a le dernier mot', () => {
+    expect(statutCourant({ statut: 'production', statutOffre: 'accepte' })).toBe('production')
+    expect(statutCourant({ statut: 'production_terminee' })).toBe('production_terminee')
+    expect(statutCourant({ statut: 'exploitation' })).toBe('exploitation')
+  })
+  it('relit l’ancienne phase d’un projet d’avant les statuts', () => {
+    expect(statutCourant({ phase: 'en_cours', statutOffre: 'accepte' })).toBe('exploitation')
+    expect(statutCourant({ phase: 'demontage' })).toBe('exploitation')
+    expect(statutCourant({ phase: 'termine' })).toBe('termine')
+    expect(statutCourant({ statut: 'production', phase: 'termine' })).toBe('production')
+  })
+  it('un projet terminé passe en facturé dès qu’une facture existe, pas avant d’être terminé', () => {
+    expect(statutCourant({ statut: 'termine', facture: true })).toBe('facture')
+    expect(statutCourant({ statut: 'production', facture: true })).toBe('production')
+  })
+  it('la route n’écrit qu’un statut manuel, ou rien', () => {
+    expect(statutStockable(null)).toBe(true)
+    expect(statutStockable('termine')).toBe(true)
+    expect(statutStockable('facture')).toBe(false)
+    expect(statutStockable('preproduction')).toBe(false)
+    expect(statutStockable('n’importe quoi')).toBe(false)
   })
 })
 
@@ -22,22 +37,25 @@ describe('frise', () => {
     { type: 'montage', date: '2026-12-14' },
     { type: 'livraison', date: '2026-12-10' },
   ]
-  it('marque ce qui est fait, l’étape en cours et ce qui reste', () => {
+  it('marque ce qui est fait, le statut en cours et ce qui reste', () => {
+    const f = parcours({ statut: 'production', statutOffre: 'accepte', logistique })
+    expect(f.map(e => e.etat)).toEqual(['fait', 'fait', 'ici', 'avenir', 'avenir', 'avenir', 'avenir'])
+    expect(f[0].detail).toBe('offre acceptée')
+  })
+  it('dit l’état de l’offre sous « préparation »', () => {
+    expect(parcours({ statutOffre: 'envoye' })[0].detail).toBe('offre envoyée')
+    expect(parcours({})[0].detail).toBe('offre à faire')
+  })
+  it('date le montage sous « en exploitation » et le démontage sous « terminé »', () => {
     const f = parcours({ statutOffre: 'accepte', logistique })
-    expect(f.map(e => e.etat)).toEqual(['fait', 'fait', 'ici', 'avenir', 'avenir', 'avenir'])
-    expect(f[1].detail).toBe('acceptée')
-    expect(f[2].detail).toBe('en cours')
+    expect(f[4].detail).toBe('montage 10 déc.')
+    expect(f[5].detail).toBe('démontage 24 déc.')
+    expect(parcours({ disassemblyDate: '2026-11-03' })[5].detail).toBe('démontage 3 nov.')
   })
-  it('date le montage au premier passage sur place, livraison comprise', () => {
-    const f = parcours({ statutOffre: 'accepte', logistique })
-    expect(f[3].detail).toBe('10 déc.')
-    expect(f[4].detail).toBe('24 déc.')
-  })
-  it('retombe sur la date de démontage du projet sans point logistique', () => {
-    expect(parcours({ disassemblyDate: '2026-11-03' })[4].detail).toBe('3 nov.')
-  })
-  it('un projet terminé a toutes ses étapes faites', () => {
-    expect(parcours({ phase: 'termine' }).every(e => e.etat === 'fait')).toBe(true)
+  it('un projet facturé a toutes ses étapes faites', () => {
+    const f = parcours({ statut: 'termine', facture: true })
+    expect(f.slice(0, -1).every(e => e.etat === 'fait')).toBe(true)
+    expect(f[6].etat).toBe('ici')
   })
   it('ignore une date mal formée', () => {
     expect(premiereDate([{ type: 'montage', date: '14.12.2026' }], ['montage'])).toBe(null)
@@ -127,22 +145,27 @@ describe('liste des projets', () => {
     { id: 2, numero: 102, deadline: null, quote_data: null },
     { id: 3, numero: 103, deadline: '2026-10-25', quote_data: { status: 'envoye' } },
     { id: 4, numero: 104, deadline: '2026-10-01', phase: 'en_cours', quote_data: { status: 'accepte' } },
-    { id: 5, numero: 105, deadline: '2026-10-10', quote_data: { status: 'accepte' } },
+    { id: 5, numero: 105, deadline: '2026-10-10', statut: 'production', quote_data: { status: 'accepte' } },
     { id: 6, numero: 106, deadline: '2026-12-01', suspended: true, quote_data: { status: 'accepte' } },
+    { id: 7, numero: 107, deadline: '2026-09-01', statut: 'termine', quote_data: { status: 'accepte' } },
   ]
-  it('range chaque projet à son étape, dans l’ordre de la frise, la pause à part', () => {
-    expect(groupesParEtape(P).map(g => [g.cle, g.projets.map(p => p.id)])).toEqual([
-      ['preparation', [2]], ['offre', [3]], ['production', [5, 1]], ['montage', [4]], ['pause', [6]],
+  it('range chaque projet à son statut, dans l’ordre de la frise, la pause à part', () => {
+    expect(groupesParStatut(P, { factures: new Set(['7']) }).map(g => [g.cle, g.projets.map(p => p.id)])).toEqual([
+      ['preparation', [3, 2]], ['preproduction', [1]], ['production', [5]], ['exploitation', [4]], ['facture', [7]], ['pause', [6]],
     ])
   })
-  it('range par livraison ; une phase posée sort le projet du retard', () => {
+  it('sort aussi les statuts vides pour les colonnes d’un kanban', () => {
+    expect(groupesParStatut(P, { vides: true }).map(g => g.cle)).toEqual(['preparation', 'preproduction', 'production', 'production_terminee', 'exploitation', 'termine', 'facture', 'pause'])
+  })
+  it('range par livraison ; un projet livré sort du retard', () => {
     expect(groupesParLivraison(P, '2026-10-22').map(g => [g.cle, g.projets.map(p => p.id)])).toEqual([
-      ['retard', [5]], ['semaine', [3]], ['mois', [1]], ['tard', [4, 6]], ['sans', [2]],
+      ['retard', [5]], ['semaine', [3]], ['mois', [1]], ['tard', [7, 4, 6]], ['sans', [2]],
     ])
   })
   it('dit si une livraison est en retard', () => {
     expect(livraisonEnRetard(P[4], '2026-10-22')).toBe(true)
     expect(livraisonEnRetard(P[3], '2026-10-22')).toBe(false)
+    expect(livraisonEnRetard(P[6], '2026-10-22')).toBe(false)
     expect(livraisonEnRetard(P[1], '2026-10-22')).toBe(false)
   })
 })
