@@ -27,7 +27,7 @@ import { STYLE_FICHE } from '../../../components/fiche/styles'
 import { AVenir, Entete, Frise, Synthese } from '../../../components/fiche/Haut'
 import Taches from '../../../components/fiche/Taches'
 import Offre from '../../../components/fiche/Offre'
-import { Fichiers, Presentations, Rentabilite, Visite } from '../../../components/fiche/Dossiers'
+import { Fichiers, Presentations, Rentabilite } from '../../../components/fiche/Dossiers'
 import TaskFormDrawer from '../../../components/TaskFormDrawer'
 
 const TYPES_LOGISTIQUE = [
@@ -329,13 +329,11 @@ export default function FicheEssai() {
   const retards = ouvertes.filter(t => enRetard(t, aujourdhui)).length
   const total = totauxDevis(quote).total
   const aCoder = lignesSansActivite(quote).length
-  const visiteFaite = !!projet.site_visit_summary || Object.values(projet.site_visit_data || {}).some(v => Array.isArray(v) ? v.length : String(v || '').trim())
   const versAncienne = `/projects/${id}`
 
   const onglets = [
     { cle: 'taches', nom: 'Tâches', v: retards ? `${retards} en retard` : `${ouvertes.length} ouverte${ouvertes.length > 1 ? 's' : ''}`, rouge: retards > 0 },
     { cle: 'offre', nom: 'Offre', v: total ? `${fmtCHF(total)} CHF` : 'à faire', rouge: aCoder > 0 && quote.status === 'accepte' },
-    { cle: 'visite', nom: 'Visite', v: visiteFaite ? 'faite' : 'à faire' },
     { cle: 'presentation', nom: 'Présentation', v: 'support client' },
     ...(isAdmin ? [{ cle: 'rentabilite', nom: 'Rentabilité', v: 'heures et marge' }] : []),
     { cle: 'fichiers', nom: 'Fichiers', v: projet.kdrive_folder_id ? 'kDrive' : 'aucun dossier' },
@@ -377,7 +375,6 @@ export default function FicheEssai() {
             activites={activites} reglages={reglages} transport={transport} projetId={id} isAdmin={isAdmin}
             sale={sale} enregistrement={enregistrement} onEnregistrer={() => enregistrerOffre()} />
         )}
-        {dossier === 'visite' && <Visite resume={projet.site_visit_summary} faite={visiteFaite} versAncienne={versAncienne} />}
         {dossier === 'presentation' && <Presentations projetId={id} />}
         {dossier === 'rentabilite' && isAdmin && <Rentabilite projetId={id} quote={quote} versAncienne={versAncienne} />}
         {dossier === 'fichiers' && <Fichiers projetId={id} dossierId={projet.kdrive_folder_id} onCreerDossier={creerDossierKdrive} creationDossier={creationDossier} />}

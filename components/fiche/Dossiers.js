@@ -1,9 +1,8 @@
-// Les dossiers Visite, Présentation, Rentabilité et Fichiers de la nouvelle
-// fiche.
+// Les dossiers Présentation, Rentabilité et Fichiers de la nouvelle fiche.
 //
-// Dans cet essai, la fiche de visite (formulaire complet, impression) et les
-// coûts réels de la rentabilité restent dans la fiche actuelle : ces dossiers
-// en montent l'essentiel et y renvoient pour le reste.
+// La visite sur site n'y est pas : son formulaire sera refait à part. Les coûts
+// réels de la rentabilité restent dans la fiche actuelle, vers laquelle le
+// dossier renvoie.
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -13,25 +12,6 @@ import { dateCourte } from '../../lib/fiche'
 import { jourLocal } from '../../lib/aujourdhui'
 
 const KDRIVE_DRIVE_ID = 1936508
-
-export function Visite({ resume, faite, versAncienne }) {
-  return (
-    <div className="fx-panneau fx-vide">
-      {faite ? (
-        <>
-          <h3>Visite sur site faite</h3>
-          {resume ? <p style={{ whiteSpace: 'pre-wrap' }}>{resume}</p> : <p>La fiche est remplie ; son résumé n’a pas encore été fait.</p>}
-        </>
-      ) : (
-        <>
-          <h3>La visite sur site n’est pas faite</h3>
-          <p>Mesures, accès, électricité, photos. La fiche s’imprime pour partir sur place, et son résumé nourrit l’offre.</p>
-        </>
-      )}
-      <a className="fx-btn p" href={versAncienne} style={{ textDecoration: 'none' }}>{faite ? 'Ouvrir la fiche de visite' : 'Remplir la fiche de visite'}</a>
-    </div>
-  )
-}
 
 export function Presentations({ projetId }) {
   const { data: liste, mutate } = useSWR(`/api/projects/${projetId}/presentations`)
