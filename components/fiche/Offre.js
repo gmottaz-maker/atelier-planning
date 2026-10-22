@@ -15,7 +15,7 @@ import QtyInput from '../QtyInput'
 import { fmtCHF } from '../../lib/money'
 import {
   purchaseNet, laborNet, serviceNet, logisticsNet, purchasePrice, servicePrice, logisticsPrice,
-  totalItem, totalComposition, totalEvenement, totauxDevis, evenementsLogistiques, deplacerLigne,
+  totalItem, totalComposition, totalEvenement, totauxDevis, evenementsLogistiques, deplacerLigne, deplacerVers,
   copierItem, copierEvenement, genRowUid, genItemUid, aUnEscompte, libelleEscompte, lignesDevis,
 } from '../../lib/quoteLines'
 import { estEnHeures, lignesSansActivite } from '../../lib/rentabilite'
@@ -38,8 +38,7 @@ const I = {
   oeil: <svg className="i" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>,
   barre: <svg className="i" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3 3.9M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.8 9.8 0 0 0 4.4-1"/></svg>,
   chev: <svg className="i" viewBox="0 0 24 24" style={{ width: 14, height: 14 }}><path d="m6 9 6 6 6-6"/></svg>,
-  haut: <svg className="i" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}><path d="m18 15-6-6-6 6"/></svg>,
-  bas: <svg className="i" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}><path d="m6 9 6 6 6-6"/></svg>,
+  poignee: <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>,
   copie: <svg className="i" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></svg>,
   suppr: <svg className="i" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>,
 }
@@ -124,7 +123,7 @@ function MenuActivites({ ouvert, activites, familles, avecRetrait, onChoisir, on
 
 // ── Une ligne et son détail ─────────────────────────────────────────────────
 
-function Ligne({ r, a, i, total: nbDansListe, gm, ouverte, activites, avecVehicules, transport, onOuvrir, onMaj, onBascule, onDeplacer, onSupprimer, onDupliquer, onMenu }) {
+function Ligne({ r, a, i, total: nbDansListe, gm, ouverte, activites, avecVehicules, transport, onOuvrir, onMaj, onBascule, onDeplacer, onSupprimer, onDupliquer, onMenu, dnd }) {
   const n = nature(a)
   const titre = r[champTitre(n)] || (champTitre(n) !== 'description' ? r.description : '') || ''
   const sous = [
@@ -150,11 +149,13 @@ function Ligne({ r, a, i, total: nbDansListe, gm, ouverte, activites, avecVehicu
 
   return (
     <>
-      <tr className={`fx-ligne${r.hidden ? ' masquee' : ''}${ouverte ? ' ouverte' : ''}`} onClick={onOuvrir} data-manque={manque ? 'oui' : undefined}>
+      <tr className={`fx-ligne${r.hidden ? ' masquee' : ''}${ouverte ? ' ouverte' : ''}${dnd?.classe || ''}`} onClick={onOuvrir} data-manque={manque ? 'oui' : undefined} {...(dnd?.cible || {})}>
         <td className="c-act-td" onClick={e => act && e.stopPropagation()}>
+          <span className="fx-act-cell">{dnd?.poignee}
           {act && (choisie
             ? <button className="fx-act" onClick={ouvrirMenu} title={`${code} ${activite?.libelle || ''} : changer l’activité`}><span className="code n">{code}</span>{activite?.libelle || ''}</button>
             : <button className="fx-act choisir" onClick={ouvrirMenu}>À choisir</button>)}
+          </span>
         </td>
         <td className="desig">
           {act && <span className="act-mobile" style={{ color: choisie ? '#c4152b' : '#5f6672' }}>{choisie ? `${code} ${activite?.libelle || ''}` : 'Activité à choisir'}</span>}
@@ -249,17 +250,21 @@ function Consulting({ projetId, contactId, quote, activites, tarifDefaut, onComp
 // En-tête repliable d'un item, d'un élément ou d'un événement nommé. Défini
 // HORS de l'éditeur : recréé à chaque rendu, son champ perdrait le focus à
 // chaque lettre tapée.
-function Groupe({ plie, onBascule, sous, nom, placeholder, total, onNom, outils }) {
+function Groupe({ plie, onBascule, sous, nom, placeholder, total, onNom, outils, dnd }) {
   return (
-    <tr className={`fx-groupe${plie ? ' plie' : ''}${sous ? ' sous' : ''}`}>
+    <tr className={`fx-groupe${plie ? ' plie' : ''}${sous ? ' sous' : ''}${dnd?.classe || ''}`} {...(dnd?.cible || {})}>
       <td colSpan={4}>
         <span className="titre">
+          {dnd?.poignee}
           <button className="fx-chev" aria-expanded={!plie} aria-label={plie ? 'Déplier' : 'Replier'} onClick={onBascule}>{I.chev}</button>
           <input value={nom || ''} placeholder={placeholder} onChange={e => onNom(e.target.value)} aria-label={placeholder} />
+          {/* Les outils vivent à côté du nom, pas à côté du prix : serrés
+              dans la colonne de l'œil, ils débordaient sur le total. */}
+          <span className="outils">{outils}</span>
         </span>
       </td>
       <td className="r n"><Chf v={total} /></td>
-      <td><span className="outils">{outils}</span></td>
+      <td />
     </tr>
   )
 }
@@ -271,6 +276,8 @@ export default function Offre({ quote, onChange, onStatut, activites, reglages, 
   const [plies, setPlies] = useState({})                 // _uid d'item ou d'élément → replié
   const [menu, setMenu] = useState(null)                 // { x, y, cible } ou { x, y, ajout }
   const [vueClient, setVueClient] = useState(false)
+  const [glisse, setGlisse] = useState(null)             // { type, cle, de } : ce qu'on tient
+  const [cible, setCible] = useState(null)               // { type, cle, avant } : où ça tombera
   const gm = quote.general_margin ?? ''
   const tauxMO = reglages?.taux_main_oeuvre ?? ''
   const t = totauxDevis(quote)
@@ -355,9 +362,43 @@ export default function Offre({ quote, onChange, onStatut, activites, reglages, 
         onDeplacer={sens => { maj(q => majListe(q, a, l => deplacerLigne(l, i, sens))); setOuverte(cleAdresse(a, i + sens)) }}
         onDupliquer={() => maj(q => majListe(q, a, l => [...l.slice(0, i + 1), { ...r, _uid: genRowUid() }, ...l.slice(i + 1)]))}
         onSupprimer={() => { if (confirm(`Supprimer la ligne « ${r[champTitre(nature(a))] || r.description || 'sans désignation'} » ?`)) { maj(q => majListe(q, a, l => l.filter((_, k) => k !== i))); setOuverte(null) } }}
-        onMenu={setMenu} />
+        onMenu={setMenu}
+        dnd={dnd('ligne', JSON.stringify(a), i, liste.length, (de, avant) => { maj(q => majListe(q, a, l => deplacerVers(l, de, avant))); setOuverte(null) })} />
     )
   })
+
+  // Glisser-déposer dans UNE liste (les items entre eux, les lignes d'une même
+  // liste entre elles). La poignée porte le geste ; la rangée survolée dit,
+  // par un trait, si l'élément tombera avant ou après elle. Au clavier, la
+  // poignée répond aux flèches haut et bas.
+  const dnd = (type, cle, i, n, deplacer) => {
+    const tenu = glisse && glisse.type === type && glisse.cle === cle
+    const ici = cible && cible.type === type && cible.cle === cle
+    const lacher = () => { setGlisse(null); setCible(null) }
+    const surRangee = (avant) => ({
+      onDragOver: e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; const b = e.currentTarget.getBoundingClientRect(); const v = avant ?? (e.clientY < b.top + b.height / 2 ? i : i + 1); if (!ici || cible.avant !== v) setCible({ type, cle, avant: v }) },
+      onDrop: e => { e.preventDefault(); if (cible) deplacer(glisse.de, cible.avant); lacher() },
+    })
+    return {
+      poignee: (
+        <button className="fx-poignee" draggable title="Glisser pour déplacer" aria-label="Déplacer : glisser, ou flèches haut et bas"
+          onClick={e => e.stopPropagation()}
+          onDragStart={e => { setGlisse({ type, cle, de: i }); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); const tr = e.currentTarget.closest('tr'); if (tr) e.dataTransfer.setDragImage(tr, 24, 20) }}
+          onDragEnd={lacher}
+          onKeyDown={e => {
+            if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); deplacer(i, i - 1) }
+            if (e.key === 'ArrowDown' && i < n - 1) { e.preventDefault(); deplacer(i, i + 2) }
+          }}>{I.poignee}</button>
+      ),
+      cible: tenu ? surRangee() : {},
+      classe: ici && cible.avant === i ? ' cible-avant' : ici && cible.avant === n && i === n - 1 ? ' cible-apres' : '',
+      // Rangée qui clôt un groupe (ses boutons d'ajout) : y lâcher, c'est
+      // poser l'élément juste après le groupe.
+      fin: { cible: tenu ? surRangee(i + 1) : {}, classe: ici && cible.avant === n && i === n - 1 ? ' cible-apres' : '' },
+    }
+  }
+  const deplacerItem = (de, avant) => { maj(q => ({ ...q, items: deplacerVers(q.items, de, avant) })); setOuverte(null) }
+  const deplacerEvenement = (de, avant) => { majEvenements(evs => deplacerVers(evs, de, avant)); setOuverte(null) }
 
   const outil = (icone, libelle, fn, desactive) => <button className="fx-vis" title={libelle} aria-label={libelle} onClick={fn} disabled={desactive} style={{ marginTop: 0 }}>{icone}</button>
 
@@ -411,12 +452,11 @@ export default function Offre({ quote, onChange, onStatut, activites, reglages, 
               {(quote.items || []).map((it, ii) => {
                 const uid = it._uid || `item-${ii}`
                 const plie = plies[uid]
+                const glisser = dnd('item', 'items', ii, quote.items.length, deplacerItem)
                 return [
-                  <Groupe key={`g-${uid}`} plie={!!plies[uid]} onBascule={() => setPlies(p => ({ ...p, [uid]: !p[uid] }))} nom={it.name} placeholder="Nom de l’item (Bar, Pergola…)" total={totalItem(it, gm)}
+                  <Groupe key={`g-${uid}`} dnd={glisser} plie={!!plies[uid]} onBascule={() => setPlies(p => ({ ...p, [uid]: !p[uid] }))} nom={it.name} placeholder="Nom de l’item (Bar, Pergola…)" total={totalItem(it, gm)}
                     onNom={v => majItem(ii, x => ({ ...x, name: v }))}
                     outils={<>
-                      {outil(I.haut, 'Monter l’item', () => maj(q => ({ ...q, items: deplacerLigne(q.items, ii, -1) })), ii === 0)}
-                      {outil(I.bas, 'Descendre l’item', () => maj(q => ({ ...q, items: deplacerLigne(q.items, ii, 1) })), ii === quote.items.length - 1)}
                       {outil(I.copie, 'Dupliquer l’item avec sa composition', () => maj(q => { const items = [...q.items]; items.splice(ii + 1, 0, copierItem(q.items[ii])); return { ...q, items } }))}
                       {outil(I.suppr, 'Supprimer l’item', () => { if (confirm(`Supprimer l’item « ${it.name || 'sans nom'} » et sa composition ?`)) maj(q => ({ ...q, items: q.items.filter((_, k) => k !== ii) })) })}
                     </>} />,
@@ -441,7 +481,7 @@ export default function Offre({ quote, onChange, onStatut, activites, reglages, 
                         ]),
                       ]
                     }),
-                    <tr key={`a-${uid}`}><td colSpan={6} style={{ borderBottom: 0 }}>
+                    <tr key={`a-${uid}`} className={glisser.fin.classe.trim()} {...glisser.fin.cible}><td colSpan={6} style={{ borderBottom: 0 }}>
                       <div className="fx-ajouts dans">
                         <button className="fx-lien" onClick={() => ajouter({ item: ii, kind: 'purchases' }, vide('achat'))}>+ Matériau</button>
                         <span onClick={e => e.stopPropagation()}><CatalogPicker kind="article" label="+ Catalogue" onPick={x => ajouter({ item: ii, kind: 'purchases' }, { ...toPurchaseRow(x), hidden: true }, false)} /></span>
@@ -478,15 +518,16 @@ export default function Offre({ quote, onChange, onStatut, activites, reglages, 
                 // Un seul événement sans nom ne pose pas d'en-tête : ses lignes
                 // se lisent directement, comme avant les événements.
                 const entete = evenements.length > 1 || String(ev.nom || '').trim()
+                const glisser = dnd('evenement', 'evenements', ei, evenements.length, deplacerEvenement)
                 return [
-                  entete && <Groupe key={`g-${uid}`} plie={!!plies[uid]} onBascule={() => setPlies(p => ({ ...p, [uid]: !p[uid] }))} nom={ev.nom} placeholder="Nom du passage (Montage Genève…) — facultatif" total={totalEvenement(ev)}
+                  entete && <Groupe key={`g-${uid}`} dnd={glisser} plie={!!plies[uid]} onBascule={() => setPlies(p => ({ ...p, [uid]: !p[uid] }))} nom={ev.nom} placeholder="Nom du passage (Montage Genève…) — facultatif" total={totalEvenement(ev)}
                     onNom={v => majEvenements(evs => evs.map((x, k) => k === ei ? { ...x, nom: v } : x))}
                     outils={<>
                       {outil(I.copie, 'Dupliquer : le second passage sur le même chantier', () => majEvenements(evs => [...evs.slice(0, ei + 1), copierEvenement(evs[ei]), ...evs.slice(ei + 1)]))}
                       {outil(I.suppr, 'Supprimer le passage', () => { if (confirm(`Supprimer « ${ev.nom || 'sans nom'} » et ses ${ev.lignes.length} ligne(s) ?`)) majEvenements(evs => evs.filter((_, k) => k !== ei)) })}
                     </>} />,
                   ...(entete && plies[uid] ? [] : lignes(ev.lignes || [], { evenement: ei })),
-                  <tr key={`a-${uid}`}><td colSpan={6} style={{ borderBottom: 0 }}>
+                  <tr key={`a-${uid}`} className={glisser.fin.classe.trim()} {...glisser.fin.cible}><td colSpan={6} style={{ borderBottom: 0 }}>
                     <div className="fx-ajouts dans">
                       <button className="fx-lien" onClick={() => ajouter({ evenement: ei }, vide('logistique'))}>+ Ligne</button>
                       <button className="fx-lien" onClick={menuAjout({ evenement: ei }, ['chantier', 'logistique'])}>+ Activité</button>

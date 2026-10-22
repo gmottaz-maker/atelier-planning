@@ -164,7 +164,21 @@ export const STYLE_FICHE = `
 .fx-chev{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;transition:transform .15s,background .15s;flex:none}
 .fx-chev:hover{background:${N.doux}}
 .fx-groupe.plie .fx-chev{transform:rotate(-90deg)}
-.fx-groupe .outils{display:flex;gap:4px;justify-content:flex-end}
+.fx-act-cell{display:flex;align-items:flex-start;gap:4px;margin-left:-28px;min-width:0}
+.fx-act-cell .fx-act{min-width:0}
+.fx-poignee{width:24px;height:26px;display:inline-grid;place-items:center;border-radius:6px;color:${N.pale};cursor:grab;opacity:0;flex:none;transition:opacity .15s}
+.fx-ligne:hover .fx-poignee,.fx-groupe:hover .fx-poignee,.fx-poignee:focus-visible{opacity:1}
+.fx-poignee:hover{background:${N.doux};color:${N.encre}}
+.fx-poignee:active{cursor:grabbing}
+.fx-groupe .titre .fx-poignee{margin-left:-28px}
+tr.cible-avant>td{box-shadow:inset 0 3px 0 ${N.cobalt}}
+tr.cible-apres>td{box-shadow:inset 0 -3px 0 ${N.cobalt}}
+@media (hover:none){.fx-poignee{display:none}.fx-act-cell,.fx-groupe .titre .fx-poignee{margin-left:0}}
+.fx-groupe .outils{display:flex;gap:2px;margin-left:auto;flex:none;opacity:0;transition:opacity .15s}
+.fx-groupe:hover .outils,.fx-groupe:focus-within .outils{opacity:1}
+@media (hover:none){.fx-groupe .outils{opacity:1}}
+.fx-groupe .outils .fx-vis{width:30px;height:30px;font-weight:400}
+.fx-groupe td.r{white-space:nowrap}
 .fx-ajouts{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;align-items:center}
 .fx-ajouts.dans{margin:10px 0 4px}
 .fx-detail td{padding:4px 12px 20px 0;border-bottom:1px solid ${N.filet2};background:#fafbfc}
