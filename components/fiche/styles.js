@@ -244,7 +244,7 @@ tr.cible-apres>td{box-shadow:inset 0 -3px 0 ${N.cobalt}}
 a.fx-projet:hover{background:#fafbfc}
 .fx-projet.tete{min-height:0;padding-top:0;padding-bottom:10px;font-size:${t.petit}px;color:${N.gris};border-bottom:0}
 .fx-projet .no{color:${N.cobalt};font-weight:600;font-size:${t.lead}px}
-.fx-projet .nom b{display:block;font-weight:600;font-size:${t.lead}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fx-projet .nom b{display:block;font-weight:600;font-size:${t.lead}px;line-height:1.3}
 .fx-projet small{display:block;color:${N.gris};font-size:${t.petit}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fx-projet .etape{display:flex;flex-direction:column;gap:6px}
 .fx-projet .mot{font-weight:500}
@@ -256,6 +256,7 @@ a.fx-projet:hover{background:#fafbfc}
 .fx-projet .offre{display:flex;align-items:center;gap:8px;font-weight:500}
 .fx-projet .offre i{width:8px;height:8px;border-radius:50%;flex:none}
 .fx-projet .prochaine b,.fx-projet .livraison b{font-weight:600}
+.fx-projet .prochaine small{white-space:normal;overflow:visible;line-height:1.35}
 .fx-projet .livraison.rouge b,.fx-projet .livraison.rouge small{color:${N.rouge}}
 .fx-projet .qui{width:34px;height:34px;border-radius:50%;background:${N.doux};display:grid;place-items:center;font-size:12px;font-weight:600}
 .fx-projet.archive{color:${N.gris}}
