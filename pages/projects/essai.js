@@ -51,15 +51,15 @@ function Ligne({ p, prochaine, aujourdhui, archive }) {
         <b>{p.name}</b>
         <small>{p.client || 'Client à définir'}</small>
       </span>
+      <span className={`livraison${retard ? ' rouge' : ''}`}>
+        {d ? <><b className="n">{dateCourte(d)}</b><small>{retard ? `en retard, ${delai(d, aujourdhui).replace('il y a ', '')}` : delai(d, aujourdhui)}</small></> : <small>Pas de date</small>}
+      </span>
       <span className="etape">
         {p.suspended ? <span className="mot gris">En pause</span> : <><MiniFrise etape={etape} /><span className="mot">{ETAPES.find(e => e.cle === etape)?.nom}</span></>}
       </span>
       <span className="offre"><i style={{ background: offre.couleur }} />{offre.mot}</span>
       <span className="prochaine">
         {prochaine ? <><b className="n">{dateCourte(prochaine.date)}</b><small>{prochaine.titre}</small></> : <small>Rien de daté</small>}
-      </span>
-      <span className={`livraison${retard ? ' rouge' : ''}`}>
-        {d ? <><b className="n">{dateCourte(d)}</b><small>{retard ? `en retard, ${delai(d, aujourdhui).replace('il y a ', '')}` : delai(d, aujourdhui)}</small></> : <small>Pas de date</small>}
       </span>
       <span className="qui" title={p.responsible || 'non défini'}>{initiales(p.responsible)}</span>
     </Link>
@@ -148,7 +148,7 @@ export default function ProjetsEssai() {
 
         <div className="fx-liste">
           <div className="fx-projet tete" aria-hidden="true">
-            <span /><span>Projet</span><span>Étape</span><span>Offre</span><span>Prochaine date</span><span>Livraison</span><span />
+            <span /><span>Projet</span><span>Livraison</span><span>Étape</span><span>Offre</span><span>Prochaine date</span><span />
           </div>
           {groupes.map(g => (
             <section key={g.cle} className="fx-groupe-liste">

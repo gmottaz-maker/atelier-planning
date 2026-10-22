@@ -240,7 +240,7 @@ tr.cible-apres>td{box-shadow:inset 0 -3px 0 ${N.cobalt}}
 .fx-groupe-liste{margin-top:40px}
 .fx-groupe-liste h2{padding-bottom:10px;border-bottom:1px solid ${N.filet}}
 .fx-groupe-liste h2 .n{color:${N.gris};font-weight:500;margin-left:6px}
-.fx-projet{display:grid;grid-template-columns:52px minmax(0,2.4fr) 190px 130px minmax(0,1.5fr) 150px 36px;gap:20px;align-items:center;min-height:72px;padding:12px 8px;border-bottom:1px solid ${N.filet2};color:inherit;text-decoration:none;border-radius:8px}
+.fx-projet{display:grid;grid-template-columns:52px minmax(0,2.4fr) 160px 190px 130px minmax(0,1.5fr) 36px;gap:20px;align-items:center;min-height:72px;padding:12px 8px;border-bottom:1px solid ${N.filet2};color:inherit;text-decoration:none;border-radius:8px}
 a.fx-projet:hover{background:#fafbfc}
 .fx-projet.tete{min-height:0;padding-top:0;padding-bottom:10px;font-size:${t.petit}px;color:${N.gris};border-bottom:0}
 .fx-projet .no{color:${N.cobalt};font-weight:600;font-size:${t.lead}px}
@@ -334,7 +334,7 @@ a.fx-projet:hover{background:#fafbfc}
   .fx-avenir li{grid-template-columns:1fr;gap:2px}
 }
 @media (max-width:1100px){
-  .fx-projet{grid-template-columns:48px minmax(0,2fr) 150px 120px 130px 34px}
+  .fx-projet{grid-template-columns:48px minmax(0,2fr) 140px 150px 120px 34px}
   .fx-projet .prochaine{display:none}
   .fx-filtres .fx-seg{margin-left:0}
   .fx{padding:32px 28px 80px}
