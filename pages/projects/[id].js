@@ -2650,6 +2650,11 @@ export default function ProjectPage() {
                     fontFamily: FONT, fontSize: 12.5, color: C.muted, padding: 0 }}>
                   {duplicationEnCours ? 'duplication…' : 'dupliquer'}
                 </button>
+                {/* La nouvelle fiche, en essai sur les mêmes données. */}
+                <Link href={`/projects/${id}/essai`}
+                  style={{ fontFamily: FONT, fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>
+                  nouvelle fiche (essai)
+                </Link>
               </span>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
