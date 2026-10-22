@@ -22,6 +22,9 @@ import { estEnHeures, lignesSansActivite } from '../../lib/rentabilite'
 import { activitesParFamille, ligneOffreActivite, libelleSuitActivite } from '../../lib/heures'
 import { ligneForfait } from '../../lib/transport'
 import { QUOTE_STATUSES } from '../../lib/quoteStatus'
+import useSWR from 'swr'
+import { compensationConsommee, ligneCompensation, CODE_CONSULTING } from '../../lib/consulting'
+import { formatDuree } from '../../lib/heures'
 
 const UNITES = ['heure(s)', 'jour(s)', 'ml', 'm²', 'km', 'PAN', 'pce']
 const uniteCourte = u => ({ 'heure(s)': 'h', 'jour(s)': 'j' })[u] || u || ''
@@ -220,6 +223,29 @@ function EnTeteTable() {
   )
 }
 
+// Le solde de consulting du client, au-dessus de l'offre (admin). « Compenser »
+// glisse une ligne de Gestion MASQUÉE : invisible sur le document, comprise
+// dans le prix. Le serveur compte les AUTRES offres du client ; celle-ci se lit
+// à l'écran, enregistrée ou non.
+function Consulting({ projetId, contactId, quote, activites, tarifDefaut, onCompenser }) {
+  const { data } = useSWR(contactId ? `/api/consulting?contact=${contactId}&exclure=${projetId}` : null)
+  if (!data || data.error) return null
+  const ici = compensationConsommee(quote)
+  if (!data.consulte && !data.compense && !ici) return null
+  const reste = data.solde - ici
+  const tarif = activites.find(a => Number(a.code) === CODE_CONSULTING)?.tarif_vente ?? tarifDefaut
+  return (
+    <div className="fx-consulting">
+      <div>
+        <b>Consulting de ce client</b>
+        <p>{formatDuree(data.consulte)} noté · {formatDuree(data.compense)} compensé dans d’autres offres{ici ? ` · ${formatDuree(ici)} dans celle-ci` : ''} · <span style={reste < 0 ? { color: '#c4152b', fontWeight: 600 } : { fontWeight: 600 }}>{reste < 0 ? `compensé ${formatDuree(-reste)} de trop` : `reste ${formatDuree(reste)}`}</span></p>
+        <small>La compensation est une ligne de gestion masquée : invisible sur l’offre, comprise dans le prix. Une offre refusée rend ses heures au solde.</small>
+      </div>
+      {reste > 0 && <button className="fx-btn p" onClick={() => onCompenser(ligneCompensation({ minutes: reste, tarif }))}>Compenser {formatDuree(reste)}</button>}
+    </div>
+  )
+}
+
 // En-tête repliable d'un item, d'un élément ou d'un événement nommé. Défini
 // HORS de l'éditeur : recréé à chaque rendu, son champ perdrait le focus à
 // chaque lettre tapée.
@@ -240,7 +266,7 @@ function Groupe({ plie, onBascule, sous, nom, placeholder, total, onNom, outils 
 
 // ── L'éditeur ───────────────────────────────────────────────────────────────
 
-export default function Offre({ quote, onChange, onStatut, activites, reglages, transport, projetId, isAdmin, sale, enregistrement, onEnregistrer }) {
+export default function Offre({ quote, onChange, onStatut, activites, reglages, transport, projetId, contactId, isAdmin, sale, enregistrement, onEnregistrer }) {
   const [ouverte, setOuverte] = useState(null)           // clé de la ligne dépliée
   const [plies, setPlies] = useState({})                 // _uid d'item ou d'élément → replié
   const [menu, setMenu] = useState(null)                 // { x, y, cible } ou { x, y, ajout }
@@ -363,6 +389,8 @@ export default function Offre({ quote, onChange, onStatut, activites, reglages, 
   return (
     <div className="fx-panneau">
       <BarreOffre quote={quote} maj={maj} changerStatut={changerStatut} vueClient={vueClient} setVueClient={setVueClient} />
+      {isAdmin && <Consulting projetId={projetId} contactId={contactId} quote={quote} activites={activites} tarifDefaut={reglages?.taux_projet}
+        onCompenser={ligne => maj(q => ({ ...q, management: [...(q.management || []), { _uid: genRowUid(), ...ligne }] }))} />}
       <div className="fx-offre">
         <div style={{ minWidth: 0 }}>
 

@@ -205,6 +205,17 @@ export const STYLE_FICHE = `
 .fx-client-doc .ln.n3{padding-left:48px;color:${N.gris}}
 .fx-client-doc .ln small{display:block;color:${N.gris};font-weight:400;font-size:${t.petit}px}
 
+.fx-consulting{display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:space-between;background:${N.doux};border-radius:${N.rayon}px;padding:18px 22px;margin:-8px 0 40px}
+.fx-consulting p{margin-top:4px}
+.fx-consulting small{display:block;color:${N.gris};font-size:${t.petit}px;margin-top:4px}
+
+/* ── Rentabilité ── */
+.fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}
+.fx-note.rouge{color:${N.rouge}}
+.fx-recap .fx-note{margin-top:20px}
+.fx-form-cout{display:grid;grid-template-columns:160px minmax(0,2fr) minmax(0,1fr) 130px 160px auto;gap:12px;align-items:end;margin-top:20px}
+.fx-form-cout .fx-btn{min-height:42px}
+
 /* ── Tâches ── */
 .fx-taches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:56px 72px}
 .fx-taches h3{font-size:${t.lead}px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:12px}
@@ -232,6 +243,10 @@ export const STYLE_FICHE = `
 .fx-puces button{padding:7px 14px;border-radius:999px;background:${N.doux};font-weight:500}
 .fx-puces button[aria-pressed=true]{background:${N.encre};color:#fff}
 .fx-faites{margin-top:12px}
+.fx-etat-pt{width:10px;height:10px;border-radius:50%;margin:6px 0 0 5px}
+.fx-gestes{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.fx .fx-btn.petit{min-height:34px;padding:0 14px;font-size:${t.petit}px}
+.fx .fx-lien.gris{color:${N.gris};font-weight:500}
 
 /* ── Dossiers simples ── */
 .fx-vide{max-width:64ch;padding:12px 0}
@@ -245,6 +260,11 @@ export const STYLE_FICHE = `
 .fx-fichiers small{color:${N.gris};font-size:${t.petit}px}
 .fx-fichiers button.nom{text-align:left}
 .fx-fichiers button.nom:hover b{text-decoration:underline;text-underline-offset:3px}
+.fx-depose{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:22px 24px;border-radius:${N.rayon}px;background:${N.doux};cursor:pointer;max-width:720px}
+.fx-depose:hover,.fx-depose.glisse{background:${N.cobaltDoux}}
+.fx-depose b{font-weight:600}
+.fx-depose small{color:${N.gris};font-size:${t.petit}px}
+.fx-fichiers .fx-lien{display:block;margin-top:2px}
 .fx-chemin{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;color:${N.gris}}
 .fx-chemin button:hover{color:${N.encre};text-decoration:underline}
 
@@ -265,6 +285,8 @@ export const STYLE_FICHE = `
   .fx-onglets{gap:28px}
 }
 @media (max-width:860px){
+  .fx-form-cout{grid-template-columns:1fr 1fr}
+  .fx-form-cout .large{grid-column:1/-1}
   .fx{padding:24px 16px 64px}
   .fx-entete h1{font-size:30px}
   .fx-frise{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));row-gap:24px}

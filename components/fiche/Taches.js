@@ -10,6 +10,7 @@ import AddressInput, { mapsDirectionsUrl, mapsViewUrl } from '../AddressInput'
 import { TASK_CATEGORIES } from '../../lib/taskCategories'
 import { genLogUid, parseTimeRange, combineTime, fmtTimeDisplay } from '../../lib/projectHelpers'
 import { dateCourte, enRetard, listeNoms } from '../../lib/fiche'
+import { Commande, FormCommande, FormSousTraitance, SousTraitance } from './Flux'
 
 const coche = <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
 
@@ -112,10 +113,24 @@ function Rdv({ point, nomType, onModifier, onSupprimer }) {
 }
 
 export default function Taches({
-  taches, logistique, aujourdhui, types, personnes, vehicules,
-  onBasculer, onEditer, onSupprimer, onNouvelle, onLogistique,
+  taches, logistique, aujourdhui, types, personnes, vehicules, projetId, moi, responsables,
+  onBasculer, onEditer, onSupprimer, onNouvelle, onLogistique, onMaj, onAjout, onRetrait,
 }) {
   const [edition, setEdition] = useState(null)   // uid du point ouvert, ou 'nouveau'
+  const [nouvelle, setNouvelle] = useState(null) // 'commande' | 'sous_traitance' en cours de saisie
+  // Commandes et sous-traitances ont leurs propres gestes ; les autres
+  // catégories passent par le tiroir de tâche commun.
+  const ligne = t => t.category === 'commande'
+    ? <Commande key={t.id} t={t} moi={moi} responsables={responsables} onMaj={onMaj} onRetrait={onRetrait} />
+    : t.category === 'sous_traitance'
+      ? <SousTraitance key={t.id} t={t} moi={moi} responsables={responsables} onMaj={onMaj} onAjout={onAjout} onRetrait={onRetrait} />
+      : <Tache key={t.id} t={t} aujourdhui={aujourdhui} onBasculer={onBasculer} onEditer={onEditer} onSupprimer={onSupprimer} />
+  const ajouterDans = cle => (cle === 'commande' || cle === 'sous_traitance' ? setNouvelle(cle) : onNouvelle(cle))
+  const formNouvelle = cle => {
+    if (nouvelle !== cle) return null
+    const props = { projetId, moi, responsables, onFait: t => { onAjout(t); setNouvelle(null) }, onAnnuler: () => setNouvelle(null) }
+    return cle === 'commande' ? <FormCommande {...props} /> : <FormSousTraitance {...props} />
+  }
   const [voirFaites, setVoirFaites] = useState(false)
   const nomType = cle => types.find(t => t.key === cle)?.label || cle
 
@@ -141,8 +156,8 @@ export default function Taches({
     taches: propres.filter(t => t.status !== 'completed' && (t.category === c.key || (!t.category && c.key === 'bureau')))
       .sort((a, b) => (a.execution_date || '9999').localeCompare(b.execution_date || '9999')),
   }))
-  const pleines = categories.filter(c => c.taches.length)
-  const vides = categories.filter(c => !c.taches.length)
+  const pleines = categories.filter(c => c.taches.length || nouvelle === c.key)
+  const vides = categories.filter(c => !c.taches.length && nouvelle !== c.key)
 
   return (
     <div>
@@ -160,15 +175,19 @@ export default function Taches({
         {pleines.map(c => (
           <div key={c.key}>
             <h3>{c.label} <span className="cpt">{c.taches.length}</span></h3>
-            {c.taches.map(t => <Tache key={t.id} t={t} aujourdhui={aujourdhui} onBasculer={onBasculer} onEditer={onEditer} onSupprimer={onSupprimer} />)}
-            <div className="fx-ajouts"><button className="fx-lien" onClick={() => onNouvelle(c.key)}>+ Ajouter une tâche</button></div>
+            {c.taches.map(ligne)}
+            {formNouvelle(c.key) || (
+              <div className="fx-ajouts"><button className="fx-lien" onClick={() => ajouterDans(c.key)}>
+                {c.key === 'commande' ? '+ Ajouter une commande' : c.key === 'sous_traitance' ? '+ Ajouter une sous-traitance' : '+ Ajouter une tâche'}
+              </button></div>
+            )}
           </div>
         ))}
       </div>
 
       <div className="fx-ajouts" style={{ marginTop: 40 }}>
         <span style={{ color: '#5f6672' }}>Ajouter dans</span>
-        {vides.map(c => <button key={c.key} className="fx-lien" onClick={() => onNouvelle(c.key)}>{c.label}</button>)}
+        {vides.map(c => <button key={c.key} className="fx-lien" onClick={() => ajouterDans(c.key)}>{c.label}</button>)}
         {faites.length > 0 && (
           <button className="fx-lien" style={{ marginLeft: 'auto' }} onClick={() => setVoirFaites(v => !v)}>
             {voirFaites ? 'Masquer les tâches faites' : `Voir les ${faites.length} tâche${faites.length > 1 ? 's' : ''} faite${faites.length > 1 ? 's' : ''}`}
@@ -177,7 +196,7 @@ export default function Taches({
       </div>
       {voirFaites && (
         <div className="fx-faites">
-          {faites.map(t => <Tache key={t.id} t={t} aujourdhui={aujourdhui} onBasculer={onBasculer} onEditer={onEditer} onSupprimer={onSupprimer} />)}
+          {faites.map(ligne)}
         </div>
       )}
     </div>

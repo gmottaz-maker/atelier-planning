@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { champsCommande, majCommande } from '../lib/commandes'
+import { champsCommande, majCommande, nouvelleCommande, receptionCommande, rouvrirCommande } from '../lib/commandes'
 
 const tache = {
   id: 31,
@@ -94,5 +94,25 @@ describe('majCommande', () => {
     expect(maj.category_data.vendor).toBe(null)
     expect(maj.category_data.quantity).toBe(null)
     expect(maj.category_data.order_date).toBe(null)
+  })
+})
+
+
+describe('cycle d’une commande (nouvelle fiche)', () => {
+  const tache = { id: 7, status: 'active', category_data: { vendor: 'OPO', order_date: '2026-10-20' } }
+  it('une nouvelle commande prend la réception prévue comme date d’exécution', () => {
+    const b = nouvelleCommande({ article: ' Vis M6 ', quantity: '10', vendor: 'OPO', order_date: '2026-10-20', expected_date: '2026-10-25', responsible: 'Arnaud' }, 'p1')
+    expect(b).toMatchObject({ title: 'Vis M6', execution_date: '2026-10-25', category: 'commande', project_id: 'p1' })
+    expect(b.category_data).toEqual({ quantity: '10', vendor: 'OPO', order_date: '2026-10-20', expected_date: '2026-10-25' })
+  })
+  it('la réception garde le reste de la commande', () => {
+    const b = receptionCommande(tache, { lieu: 'Économat', qui: 'Guillaume', jour: '2026-10-22' })
+    expect(b.status).toBe('completed')
+    expect(b.category_data).toEqual({ vendor: 'OPO', order_date: '2026-10-20', received_at: '2026-10-22', received_by: 'Guillaume', storage_location: 'Économat' })
+  })
+  it('rouvrir efface la réception, rien d’autre', () => {
+    const b = rouvrirCommande({ ...tache, status: 'completed', category_data: { ...tache.category_data, received_at: 'x', received_by: 'y', storage_location: 'z' } })
+    expect(b.status).toBe('active')
+    expect(b.category_data).toEqual({ vendor: 'OPO', order_date: '2026-10-20', received_at: null, received_by: null, storage_location: null })
   })
 })

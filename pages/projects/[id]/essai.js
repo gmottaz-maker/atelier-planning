@@ -111,13 +111,16 @@ export default function FicheEssai() {
   }, [reglagesCharges, reglages])
 
   // ── Chargement ──────────────────────────────────────────────────────────
+  // La fiche s'affiche dès que le projet est là. Les tâches arrivent ensuite :
+  // la route renvoie celles de tout l'atelier, et les attendre retardait
+  // l'écran de plusieurs secondes.
+  const [tachesChargees, setTachesChargees] = useState(false)
   useEffect(() => {
     if (!id || !moi) return
     Promise.all([
       fetch(`/api/projects/${id}`).then(r => r.json()),
-      fetch('/api/tasks', { headers: { 'x-actor': moi } }).then(r => r.json()),
       fetch(`/api/projects/${id}/updates`).then(r => r.json()),
-    ]).then(([p, toutes, maj]) => {
+    ]).then(([p, maj]) => {
       if (p && !p.error) {
         setProjet(p)
         setLogistique(initLogistics(p))
@@ -129,9 +132,11 @@ export default function FicheEssai() {
           if (migree) setSale(true)
         }
       }
-      if (Array.isArray(toutes)) setTaches(toutes.filter(t => String(t.project_id) === String(id)))
       if (Array.isArray(maj)) setEntrees(maj)
     }).catch(console.error).finally(() => setChargement(false))
+    fetch('/api/tasks', { headers: { 'x-actor': moi } }).then(r => r.json())
+      .then(toutes => { if (Array.isArray(toutes)) setTaches(toutes.filter(t => String(t.project_id) === String(id))) })
+      .catch(console.error).finally(() => setTachesChargees(true))
   }, [id, moi])
 
   // Dossier d'arrivée : celui de l'URL, sinon celui que l'étape appelle.
@@ -332,7 +337,7 @@ export default function FicheEssai() {
   const versAncienne = `/projects/${id}`
 
   const onglets = [
-    { cle: 'taches', nom: 'Tâches', v: retards ? `${retards} en retard` : `${ouvertes.length} ouverte${ouvertes.length > 1 ? 's' : ''}`, rouge: retards > 0 },
+    { cle: 'taches', nom: 'Tâches', v: !tachesChargees ? 'chargement…' : retards ? `${retards} en retard` : `${ouvertes.length} ouverte${ouvertes.length > 1 ? 's' : ''}`, rouge: retards > 0 },
     { cle: 'offre', nom: 'Offre', v: total ? `${fmtCHF(total)} CHF` : 'à faire', rouge: aCoder > 0 && quote.status === 'accepte' },
     { cle: 'presentation', nom: 'Présentation', v: 'support client' },
     ...(isAdmin ? [{ cle: 'rentabilite', nom: 'Rentabilité', v: 'heures et marge' }] : []),
@@ -362,21 +367,26 @@ export default function FicheEssai() {
           ))}
         </div>
 
-        {dossier === 'taches' && (
+        {dossier === 'taches' && !tachesChargees && <p className="fx-panneau" style={{ color: '#5f6672' }}>Chargement des tâches…</p>}
+        {dossier === 'taches' && tachesChargees && (
           <div className="fx-panneau">
             <Taches taches={taches} logistique={logistique} aujourdhui={aujourdhui}
               types={TYPES_LOGISTIQUE} personnes={PERSONNES} vehicules={VEHICULES}
+              projetId={projet.id} moi={moi} responsables={responsibles}
+              onMaj={t => setTaches(prev => prev.map(x => x.id === t.id ? t : x))}
+              onAjout={t => setTaches(prev => [...prev, t])}
+              onRetrait={tid => setTaches(prev => prev.filter(x => x.id !== tid))}
               onBasculer={basculerTache} onEditer={t => setTiroir({ task: t })} onSupprimer={supprimerTache}
               onNouvelle={c => setTiroir({ categorie: c })} onLogistique={enregistrerLogistique} />
           </div>
         )}
         {dossier === 'offre' && (
           <Offre quote={quote} onChange={q => { setQuote(q); setSale(true) }} onStatut={changerStatut}
-            activites={activites} reglages={reglages} transport={transport} projetId={id} isAdmin={isAdmin}
+            activites={activites} reglages={reglages} transport={transport} projetId={id} contactId={projet.client_contact_id} isAdmin={isAdmin}
             sale={sale} enregistrement={enregistrement} onEnregistrer={() => enregistrerOffre()} />
         )}
         {dossier === 'presentation' && <Presentations projetId={id} />}
-        {dossier === 'rentabilite' && isAdmin && <Rentabilite projetId={id} quote={quote} versAncienne={versAncienne} />}
+        {dossier === 'rentabilite' && isAdmin && <Rentabilite projetId={id} quote={quote} />}
         {dossier === 'fichiers' && <Fichiers projetId={id} dossierId={projet.kdrive_folder_id} onCreerDossier={creerDossierKdrive} creationDossier={creationDossier} />}
       </div>
 
