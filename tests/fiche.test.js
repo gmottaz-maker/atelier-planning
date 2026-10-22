@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aVenir, dateCourte, dateLongue, decouperSynthese, delai, enRetard, etapeCourante, joursEntre, listeNoms, parcours, premiereDate } from '../lib/fiche'
+import { aVenir, dateCourte, dateLongue, decouperSynthese, delai, enRetard, etapeCourante, groupesParEtape, groupesParLivraison, joursEntre, listeNoms, livraisonEnRetard, parcours, premiereDate } from '../lib/fiche'
 
 describe('étape du projet', () => {
   it('la phase posée à la main passe avant l’offre', () => {
@@ -118,5 +118,31 @@ describe('synthèse', () => {
   })
   it('ne casse pas sur une synthèse absente', () => {
     expect(decouperSynthese(null)).toEqual({ resume: '', reste: [] })
+  })
+})
+
+describe('liste des projets', () => {
+  const P = [
+    { id: 1, numero: 101, deadline: '2026-11-20', quote_data: { status: 'accepte' } },
+    { id: 2, numero: 102, deadline: null, quote_data: null },
+    { id: 3, numero: 103, deadline: '2026-10-25', quote_data: { status: 'envoye' } },
+    { id: 4, numero: 104, deadline: '2026-10-01', phase: 'en_cours', quote_data: { status: 'accepte' } },
+    { id: 5, numero: 105, deadline: '2026-10-10', quote_data: { status: 'accepte' } },
+    { id: 6, numero: 106, deadline: '2026-12-01', suspended: true, quote_data: { status: 'accepte' } },
+  ]
+  it('range chaque projet à son étape, dans l’ordre de la frise, la pause à part', () => {
+    expect(groupesParEtape(P).map(g => [g.cle, g.projets.map(p => p.id)])).toEqual([
+      ['preparation', [2]], ['offre', [3]], ['production', [5, 1]], ['montage', [4]], ['pause', [6]],
+    ])
+  })
+  it('range par livraison ; une phase posée sort le projet du retard', () => {
+    expect(groupesParLivraison(P, '2026-10-22').map(g => [g.cle, g.projets.map(p => p.id)])).toEqual([
+      ['retard', [5]], ['semaine', [3]], ['mois', [1]], ['tard', [4, 6]], ['sans', [2]],
+    ])
+  })
+  it('dit si une livraison est en retard', () => {
+    expect(livraisonEnRetard(P[4], '2026-10-22')).toBe(true)
+    expect(livraisonEnRetard(P[3], '2026-10-22')).toBe(false)
+    expect(livraisonEnRetard(P[1], '2026-10-22')).toBe(false)
   })
 })

@@ -223,6 +223,44 @@ tr.cible-apres>td{box-shadow:inset 0 -3px 0 ${N.cobalt}}
 .fx-consulting p{margin-top:4px}
 .fx-consulting small{display:block;color:${N.gris};font-size:${t.petit}px;margin-top:4px}
 
+.fx-resume-liste{display:flex;flex-wrap:wrap;gap:4px 24px;margin-top:10px;color:${N.gris};font-size:${t.lead}px}
+.fx-resume-liste .rouge{color:${N.rouge};font-weight:600}
+.fx-filtres{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:center;margin-top:40px}
+.fx-cherche{display:flex;align-items:center;gap:10px;background:${N.doux};border-radius:999px;padding:0 18px;min-height:44px;flex:0 1 420px;color:${N.gris}}
+.fx-cherche input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:${t.corps}px;color:${N.encre}}
+.fx-cherche:focus-within{box-shadow:inset 0 0 0 2px ${N.cobalt};background:#fff}
+.fx-pastilles{display:flex;flex-wrap:wrap;gap:8px}
+.fx-pastilles button{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 16px;border-radius:999px;background:${N.doux};font-weight:500}
+.fx-pastilles button i{width:8px;height:8px;border-radius:50%}
+.fx-pastilles button .n{color:${N.gris}}
+.fx-pastilles button[aria-pressed=true]{background:${N.encre};color:#fff}
+.fx-pastilles button[aria-pressed=true] .n{color:#c7cbd2}
+.fx-filtres .fx-seg{margin-left:auto}
+.fx-liste{margin-top:40px}
+.fx-groupe-liste{margin-top:40px}
+.fx-groupe-liste h2{padding-bottom:10px;border-bottom:1px solid ${N.filet}}
+.fx-groupe-liste h2 .n{color:${N.gris};font-weight:500;margin-left:6px}
+.fx-projet{display:grid;grid-template-columns:52px minmax(0,2.4fr) 190px 130px minmax(0,1.5fr) 150px 36px;gap:20px;align-items:center;min-height:72px;padding:12px 8px;border-bottom:1px solid ${N.filet2};color:inherit;text-decoration:none;border-radius:8px}
+a.fx-projet:hover{background:#fafbfc}
+.fx-projet.tete{min-height:0;padding-top:0;padding-bottom:10px;font-size:${t.petit}px;color:${N.gris};border-bottom:0}
+.fx-projet .no{color:${N.cobalt};font-weight:600;font-size:${t.lead}px}
+.fx-projet .nom b{display:block;font-weight:600;font-size:${t.lead}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fx-projet small{display:block;color:${N.gris};font-size:${t.petit}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fx-projet .etape{display:flex;flex-direction:column;gap:6px}
+.fx-projet .mot{font-weight:500}
+.fx-projet .mot.gris{color:${N.gris}}
+.fx-mini{display:flex;align-items:center;gap:3px}
+.fx-mini i{width:20px;height:4px;border-radius:2px;background:${N.filet}}
+.fx-mini i.fait{background:${N.encre}}
+.fx-mini i.ici{background:${N.cobalt}}
+.fx-projet .offre{display:flex;align-items:center;gap:8px;font-weight:500}
+.fx-projet .offre i{width:8px;height:8px;border-radius:50%;flex:none}
+.fx-projet .prochaine b,.fx-projet .livraison b{font-weight:600}
+.fx-projet .livraison.rouge b,.fx-projet .livraison.rouge small{color:${N.rouge}}
+.fx-projet .qui{width:34px;height:34px;border-radius:50%;background:${N.doux};display:grid;place-items:center;font-size:12px;font-weight:600}
+.fx-projet.archive{color:${N.gris}}
+.fx-projet.archive .no{color:${N.gris}}
+
 /* ── Rentabilité ── */
 .fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}
 .fx-note.rouge{color:${N.rouge}}
@@ -295,10 +333,19 @@ tr.cible-apres>td{box-shadow:inset 0 -3px 0 ${N.cobalt}}
   .fx-avenir li{grid-template-columns:1fr;gap:2px}
 }
 @media (max-width:1100px){
+  .fx-projet{grid-template-columns:48px minmax(0,2fr) 150px 120px 130px 34px}
+  .fx-projet .prochaine{display:none}
+  .fx-filtres .fx-seg{margin-left:0}
   .fx{padding:32px 28px 80px}
   .fx-onglets{gap:28px}
 }
 @media (max-width:860px){
+  .fx-projet{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"no nom liv" "no etape offre";gap:6px 12px}
+  .fx-projet.tete{display:none}
+  .fx-projet .no{grid-area:no}.fx-projet .nom{grid-area:nom}.fx-projet .livraison{grid-area:liv;text-align:right}
+  .fx-projet .etape{grid-area:etape;min-width:0}.fx-projet .etape .fx-mini{display:none}.fx-projet .offre{grid-area:offre;justify-content:flex-end}
+  .fx-projet .qui{display:none}
+  .fx-cherche{flex:1 1 100%}
   .fx-form-cout{grid-template-columns:1fr 1fr}
   .fx-form-cout .large{grid-column:1/-1}
   .fx{padding:24px 16px 64px}

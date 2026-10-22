@@ -4,6 +4,7 @@ import Head from 'next/head'
 import { quoteStatusMeta, quoteStripe, offreAFaire, categorieOffre, compterOffres, CATEGORIES_OFFRE } from '../lib/quoteStatus'
 import { TYPES_LIVRAISON, chercherProjets } from '../lib/projectHelpers'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
 import KDriveFolderPicker from '../components/KDriveFolderPicker'
@@ -852,6 +853,16 @@ export default function Admin() {
     const offre = typeof window !== 'undefined' && localStorage.getItem('projectsFiltreOffre')
     if (offre === 'tous' || CATEGORIES_OFFRE.some(c => c.key === offre)) setFiltreOffre(offre)
   }, [])
+
+  // « Nouveau projet » depuis la liste d'essai (/projects/essai) arrive ici :
+  // le formulaire de création reste celui de cette page.
+  const routeur = useRouter()
+  useEffect(() => {
+    if (routeur.query.nouveau !== '1') return
+    resetForm()
+    setShowForm(true)
+    routeur.replace('/', undefined, { shallow: true })
+  }, [routeur.query.nouveau]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function changeFiltreOffre(cle) {
     setFiltreOffre(cle)
