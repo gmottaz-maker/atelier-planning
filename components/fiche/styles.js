@@ -349,6 +349,82 @@ a.fx-ev:hover{box-shadow:0 2px 10px rgba(17,19,24,.08)}
 .fx-tache-liste:hover .droite .fx-lien,.fx-tache-liste .droite .fx-lien:focus-visible{opacity:1}
 @media (hover:none){.fx-tache-liste .droite .fx-lien{opacity:1}}
 
+/* ── Agenda ── */
+.fx-ag{display:grid;gap:6px;margin-top:32px}
+.fx-ag-ligne{display:grid;grid-template-columns:120px repeat(var(--jours),minmax(0,1fr));gap:6px}
+.fx-ag-tete{color:${N.gris};font-size:${t.petit}px;padding:0 4px 4px}
+.fx-ag-tete b{display:block;font-size:${t.titre}px;color:${N.encre};font-weight:600}
+.fx-ag-tete small{display:block;color:${N.gris}}
+.fx-ag-tete.auj,.fx-ag-tete.auj b{color:${N.cobalt}}
+.fx-ag-qui{font-weight:600;padding:12px 4px 0;display:grid;align-content:start;gap:2px}
+.fx-ag-qui small{color:${N.gris};font-weight:400;font-size:${t.petit}px}
+.fx-ag-jour{display:grid;gap:4px}
+.fx-demi{background:${N.doux};border-radius:8px;padding:6px;min-height:76px;display:flex;flex-direction:column;gap:4px}
+.fx-ag-jour.passe{opacity:.55}
+.fx-ag-jour.auj .fx-demi{background:${N.cobaltDoux}}
+.fx-demi .quand{font-size:12px;color:${N.pale};padding:0 4px}
+.fx-demi.absent{align-items:center;justify-content:center;background:repeating-linear-gradient(135deg,${N.doux} 0 6px,#fff 6px 12px);color:${N.gris};font-size:${t.petit}px}
+.fx-bloc{display:grid;gap:1px;text-align:left;background:#fff;border-radius:6px;padding:7px 9px;font-size:${t.petit}px;box-shadow:inset 3px 0 0 var(--fam)}
+.fx-bloc:hover{box-shadow:inset 3px 0 0 var(--fam),0 2px 10px rgba(17,19,24,.08)}
+.fx-bloc .type{color:${N.gris};display:flex;gap:6px;justify-content:space-between}
+.fx-bloc b{font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fx-bloc b .no{color:${N.cobalt}}
+.fx-demi .plus{margin-top:auto;text-align:left;padding:4px;border-radius:6px;font-size:${t.petit}px;color:${N.pale}}
+.fx-demi .plus:hover{color:${N.cobalt};background:#fff}
+.fx-demi .plus.defaut{color:${N.gris}}
+.fx-demi .trop{color:${N.rouge};font-size:12px;padding:0 4px}
+.fx-voile{position:fixed;inset:0;z-index:60;background:rgba(17,19,24,.35);display:flex;justify-content:flex-end}
+.fx-feuille{background:#fff;width:min(520px,100%);height:100%;overflow-y:auto;padding:32px 32px calc(32px + env(safe-area-inset-bottom));display:grid;align-content:start;gap:20px;animation:fx-glisse .22s cubic-bezier(.2,.7,.2,1) both}
+.fx-feuille h2{font-size:${t.titre}px;font-weight:600}
+.fx-feuille .sous{color:${N.gris};font-size:${t.petit}px;margin-top:2px}
+.fx-feuille .deux{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fx-feuille .coche{display:flex;gap:10px;align-items:center;font-size:${t.petit + 1}px;color:${N.gris}}
+.fx-feuille .erreur{color:${N.rouge};font-size:${t.petit}px}
+@keyframes fx-glisse{from{transform:translateX(24px);opacity:0}}
+.fx-st{display:grid;gap:24px;margin-top:24px;padding:24px;border-radius:${N.rayon}px;background:#fafbfc}
+.fx-st-jours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:10px}
+.fx-st-jours > div{display:grid;gap:6px}
+@media (max-width:860px){
+  .fx-ag-ligne{grid-template-columns:96px minmax(0,1fr)}
+  .fx-voile{align-items:flex-end}
+  .fx-feuille{height:auto;max-height:92vh;border-radius:${N.rayon}px ${N.rayon}px 0 0;padding:24px 20px calc(24px + env(safe-area-inset-bottom))}
+  .fx-st-jours{grid-template-columns:1fr 1fr}
+}
+
+/* ── Réunion ── */
+.fx-reunion .fx-recap dl{margin-top:16px}
+@media (max-width:1440px){.fx-reunion .fx-recap{order:-1}}
+.fx-reunion .rouge{color:${N.rouge}}
+.fx-reu-h4{font-size:${t.petit}px;font-weight:600;color:${N.gris};text-transform:uppercase;letter-spacing:.06em;margin:24px 0 4px}
+.fx-reu-h4 .n{margin-left:6px;color:${N.pale}}
+.fx-reu-statut:first-of-type .fx-reu-h4{margin-top:8px}
+.fx-reu-projet .taches{display:grid;gap:2px}
+.fx-reu-projet .taches b{font-weight:500}
+.fx-reu-jour{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;padding:14px 8px;border-bottom:1px solid ${N.filet2}}
+.fx-reu-jour .quand b{display:block;font-weight:600}
+.fx-reu-jour .quand span{color:${N.gris};font-size:${t.petit}px}
+.fx-reu-jour ul{display:grid;gap:8px}
+.fx-reu-jour li{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.fx-reu-jour li a{color:inherit;text-decoration:none;font-weight:600}
+.fx-reu-jour li a .no{color:${N.cobalt}}
+.fx-reu-jour li small{color:${N.gris};font-size:${t.petit}px}
+.fx-reu-jour .genre{font-size:12px;font-weight:600;color:${N.gris};min-width:72px}
+.fx-reu-jour .genre.livraison{color:${N.rouge}}
+.fx-reu-jour .genre.surplace{color:${N.cobalt}}
+@media (max-width:860px){
+  .fx-reu-jour{grid-template-columns:1fr;gap:6px}
+  .fx-reu-projet{grid-template-columns:40px minmax(0,1fr)}
+  .fx-reu-projet .livraison,.fx-reu-projet .taches{grid-column:2}
+}
+@media print{
+  .fx{padding:0}
+  .sans-impression{display:none !important}
+  .fx-offre{grid-template-columns:1fr;gap:24px}
+  .fx-recap{position:static;order:-1}
+  .fx-sec{break-inside:avoid-page}
+  .fx-gestes,.fx-tache .droite .fx-lien{display:none !important}
+}
+
 /* ── Rentabilité ── */
 .fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}
 .fx-note.rouge{color:${N.rouge}}

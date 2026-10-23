@@ -196,7 +196,7 @@ export default function AccueilEssai() {
               {attente.length === 0 && <p className="fx-note">Rien n’attend personne.</p>}
               <div>
                 {visibles.map(a => (
-                  <Link key={a.cle} href={a.projet ? `/projects/${a.projet.id}/essai${a.genre === 'offre' ? '?dossier=offre' : ''}` : '/tasks'} className="fx-traiter">
+                  <Link key={a.cle} href={a.projet ? `/projects/${a.projet.id}/essai${a.genre === 'offre' ? '?dossier=offre' : ''}` : '/tasks/essai'} className="fx-traiter">
                     <i style={{ background: COULEUR_TRAITER[a.genre] }} />
                     <span className="quoi"><b>{a.titre}</b>{a.qui && <small>{a.qui}</small>}</span>
                     <span className="projet">{a.projet ? <><span className="no n">{a.projet.numero}</span> {a.projet.nom}</> : ''}</span>
@@ -245,7 +245,7 @@ export default function AccueilEssai() {
             <GroupeTaches titre="Aujourd’hui" liste={mes.jour} />
             <GroupeTaches titre="Cette semaine" liste={mes.semaine} />
             <GroupeTaches titre="Plus tard" liste={mes.plusTard} />
-            <div className="fx-ajouts"><Link className="fx-lien" href="/tasks">Toutes les tâches →</Link></div>
+            <div className="fx-ajouts"><Link className="fx-lien" href="/tasks/essai">Toutes les tâches →</Link></div>
           </aside>
         </div>
       </div>
