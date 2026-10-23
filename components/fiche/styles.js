@@ -425,6 +425,18 @@ a.fx-ev:hover{box-shadow:0 2px 10px rgba(17,19,24,.08)}
   .fx-gestes,.fx-tache .droite .fx-lien{display:none !important}
 }
 
+/* ── Outils ── */
+.fx-outils{margin-top:56px}
+.fx-outils h2{font-size:${t.titre}px;font-weight:600;padding-bottom:12px;border-bottom:1px solid ${N.filet}}
+.fx-outils .grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:0 48px}
+.fx-outil{display:grid;align-content:start;gap:6px;padding:24px 12px 24px;margin:0 -12px;border-bottom:1px solid ${N.filet2};border-radius:${N.rayon}px;color:inherit;text-decoration:none;transition:background .15s}
+.fx-outil:hover{background:#fafbfc}
+.fx-outil b{font-size:${t.titre}px;font-weight:600;letter-spacing:-.01em}
+.fx-outil:hover b{color:${N.cobalt}}
+.fx-outil p{color:${N.gris};max-width:56ch}
+.fx-outil .etat{font-size:${t.petit}px;font-weight:600;color:${N.cobalt};margin-top:4px}
+.fx-outil .etat.rouge{color:${N.rouge}}
+
 /* ── Rentabilité ── */
 .fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}
 .fx-note.rouge{color:${N.rouge}}
