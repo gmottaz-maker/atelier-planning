@@ -291,6 +291,50 @@ a.fx-projet:hover{background:#fafbfc}
 .fx-carte .offre{display:flex;align-items:center;gap:6px;font-size:${t.petit}px;font-weight:500;white-space:nowrap}
 .fx-carte .offre i{width:7px;height:7px;border-radius:50%}
 
+.fx-semaine-bloc{margin-top:48px}
+.fx-semaine-bloc h2 .dates{color:${N.gris};font-weight:500;margin-left:10px}
+.fx-semaine{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) repeat(2,minmax(0,.6fr));gap:8px;margin-top:16px}
+.fx-jour{background:${N.doux};border-radius:${N.rayon}px;padding:14px 12px;min-height:180px;display:flex;flex-direction:column;gap:8px}
+.fx-jour .tete{display:flex;align-items:baseline;gap:8px;color:${N.gris};font-size:${t.petit}px}
+.fx-jour .tete b{font-size:${t.titre}px;color:${N.encre};font-weight:600}
+.fx-jour.auj{background:${N.cobaltDoux};box-shadow:inset 0 0 0 2px ${N.cobalt}}
+.fx-jour.auj .tete,.fx-jour.auj .tete b{color:${N.cobalt}}
+.fx-jour.passe{opacity:.6}
+.fx-jour.ferme{background:#fafbfc}
+.fx-jour .rien{color:${N.pale};font-size:${t.petit}px}
+.fx-ev{display:grid;gap:2px;background:#fff;border-radius:8px;padding:10px;color:inherit;text-decoration:none;font-size:${t.petit}px}
+a.fx-ev:hover{box-shadow:0 2px 10px rgba(17,19,24,.08)}
+.fx-ev .genre{display:flex;align-items:center;gap:6px;color:${N.gris}}
+.fx-ev .genre i{width:7px;height:7px;border-radius:50%;flex:none}
+.fx-ev b{font-weight:600;font-size:${t.corps - 1}px;line-height:1.3}
+.fx-ev .no{color:${N.cobalt}}
+.fx-ev small{color:${N.gris}}
+.fx-ev.livraison{box-shadow:inset 3px 0 0 ${N.rouge}}
+.fx-prochain{margin-top:16px;font-size:${t.lead}px}
+.fx-prochain b{font-weight:600}
+.fx-prochain .fx-lien{margin-left:6px}
+.fx-legende{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px;color:${N.gris};font-size:${t.petit}px}
+.fx-legende span{display:inline-flex;align-items:center;gap:6px}
+.fx-legende i{width:7px;height:7px;border-radius:50%}
+.fx-traiter{display:grid;grid-template-columns:10px minmax(0,1.4fr) minmax(0,1.6fr) 140px;gap:16px;align-items:center;min-height:56px;padding:10px 8px;border-bottom:1px solid ${N.filet2};color:inherit;text-decoration:none;border-radius:8px}
+.fx-traiter:hover{background:#fafbfc}
+.fx-traiter>i{width:8px;height:8px;border-radius:50%}
+.fx-traiter b{font-weight:600}
+.fx-traiter small{display:block;color:${N.gris};font-size:${t.petit}px}
+.fx-traiter .no,.fx-etabli .no{color:${N.cobalt};font-weight:600}
+.fx-traiter .detail{text-align:right;color:${N.gris}}
+.fx-etabli{display:grid;grid-template-columns:48px minmax(0,2fr) 140px 200px;gap:16px;align-items:center;min-height:64px;padding:10px 8px;border-bottom:1px solid ${N.filet2};color:inherit;text-decoration:none;border-radius:8px}
+.fx-etabli:hover{background:#fafbfc}
+.fx-etabli .nom b{display:block;font-weight:600}
+.fx-etabli small{display:block;color:${N.gris};font-size:${t.petit}px}
+.fx-etabli .statut{display:flex;flex-direction:column;gap:6px;font-weight:500}
+.fx-etabli .livraison b{font-weight:600}
+.fx-etabli .livraison.rouge b,.fx-etabli .livraison.rouge small{color:${N.rouge}}
+.fx-mes .fx-tache .fx-case{cursor:pointer}
+.fx-mes-groupe{margin-top:16px}
+.fx-mes-groupe h3{font-size:${t.corps}px;font-weight:600}
+.fx-mes-groupe h3 .n{color:${N.gris};font-weight:500;margin-left:4px}
+
 /* ── Rentabilité ── */
 .fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}
 .fx-note.rouge{color:${N.rouge}}
@@ -363,6 +407,8 @@ a.fx-projet:hover{background:#fafbfc}
   .fx-avenir li{grid-template-columns:1fr;gap:2px}
 }
 @media (max-width:1100px){
+  .fx-semaine{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .fx-etabli{grid-template-columns:44px minmax(0,1fr) 120px 170px}
   .fx-projet{grid-template-columns:48px minmax(0,2fr) 140px 150px 120px 34px}
   .fx-projet .prochaine{display:none}
   .fx-filtres .fx-seg{margin-left:0}
@@ -370,6 +416,15 @@ a.fx-projet:hover{background:#fafbfc}
   .fx-onglets{gap:28px}
 }
 @media (max-width:860px){
+  .fx-semaine{grid-template-columns:1fr}
+  .fx-jour{min-height:0}
+  .fx-jour.passe:not(.auj),.fx-jour.vide:not(.auj){display:none}
+  .fx-semaine-bloc .fx-sec-t{flex-wrap:wrap;align-items:center}
+  .fx-semaine-bloc h2 .dates{display:block;margin:2px 0 0}
+  .fx-traiter{grid-template-columns:10px minmax(0,1fr) auto;grid-template-areas:"pt quoi detail" "pt projet projet"}
+  .fx-traiter>i{grid-area:pt}.fx-traiter .quoi{grid-area:quoi}.fx-traiter .projet{grid-area:projet}.fx-traiter .detail{grid-area:detail}
+  .fx-etabli{grid-template-columns:40px minmax(0,1fr) auto}
+  .fx-etabli .statut{display:none}
   .fx-projet{grid-template-columns:44px minmax(0,1fr) auto;grid-template-areas:"no nom liv" "no etape offre";gap:6px 12px}
   .fx-projet.tete{display:none}
   .fx-projet .no{grid-area:no}.fx-projet .nom{grid-area:nom}.fx-projet .livraison{grid-area:liv;text-align:right}
