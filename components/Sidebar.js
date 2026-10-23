@@ -1,12 +1,9 @@
-// La navigation de bureau. Pendant la refonte, elle se décline en trois essais
-// (components/nav/Navigation.js) ; la liste des écrans vit dans
-// lib/navigation.js, lue aussi par la barre du bas du téléphone.
-//
-// `_app.js` pose encore la marge de l'ancienne barre (SIDEBAR_WIDTH) ; chaque
-// essai la remplace par sa propre largeur. Une fois l'essai choisi, _app lira
-// la largeur retenue et cette constante pourra suivre.
+// La navigation de bureau : le rail (components/nav/Navigation.js). La liste
+// des écrans vit dans lib/navigation.js, lue aussi par la barre du bas du
+// téléphone. `_app.js` décale le contenu de SIDEBAR_WIDTH.
 import Navigation from './nav/Navigation'
+import { LARGEUR_RAIL } from './nav/styles'
 
-export const SIDEBAR_WIDTH = 224
+export const SIDEBAR_WIDTH = LARGEUR_RAIL
 
 export default Navigation

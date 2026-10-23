@@ -3,8 +3,7 @@
 import { N } from '../../lib/theme'
 
 const t = N.tailles
-export const LARGEURS = { colonne: 248, barre: 0, rail: 88 }
-export const HAUTEUR_BARRE = 64
+export const LARGEUR_RAIL = 88
 
 export const STYLE_NAV = `
 @font-face{font-family:'General Sans';src:url('/fonts/general-sans-400.woff2') format('woff2');font-weight:400;font-display:swap}
@@ -18,13 +17,6 @@ export const STYLE_NAV = `
 .nv .nv-i{flex:none}
 .nv .n{font-variant-numeric:tabular-nums}
 
-/* Le contenu se décale selon l'essai : _app pose la marge de l'ancienne
-   barre ; on la remplace ici tant que le choix n'est pas fait. */
-.nv-colonne + div{margin-left:${LARGEURS.colonne}px !important}
-.nv-rail + div{margin-left:${LARGEURS.rail}px !important}
-.nv-barre + div{margin-left:0 !important;padding-top:${HAUTEUR_BARRE}px}
-.nv-barre + div .fx-recap{top:${HAUTEUR_BARRE + 24}px}
-
 /* Une entrée de navigation, dans les trois essais */
 .nv-lien{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 12px;border-radius:8px;color:${N.gris};font-weight:500;transition:background .12s,color .12s}
 .nv-lien:hover{background:${N.doux};color:${N.encre}}
@@ -33,48 +25,12 @@ export const STYLE_NAV = `
 .nv-lien[aria-current=page] .compte{color:${N.cobalt}}
 .nv-chercher{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;background:${N.doux};color:${N.gris};width:100%}
 .nv-chercher:hover{color:${N.encre}}
-.nv-chercher kbd,.nv-palette kbd{margin-left:auto;font:500 12px ${N.police};color:${N.pale};background:#fff;border-radius:6px;padding:2px 6px}
+.nv-palette kbd{margin-left:auto;font:500 12px ${N.police};color:${N.pale};background:#fff;border-radius:6px;padding:2px 6px}
 .nv-avatar{width:32px;height:32px;border-radius:50%;background:${N.encre};color:#fff;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none}
 .nv-version{font-size:12px;color:${N.pale};padding:0 12px}
 
-/* ── A. Colonne ── */
-.nv-colonne{position:fixed;inset:0 auto 0 0;width:${LARGEURS.colonne}px;background:#fff;border-right:1px solid ${N.filet};display:flex;flex-direction:column;gap:2px;padding:24px 16px 16px;overflow-y:auto;z-index:30}
-.nv-colonne .logo{padding:0 12px 24px;display:block}
-.nv-colonne .nv-chercher{margin-bottom:16px}
-.nv-rubrique{margin-top:16px}
-.nv-rubrique > button{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:36px;padding:0 12px;border-radius:8px;font-size:${t.petit}px;font-weight:600;color:${N.encre}}
-.nv-rubrique > button:hover{background:${N.doux}}
-.nv-rubrique > button .nv-i{color:${N.pale};transition:transform .15s}
-.nv-rubrique > button[aria-expanded=false] .nv-i{transform:rotate(-90deg)}
-.nv-rubrique .nv-lien{min-height:36px;padding-left:12px;font-size:${t.petit + 1}px}
-.nv-compte{margin-top:auto;padding-top:16px;border-top:1px solid ${N.filet2};display:grid;gap:2px}
-.nv-moi{display:flex;align-items:center;gap:10px;padding:8px 12px}
-.nv-moi b{font-weight:600;font-size:${t.petit + 1}px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.nv-moi .outils{display:flex;gap:2px}
-.nv-moi .outils > *{width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:${N.gris}}
-.nv-moi .outils > *:hover,.nv-moi .outils > [aria-current=page]{background:${N.doux};color:${N.encre}}
-.nv-colonne .nv-moi{padding:8px 4px 8px 8px}
-.nv-compte .nv-lien{min-height:36px;font-size:${t.petit + 1}px}
-
-/* ── B. Barre en haut ── */
-.nv-barre{position:fixed;inset:0 0 auto 0;height:${HAUTEUR_BARRE}px;background:#fff;border-bottom:1px solid ${N.filet};display:flex;align-items:center;gap:8px;padding:0 24px;z-index:30}
-.nv-barre .logo{margin-right:24px;display:block}
-.nv-barre .nv-lien{min-height:40px;padding:0 14px}
-.nv-barre .nv-lien .compte{margin-left:2px}
-.nv-barre .espace{flex:1}
-.nv-barre .nv-chercher{width:240px}
-.nv-menu{position:relative}
-.nv-menu > button{display:flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:8px;color:${N.gris};font-weight:500}
-.nv-menu > button:hover,.nv-menu > button[aria-expanded=true]{background:${N.doux};color:${N.encre}}
-.nv-menu > button.actif{color:${N.cobalt};background:${N.cobaltDoux}}
-.nv-deroule{position:absolute;top:calc(100% + 8px);left:0;background:#fff;border-radius:${N.rayon}px;box-shadow:0 12px 40px rgba(17,19,24,.14),0 0 0 1px ${N.filet};padding:16px;display:grid;gap:20px 24px;grid-template-columns:repeat(var(--cols,1),auto);min-width:220px;animation:nv-entre .14s ease-out both}
-.nv-deroule.droite{left:auto;right:0}
-.nv-deroule h4{font-size:${t.petit}px;font-weight:600;color:${N.encre};margin:0 0 6px 12px}
-.nv-deroule .nv-lien{min-height:36px;white-space:nowrap;font-size:${t.petit + 1}px}
-@keyframes nv-entre{from{opacity:0;transform:translateY(-4px)}}
-
-/* ── C. Rail ── */
-.nv-rail{position:fixed;inset:0 auto 0 0;width:${LARGEURS.rail}px;background:${N.encre};color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;padding:20px 8px 16px;z-index:30}
+/* ── Le rail ── */
+.nv-rail{position:fixed;inset:0 auto 0 0;width:${LARGEUR_RAIL}px;background:${N.encre};color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;padding:20px 8px 16px;z-index:30;overflow-y:auto;scrollbar-width:none}
 .nv-rail .logo{font-weight:600;font-size:${t.titre}px;letter-spacing:-.02em;margin-bottom:16px}
 .nv-rail .logo span{color:#ff5a6e}
 .nv .nv-case{display:flex;flex-direction:column;align-items:center;gap:4px;width:72px;padding:8px 0;border-radius:10px;color:rgba(255,255,255,.62);font-size:12px;font-weight:500;position:relative}
@@ -84,19 +40,15 @@ export const STYLE_NAV = `
 .nv-rail .sep{width:40px;height:1px;background:rgba(255,255,255,.14);margin:8px 0}
 .nv-rail .bas{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:4px}
 .nv-rail .nv-avatar{background:#fff;color:${N.encre}}
-.nv-volet{position:fixed;top:0;bottom:0;left:${LARGEURS.rail}px;width:300px;background:#fff;color:${N.encre};box-shadow:12px 0 40px rgba(17,19,24,.12);padding:28px 16px;overflow-y:auto;z-index:29;display:grid;align-content:start;gap:20px;animation:nv-glisse .16s ease-out both}
+.nv-volet{position:fixed;top:0;bottom:0;left:${LARGEUR_RAIL}px;width:300px;background:#fff;color:${N.encre};box-shadow:12px 0 40px rgba(17,19,24,.12);padding:28px 16px;overflow-y:auto;z-index:29;display:grid;align-content:start;gap:20px;animation:nv-glisse .16s ease-out both}
 .nv-volet h3{font-size:${t.titre}px;font-weight:600;padding:0 12px}
 .nv-volet h4{font-size:${t.petit}px;font-weight:600;color:${N.gris};margin:0 0 4px 12px}
 .nv-volet .nv-lien{min-height:38px}
+@keyframes nv-entre{from{opacity:0;transform:translateY(-4px)}}
 @keyframes nv-glisse{from{opacity:0;transform:translateX(-8px)}}
 
 /* ── Sélecteur d'essai ── */
-.nv-feuille,.nv-deroule{color:${N.encre}}
-.nv-essai{position:fixed;right:20px;bottom:20px;z-index:70;display:flex;align-items:center;gap:4px;padding:4px;border-radius:999px;background:${N.encre};color:#fff;box-shadow:0 8px 30px rgba(17,19,24,.25);font-size:${t.petit}px}
-.nv-essai span{padding:0 10px 0 12px;color:rgba(255,255,255,.7)}
-.nv-essai button{padding:6px 12px;border-radius:999px;color:rgba(255,255,255,.8);font-weight:500}
-.nv-essai button[aria-pressed=true]{background:#fff;color:${N.encre}}
-@media print{.nv-essai{display:none}}
+.nv-feuille{color:${N.encre}}
 
 /* ── Recherche ⌘K ── */
 .nv-palette-voile{position:fixed;inset:0;z-index:80;background:rgba(17,19,24,.35);display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px}
