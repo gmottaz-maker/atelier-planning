@@ -335,6 +335,20 @@ a.fx-ev:hover{box-shadow:0 2px 10px rgba(17,19,24,.08)}
 .fx-mes-groupe h3{font-size:${t.corps}px;font-weight:600}
 .fx-mes-groupe h3 .n{color:${N.gris};font-weight:500;margin-left:4px}
 
+.fx-liste-taches{max-width:1100px}
+.fx-groupe-liste h2.rouge{color:${N.rouge}}
+.fx-groupe-liste h2 .no{color:${N.cobalt}}
+.fx-tache-liste{grid-template-columns:28px minmax(0,1fr) auto;padding:14px 4px}
+.fx-tache-liste .titre{font-size:${t.corps}px}
+.fx-tache-liste small{margin-top:2px}
+.fx-tache-liste .lien-projet{color:${N.encre};text-decoration:none;font-weight:500}
+.fx-tache-liste .lien-projet .n{color:${N.cobalt}}
+.fx-tache-liste .lien-projet:hover{text-decoration:underline;text-underline-offset:3px}
+.fx-tache-liste .droite{display:grid;justify-items:end;gap:2px}
+.fx-tache-liste .droite .fx-lien{font-size:${t.petit}px;opacity:0;transition:opacity .15s}
+.fx-tache-liste:hover .droite .fx-lien,.fx-tache-liste .droite .fx-lien:focus-visible{opacity:1}
+@media (hover:none){.fx-tache-liste .droite .fx-lien{opacity:1}}
+
 /* ── Rentabilité ── */
 .fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}
 .fx-note.rouge{color:${N.rouge}}
