@@ -129,7 +129,7 @@ export function Frise({ etapes, onChoisir, enCours }) {
   return (
     <ol className="fx-frise" aria-label="Statut du projet">
       {etapes.map(e => {
-        const contenu = <>{e.nom}{e.detail && <small className="n">{e.detail}</small>}</>
+        const contenu = <span className="lib">{e.nom}{e.detail && <small className="n">{e.detail}</small>}</span>
         const cliquable = onChoisir && e.cle !== 'facture' && e.etat !== 'ici'
         return (
           <li key={e.cle} className={e.etat === 'avenir' ? '' : e.etat} aria-current={e.etat === 'ici' ? 'step' : undefined}>

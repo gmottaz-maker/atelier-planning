@@ -55,7 +55,7 @@ export const STYLE_FICHE = `
 /* ── Frise + synthèse + à venir : même grille que l'offre ── */
 .fx-etat{display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-areas:"frise ." "synth avenir";gap:56px 96px;margin-top:48px}
 .fx-frise{grid-area:frise;display:flex}
-.fx-frise li{flex:1 1 0;position:relative;padding:28px 12px 0 0;color:${N.pale};font-weight:500}
+.fx-frise li{flex:1 1 0;min-width:0;position:relative;padding:28px 12px 0 0;color:${N.pale};font-weight:500}
 .fx-frise li::before{content:"";position:absolute;top:6px;left:0;right:0;height:2px;background:${N.filet}}
 .fx-frise li::after{content:"";position:absolute;top:0;left:0;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 2px ${N.filet}}
 .fx-frise li.fait{color:${N.encre}}
@@ -63,9 +63,13 @@ export const STYLE_FICHE = `
 .fx-frise li.fait::after{background:${N.encre};box-shadow:none}
 .fx-frise li.ici{color:${N.cobalt};font-weight:600}
 .fx-frise li.ici::after{background:${N.cobalt};box-shadow:0 0 0 5px ${N.cobaltDoux}}
-.fx-frise li:last-child{flex:0 0 auto;padding-right:0;text-align:right}
-.fx-frise li:last-child::after{left:auto;right:0}
-.fx-frise li:last-child::before{left:0;right:7px}
+/* Le dernier point tombe pile au bout de la frise, à la même distance du
+   précédent que tous les autres : l'élément n'a que la largeur du point, et
+   son libellé déborde vers la gauche. */
+.fx-frise li:last-child{flex:0 0 14px;padding-right:0}
+.fx-frise li:last-child::before{display:none}
+.fx-frise li:last-child .lib{position:absolute;right:0;top:28px;white-space:nowrap;text-align:right}
+.fx-frise .lib{display:block}
 .fx-etape{text-align:inherit;font:inherit;color:inherit;border-radius:6px}
 .fx-etape:hover{color:${N.cobalt}}
 .fx-etape:hover small{color:${N.cobalt}}
@@ -377,9 +381,9 @@ a.fx-projet:hover{background:#fafbfc}
   .fx{padding:24px 16px 64px}
   .fx-entete h1{font-size:30px}
   .fx-frise{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));row-gap:24px}
-  .fx-frise li:last-child{text-align:left;padding-right:12px}
-  .fx-frise li:last-child::after{left:0;right:auto}
-  .fx-frise li:last-child::before{left:0;right:0}
+  .fx-frise li:last-child{padding-right:12px}
+  .fx-frise li:last-child::before{display:block}
+  .fx-frise li:last-child .lib{position:static;white-space:normal;text-align:left}
   .fx-avenir ol{grid-template-columns:1fr 1fr}
   .fx-composer{width:100%}
   .fx-taches{grid-template-columns:1fr}
