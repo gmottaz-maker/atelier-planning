@@ -437,6 +437,96 @@ a.fx-ev:hover{box-shadow:0 2px 10px rgba(17,19,24,.08)}
 .fx-outil .etat{font-size:${t.petit}px;font-weight:600;color:${N.cobalt};margin-top:4px}
 .fx-outil .etat.rouge{color:${N.rouge}}
 
+/* ── Dossier (charges sociales, assurances) ── */
+.fx-dos-sous{color:${N.gris};max-width:72ch;margin:-4px 0 16px}
+.fx-pt{display:inline-flex;align-items:center;gap:6px;font-size:${t.petit}px;font-weight:600;white-space:nowrap;color:${N.gris}}
+.fx-pt i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.fx-pt.vert{color:${N.vert}}.fx-pt.rouge{color:${N.rouge}}.fx-pt.cobalt{color:${N.cobalt}}.fx-pt.encre{color:${N.encre}}
+.fx-dos-ligne{padding:18px 0;border-bottom:1px solid ${N.filet2};display:grid;gap:6px}
+.fx-dos-ligne .tete{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.fx-dos-ligne .tete b{font-weight:600;font-size:${t.lead - 1}px}
+.fx-dos-ligne .meta{color:${N.gris};font-size:${t.petit}px}
+.fx-dos-ligne .droite{margin-left:auto;font-weight:600;white-space:nowrap}
+.fx-dos-ligne .droite.meta{font-weight:400}
+.fx-dos-ligne p{max-width:76ch}
+.fx-dos-ligne .note{color:${N.gris};font-size:${t.petit}px}
+.fx-dos-ligne .note.rouge{color:${N.rouge}}
+.fx-dos-ligne .refs{color:${N.gris};font-size:${t.petit}px}
+.fx-dos-ligne .source{color:${N.pale};font-size:12px;word-break:break-word}
+.fx-dos-ligne.caduc,.fx-dos-ligne.fait{opacity:.55}
+.fx-dos-ligne.reponse{padding:20px;margin-top:12px;border:0;border-radius:${N.rayon}px;background:#fafbfc}
+.fx-dos-ligne .faits{display:flex;flex-wrap:wrap;gap:12px 32px;margin:8px 0 0}
+.fx-dos-ligne .faits dt{color:${N.gris};font-size:${t.petit}px}
+.fx-dos-ligne .faits dd{margin:0;font-weight:500}
+.fx-question form{display:flex;gap:10px}
+.fx-question form .fx-champ{font-size:${t.lead}px;min-height:52px;padding:0 18px}
+.fx-question .fx-puces{margin-top:12px}
+.fx-tab-defile{overflow-x:auto}
+.fx-tab{width:100%;border-collapse:collapse;min-width:560px}
+.fx-tab th{text-align:left;font-size:${t.petit}px;font-weight:500;color:${N.gris};padding:0 12px 10px 0;border-bottom:1px solid ${N.filet};white-space:nowrap}
+.fx-tab td{padding:14px 12px 14px 0;border-bottom:1px solid ${N.filet2};vertical-align:top}
+.fx-tab .nb{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fx-tab th.nb{text-align:right}
+.fx-tab b{font-weight:600}
+.fx-tab small{display:block;color:${N.gris};font-size:${t.petit}px;margin-top:2px}
+.fx-tab .gris{color:${N.gris}}
+.fx-tab .neg{color:${N.rouge};font-weight:600}
+.fx-tab .pos{color:${N.vert}}
+.fx-tab tfoot td{font-weight:600;border-bottom:0;border-top:1px solid ${N.encre}}
+.fx-encadre{margin-top:20px;padding:18px 20px;border-radius:${N.rayon}px;background:${N.cobaltDoux};display:grid;gap:6px}
+.fx-encadre > b{font-weight:600;color:${N.cobalt}}
+.fx-encadre p{max-width:76ch}
+.fx-dos-avert{margin-top:20px;font-size:${t.petit}px;color:${N.rouge}}
+@media (max-width:860px){.fx-question form{flex-direction:column}}
+
+/* ── Annuaire ── */
+.fx-annu{display:grid;grid-template-columns:240px minmax(0,1fr);gap:64px;margin-top:40px;align-items:start}
+.fx-annu-cats{position:sticky;top:24px;display:grid;gap:2px}
+.fx-annu-cats button:not(.gerer){display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;padding:8px 12px;border-radius:8px;font-weight:500;color:${N.encre}}
+.fx-annu-cats button:not(.gerer) .n{color:${N.pale};font-weight:500}
+.fx-annu-cats button:not(.gerer):hover{background:${N.doux}}
+.fx-annu-cats button[aria-pressed=true]{background:${N.cobaltDoux};color:${N.cobalt};font-weight:600}
+.fx-annu-cats button[aria-pressed=true] .n{color:${N.cobalt}}
+.fx-annu-cats button.fille{padding-left:28px;font-weight:400;color:${N.gris}}
+.fx-annu-cats .gerer{margin:16px 12px 0;font-size:${t.petit}px}
+.fx-annu-titre{font-size:${t.titre}px;font-weight:600;margin:32px 0 4px}
+.fx-annu-titre .n{color:${N.pale};font-weight:500;margin-left:6px}
+.fx-entree{padding:20px 0;border-bottom:1px solid ${N.filet2};display:grid;gap:4px}
+.fx-entree .tete{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.fx-entree .nom{font-size:${t.lead}px;font-weight:600;text-align:left}
+.fx-entree .nom:hover{color:${N.cobalt}}
+.fx-entree .cats{font-size:${t.petit}px;color:${N.gris}}
+.fx-entree p{max-width:76ch}
+.fx-entree .coord{display:flex;flex-wrap:wrap;gap:4px 20px;color:${N.gris};font-size:${t.petit + 1}px;margin-top:4px}
+.fx-entree .notes{color:${N.gris};font-size:${t.petit + 1}px}
+.fx-annu-gestion{margin-top:24px;padding:24px;border-radius:${N.rayon}px;background:#fafbfc;display:grid;gap:8px}
+.fx-annu-gestion h3{font-size:${t.lead}px;font-weight:600}
+.fx-annu-cat-gestion{display:grid;grid-template-columns:minmax(0,1fr) 32px auto;gap:12px;align-items:center}
+.fx-annu-cat-gestion.fille{padding-left:24px}
+.fx-annu-cat-gestion .fx-champ{background:#fff;min-height:36px}
+.fx-annu-cat-gestion .n{color:${N.pale};text-align:right}
+.fx-annu-gestion .ajout{display:grid;grid-template-columns:minmax(0,1fr) 200px auto;gap:10px;margin-top:12px}
+.fx-annu-gestion .ajout .fx-champ{background:#fff}
+@media (max-width:860px){
+  .fx-annu{grid-template-columns:1fr;gap:24px}
+  .fx-annu-cats{position:static;display:flex;flex-wrap:wrap;gap:6px}
+  .fx-annu-cats > div{display:contents}
+  .fx-annu-cats button:not(.gerer){width:auto;background:${N.doux};border-radius:999px;padding:6px 14px}
+  .fx-annu-cats button.fille{padding-left:14px}
+  .fx-annu-cats .gerer{margin:4px 0 0;width:100%;justify-content:flex-start}
+  .fx-annu-gestion .ajout{grid-template-columns:1fr}
+}
+
+/* ── Marge au km ── */
+.fx-hyp{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:20px 24px}
+.fx-hyp label{display:grid;gap:4px}
+.fx-hyp .fx-champ{text-align:right;font-size:${t.lead}px;font-weight:500}
+.fx-hyp small{color:${N.gris};font-size:${t.petit}px}
+.fx-hyp label.modifie .fx-champ{box-shadow:inset 0 0 0 2px ${N.cobalt};background:#fff}
+.fx-hyp label.modifie small::after{content:' · modifié ici';color:${N.cobalt}}
+.fx-recap .grand.rouge{color:${N.rouge}}
+.fx-encadre .rouge{color:${N.rouge}}
+
 /* ── Rentabilité ── */
 .fx-note{color:${N.gris};font-size:${t.petit}px;margin:10px 0 0;max-width:90ch}
 .fx-note.rouge{color:${N.rouge}}

@@ -8,6 +8,7 @@ import useSWR from 'swr'
 import useIsAdmin from '../../lib/useIsAdmin'
 import { STYLE_FICHE } from '../../components/fiche/styles'
 import { GROUPES, OUTILS, etatsOutils } from '../../lib/outils'
+import { lienDe } from '../../lib/navigation'
 
 export default function OutilsEssai() {
   const isAdmin = useIsAdmin()
@@ -45,7 +46,7 @@ export default function OutilsEssai() {
               {g.outils.map(o => {
                 const e = etats[o.href]
                 return (
-                  <Link key={o.href} href={o.href} className="fx-outil">
+                  <Link key={o.href} href={lienDe(o.href)} className="fx-outil">
                     <b>{o.nom}</b>
                     <p>{o.resume}</p>
                     {e && <span className={`etat n${e.alerte ? ' rouge' : ''}`}>{e.texte}</span>}
