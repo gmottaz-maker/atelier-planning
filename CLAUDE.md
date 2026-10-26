@@ -1482,6 +1482,54 @@ valent la somme de ce qu'ils contiennent. La graisse suit le RÔLE de la ligne,
 pas sa profondeur : une composition n'est jamais en gras, qu'elle tienne sous
 un item ou sous un élément.
 
+**Un acompte est une FACTURE à part entière** (`customer_invoices.type`) :
+même table, même séquence de numéros, même QR-bill, même PDF. Il est envoyé,
+payé, rapproché en banque et comptabilisé comme les autres ; en faire un objet
+séparé aurait obligé à lui refabriquer chacune de ces vies. Le bouton
+n'apparaît que si l'offre est ACCEPTÉE — demander de l'argent d'avance sur un
+brouillon qu'on va corriger n'a pas de sens, et c'est ce total-là qui sert de
+base.
+
+Trois règles arbitrées le 26 octobre 2026, et aucune n'est un détail :
+
+1. **La TVA est due sur l'acompte.** Il porte donc la sienne, et la facture
+   finale déduit l'acompte **TTC**. La déduire du HT la compterait deux fois.
+   C'est la seule place juste, et `invoiceTotals` la met après la TVA.
+2. **Un pourcentage porte sur le TOTAL HT de l'offre**, la TVA venant
+   par-dessus : l'acompte reste une facture ordinaire.
+3. **`amount` d'une facture finale est CE QUI RESTE À PAYER.** C'est ce que le
+   client vire, donc ce que le rapprochement bancaire retrouvera ; l'acompte a
+   déjà été comptabilisé sur sa propre facture. `amount_net` et `vat_amount`
+   restent ceux de la facture ENTIÈRE — le document montre le total complet,
+   puis la déduction, puis le solde.
+
+**Le montant d'un acompte n'est pas une donnée libre : il se RECALCULE.** La
+base (`acompte_base`) et la valeur saisie sont stockées ; la somme se déduit de
+`quote_snapshot` à chaque validation serveur. C'est ce qui permet de refuser un
+montant fabriqué par le navigateur, exactement comme pour les autres totaux.
+
+**La somme des acomptes à déduire se lit EN BASE, jamais dans le corps de la
+requête.** Un navigateur qui annoncerait vingt mille francs d'acomptes se
+ferait une facture à zéro. Même règle que l'identité, qui vient du JWT.
+
+**Ce que la facture finale déduit est FIGÉ à l'émission**
+(`acomptes_deduits`, un instantané `[{ id, numero, date, montant }]`). Même
+raison que le forfait de transport qui recopie sa distance : annuler un acompte
+six mois plus tard ne doit pas réécrire ce que le client a reçu.
+
+**Un acompte annulé ne se déduit pas ; un acompte impayé, si.** L'annulé ne
+sera jamais payé. L'impayé reste dû — il est une créance ouverte sur sa propre
+facture, et le client doit le solde quoi qu'il arrive.
+
+**Des acomptes qui dépassent le total ne font pas une facture négative.** Le
+solde est borné à zéro et l'excédent est annoncé à l'écran : un trop-perçu
+demande une note de crédit, pas une facture que le rapprochement bancaire ne
+pourra jamais solder.
+
+**Le PDF d'un acompte ne détaille pas l'offre** — une seule ligne. Imprimer le
+détail du chantier à côté d'un sous-total qui n'en est qu'une fraction donne un
+document qui se contredit ; le client a déjà le détail dans son offre.
+
 **Un seul format de PDF, pour l'offre comme pour la facture.** Ce qui apparaît
 se règle ligne par ligne (`hidden`), plus par un couple détaillé/résumé. La
 colonne `customer_invoices.detail_level` subsiste en base mais n'est plus lue.
@@ -1667,6 +1715,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-annuaire.sql` | tables `annuaire`, `annuaire_categories`, `annuaire_liens` | en fin de fichier |
 | `schema-invoice-reference.sql` | `customer_invoices.reference` (réf. propre à la facture) | en fin de fichier |
 | `schema-economat.sql` | tables `economat_categories`, `economat_fournisseurs`, `economat_articles`, `economat_commandes` + arbre, couleurs et fournisseurs de départ | en fin de fichier |
+| `schema-acomptes.sql` | `customer_invoices.type`, `acompte_base`, `acompte_valeur`, `acomptes_deduits` | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

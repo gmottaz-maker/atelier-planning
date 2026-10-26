@@ -1,6 +1,7 @@
 import { getSupabaseServer } from '../../../lib/supabase-server'
 import { requireAdmin } from '../../../lib/requireAdmin'
 import { validerFacture } from '../../../lib/invoiceCheck'
+import { acomptesDuProjet, totalAcomptesTTC } from '../../../lib/acomptes'
 import { erreurApi } from '../../../lib/apiError'
 
 const supabase = getSupabaseServer()
@@ -40,7 +41,20 @@ export default async function handler(req, res) {
       const { data: actuelle } = await supabase
         .from('customer_invoices').select('*').eq('id', id).maybeSingle()
       if (!actuelle) return res.status(404).json({ error: 'Facture introuvable' })
-      const check = validerFacture({ ...actuelle, ...payload })
+
+      // Les acomptes du projet, relus EN BASE à chaque validation — et jamais
+      // celui-ci : une facture ne se déduit pas d'elle-même.
+      let acomptesTTC = 0
+      const fusion = { ...actuelle, ...payload }
+      if (fusion.project_id && fusion.type !== 'acompte') {
+        const { data: deja } = await supabase
+          .from('customer_invoices')
+          .select('id, invoice_number, issue_date, amount, status, type, project_id')
+          .eq('project_id', fusion.project_id).eq('type', 'acompte')
+        acomptesTTC = totalAcomptesTTC(acomptesDuProjet(deja || [], { projectId: fusion.project_id, sauf: id }))
+      }
+
+      const check = validerFacture(fusion, { acomptesTTC })
       if (!check.ok) return res.status(400).json({ error: check.error })
       if ('amount' in payload || 'quote_snapshot' in payload ||
           'discount_rate' in payload || 'discount_amount' in payload || 'vat_rate' in payload) {

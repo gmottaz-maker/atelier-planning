@@ -106,3 +106,70 @@ describe('clé d\'idempotence du stockage', () => {
     expect(storageBillingKey(2026, 2, 'A')).not.toBe(storageBillingKey(2026, 2, 'B'))
   })
 })
+
+describe('factures d\'acompte, côté serveur', () => {
+  // Offre de 1200 HT. Un acompte de 30 % vaut 360 HT, 389.16 TTC à 8,1 %.
+  const acompte = { ...base, type: 'acompte', acompte_base: 'pourcentage', acompte_valeur: 30,
+    amount: 389.16, amount_net: 360, vat_amount: 29.16 }
+
+  it('recalcule le montant d\'un acompte depuis le POURCENTAGE, pas depuis le corps', () => {
+    const r = validerFacture(acompte)
+    expect(r.ok).toBe(true)
+    expect(r.valeurs).toMatchObject({ amount: 389.16, amount_net: 360, vat_amount: 29.16 })
+  })
+
+  it('accepte un acompte en montant fixe', () => {
+    const r = validerFacture({ ...acompte, acompte_base: 'montant', acompte_valeur: 500,
+      amount: 540.5, amount_net: 500, vat_amount: 40.5 })
+    expect(r.ok).toBe(true)
+    expect(r.valeurs.amount).toBe(540.5)
+  })
+
+  it('refuse un acompte dont le montant annoncé ne suit pas le pourcentage', () => {
+    // Le navigateur ne fixe pas la somme : elle se déduit de l'offre.
+    expect(validerFacture({ ...acompte, amount: 900 }).ok).toBe(false)
+  })
+
+  it('refuse un acompte qui dépasse l\'offre, ou sans base', () => {
+    expect(validerFacture({ ...acompte, acompte_valeur: 150 }).ok).toBe(false)
+    expect(validerFacture({ ...acompte, acompte_base: undefined }).ok).toBe(false)
+    expect(validerFacture({ ...base, type: 'inventé' }).ok).toBe(false)
+  })
+
+  it('un acompte ne se déduit pas d\'acomptes', () => {
+    // Même si la route en annonçait, un acompte EST la déduction à venir.
+    const r = validerFacture(acompte, { acomptesTTC: 300 })
+    expect(r.ok).toBe(true)
+    expect(r.valeurs.amount).toBe(389.16)
+  })
+})
+
+describe('la facture finale déduit les acomptes', () => {
+  it('attend le SOLDE, pas le total', () => {
+    // 1297.20 TTC moins 389.16 d'acompte = 908.04 à payer.
+    const r = validerFacture({ ...base, amount: 908.04 }, { acomptesTTC: 389.16 })
+    expect(r.ok).toBe(true)
+    expect(r.valeurs.amount).toBe(908.04)
+    // Le net et la TVA restent ceux de la facture ENTIÈRE : la TVA a déjà été
+    // déclarée sur l'acompte, mais le document montre bien le total complet.
+    expect(r.valeurs.amount_net).toBe(1200)
+    expect(r.valeurs.vat_amount).toBe(97.2)
+  })
+
+  it('refuse le total complet quand un acompte a déjà été facturé', () => {
+    const r = validerFacture({ ...base, amount: 1297.2 }, { acomptesTTC: 389.16 })
+    expect(r.ok).toBe(false)
+    expect(r.error).toMatch(/acomptes/)
+  })
+
+  it('ignore ce que le NAVIGATEUR prétend sur les acomptes', () => {
+    // Le corps porte un champ `acomptes` menteur : il ne doit rien changer.
+    const r = validerFacture({ ...base, acomptes: 1200, acomptes_deduits: [{ montant: 1200 }], amount: 97.2 })
+    expect(r.ok).toBe(false)
+  })
+
+  it('sans acompte, le comportement d\'avant est intact', () => {
+    expect(validerFacture(base).ok).toBe(true)
+    expect(validerFacture(base, { acomptesTTC: 0 }).ok).toBe(true)
+  })
+})

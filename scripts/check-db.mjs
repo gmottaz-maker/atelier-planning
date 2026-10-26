@@ -100,6 +100,12 @@ const CONTROLES = [
     sonde: async () => !(await sb.from('work_slots').select('id').limit(1)).error,
   },
   {
+    nom: 'factures d\u2019acompte',
+    migration: 'schema-acomptes.sql',
+    sonde: async () => !(await sb.from('customer_invoices')
+      .select('id, type, acompte_base, acompte_valeur, acomptes_deduits').limit(1)).error,
+  },
+  {
     nom: 'agenda',
     migration: 'schema-agenda.sql',
     sonde: async () => !(await sb.from('agenda')

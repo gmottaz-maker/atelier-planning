@@ -19,6 +19,7 @@ import { defaultQuote } from '../../lib/quoteDefaults'
 import { useQuoteDefaults } from '../../lib/useQuoteDefaults'
 import { computeQuoteTotal } from '../../lib/quoteTotals'
 import { invoiceTotals } from '../../lib/invoiceTotals'
+import { montantAcompteHT, acomptesDuProjet, totalAcomptesTTC } from '../../lib/acomptes'
 import { fmtCHF } from '../../lib/money'
 import { AL, C } from '../../lib/theme'
 
@@ -45,7 +46,11 @@ export default function FactureEmisePage() {
     vat_rate: '8.1', issue_date: today(), due_date: addDays(today(), 30),
     iban_recipient: '', notes: '', status: 'created',
     object: '', reference: '', discount_label: '', discount_rate: '', discount_amount: '',
+    type: 'facture', acompte_base: 'pourcentage', acompte_valeur: '',
   })
+  // Les acomptes déjà émis sur ce chantier. Aperçu seulement : le serveur
+  // recalcule la déduction depuis la base avant d'enregistrer.
+  const [acomptes, setAcomptes] = useState([])
   const [loading, setLoading] = useState(true)
   const [dirty, setDirty]     = useState(false)
   const [saving, setSaving]   = useState(false)
@@ -85,6 +90,9 @@ export default function FactureEmisePage() {
           object: inv.object || '',
           reference: inv.reference || '',
           discount_label: inv.discount_label || '',
+          type: inv.type || 'facture',
+          acompte_base: inv.acompte_base || 'pourcentage',
+          acompte_valeur: inv.acompte_valeur ?? '',
           discount_rate: inv.discount_rate ?? '',
           discount_amount: inv.discount_amount ?? '',
         })
@@ -95,7 +103,10 @@ export default function FactureEmisePage() {
         const from = router.query.from ? String(router.query.from) : ''
         const p = (Array.isArray(prj) ? prj : []).find(x => String(x.id) === from)
         if (p) {
-          setForm(f => ({ ...f, project_id: p.id, client_name: p.client || '', client_address: p.client_address || '' }))
+          const acompte = router.query.acompte === '1'
+          setForm(f => ({ ...f, project_id: p.id, client_name: p.client || '', client_address: p.client_address || '',
+            type: acompte ? 'acompte' : 'facture',
+            object: acompte ? `Acompte — ${p.name || ''}`.trim() : f.object }))
           setQuote(isGrouped(p.quote_data) ? p.quote_data : defaultQuote(reglages))
         } else {
           setQuote(defaultQuote(reglages))
@@ -105,6 +116,19 @@ export default function FactureEmisePage() {
     })()
     return () => { cancelled = true }
   }, [router.isReady, id, reglagesCharges])
+
+  // Les acomptes déjà émis sur ce chantier, rechargés dès que le projet
+  // change. Aperçu seulement : la déduction qui fait foi est recalculée par le
+  // serveur, depuis la base, à l'enregistrement.
+  useEffect(() => {
+    if (!form.project_id) { setAcomptes([]); return }
+    let annule = false
+    adminFetch(`/api/customer-invoices?project=${encodeURIComponent(form.project_id)}&type=acompte`)
+      .then(r => r.json())
+      .then(d => { if (!annule) setAcomptes(Array.isArray(d) ? d : []) })
+      .catch(() => { if (!annule) setAcomptes([]) })
+    return () => { annule = true }
+  }, [form.project_id])
 
   // Reprend le devis d'un projet (bouton « Reprendre l'offre »)
   function pickProject(pid) {
@@ -121,21 +145,37 @@ export default function FactureEmisePage() {
     setDirty(true)
   }
 
+  // Le total HT de l'OFFRE : la base d'un acompte, et le sous-total d'une
+  // facture ordinaire.
+  const totalOffreHT = computeQuoteTotal(quote)
+  const estAcompte = form.type === 'acompte'
+
+  // Un acompte ne facture qu'une PART de l'offre ; une facture finale facture
+  // tout et retire ce qui a déjà été demandé d'avance.
+  const calculAcompte = estAcompte
+    ? montantAcompteHT({ base: form.acompte_base, valeur: form.acompte_valeur, sousTotalHT: totalOffreHT })
+    : null
+  const dejaVerses = estAcompte ? [] : acomptesDuProjet(acomptes, { projectId: form.project_id, sauf: isNew ? null : id })
+
   const totals = invoiceTotals({
-    subtotal: computeQuoteTotal(quote),
+    subtotal: estAcompte ? (calculAcompte?.montant || 0) : totalOffreHT,
     discount_rate: form.discount_rate,
     discount_amount: form.discount_amount,
     vat_rate: form.vat_rate,
+    acomptes: totalAcomptesTTC(dejaVerses),
   })
-  const { subtotal, discount, net, vat, gross } = totals
+  const { subtotal, discount, net, vat, gross, du, excedent } = totals
 
   async function save({ close = false } = {}) {
     if (!form.client_name) { setError('Le client est requis.'); return }
+    if (estAcompte && !calculAcompte?.ok) { setError(calculAcompte?.erreur || 'Acompte invalide.'); return }
     setSaving(true); setError('')
     try {
       const body = {
         ...form,
-        amount: gross.toFixed(2), amount_net: net.toFixed(2), vat_amount: vat.toFixed(2),
+        // `amount` est ce qui RESTE à payer — le serveur le recalcule et
+        // refuse au-delà du centime.
+        amount: du.toFixed(2), amount_net: net.toFixed(2), vat_amount: vat.toFixed(2),
         quote_snapshot: quote,
       }
       const r = await adminFetch(isNew ? '/api/customer-invoices' : `/api/customer-invoices/${id}`, {
@@ -305,6 +345,43 @@ export default function FactureEmisePage() {
             <QuoteEditor value={quote} onChange={q => { setQuote(q); setDirty(true) }} reglages={reglages} />
           </div>
 
+          {/* ── Acompte ── */}
+          {estAcompte && (
+            <div className="u-surface u-panel border u-line p-5 space-y-3" style={{ borderColor: C.outline }}>
+              <h2 className="font-semibold u-ink" style={{ fontSize: 15 }}>Acompte</h2>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className={label}>Calculé sur</label>
+                  <select className={input} value={form.acompte_base} onChange={e => set('acompte_base', e.target.value)}>
+                    <option value="pourcentage">un pourcentage de l&apos;offre</option>
+                    <option value="montant">un montant fixe</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={label}>
+                    {form.acompte_base === 'pourcentage' ? 'Pourcentage du total HT' : `Montant HT (${form.currency})`}
+                  </label>
+                  <input type="number" step={form.acompte_base === 'pourcentage' ? '1' : '0.01'} min="0"
+                    className={input + ' text-right tabular-nums'}
+                    value={form.acompte_valeur} onChange={e => set('acompte_valeur', e.target.value)}
+                    placeholder={form.acompte_base === 'pourcentage' ? '30' : '5000'} />
+                </div>
+                <div>
+                  <label className={label}>Total HT de l&apos;offre</label>
+                  <div className={input + ' text-right tabular-nums'} style={{ background: C.neutralBg }}>
+                    {fmtCHF(totalOffreHT)} {form.currency}
+                  </div>
+                </div>
+              </div>
+              {calculAcompte && !calculAcompte.ok
+                ? <p className="text-xs" style={{ color: C.danger }}>{calculAcompte.erreur}</p>
+                : <p className="text-xs u-muted">
+                    La TVA s&apos;applique par-dessus : cet acompte est une facture ordinaire, et la
+                    facture finale le déduira TTC.
+                  </p>}
+            </div>
+          )}
+
           {/* ── Escompte sur toute la facture ── */}
           <div className="u-surface u-panel border u-line p-5 space-y-3">
             <h2 className="font-semibold u-ink" style={{ fontSize: 15 }}>Escompte sur la facture</h2>
@@ -351,8 +428,30 @@ export default function FactureEmisePage() {
             </div>
             <div className="flex justify-between items-baseline pt-2 border-t u-line">
               <span className="text-sm font-semibold u-ink">Total TTC</span>
-              <span className="font-bold tabular-nums u-ink" style={{ fontSize: 22 }}>{fmtCHF(gross)} {form.currency}</span>
+              <span className={dejaVerses.length ? 'tabular-nums u-ink' : 'font-bold tabular-nums u-ink'}
+                style={{ fontSize: dejaVerses.length ? 15 : 22 }}>{fmtCHF(gross)} {form.currency}</span>
             </div>
+
+            {/* Les acomptes se retirent APRÈS la TVA : ils ont déjà porté la
+                leur sur leur propre facture. */}
+            {dejaVerses.map(a => (
+              <div key={a.id} className="flex justify-between text-sm mt-1" style={{ color: C.danger }}>
+                <span>Acompte {a.invoice_number}{a.issue_date ? ` du ${a.issue_date}` : ''}</span>
+                <span className="tabular-nums font-medium">− {fmtCHF(a.amount)} {form.currency}</span>
+              </div>
+            ))}
+            {dejaVerses.length > 0 && (
+              <div className="flex justify-between items-baseline pt-2 mt-1 border-t u-line">
+                <span className="text-sm font-semibold u-ink">Reste à payer</span>
+                <span className="font-bold tabular-nums u-ink" style={{ fontSize: 22 }}>{fmtCHF(du)} {form.currency}</span>
+              </div>
+            )}
+            {excedent > 0 && (
+              <p className="text-xs mt-2" style={{ color: C.danger }}>
+                Les acomptes dépassent le total de {fmtCHF(excedent)} {form.currency}. La facture est
+                ramenée à zéro — le trop-perçu demande une note de crédit, pas une facture négative.
+              </p>
+            )}
           </div>
 
           {/* ── Actions ── */}

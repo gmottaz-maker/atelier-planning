@@ -107,3 +107,44 @@ describe('référence sous l\'objet', () => {
     expect(buildFactureHtml(base, company, null)).not.toContain('Référence')
   })
 })
+
+describe('factures d\'acompte dans le PDF', () => {
+  it('un ACOMPTE ne détaille pas l\'offre : une seule ligne', () => {
+    // Imprimer le détail du chantier à côté d'un sous-total qui n'en est
+    // qu'une fraction donne un document qui se contredit.
+    const html = buildFactureHtml({
+      ...base, type: 'acompte', acompte_base: 'pourcentage', acompte_valeur: 30,
+      amount_net: 300, vat_amount: 24.3, amount: 324.3,
+    }, {}, null)
+    expect(html).toContain('Acompte de 30 % sur l’offre'.replace('’', "'"))
+    expect(html).not.toContain('Néon 100cm')
+  })
+
+  it('un acompte en montant fixe ne prétend pas à un pourcentage', () => {
+    const html = buildFactureHtml({
+      ...base, type: 'acompte', acompte_base: 'montant', acompte_valeur: 500,
+      amount_net: 500, vat_amount: 40.5, amount: 540.5,
+    }, {}, null)
+    expect(html).toContain('Acompte sur l\'offre')
+    expect(html).not.toMatch(/Acompte de .* %/)
+  })
+
+  it('la facture FINALE montre le total, la déduction, puis le solde', () => {
+    const html = buildFactureHtml({
+      ...base,
+      amount_net: 1000, vat_amount: 81, amount: 756.7,   // 1081 − 324.30
+      acomptes_deduits: [{ id: 7, numero: '2026-009', date: '2026-05-02', montant: 324.3 }],
+    }, {}, null)
+    expect(html).toContain('Total TTC')
+    expect(html).toContain('Acompte 2026-009 du 2026-05-02')
+    expect(html).toContain('Reste à payer')
+    // Le détail du chantier reste imprimé : c'est la facture finale.
+    expect(html).toContain('Néon 100cm')
+  })
+
+  it('sans acompte, le PDF est celui d\'avant', () => {
+    const html = buildFactureHtml(base, {}, null)
+    expect(html).toContain('Total à payer')
+    expect(html).not.toContain('Reste à payer')
+  })
+})

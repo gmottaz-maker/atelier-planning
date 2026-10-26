@@ -3,8 +3,11 @@ import { invoiceTotals } from '../lib/invoiceTotals'
 
 describe('invoiceTotals', () => {
   it('calcule la TVA sans escompte', () => {
+    // Comparaison de l'objet ENTIER, à dessein : une clé ajoutée au retour
+    // doit faire réfléchir celui qui l'ajoute. `acomptes`, `excedent` et `du`
+    // sont arrivés le 26 octobre 2026 avec les factures d'acompte.
     expect(invoiceTotals({ subtotal: 1000, vat_rate: 8.1 }))
-      .toEqual({ subtotal: 1000, discount: 0, net: 1000, vat: 81, gross: 1081 })
+      .toEqual({ subtotal: 1000, discount: 0, net: 1000, vat: 81, gross: 1081, acomptes: 0, excedent: 0, du: 1081 })
   })
 
   it('applique un escompte en pourcentage avant la TVA', () => {

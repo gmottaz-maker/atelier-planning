@@ -3547,6 +3547,18 @@ export default function ProjectPage() {
                           convertir en facture
                         </ButtonPill>
                       )}
+                      {/* L'acompte ne s'offre QU'UNE FOIS L'OFFRE ACCEPTÉE :
+                          demander de l'argent d'avance sur un brouillon qu'on
+                          va encore corriger n'a pas de sens, et le montant se
+                          calcule justement sur ce total-là. */}
+                      {isAdmin && quote.status === 'accepte' && (
+                        <ButtonPill href={`/factures-emises/new?from=${id}&acompte=1`}
+                          onClick={e => ouvrirApresEnregistrement(e, `/factures-emises/new?from=${id}&acompte=1`, true)}
+                          style={{ fontSize: 13, padding: '0.45rem 1rem' }}
+                          title="Facturer un acompte : un pourcentage de l'offre, ou un montant fixe">
+                          facture d&apos;acompte
+                        </ButtonPill>
+                      )}
                     </div>
                   )}
                 </div>
