@@ -2244,6 +2244,32 @@ export default function ProjectPage() {
     }
   }
 
+  /**
+   * Ouvrir une page qui relit l'offre en base — mais pas avant de l'avoir
+   * enregistrée.
+   *
+   * L'aperçu PDF et la conversion en facture se rendent côté serveur depuis
+   * `quote_data`. Tant que l'éditeur a des modifications en attente, ces pages
+   * montrent l'offre PRÉCÉDENTE, et rien ne le signale : le « non enregistré »
+   * est un petit texte, l'infobulle demande de survoler. Le 26 octobre 2026,
+   * une offre est sortie avec une Fabrication à zéro parce que les montants
+   * venaient d'être saisis.
+   *
+   * Si l'enregistrement échoue, on N'OUVRE PAS : un document périmé ouvert
+   * dans un onglet est indistinguable d'un document juste.
+   */
+  async function ouvrirApresEnregistrement(e, url, memeOnglet = false) {
+    if (!quoteDirty) return               // lien normal : clic milieu, ⌘-clic, tout marche
+    e.preventDefault()
+    const ok = await saveQuote()
+    if (!ok) {
+      alert('L\'offre n\'a pas pu être enregistrée. Le document afficherait une version périmée — rien n\'a été ouvert.')
+      return
+    }
+    if (memeOnglet) router.push(url)
+    else window.open(url, '_blank', 'noopener')
+  }
+
   // Auto-save: 5 min après une modification, on enregistre silencieusement
   const latestQuote   = useRef(quote)
   const latestProject = useRef(project)
@@ -3500,15 +3526,24 @@ export default function ProjectPage() {
                       <ButtonPill onClick={saveQuote} disabled={!quoteDirty || quoteSaving} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
                         {quoteSaving ? 'enregistrement…' : 'enregistrer'}
                       </ButtonPill>
+                      {/* Ces deux boutons ouvrent des pages qui relisent l'offre DEPUIS
+                          LA BASE. Cliqués avec des modifications non enregistrées, ils
+                          servaient la version d'AVANT sans rien dire : un `ButtonPill`
+                          qui porte un `href` est un <a>, et `disabled` ne s'y applique
+                          pas — seule l'infobulle changeait, et une infobulle ne se voit
+                          pas au trackpad. Un PDF d'offre périmé se découvre chez le
+                          client. On enregistre donc d'abord, puis on ouvre. */}
                       <ButtonPill href={`/projects/${id}/devis`} target="_blank" rel="noopener"
+                        onClick={e => ouvrirApresEnregistrement(e, `/projects/${id}/devis`)}
                         style={{ fontSize: 13, padding: '0.45rem 1rem' }}
-                        title={quoteDirty ? 'Enregistre d\'abord pour inclure les dernières modifs' : 'Aperçu et PDF de l\'offre'}>
+                        title={quoteDirty ? 'Enregistre l\'offre puis ouvre l\'aperçu' : 'Aperçu et PDF de l\'offre'}>
                         offre pdf
                       </ButtonPill>
                       {isAdmin && (
                         <ButtonPill href={`/factures-emises/new?from=${id}`}
+                          onClick={e => ouvrirApresEnregistrement(e, `/factures-emises/new?from=${id}`, true)}
                           style={{ fontSize: 13, padding: '0.45rem 1rem' }}
-                          title={quoteDirty ? 'Enregistre d\'abord' : 'Convertir en facture officielle avec QR-bill'}>
+                          title={quoteDirty ? 'Enregistre l\'offre puis ouvre la facture' : 'Convertir en facture officielle avec QR-bill'}>
                           convertir en facture
                         </ButtonPill>
                       )}
