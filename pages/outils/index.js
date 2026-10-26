@@ -16,6 +16,12 @@ const OUTILS = [
     etat: '271 produits · 20 tarifés',
   },
   {
+    href: '/outils/impression-3d',
+    nom: 'Impression 3D',
+    resume: 'Déposer des fichiers STL ou 3MF et obtenir le prix à facturer, pièce par pièce : poids, temps machine, plateaux, manutention. Tout se calcule dans le navigateur, aucun fichier n’est envoyé.',
+    etat: 'STL · 3MF',
+  },
+  {
     href: '/outils/charges-sociales',
     nom: 'Charges sociales',
     resume: 'Ce qu’un employé coûte vraiment : AVS, chômage, allocations familiales, accidents (LAA) et prévoyance (LPP), par personne et par organisme. Ce qui est prélevé sans qu’on ait le choix.',

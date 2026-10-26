@@ -49,6 +49,7 @@ pages/
   outils/economat.js   — Économat : les consommables de l'atelier (section dédiée)
   outils/charges-sociales.js — (admin) Ce qu'un employé coûte : AVS/AC/AF, LAA, LPP
   outils/assurances.js — (admin) Ce qu'on a choisi d'assurer, et ce qui est couvert
+  outils/impression-3d.js — Prix d'une impression 3D depuis les fichiers STL/3MF (section dédiée)
   outils/marge-km.js   — (admin) Marge au km : un trajet gagne-t-il de l'argent ?
                          simulation sur les réglages Transport, sans les modifier
   peintures.js         — Redirection vers /outils/peintures (anciens signets)
@@ -125,6 +126,8 @@ lib/
   economat.js            — Économat : états, lien fournisseur, arbre, filtres, planches
   economatCarte.js       — La carte A6 et la planche A4 PAYSAGE (quatre par feuille)
   assurances.js · assurancesCalc.js — Contrats, couvertures, coût par personne
+  impression3d.js        — Impression 3D : poids, temps, plateaux, prix, calibration
+  maillage3d.js          — Lecture STL/3MF, séparation en corps, volume, surface, empreinte
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
@@ -548,6 +551,58 @@ liste contrôlée est créé, mais ANNONCÉ : c'est plus souvent une coquille
 qu'une nouvelle maison. Rejouer le
 script met à jour sans dupliquer et **ne touche ni `etat`, ni `jeton`, ni
 l'historique** — un rejeu ne doit pas remettre tout le stock au vert.
+
+### Impression 3D (`/outils/impression-3d`)
+
+On dépose des fichiers STL ou 3MF ; la page donne le prix à facturer, par
+pièce et par poste. Spécification d'origine : « Calculateur de prix
+d'impression 3D », octobre 2026, calibrée sur un vrai job (122 pièces origami
+pour une vitrine, temps réels de Bambu Studio sur X1C).
+
+**Tout se passe dans le navigateur, aucun fichier n'est envoyé.** Pas de
+route, pas de table. `lib/maillage3d.js` lit les fichiers et mesure,
+`lib/impression3d.js` chiffre ; la page n'affiche. Le 3MF se dézippe par
+`DecompressionStream` (Node le fournit aussi, d'où des tests sans navigateur),
+et l'aperçu est un rendu canvas 2D maison : pas de three.js ni de bibliothèque
+zip pour une vignette et une archive.
+
+**Un fichier n'est pas une pièce.** Chaque fichier est séparé en corps
+disjoints (composantes connexes, sommets soudés au micron), et chaque corps
+devient une référence `<fichier> #1`, `#2`… triée sur X. Sont écartés, et
+listés à l'écran : les corps sous 1 cm³ ou de volume nul, et les triangles en
+double. **Les doublons sont retirés AVANT la séparation** : deux copies
+superposées d'un 3MF Bambu partagent tous leurs sommets, et se soudaient en
+une seule pièce de volume double — facturée deux fois sa matière. Dans un 3MF,
+les éléments posés qui renvoient au même objet, ou des objets de forme
+identique, s'additionnent en QUANTITÉ ; dans un STL, chaque corps reste une
+référence.
+
+**Ce qui vient du slicer remplace l'estimation, et l'écran le dit** (« estimé »
+/ « slicer » sous chaque valeur). Le modèle de temps (`a × g + b`) est calibré
+sur des pièces décoratives creuses : pour une pièce pleine ou technique, le
+temps du slicer fait foi.
+
+**Le brim ne compte que pour une pièce ÉLANCÉE** (hauteur / empreinte > 4,
+celle à qui l'alerte le recommande). La spec l'ajoutait à toutes : un socle de
+96 mm occupait 120 mm et se retrouvait seul sur un plateau de 232, vingt socles
+faisaient vingt plateaux. Décidé le 26 octobre 2026. Le nombre de plateaux
+reste forçable à la main.
+
+**La calibration est PARTAGÉE** (`app_settings.impression3d_reglages` : k_cal,
+a, b, et densité, prix, facteur temps et ratés par matière). Même arbitrage
+que les coefficients de peinture : un plateau mesuré par l'un doit corriger
+les devis de tous. Lecture pour tous, écriture admin ; un membre peut modifier
+pour son devis sans enregistrer. `normaliserReglages()` fait retomber une
+valeur absente ou aberrante sur celle d'origine. L'écran « Calibrer » refait
+la régression `temps = a × g + b × n` sur des plateaux réels ; sur les quatre
+plateaux de la spec, il redonne a = 0,0174 et b = 0,260. **Les prix au kg sont
+des valeurs de départ**, à remplacer par les prix d'achat réels.
+
+**Les prix sont arrondis au 0,05 par pièce**, et le total HT est la somme des
+lignes arrondies. Le récapitulatif par poste n'est pas arrondi : la différence
+est affichée sur une ligne « Arrondis », pour que les deux tableaux bouclent.
+La manutention par pièce pèse ~60 % du total sur une série de petites pièces :
+c'est le levier principal, et l'écran le met en avant.
 
 ### Charges sociales et Assurances (`/outils/charges-sociales`, `/outils/assurances`) — admin
 

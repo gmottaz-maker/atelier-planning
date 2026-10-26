@@ -89,6 +89,17 @@ describe('app-settings — IBAN et raison sociale imprimés sur les factures', (
     expect(res.statusCode).toBe(403)
   })
 
+  it('laisse un membre LIRE la calibration d\'impression 3D, mais pas la modifier', async () => {
+    sous(MEMBRE, { app_settings: [{ key: 'impression3d_reglages', value: { kCal: 0.85 } }] })
+    const lu = await appeler(await charger(), { method: 'GET', query: { key: 'impression3d_reglages' } })
+    expect(lu.statusCode).toBe(200)
+    sous(MEMBRE)
+    const ecrit = await appeler(await charger(), {
+      method: 'PUT', query: { key: 'impression3d_reglages' }, body: { value: { kCal: 9 } },
+    })
+    expect(ecrit.statusCode).toBe(403)
+  })
+
   it('laisse l\'admin modifier', async () => {
     sous(ADMIN, { app_settings: [] })
     const res = await appeler(await charger(), {

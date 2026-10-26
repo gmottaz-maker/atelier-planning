@@ -8,6 +8,9 @@ const DEFAULTS = {
   responsibles: ['Arnaud', 'Guillaume', 'Gabin', 'non défini'],
   // Repris de lib/paintCalc.js — hypothèses d'atelier, pas des données RUCO.
   paint_coefficients: null,
+  // Calibration du calculateur d'impression 3D (k_cal, a, b, matières). Le
+  // défaut vit dans lib/impression3d.js, qui retombe dessus si la clé est vide.
+  impression3d_reglages: null,
   // Tarifs et marge d'une offre neuve. Le défaut vient de lib/quoteDefaults.js,
   // qui fait foi — le dupliquer ici ferait diverger le formulaire du calcul.
   quote_defaults: DEFAUTS_OFFRE,
@@ -45,12 +48,15 @@ const DEFAULTS = {
 // peinture. Partagés volontairement — si quelqu'un les recalibre après des
 // essais d'atelier, les chiffrages de toute l'équipe doivent en profiter.
 // Lecture pour tous, écriture admin, comme le reste de cette table.
+// `impression3d_reglages` : calibration et prix matière du calculateur
+// d'impression 3D. Partagés pour la même raison que les coefficients peinture :
+// un plateau mesuré par l'un doit corriger les devis de tous.
 // `quote_defaults` : tarifs horaires et marge d'une offre neuve. Lecture pour
 // tous — la page projet en a besoin pour remplir une offre — écriture admin :
 // ce sont les prix de vente de l'atelier.
 // `transport` : noms des véhicules et forfaits de ville — l'éditeur d'offre en
 // a besoin, et ce ne sont que des prix de vente.
-const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficients', 'quote_defaults', 'transport'])
+const CLES_LISIBLES = new Set(['company_info', 'responsibles', 'paint_coefficients', 'impression3d_reglages', 'quote_defaults', 'transport'])
 
 // Clés lisibles par l'ADMIN seul. `couts_vehicules` : leasing, assurance et
 // consommation de chaque véhicule — rapprochés des km facturés, ils disent la
