@@ -29,6 +29,11 @@ export default function MargeKmEssai() {
   const { reglages } = useQuoteDefaults()
   const { data: coutsBruts } = useSWR('/api/app-settings/couts_vehicules')
   const { data: activitesBrutes } = useSWR('/api/activites')
+  // Même clé que useTransport (une seule requête) : sert à savoir si les
+  // réglages sont arrivés. Sans ça, « Aucun véhicule » et des hypothèses
+  // par défaut s'affichaient le temps du chargement.
+  const { data: transportBrut } = useSWR('/api/app-settings/transport')
+  const charge = transportBrut !== undefined && coutsBruts !== undefined && activitesBrutes !== undefined
   const [modif, setModif] = useState({})
 
   if (user && !isAdmin) { router.replace('/'); return null }
@@ -77,14 +82,15 @@ export default function MargeKmEssai() {
           <div>
             <p className="fx-chemin"><Link href="/outils/essai">Outils</Link></p>
             <h1>Marge au kilomètre</h1>
-            <p className="fx-resume-liste"><span>Un trajet gagne-t-il de l’argent ?</span>{perdants > 0 && <span className="rouge">{perdants} forfait{perdants > 1 ? 's' : ''} perd{perdants > 1 ? 'ent' : ''} à deux dans le {plusCher?.nom}</span>}</p>
+            <p className="fx-resume-liste"><span>Un trajet gagne-t-il de l’argent ?</span>{charge && perdants > 0 && <span className="rouge">{perdants} forfait{perdants > 1 ? 's' : ''} perd{perdants > 1 ? 'ent' : ''} à deux dans le {plusCher?.nom}</span>}</p>
           </div>
           <div className="fx-actions">
             <a className="fx-btn g" href="/outils/marge-km" style={{ textDecoration: 'none' }}>Ancienne page</a>
           </div>
         </header>
 
-        <div className="fx-offre" style={{ marginTop: 48 }}>
+        {!charge && <p className="fx-note" style={{ marginTop: 40 }}>Chargement…</p>}
+        {charge && <div className="fx-offre" style={{ marginTop: 48 }}>
           <div style={{ minWidth: 0 }}>
             {manques.length > 0 && (
               <div className="fx-encadre" style={{ marginTop: 0, marginBottom: 32, background: N.rougeDoux }}>
@@ -167,7 +173,7 @@ export default function MargeKmEssai() {
               <dt>Coût de la conduite</dt><dd className="n">{coutHoraire == null ? '—' : `${deuxDec(coutHoraire)} CHF / h`}</dd>
             </dl>
           </aside>
-        </div>
+        </div>}
       </div>
     </div>
   )

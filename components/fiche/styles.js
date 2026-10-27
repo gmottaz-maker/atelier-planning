@@ -462,6 +462,9 @@ a.fx-ev:hover{box-shadow:0 2px 10px rgba(17,19,24,.08)}
 .fx-question form .fx-champ{font-size:${t.lead}px;min-height:52px;padding:0 18px}
 .fx-question .fx-puces{margin-top:12px}
 .fx-tab-defile{overflow-x:auto}
+/* Sur un téléphone le tableau défile de côté : la première colonne reste en place,
+   sinon on lit des montants sans savoir à qui ils appartiennent. */
+.fx-tab-defile .fx-tab tr>:first-child{position:sticky;left:0;background:${N.fond};z-index:1}
 .fx-tab{width:100%;border-collapse:collapse;min-width:560px}
 .fx-tab th{text-align:left;font-size:${t.petit}px;font-weight:500;color:${N.gris};padding:0 12px 10px 0;border-bottom:1px solid ${N.filet};white-space:nowrap}
 .fx-tab td{padding:14px 12px 14px 0;border-bottom:1px solid ${N.filet2};vertical-align:top}

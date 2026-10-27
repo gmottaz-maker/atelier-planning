@@ -167,7 +167,7 @@ export default function AnnuaireEssai() {
           <div style={{ minWidth: 0 }}>
             <label className="fx-cherche">
               <svg className="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-              <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Thermolaquage, fraises, un nom, une ville…" aria-label="Chercher dans l’annuaire" />
+              <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="Thermolaquage, un nom, une ville…" aria-label="Chercher dans l’annuaire" />
             </label>
 
             {gestion && (
