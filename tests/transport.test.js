@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  coutKm, coutsKmFlotte, normaliserTransport, normaliserCouts, lignesTransport, margeTransport, ligneForfait, nombre, transportPrevu, simulerTrajet, margeParKm,
+  coutKm, coutsKmFlotte, normaliserTransport, normaliserCouts, lignesTransport, margeTransport, ligneForfait, nombre, transportPrevu, simulerTrajet, margeParKm, vehiculesChoisissables,
 } from '../lib/transport'
 import { lignesDevis, totauxDevis } from '../lib/quoteLines'
 
@@ -28,6 +28,13 @@ describe('coût au km', () => {
   })
   it('flotte : moyenne pondérée par les km', () => {
     expect(coutsKmFlotte(COUTS).moyenne).toBeCloseTo(0.875, 2)
+  })
+  // Le Vito vendu (26 octobre 2026) garde son coût pour les anciennes lignes,
+  // mais une ligne sans véhicule chiffrée aujourd'hui ne roulera pas dedans.
+  it('flotte : un véhicule vendu garde son coût mais sort de la moyenne', () => {
+    const f = coutsKmFlotte(COUTS, ['vito'])
+    expect(f.par.vito).toBeCloseTo(0.515, 2)
+    expect(f.moyenne).toBeCloseTo(1.236, 2)
   })
   // Un coût au km inventé serait pire que pas de coût.
   it('rend null quand il manque les km, la consommation ou le diesel', () => {
@@ -182,5 +189,22 @@ describe('margeParKm', () => {
     expect(margeParKm({ tarif: 3, coutKm: null, coutHoraire: 72, vitesse: 70 })).toBe(null)
     expect(margeParKm({ tarif: 3, coutKm: 1, coutHoraire: null, vitesse: 70 })).toBe(null)
     expect(margeParKm({ tarif: 3, coutKm: 1, coutHoraire: 72, vitesse: 0 })).toBe(null)
+  })
+})
+
+describe('véhicule vendu', () => {
+  const t = normaliserTransport({ vehicules: [{ id: 'master', nom: 'Renault Master' }, { id: 'vito', nom: 'Mercedes Vito', vendu: true }] })
+  it('reste dans le réglage, marqué vendu', () => {
+    expect(t.vehicules).toEqual([{ id: 'master', nom: 'Renault Master' }, { id: 'vito', nom: 'Mercedes Vito', vendu: true }])
+  })
+  it('n’est plus proposé sur une ligne neuve', () => {
+    expect(vehiculesChoisissables(t, '').map(v => v.id)).toEqual(['master'])
+  })
+  // Sinon le menu effacerait le véhicule d'une offre déjà faite.
+  it('reste proposé sur une ligne qui le porte déjà', () => {
+    expect(vehiculesChoisissables(t, 'vito').map(v => v.id)).toEqual(['master', 'vito'])
+  })
+  it('seul `true` vaut vendu', () => {
+    expect(normaliserTransport({ vehicules: [{ nom: 'X', vendu: 'oui' }] }).vehicules[0].vendu).toBeUndefined()
   })
 })

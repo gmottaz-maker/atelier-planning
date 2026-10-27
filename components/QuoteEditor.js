@@ -15,7 +15,7 @@ import { fmtCHF } from '../lib/money'
 import { genRowUid, genItemUid, copierItem, copierEvenement, deplacerLigne, evenementsLogistiques } from '../lib/quoteLines'
 import { DEFAUTS_OFFRE, normaliserReglagesOffre } from '../lib/quoteDefaults'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
-import { ligneForfait } from '../lib/transport'
+import { ligneForfait, vehiculesChoisissables } from '../lib/transport'
 
 // Styles partagés — le système n'a qu'une bordure (le filet outline 1.5px) et
 // deux radius.
@@ -994,7 +994,7 @@ export default function QuoteEditor({ value, onChange, reglages, transport }) {
                                                 onChange={e => updateLogisticsRow(ei, i, 'vehicule', e.target.value)}
                                                 style={{ flex: 1, minWidth: 0, ...(r.vehicule ? {} : { color: C.warning }) }}>
                                                 <option value="">véhicule…</option>
-                                                {transport.vehicules.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                                                {vehiculesChoisissables(transport, r.vehicule).map(v => <option key={v.id} value={v.id}>{v.nom}{v.vendu ? ' (vendu)' : ''}</option>)}
                                               </select>
                                               {/* Largeur AUTO : le navigateur dimensionne le menu
                                                   sur son contenu, flèche comprise. En lui imposant

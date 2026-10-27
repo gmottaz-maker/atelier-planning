@@ -20,7 +20,7 @@ import {
 } from '../../lib/quoteLines'
 import { estEnHeures, lignesSansActivite } from '../../lib/rentabilite'
 import { activitesParFamille, ligneOffreActivite, libelleSuitActivite } from '../../lib/heures'
-import { ligneForfait } from '../../lib/transport'
+import { ligneForfait, vehiculesChoisissables } from '../../lib/transport'
 import { QUOTE_STATUSES } from '../../lib/quoteStatus'
 import useSWR from 'swr'
 import { compensationConsommee, ligneCompensation, CODE_CONSULTING } from '../../lib/consulting'
@@ -192,7 +192,7 @@ function Ligne({ r, a, i, total: nbDansListe, gm, ouverte, activites, avecVehicu
                 <>
                   <label><span className="fx-etiquette">Véhicule</span>
                     <select className="fx-champ" value={r.vehicule || ''} onChange={e => set('vehicule', e.target.value)}>
-                      <option value="">—</option>{transport.vehicules.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                      <option value="">—</option>{vehiculesChoisissables(transport, r.vehicule).map(v => <option key={v.id} value={v.id}>{v.nom}{v.vendu ? ' (vendu)' : ''}</option>)}
                     </select></label>
                   <label><span className="fx-etiquette">Personnes à bord</span>
                     <select className="fx-champ" value={r.personnes || 1} onChange={e => set('personnes', Number(e.target.value))}>

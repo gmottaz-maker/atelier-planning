@@ -56,7 +56,7 @@ export default function MargeKm() {
   const vitesse = nombre(val('vitesse', couts.vitesse_moyenne ?? 70)) ?? 70
   const kmAn = id => nombre(val(`km_${id}`, couts.vehicules[id]?.km_annuels ?? ''))
 
-  const vehicules = transport.vehicules.map(v => {
+  const vehicules = transport.vehicules.filter(v => !v.vendu).map(v => {
     const km = kmAn(v.id)
     const c = coutKm({ ...(couts.vehicules[v.id] || {}), km_annuels: km }, couts.prix_diesel)
     return { ...v, km, cout: c }

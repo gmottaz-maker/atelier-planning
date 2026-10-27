@@ -512,9 +512,15 @@ function TransportSection() {
     modifier(b => { b.transport.vehicules.push({ id, nom: nom.trim() }); b.couts.vehicules[id] = {}; return b })
   }
   const retirerVehicule = id => {
-    if (!window.confirm('Retirer ce véhicule ? Les offres qui le citent seront comptées au coût moyen de la flotte.')) return
+    if (!window.confirm('Retirer ce véhicule ? Les offres qui le citent seront comptées au coût moyen de la flotte. Pour un véhicule vendu, coche plutôt « vendu ».')) return
     modifier(b => { b.transport.vehicules = b.transport.vehicules.filter(x => x.id !== id); delete b.couts.vehicules[id]; return b })
   }
+  // Vendu : il n'est plus proposé dans les offres, mais garde son coût pour
+  // celles qui l'ont roulé (cf. normaliserTransport).
+  const basculerVendu = id => modifier(b => {
+    b.transport.vehicules = b.transport.vehicules.map(x => (x.id !== id ? x : x.vendu ? { id: x.id, nom: x.nom } : { ...x, vendu: true }))
+    return b
+  })
 
   async function commit() {
     setSaving(true); setFeedback('')
@@ -537,7 +543,8 @@ function TransportSection() {
   }
 
   const couts = normaliserCouts(v.couts)
-  const flotte = coutsKmFlotte({ ...couts, vehicules: Object.fromEntries(v.transport.vehicules.map(x => [x.id, couts.vehicules[x.id] || {}])) })
+  const flotte = coutsKmFlotte({ ...couts, vehicules: Object.fromEntries(v.transport.vehicules.map(x => [x.id, couts.vehicules[x.id] || {}])) },
+    v.transport.vehicules.filter(x => x.vendu).map(x => x.id))
   const fmt = (x, d = 2) => (x == null ? '—' : x.toFixed(d).replace('.', ','))
   const inputCls = "w-full px-2 py-1.5 border u-line u-pill text-sm u-surface focus:u-line focus:outline-none text-right tabular-nums"
 
@@ -577,9 +584,12 @@ function TransportSection() {
             <tr>
               <th />
               {v.transport.vehicules.map(x => (
-                <th key={x.id} className="text-sm font-semibold u-ink text-right" style={{ padding: '0 0 8px 12px' }}>
+                <th key={x.id} className={`text-sm font-semibold text-right ${x.vendu ? 'u-muted' : 'u-ink'}`} style={{ padding: '0 0 8px 12px' }}>
                   {x.nom}
                   <button onClick={() => retirerVehicule(x.id)} className="u-muted hover:u-ko" style={{ marginLeft: 8, fontWeight: 400 }} aria-label={`Retirer ${x.nom}`}>×</button>
+                  <label className="text-xs u-muted" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, fontWeight: 400, marginTop: 2 }}>
+                    <input type="checkbox" checked={!!x.vendu} disabled={!charge} onChange={() => basculerVendu(x.id)} /> vendu
+                  </label>
                 </th>
               ))}
               <th style={{ padding: '0 0 8px 12px', textAlign: 'right' }}>
@@ -618,7 +628,8 @@ function TransportSection() {
         </table>
         <p className="text-xs u-muted mt-3">
           Moyenne de la flotte, pondérée par les km : <b className="u-ink">{fmt(flotte.moyenne)} CHF / km</b> — utilisée
-          quand une ligne de l'offre n'a pas de véhicule. Des km surestimés font baisser le coût au km : compte les km
+          quand une ligne de l'offre n'a pas de véhicule. Un véhicule vendu n'y entre plus et n'est plus proposé dans
+          les offres ; il garde son coût pour celles qui l'ont roulé. Des km surestimés font baisser le coût au km : compte les km
           réellement roulés.
         </p>
       </div>

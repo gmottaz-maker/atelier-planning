@@ -1366,7 +1366,7 @@ function RentabiliteProjet({ projectId, quote }) {
   // de route. RÉEL : les mêmes km, moins les heures de conduite vraiment
   // imputées (51). Les véhicules entrent aussi dans la marge réelle du projet.
   const coutsVeh = normaliserCouts(coutsVehicules?.value)
-  const flotte = coutsKmFlotte(coutsVeh)
+  const flotte = coutsKmFlotte(coutsVeh, reglagesTransport.vehicules.filter(v => v.vendu).map(v => v.id))
   const conduite = mo.lignes.find(l => l.code === CODE_CONDUITE)
   const coutHoraireConduite = activites.find(a => Number(a.code) === CODE_CONDUITE)?.cout_revient
   const lignesTr = lignesTransport(quote)
