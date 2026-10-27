@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
+import { useRafraichirCompteurs } from '../lib/swr'
 import Head from 'next/head'
 import { useAuth } from './_app'
 import { useResponsibles } from '../lib/useResponsibles'
@@ -270,6 +271,7 @@ export default function Tasks() {
   // Données via SWR : cache instantané + revalidation au focus
   const { data: tasks = [], isLoading: tasksLoading, mutate: mutateTasks } = useSWR('/api/tasks')
   const { data: allProjects = [], mutate: mutateProjects } = useSWR('/api/projects?light=1')
+  const rafraichirCompteurs = useRafraichirCompteurs()
   const projects = allProjects.filter(p => p.status === 'active')
   const loading = tasksLoading && tasks.length === 0
   const [view, setView] = useState('week')       // 'today' | 'week' | 'twoweeks' | 'all'
@@ -331,7 +333,8 @@ export default function Tasks() {
   const fetchAll = useCallback(() => {
     mutateTasks()
     mutateProjects()
-  }, [mutateTasks, mutateProjects])
+    rafraichirCompteurs()
+  }, [mutateTasks, mutateProjects, rafraichirCompteurs])
 
   // Init personFilter when currentUser becomes available
   useEffect(() => {

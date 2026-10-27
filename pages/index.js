@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
+import { useRafraichirCompteurs } from '../lib/swr'
 import Head from 'next/head'
 import { quoteStatusMeta, quoteStripe, offreAFaire, categorieOffre, compterOffres, CATEGORIES_OFFRE } from '../lib/quoteStatus'
 import { TYPES_LIVRAISON, chercherProjets } from '../lib/projectHelpers'
@@ -825,8 +826,11 @@ export default function Admin() {
   const isAdmin = useIsAdmin()
   const { data: invoices = [] } = useSWR(isAdmin ? '/api/customer-invoices' : null)
   const invoiceProjectIds = new Set((Array.isArray(invoices) ? invoices : []).map(i => String(i.project_id)))
-  const fetchProjects = () => mutateProjects()
-  const fetchTasks    = () => mutateTasks()
+  // Ces deux helpers suivent toute création, archivage ou suppression : c'est
+  // là que les compteurs de la barre latérale changent de valeur.
+  const rafraichirCompteurs = useRafraichirCompteurs()
+  const fetchProjects = () => { mutateProjects(); rafraichirCompteurs() }
+  const fetchTasks    = () => { mutateTasks(); rafraichirCompteurs() }
   // On ne montre le skeleton qu'au tout premier chargement (cache vide)
   const loading = projectsLoading && projects.length === 0
 

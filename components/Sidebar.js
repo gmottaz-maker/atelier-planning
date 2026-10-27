@@ -118,13 +118,11 @@ export default function Sidebar() {
   const isAdmin = useIsAdmin()
   const p = router.pathname
 
-  // Compteurs live (SWR dédupliqué avec les pages qui chargent déjà ces données)
-  const { data: tasks = [] } = useSWR('/api/tasks')
-  const { data: projects = [] } = useSWR('/api/projects?light=1')
-  const counts = {
-    tasks: Array.isArray(tasks) ? tasks.filter(t => t.status === 'active').length : 0,
-    projects: Array.isArray(projects) ? projects.filter(pr => pr.status === 'active').length : 0,
-  }
+  // Deux entiers, un appel. La barre latérale tirait ces compteurs de
+  // `/api/tasks` et `/api/projects?light=1` : deux listes complètes chargées
+  // sur chaque page, pour n'en afficher que la longueur.
+  const { data: compteurs } = useSWR('/api/compteurs')
+  const counts = { tasks: compteurs?.taches || 0, projects: compteurs?.projets || 0 }
 
   const finLink = (item) => {
     const active = p === item.href

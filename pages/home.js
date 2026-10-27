@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
+import { useRafraichirCompteurs } from '../lib/swr'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useAuth } from './_app'
@@ -109,6 +110,7 @@ export default function HomePage() {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_CLIENT_ID
 
   const { data: tasks = [], isLoading, mutate: mutateTasks } = useSWR('/api/tasks')
+  const rafraichirCompteurs = useRafraichirCompteurs()
   const tasksLoading = isLoading && tasks.length === 0
   const [taskView, setTaskView] = useState('list')
   const [calEvents, setCalEvents] = useState([])
@@ -138,6 +140,7 @@ export default function HomePage() {
       mutateTasks()
       console.error(err)
     }
+    rafraichirCompteurs()
   }
 
   // ─── Task groups ──────────────────────────────────────────────────────────
