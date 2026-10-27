@@ -131,7 +131,7 @@ lib/
   fileType.js            — Type réel d'un fichier déposé + en-têtes de réponse
   kdriveAccess.js · signedRef.js — Autorisation d'accès aux fichiers kDrive
   useIsAdmin.js · useIsMobile.js · useResponsibles.js · useSuggestions.js — Hooks
-  swr.js                 — Cache SWR persisté en localStorage (voir /peintures)
+  swr.js                 — Cache SWR persisté en sessionStorage (voir /peintures)
   theme.js               — Jetons de style (C, FONT, MONO)
   devisHtml.js · factureHtml.js · htmlToPdf.js · pdfFilename.js — Génération des PDF
   quoteLines.js          — Modèle des lignes d'offre : 3 niveaux, totaux, masquage
@@ -359,7 +359,7 @@ donnerait une fausse impression de chiffrage complet.
 
 ### Deux contraintes à ne pas casser
 
-**Ne pas charger ce JSON via SWR.** Le cache SWR est persisté en localStorage
+**Ne pas charger ce JSON via SWR.** Le cache SWR est persisté en sessionStorage
 (`lib/swr.js`) et réécrit la map entière ; 1 Mo y ferait sauter le quota, et
 l'écriture étant dans un `try/catch` silencieux, cela casserait le cache de
 toutes les autres pages sans message. La page utilise un `fetch` dans un
@@ -1572,10 +1572,25 @@ grosse réponse ne remplisse pas le quota à elle seule.
 
 **Les listes de projets se chargent avec `?light=1`.** `quote_data` pèse 60 %
 de `/api/projects` et porte les prix d'achat et les marges, alors que les listes
-n'en affichent qu'un mot — et la barre latérale charge cette route sur CHAQUE
-page. Le paramètre ne laisse que `quote_data.status`, sans changer le format.
-`/offres` et les pages de facture gardent la réponse entière : elles recalculent
-les totaux.
+n'en affichent qu'un mot. Le paramètre ne laisse que `quote_data.status`, sans
+changer le format. `/offres` et les pages de facture gardent la réponse
+entière : elles recalculent les totaux.
+
+**On ne revalide plus au retour d'onglet.** `revalidateOnFocus` relançait
+toutes les requêtes de la page à chaque fois que l'onglet reprenait le focus —
+dix, sur la fiche projet, chacune au minimum 200 ms : le coût nu d'une fonction
+serverless chez Vercel, avant la moindre requête à la base. Nous sommes deux à
+utiliser le logiciel et les écritures appellent déjà `mutate()`. La
+revalidation à la reconnexion reste, elle : là, le cache a pu manquer quelque
+chose.
+
+**La barre latérale compte, elle ne liste pas.** Ses deux badges se
+déduisaient de `/api/projects?light=1` et `/api/tasks`, chargés sur CHAQUE
+page : 139 Ko et les deux requêtes les plus lourdes du logiciel, pour deux
+entiers. `/api/compteurs` les compte avec `head: true` — aucune ligne ne
+transite, la réponse fait 25 octets. En contrepartie les badges ne suivent plus
+les listes : une page qui crée, archive ou termine doit appeler
+`useRafraichirCompteurs()` (`lib/swr.js`), sinon le chiffre reste figé.
 
 ---
 
