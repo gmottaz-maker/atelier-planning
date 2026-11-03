@@ -115,6 +115,8 @@ lib/
   fetchTimeout.js        — fetch avec délai maximal, pour tous les appels sortants
   apiError.js            — Réponses d'erreur normalisées + journalisation nettoyée
   api.js                 — Client API : res.ok, erreurs typées, annulation
+  ficheProjet.js         — Fiche projet : quand appliquer le projet relu, et l'offre
+                           qu'il porte (deux décisions, deux offres déjà perdues)
   projectHelpers.js      — Calculs et formatage de la fiche projet ; recherche libre
                            dans la liste (`chercherProjets`)
   textSearch.js          — Correspondance par DÉBUT DE MOT, tous les mots exigés.
@@ -1381,6 +1383,15 @@ projet propose alors les deux gestes, « créer le dossier »
 (`/api/projects/[id]/kdrive-folder`) ou « choisir un dossier existant ». Un
 projet SANS dossier est un état normal, pas un oubli.
 
+**Un projet archivé se duplique sans être restauré.** Le même chantier revient
+six mois plus tard, et le modèle est dans l'archive. Il fallait la restaurer,
+ouvrir la fiche, dupliquer, puis réarchiver — quatre gestes dont trois n'ont
+rien à voir avec ce qu'on veut, et un projet terminé qui repasse « en cours »
+entre-temps, le temps de passer dans les compteurs et la charge de l'atelier.
+La route de duplication n'a jamais eu besoin de ça : elle LIT la source et
+insère une copie active. « dupliquer » est donc dans le menu de la ligne
+archivée, à côté de « restaurer », et l'original ne bouge pas.
+
 **Dupliquer un projet ne recopie ni son dossier, ni son passé.** Le même
 chantier se refait six mois plus tard : `projectCopy` (lib/duplicateDoc.js)
 reprend client, contact, résumé, notes, logistique, démontage, visite sur
@@ -1583,6 +1594,41 @@ serverless chez Vercel, avant la moindre requête à la base. Nous sommes deux �
 utiliser le logiciel et les écritures appellent déjà `mutate()`. La
 revalidation à la reconnexion reste, elle : là, le cache a pu manquer quelque
 chose.
+
+**La fiche projet lit tout par SWR.** Ses quatre lectures — le projet, ses
+tâches, ses fichiers, son fil — passaient par un `Promise.all` de `fetch` dans
+un `useEffect` : hors du cache, donc une page blanche à chaque arrivée sur
+l'écran le plus ouvert du logiciel. Deux gardes rendent le passage à SWR sûr,
+et ce ne sont pas des précautions de style — c'est par un rechargement mal
+gardé que deux offres ont été perdues (cf. `doitSemerOffreVierge`) :
+
+1. **`doitAppliquerProjet` compare `updated_at`** (`lib/ficheProjet.js`). SWR
+   rappelle, donc la même donnée arrive deux fois ; et une revalidation lancée
+   au montage peut se poser APRÈS un enregistrement, rapportant la version
+   d'AVANT. Une réponse plus ancienne que ce qui est affiché est ignorée. Les
+   six gestes qui reposent l'état renvoyé par la route dans `project` écrivent
+   aussi le cache (`mutate(project, false)`), pour que revenir sur la page ne
+   repeigne pas la version d'avant.
+2. **Les drapeaux `*Dirty` protègent la saisie en cours.** Logistique, visite
+   sur place et offre ne se re-dérivent que si rien n'est en attente.
+
+`offreDuProjet` renvoie `null` quand le projet n'a pas d'offre, et une offre
+même VIDE quand il en a une : seul le premier cas autorise à semer le modèle
+par défaut.
+
+**La fiche projet ne lit plus toutes les tâches de l'application.** Elle
+chargeait `/api/tasks` en entier — 51 Ko, jointures comprises — pour n'en
+garder que les siennes par un filtre côté client. `?project=<uuid>` fait le
+filtre en base : 1,1 Ko pour un projet qui a deux tâches. La forme de
+l'identifiant est vérifiée par la route, sinon un `?project=foo` partirait en
+erreur Postgres remontée en 500. `visibleTasks` s'applique après, inchangé :
+le filtre par projet n'est pas une porte dérobée vers les tâches privées d'un
+collègue, et un test le garde.
+
+**`useResponsibles` et `useQuoteDefaults` passent par SWR**, comme
+`useTransport` depuis toujours. Ces deux hooks faisaient un `fetch` nu : hors
+du cache, et refait par chacun des onze écrans qui les montent. Leur API
+publique n'a pas changé.
 
 **La barre latérale compte, elle ne liste pas.** Ses deux badges se
 déduisaient de `/api/projects?light=1` et `/api/tasks`, chargés sur CHAQUE
