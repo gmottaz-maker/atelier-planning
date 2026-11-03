@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { doitAppliquerProjet, offreDuProjet } from '../lib/ficheProjet'
+import { doitAppliquerProjet, offreDuProjet, estUnDevis } from '../lib/ficheProjet'
 
 const uid = () => 'i_test'
 
@@ -96,5 +96,32 @@ describe('offreDuProjet', () => {
     const r = offreDuProjet({ quote_data: { logistics: [{ _uid: 'g' }] } }, uid)
     expect(r.migree).toBe(true)
     expect(r.offre.items).toEqual([])
+  })
+})
+
+// Le bouton « enregistrer » passait l'évènement de clic là où `saveQuote`
+// attend un devis : `JSON.stringify` cassait sur ses références circulaires,
+// l'échec était avalé, et un brouillon ne s'enregistrait plus.
+describe('estUnDevis', () => {
+  it('reconnaît un devis à ses listes de lignes', () => {
+    expect(estUnDevis({ items: [] })).toBe(true)
+    expect(estUnDevis({ management: [{}] })).toBe(true)
+    expect(estUnDevis({ subcontracting: [] })).toBe(true)
+    expect(estUnDevis({ logistics: [] })).toBe(true)
+  })
+
+  it('refuse un évènement de clic', () => {
+    const evenement = { type: 'click', bubbles: true, nativeEvent: {}, target: {}, currentTarget: {} }
+    expect(estUnDevis(evenement)).toBe(false)
+  })
+
+  it('refuse ce qui n\'est pas un objet', () => {
+    for (const x of [undefined, null, 0, '', 'brouillon', true, []]) {
+      expect(estUnDevis(x)).toBe(false)
+    }
+  })
+
+  it('refuse un objet dont les clés de lignes ne sont pas des listes', () => {
+    expect(estUnDevis({ items: 'oui', status: 'brouillon' })).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { defaultQuote, doitSemerOffreVierge } from '../../lib/quoteDefaults'
-import { doitAppliquerProjet, offreDuProjet } from '../../lib/ficheProjet'
+import { doitAppliquerProjet, offreDuProjet, estUnDevis } from '../../lib/ficheProjet'
 import { useQuoteDefaults } from '../../lib/useQuoteDefaults'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
@@ -2227,7 +2227,9 @@ export default function ProjectPage() {
   // dans la foulée d'un changement, et l'état lu ici serait celui d'AVANT.
   // C'est ce décalage qui ferait repartir l'ancien statut vers la base.
   async function saveQuote(devis) {
-    const aEcrire = devis || quote
+    // `estUnDevis` et non `devis ||` : un `onClick={saveQuote}` passe
+    // l'évènement de clic à cette place, et c'est arrivé — voir la lib.
+    const aEcrire = estUnDevis(devis) ? devis : quote
     setQuoteSaving(true)
     try {
       const r = await fetch(`/api/projects/${id}`, {
@@ -3522,7 +3524,7 @@ export default function ProjectPage() {
                   {quoteExpanded && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       {quoteDirty && <span style={{ fontSize: 12, color: C.warning }}>non enregistré</span>}
-                      <ButtonPill onClick={saveQuote} disabled={!quoteDirty || quoteSaving} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
+                      <ButtonPill onClick={() => saveQuote()} disabled={!quoteDirty || quoteSaving} style={{ fontSize: 13, padding: '0.45rem 1rem' }}>
                         {quoteSaving ? 'enregistrement…' : 'enregistrer'}
                       </ButtonPill>
                       {/* Ces deux boutons ouvrent des pages qui relisent l'offre DEPUIS
