@@ -1897,9 +1897,18 @@ export default function ProjectPage() {
   // sinon la tuile resterait marquée ouverte au-dessus d'un titre seul.
   useEffect(() => { if (volet === 'visite' && !visitExpanded) setVolet(null) }, [volet, visitExpanded])
   useEffect(() => { if (volet === 'offre' && !quoteExpanded) setVolet(null) }, [volet, quoteExpanded])
-  const { data: presentationsListe } = useSWR(id ? `/api/projects/${id}/presentations` : null)
-  const { data: heuresTuile } = useSWR(id && isAdmin ? `/api/heures?project=${id}` : null)
-  const { data: activitesTuile } = useSWR(isAdmin ? '/api/activites' : null)
+  // Les tuiles n'appellent plus rien pour leurs chiffres.
+  //
+  // Trois requêtes partaient au montage pour garnir des tuiles FERMÉES : le
+  // nombre de présentations, les heures passées, et les activités qui servent
+  // à les valoriser. Trois allers-retours pour trois nombres que personne ne
+  // regarde avant d'avoir ouvert le dossier concerné — où ils se chargent de
+  // toute façon.
+  //
+  // Ce qui reste affiché est ce qui ne coûte RIEN : le total de l'offre et les
+  // heures offertes se calculent sur `quote`, déjà en mémoire. Les heures
+  // PASSÉES, elles, demandaient la base : elles apparaissent à l'ouverture de
+  // la tuile Rentabilité.
 
   // ── Les quatre lectures de la fiche ──────────────────────────────────────
   //
@@ -3202,16 +3211,15 @@ export default function ProjectPage() {
 
         {/* ── Les dossiers du projet, en tuiles ── */}
         {(() => {
-          const nbPres = Array.isArray(presentationsListe) ? presentationsListe.length : 0
           const totalOffre = totauxDevis(quote).total
           const offreVide = !totalOffre && (!quote.status || quote.status === 'brouillon')
           // Même règle que le filtre « offre à faire » : absente, brouillon ou
           // à corriger, la balle est chez nous.
           const offreAlerte = offreAFaire(quote) || quote.status === 'a_corriger'
-          // Heures offertes contre heures passées — les mêmes calculs que le
-          // tableau de rentabilité, pour que la tuile ne le contredise jamais.
+          // Les heures OFFERTES viennent de l'offre, déjà chargée : le même
+          // calcul que le tableau de rentabilité, pour que la tuile ne le
+          // contredise jamais.
           const hOffertes = prevuDevis(quote).heures
-          const hPassees = reelProjet([], Array.isArray(heuresTuile) ? heuresTuile : [], Array.isArray(activitesTuile) ? activitesTuile : []).heures
           const heuresTexte = n => `${String(Math.round(n * 10) / 10).replace('.', ',')}`
           const tuiles = [
             {
@@ -3227,13 +3235,13 @@ export default function ProjectPage() {
             },
             {
               cle: 'presentation', nom: 'Présentation',
-              valeur: nbPres ? String(nbPres) : '—',
-              sous: nbPres ? `présentation${nbPres > 1 ? 's' : ''} client` : 'aucune pour l’instant',
+              valeur: '—',
+              sous: 'support envoyé avec l’offre',
             },
             ...(isAdmin ? [{
               cle: 'rentabilite', nom: 'Rentabilité',
-              valeur: `${heuresTexte(hPassees)} / ${heuresTexte(hOffertes)} h`,
-              sous: 'heures passées / offertes',
+              valeur: hOffertes ? `${heuresTexte(hOffertes)} h` : '—',
+              sous: hOffertes ? 'heures offertes' : 'aucune heure à l’offre',
             }] : []),
           ]
           return <TuilesProjet tuiles={tuiles} volet={volet} onOuvrir={ouvrirVolet} />

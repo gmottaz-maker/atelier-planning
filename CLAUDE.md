@@ -1616,6 +1616,17 @@ gardé que deux offres ont été perdues (cf. `doitSemerOffreVierge`) :
 même VIDE quand il en a une : seul le premier cas autorise à semer le modèle
 par défaut.
 
+**Les tuiles de la fiche n'appellent rien pour leurs chiffres.** Trois
+requêtes partaient au montage pour garnir des tuiles FERMÉES : le nombre de
+présentations, les heures passées, et les activités qui servent à les
+valoriser. Trois allers-retours pour trois nombres que personne ne regarde
+avant d'avoir ouvert le dossier — où ils se chargent de toute façon. Ce qui
+reste affiché est ce qui ne coûte rien : le total de l'offre et les heures
+OFFERTES se calculent sur `quote`, déjà en mémoire. Décidé le 3 novembre 2026,
+badges sans chiffre assumés. **Ajouter un chiffre sur une tuile fermée, c'est
+rajouter une requête au montage** — la question à se poser est si on le
+regarde avant d'ouvrir.
+
 **La fiche projet ne lit plus toutes les tâches de l'application.** Elle
 chargeait `/api/tasks` en entier — 51 Ko, jointures comprises — pour n'en
 garder que les siennes par un filtre côté client. `?project=<uuid>` fait le
