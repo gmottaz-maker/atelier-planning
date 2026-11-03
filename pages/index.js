@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import { useRafraichirCompteurs } from '../lib/swr'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
 import { quoteStatusMeta, quoteStripe, offreAFaire, categorieOffre, compterOffres, CATEGORIES_OFFRE } from '../lib/quoteStatus'
 import { TYPES_LIVRAISON, chercherProjets } from '../lib/projectHelpers'
 import Link from 'next/link'
@@ -817,6 +818,7 @@ export default function Admin() {
   const { user, signOut } = useAuth()
   const { responsibles } = useResponsibles()
 
+  const router = useRouter()
   // Données via SWR : affichage instantané depuis le cache + revalidation auto
   const { data: projects = [], isLoading: projectsLoading, mutate: mutateProjects } = useSWR('/api/projects?light=1')
   const { data: tasks = [], mutate: mutateTasks } = useSWR('/api/tasks')
@@ -968,6 +970,44 @@ export default function Admin() {
     })
     showFeedback('Projet restauré')
     fetchProjects()
+  }
+
+  // Dupliquer un projet ARCHIVÉ sans le réveiller.
+  //
+  // Le même chantier revient six mois plus tard : le modèle est dans
+  // l'archive. Il fallait jusqu'ici le restaurer, ouvrir sa fiche, dupliquer,
+  // puis le réarchiver — quatre gestes dont trois n'ont aucun rapport avec ce
+  // qu'on veut, et un projet terminé qui repasse en cours entre-temps. La
+  // route de duplication, elle, n'a jamais eu besoin de ça : elle LIT la
+  // source et insère une copie active. L'original ne bouge pas.
+  const [copieEnCours, setCopieEnCours] = useState(null)
+  async function dupliquerArchive(project) {
+    const nom = prompt('Nom du nouveau projet ?', `${project.name} (copie)`)
+    if (!nom || !nom.trim()) return
+    if (!confirm(
+      `Créer « ${nom.trim()} » à partir de ce projet archivé ?\n\n`
+      + 'Sont repris : client, contact, résumé, notes, logistique, démontage, '
+      + 'visite sur place et toute l\'offre (en brouillon, sans numéro).\n\n'
+      + 'Ne suivent pas : le dossier kDrive, la référence client, la synthèse, '
+      + 'la phase — ni les tâches, fichiers, heures et coûts, qui sont le '
+      + 'travail fait sur CE chantier.\n\n'
+      + `« ${project.name} » reste archivé.`
+    )) return
+
+    setCopieEnCours(project.id)
+    try {
+      const r = await fetch(`/api/projects/${project.id}/dupliquer`, {
+        method: 'POST',
+        headers: actorHeaders(),
+        body: JSON.stringify({ name: nom.trim() }),
+      })
+      const copie = await r.json()
+      if (!r.ok || copie?.error) throw new Error(copie?.error || `Requête échouée (${r.status})`)
+      router.push(`/projects/${copie.id}`)
+    } catch (e) {
+      alert(`Duplication impossible : ${e.message}`)
+      setCopieEnCours(null)
+    }
   }
 
   function handleEdit(project) {
@@ -1658,6 +1698,8 @@ export default function Admin() {
                       <span style={{ fontSize: 12, color: C.muted }}>{formatDate(project.deadline)}</span>
                     </div>
                     <ProjectActionsMenu items={[
+                      { label: copieEnCours === project.id ? 'duplication…' : 'dupliquer',
+                        onClick: () => dupliquerArchive(project) },
                       { label: 'restaurer', onClick: () => handleRestore(project) },
                       { label: 'supprimer', onClick: () => handleDelete(project), danger: true },
                     ]} />
