@@ -919,6 +919,21 @@ temps de conduite (51) au coût de revient ; la marge réelle du projet compte
 aussi les véhicules. Les coûts des véhicules sont une clé `app_settings`
 lisible par l'ADMIN seul (`CLES_ADMIN`) ; les noms et forfaits, par tous.
 
+**Un véhicule vendu est MARQUÉ vendu, il ne se retire pas.** Le retirer des
+réglages effaçait aussi son coût, et les trajets déjà faits avec lui
+retombaient au coût moyen de la flotte — le Vito à 0,53 CHF/km compté au prix
+du Master : la rentabilité de chantiers TERMINÉS changeait. Vendu, il reste
+dans `app_settings.transport` avec son coût, et trois choses en découlent :
+il n'est plus proposé sur une ligne km ou forfait SAUF celle qui le porte déjà
+(`vehiculesChoisissables` — sinon le menu l'effacerait d'une offre déjà faite
+au premier coup d'œil) ; il sort de la moyenne de la flotte, qui chiffre les
+lignes sans véhicule, parce qu'une ligne chiffrée aujourd'hui ne roulera pas
+dedans ; il sort de la marge au km, qui simule des trajets à venir. Case
+« vendu » sous chaque véhicule dans Réglages → Transport. Seul `vendu === true`
+compte, jamais une chaîne. Le Vito a été vendu le 26 octobre 2026 ; sa case
+n'est à cocher qu'après déploiement, et `lib/assurances.js` le cite encore sur
+les polices Smile — à reprendre à la main après résiliation.
+
 **La rentabilité compare au prix de REVIENT** (`lib/rentabilite.js`, bloc admin
 en bas de la fiche projet). Le prévu se lit sur l'offre AVANT marge et escompte
 — prix d'achat × quantité, tarif de sous-traitance × quantité — parce que c'est
@@ -1615,6 +1630,18 @@ gardé que deux offres ont été perdues (cf. `doitSemerOffreVierge`) :
 `offreDuProjet` renvoie `null` quand le projet n'a pas d'offre, et une offre
 même VIDE quand il en a une : seul le premier cas autorise à semer le modèle
 par défaut.
+
+**`saveQuote(devis)` ne se branche jamais nu sur un `onClick`.** Le paramètre
+existe parce que le changement de statut enregistre dans la foulée d'un
+`setQuote` pas encore appliqué. Mais `onClick={saveQuote}` passe l'ÉVÈNEMENT
+DE CLIC à cette place : `JSON.stringify` casse sur ses références circulaires,
+l'échec est avalé par le `catch` de la fonction, et l'offre reste « non
+enregistrée » sans qu'un seul message le dise. Les brouillons ne
+s'enregistraient plus qu'en passant l'offre en « envoyé », seul autre chemin à
+fournir un vrai devis — trois jours en production, du 27 au 30 octobre 2026.
+`estUnDevis` (`lib/ficheProjet.js`) ferme le genre de faute, parce qu'elle est
+MUETTE. La règle générale : un gestionnaire dont le premier paramètre n'est pas
+l'évènement s'enveloppe (`onClick={() => f()}`).
 
 **Les tuiles de la fiche n'appellent rien pour leurs chiffres.** Trois
 requêtes partaient au montage pour garnir des tuiles FERMÉES : le nombre de
