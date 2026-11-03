@@ -151,6 +151,52 @@ describe('tâches privées', () => {
   })
 })
 
+// `?project=` : la fiche projet lisait TOUTES les tâches pour n'en garder que
+// les siennes. Le filtre est maintenant fait par la base — et il ne doit pas
+// servir de porte dérobée aux tâches privées d'un collègue.
+describe('tâches — filtre par projet', () => {
+  const PA = '4cba234d-250c-44eb-aadc-179557ba6293'
+  const PB = '11111111-2222-3333-4444-555555555555'
+  const taches = [
+    { id: 't1', title: 'Projet A',        project_id: PA, is_private: false, responsible: 'Arnaud', status: 'active' },
+    { id: 't2', title: 'Projet B',        project_id: PB, is_private: false, responsible: 'Arnaud', status: 'active' },
+    { id: 't3', title: 'Privée Arnaud A', project_id: PA, is_private: true,  responsible: 'Arnaud', status: 'active' },
+  ]
+
+  it('ne renvoie que les tâches du projet demandé', async () => {
+    sous(ADMIN, { tasks: taches })
+    const res = await appeler(await import('../pages/api/tasks/index'), {
+      method: 'GET', query: { project: PA },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.body.map(t => t.title)).toEqual(['Projet A', 'Privée Arnaud A'])
+  })
+
+  it('applique quand même la règle des tâches privées', async () => {
+    sous(MEMBRE, { tasks: taches })            // Gabin
+    const res = await appeler(await import('../pages/api/tasks/index'), {
+      method: 'GET', query: { project: PA },
+    })
+    expect(res.body.map(t => t.title)).toEqual(['Projet A'])
+  })
+
+  // La colonne est de type uuid : sans ce contrôle, `?project=foo` partait en
+  // erreur Postgres remontée en 500 alors que c'est la requête qui est fausse.
+  it('refuse un identifiant qui n\'est pas un uuid', async () => {
+    sous(ADMIN, { tasks: taches })
+    const res = await appeler(await import('../pages/api/tasks/index'), {
+      method: 'GET', query: { project: 'foo' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('sans paramètre, renvoie tout — les autres écrans en dépendent', async () => {
+    sous(ADMIN, { tasks: taches })
+    const res = await appeler(await import('../pages/api/tasks/index'), { method: 'GET' })
+    expect(res.body).toHaveLength(3)
+  })
+})
+
 describe('fichiers kDrive', () => {
   const charger = () => import('../pages/api/kdrive/download')
 

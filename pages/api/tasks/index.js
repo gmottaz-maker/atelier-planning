@@ -4,6 +4,8 @@ import { visibleTasks, resolvePrivateOwner } from '../../../lib/taskAccess'
 import * as todoist from '../../../lib/todoist'
 import { erreurApi } from '../../../lib/apiError'
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 async function logActivity(supabase, actor, action, task) {
   if (!actor) return
   await supabase.from('activity_log').insert({
@@ -23,9 +25,23 @@ export default async function handler(req, res) {
   const actor = user.name
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
+    // `?project=<uuid>` : le filtre est fait par la BASE. La fiche projet
+    // lisait toutes les tâches de l'application — 51 Ko — pour n'en garder
+    // que les siennes, et le tri côté client cachait ce gâchis.
+    //
+    // La forme de l'identifiant est vérifiée ici : la colonne est de type
+    // uuid, et un `?project=foo` partirait sinon en erreur Postgres remontée
+    // en 500 alors que c'est la requête qui est mauvaise.
+    const projet = String(req.query.project || '')
+    if (projet && !UUID.test(projet)) {
+      return res.status(400).json({ error: 'Identifiant de projet invalide' })
+    }
+
+    let requete = supabase
       .from('tasks')
       .select('*, projects(id, name, color_override)')
+    if (projet) requete = requete.eq('project_id', projet)
+    const { data, error } = await requete
       .order('execution_date', { ascending: true })
       .order('created_at', { ascending: true })
 

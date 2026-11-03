@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { defaultQuote, doitSemerOffreVierge } from '../../lib/quoteDefaults'
+import { doitAppliquerProjet, offreDuProjet } from '../../lib/ficheProjet'
 import { useQuoteDefaults } from '../../lib/useQuoteDefaults'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
@@ -1900,75 +1901,68 @@ export default function ProjectPage() {
   const { data: heuresTuile } = useSWR(id && isAdmin ? `/api/heures?project=${id}` : null)
   const { data: activitesTuile } = useSWR(isAdmin ? '/api/activites' : null)
 
-  // ── Load data ────────────────────────────────────────────────────────────
+  // ── Les quatre lectures de la fiche ──────────────────────────────────────
+  //
+  // Elles passaient par un `Promise.all` de quatre `fetch` : hors du cache
+  // SWR, donc une page blanche à chaque arrivée le temps de quatre
+  // allers-retours — sur la page la plus ouverte du logiciel. Par SWR,
+  // l'écran se peint depuis le cache de l'onglet, puis la version fraîche
+  // prend la place.
+  //
+  // `?project=` est nouveau : la fiche lisait TOUTES les tâches de
+  // l'application pour n'en garder que les siennes.
+  const { data: projetBrut, error: projetErreur, mutate: majCacheProjet } = useSWR(id ? `/api/projects/${id}` : null)
+  const { data: tachesBrutes }   = useSWR(id ? `/api/tasks?project=${id}` : null)
+  const { data: fichiersBruts }  = useSWR(id ? `/api/projects/${id}/files` : null)
+  const { data: filBrut }        = useSWR(id ? `/api/projects/${id}/updates` : null)
+
+  // Trois listes sans dérivation : elles se recopient telles quelles. Les
+  // gestes de l'écran continuent de les mettre à jour directement, et SWR ne
+  // relance plus rien de lui-même depuis qu'on ne revalide plus au focus.
+  useEffect(() => { if (Array.isArray(tachesBrutes))  setTasks(tachesBrutes) },    [tachesBrutes])
+  useEffect(() => { if (Array.isArray(fichiersBruts)) setFiles(fichiersBruts) },   [fichiersBruts])
+  useEffect(() => { if (Array.isArray(filBrut))       setUpdates(filBrut) },       [filBrut])
+
   useEffect(() => {
-    if (!id || !currentUser) return
-    Promise.all([
-      fetch(`/api/projects/${id}`).then(r => r.json()),
-      fetch('/api/tasks', { headers: { 'x-actor': currentUser } }).then(r => r.json()),
-      fetch(`/api/projects/${id}/files`).then(r => r.json()),
-      fetch(`/api/projects/${id}/updates`).then(r => r.json()),
-    ]).then(([proj, allTasks, fileList, updateList]) => {
-      if (Array.isArray(updateList)) setUpdates(updateList)
-      if (proj && !proj.error) {
-        setProject(proj)
-        setLogistics(initLogistics(proj))
-        if (proj.site_visit_data && Object.keys(proj.site_visit_data).length > 0) {
-          setSiteVisit(v => ({ ...v, ...proj.site_visit_data }))
-          setVisitExpanded(true)
-        }
-        if (proj.site_visit_summary) setVisitSummary(proj.site_visit_summary)
-        if (proj.quote_data) {
-          const q = proj.quote_data
-          // Nouveau format : { management, items, subcontracting, logistics }
-          if (Array.isArray(q.items) || Array.isArray(q.management)) {
-            const totalLines = (q.management?.length || 0) + (q.items?.length || 0)
-              + (q.subcontracting?.length || 0) + (q.logistics?.length || 0)
-            if (totalLines > 0) {
-              setQuote({
-                management:     q.management || [],
-                items:          q.items || [],
-                subcontracting: q.subcontracting || [],
-                logistics:      q.logistics || [],
-                general_margin: q.general_margin ?? '',
-                status:         q.status || 'brouillon',
-                number:         q.number || '',
-              })
-              offreVierge.current = false
-              setQuoteExpanded(true)
-            }
-          // Migration silencieuse depuis l'ancien format { purchases, labor, logistics }
-          } else if (q.purchases?.length || q.labor?.length || q.logistics?.length) {
-            const migrated = {
-              management: [],
-              items: (q.purchases?.length || q.labor?.length)
-                ? [{
-                    _uid: `i_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-                    name: 'Général',
-                    purchases: q.purchases || [],
-                    labor:     q.labor || [],
-                  }]
-                : [],
-              subcontracting: [],
-              logistics: q.logistics || [],
-              general_margin: '',
-              status: q.status || 'brouillon',
-              number: q.number || '',
-            }
-            setQuote(migrated)
-            offreVierge.current = false
-            setQuoteDirty(true)  // forcer un re-save dans le nouveau format
-            setQuoteExpanded(true)
-          }
-        }
+    if (projetBrut !== undefined || projetErreur) setLoading(false)
+  }, [projetBrut, projetErreur])
+
+  // Six gestes de la fiche reposent dans `project` l'état renvoyé par la route
+  // après un PUT. Le cache SWR doit suivre : sans ça, revenir sur la page
+  // repeindrait la version d'AVANT l'enregistrement, le temps d'une
+  // revalidation. `false` écrit le cache sans relancer de requête.
+  useEffect(() => {
+    if (project?.id) majCacheProjet(project, false)
+  }, [project, majCacheProjet])
+
+  // Le projet, lui, se DÉRIVE : logistique, visite sur place et offre en
+  // découlent. Deux gardes, et ni l'une ni l'autre n'est décorative :
+  // `doitAppliquerProjet` refuse une réponse plus ancienne que ce qui est
+  // affiché (une revalidation qui se pose après un enregistrement), et les
+  // drapeaux `*Dirty` protègent ce qui est en cours de saisie.
+  useEffect(() => {
+    if (!doitAppliquerProjet({ arrivant: projetBrut, courant: project })) return
+    const proj = projetBrut
+    setProject(proj)
+    if (!logisticsDirty) setLogistics(initLogistics(proj))
+    if (!visitDirty) {
+      if (proj.site_visit_data && Object.keys(proj.site_visit_data).length > 0) {
+        setSiteVisit(v => ({ ...v, ...proj.site_visit_data }))
+        setVisitExpanded(true)
       }
-      if (Array.isArray(allTasks)) {
-        setTasks(allTasks.filter(t => String(t.project_id) === String(id)))
+      if (proj.site_visit_summary) setVisitSummary(proj.site_visit_summary)
+    }
+    if (!quoteDirty) {
+      const lu = offreDuProjet(proj)
+      if (lu) {
+        setQuote(lu.offre)
+        offreVierge.current = false
+        setQuoteExpanded(true)
+        // Ancien format relu : il faut le réécrire au format courant.
+        if (lu.migree) setQuoteDirty(true)
       }
-      if (Array.isArray(fileList)) setFiles(fileList)
-    }).catch(console.error)
-    .finally(() => setLoading(false))
-  }, [id, currentUser])
+    }
+  }, [projetBrut, project, logisticsDirty, visitDirty, quoteDirty])
 
   // Charger l'aperçu kDrive dès que le projet est chargé
   useEffect(() => {
@@ -2027,10 +2021,9 @@ export default function ProjectPage() {
 
   // Synchronise les tâches associées aux points logistiques (1 tâche par personne assignée)
   async function syncLogisticsTasks(currentItems) {
-    const tasksRes = await fetch('/api/tasks', { headers: { 'x-actor': currentUser } }).then(r => r.json()).catch(() => null)
+    const tasksRes = await fetch(`/api/tasks?project=${id}`).then(r => r.json()).catch(() => null)
     if (!Array.isArray(tasksRes)) return
     const existingLogTasks = tasksRes.filter(t =>
-      String(t.project_id) === String(id) &&
       t.category === 'logistique' &&
       t.category_data?.source_logistics_uid
     )
@@ -2090,10 +2083,8 @@ export default function ProjectPage() {
 
     // Recharger les tâches de ce projet
     try {
-      const fresh = await fetch('/api/tasks', { headers: { 'x-actor': currentUser } }).then(r => r.json())
-      if (Array.isArray(fresh)) {
-        setTasks(fresh.filter(t => String(t.project_id) === String(id)))
-      }
+      const fresh = await fetch(`/api/tasks?project=${id}`).then(r => r.json())
+      if (Array.isArray(fresh)) setTasks(fresh)
     } catch (_) {}
   }
 
