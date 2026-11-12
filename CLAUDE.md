@@ -92,7 +92,11 @@ pages/
     accounts.js, catalog.js, contacts.js, email-templates.js, work-*.js, …
 
 components/
-  Sidebar.js · BottomNav.js · NavBar.js  — Navigation (desktop / mobile / en-tête)
+  nav/Navigation.js      — LE RAIL : navigation de bureau (Sidebar.js n'en est qu'un alias)
+  nav/Recherche.js · nav/icones.js · nav/styles.js — Recherche ⌘K, icônes, styles du rail
+  BottomNav.js · NavBar.js — Navigation mobile / en-tête
+  fiche/*.js             — Briques de la nouvelle fiche projet (Haut, Offre, Taches,
+                           Dossiers, Flux) — voir Navigation, pages d'essai
   ApiErrorBanner.js      — Bandeau des mutations API en échec (monté dans _app)
   QuoteEditor.js         — Éditeur d'offre groupé, PARTAGÉ offre + facture
   QtyInput.js            — Champ quantité (pas de 0.5, premier cran à 1)
@@ -300,8 +304,8 @@ comptabilité. Chaque outil est autonome. Pour en ajouter un : une page sous
 `pages/outils/`, une entrée dans la liste de `pages/outils/index.js`, et le
 calcul dans `lib/` pour qu'il soit testable.
 
-Entrée `Outils` dans `MAIN_ITEMS` de `components/Sidebar.js`. Pas d'entrée dans
-`BottomNav` (nav mobile volontairement courte).
+Entrée `Outils` dans la rubrique `travail` de `lib/navigation.js`. Le rail, la
+barre du bas et la recherche ⌘K la reprennent sans rien à ajouter ailleurs.
 
 ### Peintures RUCO (`/outils/peintures`)
 
@@ -722,9 +726,9 @@ n'y figurait pas était injoignable depuis un téléphone — heures, activité,
 outils (donc l'économat et l'annuaire), contacts, catalogue, stockage, offres,
 factures, banque, compta. Dix-huit pages. Elle porte maintenant QUATRE entrées
 (accueil, projets, tâches, horaires) et un « plus » qui ouvre la MÊME liste que
-la sidebar, **importée d'elle** (`MAIN_ITEMS`, `FIN_TOP`, `FIN_GROUPS`) et non
-recopiée : deux listes de navigation divergent au premier ajout, et c'est
-exactement comme ça que l'économat est né sans entrée mobile.
+le rail, **lue dans `lib/navigation.js`** (`RUBRIQUES`) et non recopiée : deux
+listes de navigation divergent au premier ajout, et c'est exactement comme ça
+que l'économat est né sans entrée mobile.
 
 **`u-tactile` agrandit la ZONE sans agrandir le DESSIN** (`globals.css`). Un
 pseudo-élément centré de 44 px capte le doigt ; l'élément garde sa taille et la
@@ -1110,15 +1114,34 @@ commentaire que l'annulation ignore.
 
 ## Navigation — où va quoi
 
-La sidebar a quatre zones, et leur ordre dit la fréquence :
+**Une seule liste d'écrans, `lib/navigation.js`** (`RUBRIQUES`). Le rail de
+bureau, la barre du bas du téléphone ET la recherche ⌘K la lisent toutes :
+deux listes de navigation divergent au premier ajout, et c'est exactement
+comme ça que dix-huit pages étaient devenues injoignables au doigt.
+
+Les rubriques suivent la fréquence :
 
 ```
-accueil · projets · tâches · agenda · meeting · outils     ce qu'on ouvre en travaillant
-MON TEMPS            horaires · heures · frais             ce que chacun saisit pour soi
-FINANCES CLIENTS     …                                     (admin)
-FINANCES INTERNES    …                                     (admin)
-REPORTING            charge de l'atelier · journal         ce qu'on regarde (admin)
+travail           accueil · projets · tâches · agenda · réunion · outils
+Mon temps         horaires · heures · frais        ce que chacun saisit pour soi
+Gestion           tableau de bord · contacts · prospects · catalogue · stockage   (admin)
+Finances clients  offres · factures sortantes      (admin)
+Finances internes factures entrantes · justificatifs · banque · compta            (admin)
+Reporting         charge de l'atelier · journal    ce qu'on regarde (admin)
 ```
+
+**Le rail a remplacé la barre latérale le 12 novembre 2026.** Quatre-vingt-huit
+pixels sombres, une icône et un mot par écran ; les rubriques moins fréquentes
+et le compte s'ouvrent dans un volet à côté. Retenu le 23 octobre contre une
+colonne blanche et une barre en haut : le plus compact, et la page garde
+presque toute sa largeur sur un treize pouces. `components/Sidebar.js` n'est
+plus qu'un alias de `components/nav/Navigation.js` — `_app.js` monte le rail
+par ce nom et décale le contenu de `SIDEBAR_WIDTH`.
+
+**Le rail est monté sur CHAQUE page : ce qu'il lit, il le lit partout.** Ses
+compteurs passent par `/api/compteurs`, et la liste complète des projets n'est
+chargée qu'à l'ouverture de ⌘K (voir « la barre latérale compte, elle ne liste
+pas »). Y ajouter une lecture, c'est l'ajouter à toutes les pages.
 
 **Agenda, horaires et heures étaient côte à côte dans la liste plate** : trois
 mots qui disent « temps » sans dire lequel, et qu'il fallait ouvrir pour s'en
@@ -1140,9 +1163,28 @@ rapprochement, comptes, export. **Supprimer le dépôt plutôt que le déplacer
 aurait retiré à un membre sa seule façon de rendre un ticket** — `/api/expenses`
 ramène un non-admin à son propre nom, mais encore faut-il un écran.
 
-**Tout écran retiré de `MAIN_ITEMS` doit figurer dans un groupe repris par
-`BottomNav`**, sinon il devient inatteignable au doigt : la barre du bas est la
-seule navigation sous 768 px, et dix-huit pages avaient déjà disparu ainsi.
+**Un écran qui n'est pas dans `RUBRIQUES` n'existe pas au doigt.** La barre du
+bas est la seule navigation sous 768 px ; elle montre quatre entrées et un
+« plus » qui ouvre la MÊME liste. Dix-huit pages avaient disparu ainsi quand
+les deux barres portaient chacune la sienne.
+
+**Les écrans redessinés vivent sous `…/essai`**, à côté des actuels, depuis le
+déploiement du 12 novembre 2026 : `/projects/essai`, `/projects/[id]/essai`,
+`/home/essai`, `/tasks/essai`, `/agenda/essai`, `/meeting/essai`,
+`/outils/essai` et les quatre outils admin. `PAGES_ESSAI` (`lib/navigation.js`)
+y mène, chaque page d'essai garde un lien vers l'ancienne, et les deux écrivent
+dans la MÊME base. À retirer quand les essais remplaceront les pages — c'est
+la bascule, et elle n'est pas faite.
+
+**`projects.statut` est une colonne SÉPARÉE de `phase`**
+(`schema-projet-statut.sql`). La nouvelle fiche l'écrit, l'application actuelle
+lit toujours `phase` : un statut posé en essai n'apparaît donc ni dans la liste
+actuelle, ni dans la charge de l'atelier, ni sur l'écran mural. C'est ce qui
+rend la bascule possible sans rien casser — et ce qu'il faudra réconcilier le
+jour où elle se fait. Seuls les statuts que personne ne peut déduire sont
+stockés (`production`, `production_terminee`, `exploitation`, `termine`) ;
+NULL veut dire « déduit » — préparation tant que l'offre n'est pas acceptée,
+pré-production dès qu'elle l'est.
 
 **La pointeuse n'existe plus** (`clock_sessions`, `/api/clock-session`,
 pointage arrivée/départ). Rien ne fermait jamais une session : au 5 octobre
