@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem, deplacerLigne, libelleEscompte,
+import { lignesDevis, totauxDevis, normaliserDevis, copierItem, totalItem, deplacerLigne, deplacerVers, libelleEscompte,
   evenementsLogistiques,
   totalEvenement,
   copierEvenement,
@@ -532,5 +532,26 @@ describe('événements logistiques', () => {
     expect(copie.lignes[0].rate).toBe(3)
     // L'originale n'a pas bougé.
     expect(ev.lignes[0]._uid).toBe('r1')
+  })
+})
+
+describe('glisser-déposer', () => {
+  const l = ['a', 'b', 'c', 'd']
+  it('descend un élément avant une position plus loin', () => {
+    expect(deplacerVers(l, 0, 3)).toEqual(['b', 'c', 'a', 'd'])
+    expect(deplacerVers(l, 0, 4)).toEqual(['b', 'c', 'd', 'a'])
+  })
+  it('monte un élément', () => {
+    expect(deplacerVers(l, 3, 0)).toEqual(['d', 'a', 'b', 'c'])
+    expect(deplacerVers(l, 2, 1)).toEqual(['a', 'c', 'b', 'd'])
+  })
+  it('déposé sur place, ne change rien et rend le même tableau', () => {
+    expect(deplacerVers(l, 1, 1)).toBe(l)
+    expect(deplacerVers(l, 1, 2)).toBe(l)
+  })
+  it('hors bornes, ne perd ni ne duplique rien', () => {
+    expect(deplacerVers(l, -1, 2)).toBe(l)
+    expect(deplacerVers(l, 1, 5)).toBe(l)
+    expect(deplacerVers(null, 0, 1)).toBe(null)
   })
 })

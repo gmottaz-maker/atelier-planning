@@ -1815,6 +1815,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-invoice-reference.sql` | `customer_invoices.reference` (réf. propre à la facture) | en fin de fichier |
 | `schema-economat.sql` | tables `economat_categories`, `economat_fournisseurs`, `economat_articles`, `economat_commandes` + arbre, couleurs et fournisseurs de départ | en fin de fichier |
 | `schema-acomptes.sql` | `customer_invoices.type`, `acompte_base`, `acompte_valeur`, `acomptes_deduits` | en fin de fichier |
+| `schema-projet-statut.sql` | `projects.statut` (nouvelle fiche : production → terminé ; colonne SÉPARÉE de `phase`) | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.

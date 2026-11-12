@@ -859,6 +859,16 @@ export default function Admin() {
     if (offre === 'tous' || CATEGORIES_OFFRE.some(c => c.key === offre)) setFiltreOffre(offre)
   }, [])
 
+  // « Nouveau projet » depuis la liste d'essai (/projects/essai) arrive ici :
+  // le formulaire de création reste celui de cette page.
+  const routeur = useRouter()
+  useEffect(() => {
+    if (routeur.query.nouveau !== '1') return
+    resetForm()
+    setShowForm(true)
+    routeur.replace('/', undefined, { shallow: true })
+  }, [routeur.query.nouveau]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function changeFiltreOffre(cle) {
     setFiltreOffre(cle)
     if (typeof window !== 'undefined') localStorage.setItem('projectsFiltreOffre', cle)

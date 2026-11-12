@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { champsSousTraitance, majSousTraitance } from '../lib/sousTraitance'
+import { champsSousTraitance, majSousTraitance, etatSousTraitance, nouvelleSousTraitance, pretARecuperer, recupere, rouvrirSousTraitance, tacheRecuperation } from '../lib/sousTraitance'
 
 const tache = {
   id: 12,
@@ -99,5 +99,32 @@ describe('majSousTraitance', () => {
     })
     expect(maj.category_data.subcontractor).toBe(null)
     expect(maj.category_data.drop_date).toBe(null)
+  })
+})
+
+
+describe('cycle d’une sous-traitance (nouvelle fiche)', () => {
+  const tache = { id: 9, project_id: 'p1', title: 'Découpe panneaux', status: 'active', category_data: { subcontractor: 'Tôle Factory', drop_date: '2026-10-20' } }
+  it('se crée avec la récupération prévue comme date d’exécution', () => {
+    const b = nouvelleSousTraitance({ title: 'Découpe', subcontractor: ' Tôle Factory ', drop_date: '2026-10-20', expected_pickup_date: '2026-10-30', responsible: 'Arnaud' }, 'p1')
+    expect(b).toMatchObject({ title: 'Découpe', execution_date: '2026-10-30', category: 'sous_traitance' })
+    expect(b.category_data.subcontractor).toBe('Tôle Factory')
+  })
+  it('passe de chez le sous-traitant à prête, puis à l’atelier', () => {
+    expect(etatSousTraitance(tache)).toBe('chez')
+    expect(etatSousTraitance({ ...tache, category_data: { ready_at: '2026-10-22' } })).toBe('pret')
+    expect(etatSousTraitance({ ...tache, status: 'completed' })).toBe('atelier')
+  })
+  it('prête : une tâche de récupération pour Arnaud, liée à la sous-traitance', () => {
+    expect(tacheRecuperation(tache, '2026-10-22')).toEqual({
+      title: 'Récupérer Découpe panneaux chez Tôle Factory', responsible: 'Arnaud', execution_date: '2026-10-22',
+      project_id: 'p1', category: 'logistique', category_data: { source_task_id: 9, kind: 'pickup' },
+    })
+    expect(pretARecuperer(tache, { qui: 'Guillaume', jour: '2026-10-22', recuperationId: 12 }).category_data)
+      .toEqual({ subcontractor: 'Tôle Factory', drop_date: '2026-10-20', ready_at: '2026-10-22', ready_by: 'Guillaume', pickup_task_id: 12 })
+  })
+  it('récupérée : rangée, l’historique gardé ; rouvrir efface tout l’avancement', () => {
+    expect(recupere(tache, { lieu: 'Entrée', qui: 'Arnaud', jour: '2026-10-23' })).toMatchObject({ status: 'completed', category_data: { subcontractor: 'Tôle Factory', storage_location: 'Entrée' } })
+    expect(rouvrirSousTraitance(tache).category_data).toMatchObject({ subcontractor: 'Tôle Factory', ready_at: null, picked_up_at: null, pickup_task_id: null })
   })
 })
