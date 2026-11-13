@@ -1171,10 +1171,18 @@ les deux barres portaient chacune la sienne.
 **Les écrans redessinés vivent sous `…/essai`**, à côté des actuels, depuis le
 déploiement du 12 novembre 2026 : `/projects/essai`, `/projects/[id]/essai`,
 `/home/essai`, `/tasks/essai`, `/agenda/essai`, `/meeting/essai`,
-`/outils/essai` et les quatre outils admin. `PAGES_ESSAI` (`lib/navigation.js`)
-y mène, chaque page d'essai garde un lien vers l'ancienne, et les deux écrivent
-dans la MÊME base. À retirer quand les essais remplaceront les pages — c'est
-la bascule, et elle n'est pas faite.
+`/outils/essai` et les quatre outils admin. Chaque page d'essai garde un lien
+vers l'ancienne, et les deux écrivent dans la MÊME base.
+
+**Le rail n'y mène PLUS** (`ESSAIS_DANS_LA_NAV = false`, 13 novembre 2026).
+Il l'a fait un jour, et c'était l'erreur : `lienDe` renvoyait toute entrée
+principale vers sa version d'essai, donc cliquer « Projets » menait au nouveau
+design. Le redesign devenait l'interface de travail sans que personne l'ait
+décidé — et son éditeur d'offre n'est pas utilisable. Les essais restent
+joignables à la main (`/projects/essai`, …), `PAGES_ESSAI` reste écrite, et
+c'est ce seul drapeau qui fera la bascule le jour où elle sera méritée.
+
+Du redesign, **seul le rail a remplacé l'existant**, et il est retenu.
 
 **`projects.statut` est une colonne SÉPARÉE de `phase`**
 (`schema-projet-statut.sql`). La nouvelle fiche l'écrit, l'application actuelle

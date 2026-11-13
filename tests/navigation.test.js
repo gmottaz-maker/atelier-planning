@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { RUBRIQUES, chercher, estActif, lienDe, rubriqueActive, rubriquesVisibles } from '../lib/navigation'
+import { RUBRIQUES, chercher, estActif, lienDe, rubriqueActive, rubriquesVisibles, PAGES_ESSAI, ESSAIS_DANS_LA_NAV } from '../lib/navigation'
 
 const item = href => RUBRIQUES.flatMap(r => r.items).find(i => i.href === href)
 
@@ -12,9 +12,19 @@ describe('navigation', () => {
     expect(estActif(item('/outils'), '/peintures')).toBe(true)
     expect(estActif(item('/outils'), '/outils/economat')).toBe(true)
   })
-  it('mène aux pages d’essai pendant la refonte', () => {
-    expect(lienDe('/tasks')).toBe('/tasks/essai')
+  // Décidé le 13 novembre 2026 : le rail mène aux pages ACTUELLES. Le
+  // redesign reste déployé et joignable à la main, mais l'éditeur d'offre n'y
+  // est pas utilisable, et une navigation qui y menait partout en faisait le
+  // défaut sans que personne l'ait décidé.
+  it('mène aux pages actuelles, pas aux essais', () => {
+    expect(lienDe('/tasks')).toBe('/tasks')
+    expect(lienDe('/')).toBe('/')
     expect(lienDe('/heures')).toBe('/heures')
+  })
+  // La table reste, c'est elle qui fera la bascule le jour venu.
+  it('garde la correspondance vers les essais, pour la bascule', () => {
+    expect(PAGES_ESSAI['/tasks']).toBe('/tasks/essai')
+    expect(ESSAIS_DANS_LA_NAV).toBe(false)
   })
   it('cache la gestion à un membre, et trouve la rubrique ouverte', () => {
     expect(rubriquesVisibles(false).map(r => r.cle)).toEqual(['travail', 'temps'])
