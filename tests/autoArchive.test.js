@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { moisRevolu, offreArchivee, factureArchivee } from '../lib/autoArchive'
+import { moisRevolu, offreArchivee, factureArchivee, peutArchiver } from '../lib/autoArchive'
 
 // Référence fixe : 24 août 2026. Sans date fixe, ces tests deviendraient faux
 // au changement de mois — exactement le bug qu'ils sont censés attraper.
@@ -68,5 +68,42 @@ describe('factureArchivee', () => {
     // indéfiniment.
     expect(factureArchivee({ status: 'paid', paid_at: null, issue_date: '2026-05-04' }, LE_24_AOUT)).toBe(true)
     expect(factureArchivee({ status: 'paid', paid_at: null, issue_date: '2026-08-04' }, LE_24_AOUT)).toBe(false)
+  })
+})
+
+// L'archivage automatique ne sait ranger que ce qui finit par être payé. Une
+// annulée et un brouillon jamais envoyé ne le seront jamais, et restaient
+// donc dans la liste courante à vie — 15 sur 50 au 19 novembre 2026.
+describe('archivage manuel d’une facture', () => {
+  it('ce qui est rangé à la main l’est, quel que soit le statut', () => {
+    expect(factureArchivee({ status: 'cancelled', archived_at: '2026-11-19T10:00:00Z' }, LE_24_AOUT)).toBe(true)
+    expect(factureArchivee({ status: 'created', archived_at: '2026-11-19T10:00:00Z' }, LE_24_AOUT)).toBe(true)
+    // Même une facture encore due : si quelqu'un l'a rangée, elle est rangée.
+    // Le refus se fait à la POSE du geste (`peutArchiver`), pas à la lecture.
+    expect(factureArchivee({ status: 'sent', archived_at: '2026-11-19T10:00:00Z' }, LE_24_AOUT)).toBe(true)
+  })
+
+  it('sans rangement manuel, la règle automatique décide comme avant', () => {
+    expect(factureArchivee({ status: 'paid', paid_at: '2026-07-28', archived_at: null }, LE_24_AOUT)).toBe(true)
+    expect(factureArchivee({ status: 'cancelled', archived_at: null }, LE_24_AOUT)).toBe(false)
+  })
+
+  it('on range ce qui est clos, et le brouillon jamais parti', () => {
+    expect(peutArchiver({ status: 'cancelled' })).toBe(true)
+    expect(peutArchiver({ status: 'created' })).toBe(true)
+    expect(peutArchiver({ status: 'paid' })).toBe(true)
+  })
+
+  // Sortir une créance ouverte de la liste, c'est se retirer de sous les yeux
+  // la ligne qu'on doit relancer — pendant que « à encaisser » la compte
+  // toujours, puisque ce total porte sur TOUTES les factures.
+  it('on ne range pas ce qui est encore dû', () => {
+    expect(peutArchiver({ status: 'sent' })).toBe(false)
+    expect(peutArchiver({ status: 'pending' })).toBe(false)
+  })
+
+  it('ne propose pas d’archiver ce qui l’est déjà', () => {
+    expect(peutArchiver({ status: 'paid', archived_at: '2026-11-19T10:00:00Z' })).toBe(false)
+    expect(peutArchiver(null)).toBe(false)
   })
 })

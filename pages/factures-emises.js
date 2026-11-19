@@ -12,7 +12,7 @@ import { nomPdfDocument } from '../lib/pdfFilename'
 import { invoiceCopyBody } from '../lib/duplicateDoc'
 import { fmtCHF as fmtMontant } from '../lib/money'
 import { AL, C, FONT, MONO, R } from '../lib/theme'
-import { factureArchivee } from '../lib/autoArchive'
+import { factureArchivee, peutArchiver } from '../lib/autoArchive'
 import { effectiveStatus, correspondAuFiltre } from '../lib/customerStatus'
 import { grouperFacturesParClient } from '../lib/facturesGroupes'
 import PillsFiltre from '../components/PillsFiltre'
@@ -149,6 +149,16 @@ export default function FacturesEmises() {
     `/api/customer-invoices/${inv.id}/pdf?download=1&n=${encodeURIComponent(nomPdfDocument(inv.client_name, inv.invoice_number, { repli: inv.projects?.name }))}`
 
   // Duplique une facture : nouveau numéro, dates du jour, statut « créée ».
+  // Ranger une facture à la main, et l'en sortir.
+  //
+  // L'archivage automatique ne sait ranger que ce qui finit par être payé
+  // (cf. lib/autoArchive.js) ; une annulée ou un brouillon jamais envoyé
+  // restaient dans la liste courante à vie. `peutArchiver` refuse ce qui est
+  // encore dû — sortir une créance ouverte de la liste, c'est se retirer de
+  // sous les yeux la ligne qu'on doit relancer.
+  const rangerFacture = (inv, ranger) =>
+    patchInvoice(inv, { archived_at: ranger ? new Date().toISOString() : null })
+
   async function duplicate(inv) {
     if (!confirm(`Dupliquer la facture ${inv.invoice_number} ?\n\nUne nouvelle facture sera créée avec le même contenu, un nouveau numéro et la date du jour.`)) return
     try {
@@ -380,6 +390,12 @@ export default function FacturesEmises() {
                     {[
                       { label: 'envoyer',   title: 'Envoyer la facture par e-mail',                   act: () => openSend(inv) },
                       { label: 'dupliquer', title: 'Créer une nouvelle facture avec le même contenu', act: () => duplicate(inv) },
+                      // Rangée à la main : visible seulement là où ça a un sens.
+                      ...(inv.archived_at
+                        ? [{ label: 'désarchiver', title: 'Remettre dans la liste courante', act: () => rangerFacture(inv, false) }]
+                        : peutArchiver(inv)
+                          ? [{ label: 'archiver', title: 'Sortir de la liste courante — reste dans « archivées »', act: () => rangerFacture(inv, true) }]
+                          : []),
                     ].map(b => (
                       <button key={b.label} title={b.title} onClick={b.act} style={lienAction}
                         onMouseEnter={e => { e.currentTarget.style.color = AL.black }}

@@ -24,7 +24,11 @@ export default async function handler(req, res) {
                      'currency', 'issue_date',
                      'due_date', 'iban_recipient', 'notes', 'status', 'quote_snapshot',
                      'detail_level', 'sent_at', 'paid_at', 'object', 'reference',
-                     'discount_label', 'discount_rate', 'discount_amount']
+                     'discount_label', 'discount_rate', 'discount_amount',
+                     // Rangée à la main : null pour la remettre dans la liste
+                     // courante. L'archivage automatique de fin de mois, lui,
+                     // reste DÉRIVÉ et n'écrit rien (cf. lib/autoArchive.js).
+                     'archived_at']
     const payload = { updated_at: new Date().toISOString() }
     for (const k of allowed) if (k in req.body) payload[k] = req.body[k] === '' ? null : req.body[k]
     for (const k of ['amount', 'amount_net', 'vat_rate', 'vat_amount', 'discount_rate', 'discount_amount']) {

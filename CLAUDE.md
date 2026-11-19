@@ -1606,6 +1606,19 @@ pourra jamais solder.
 détail du chantier à côté d'un sous-total qui n'en est qu'une fraction donne un
 document qui se contredit ; le client a déjà le détail dans son offre.
 
+**Une facture se range à la main quand elle ne sera jamais payée.** L'archivage
+des factures était entièrement DÉRIVÉ (`lib/autoArchive.js`) : payée, et le
+mois du paiement révolu. La règle ne sait donc ranger que ce qui finit par être
+payé — une annulée ou un brouillon jamais envoyé restaient dans la liste
+courante à vie (15 sur 50 au 19 novembre 2026). `archived_at` prime sur la
+règle, comme `quote_data.archived` prime déjà pour une offre.
+
+`peutArchiver` refuse `sent` et `pending` : sortir une créance ouverte de la
+liste, c'est se retirer de sous les yeux la ligne qu'on doit relancer — et le
+total « à encaisser » la compterait toujours, puisqu'il porte sur TOUTES les
+factures, pas sur la liste visible. Le refus est à la POSE du geste ; à la
+lecture, ce qui est rangé est rangé.
+
 **Un seul format de PDF, pour l'offre comme pour la facture.** Ce qui apparaît
 se règle ligne par ligne (`hidden`), plus par un couple détaillé/résumé. La
 colonne `customer_invoices.detail_level` subsiste en base mais n'est plus lue.
@@ -1866,6 +1879,7 @@ sur l'ancien comportement si l'objet manque, l'inverse n'est pas vrai.
 | `schema-economat.sql` | tables `economat_categories`, `economat_fournisseurs`, `economat_articles`, `economat_commandes` + arbre, couleurs et fournisseurs de départ | en fin de fichier |
 | `schema-acomptes.sql` | `customer_invoices.type`, `acompte_base`, `acompte_valeur`, `acomptes_deduits` | en fin de fichier |
 | `schema-projet-statut.sql` | `projects.statut` (nouvelle fiche : production → terminé ; colonne SÉPARÉE de `phase`) | en fin de fichier |
+| `schema-facture-archive.sql` | `customer_invoices.archived_at` (archivage manuel d'une facture) | en fin de fichier |
 
 `schema-prospects.sql` (les trois tables de prospection) a été jouée le
 4 septembre 2026 et vérifiée par `check:db`.
